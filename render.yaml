@@ -1,0 +1,23 @@
+# Configuração do Render (plano grátis). No painel do Render: New > Blueprint > escolher este repositório.
+services:
+  - type: web
+    name: casa-luckham
+    runtime: node
+    plan: free
+    region: virginia
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/saude
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: ROOT_NOME
+        value: Evran Luckham
+      # As três abaixo o Render pede na hora de criar (ficam em segredo, fora do código).
+      - key: ROOT_SENHA
+        sync: false
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false

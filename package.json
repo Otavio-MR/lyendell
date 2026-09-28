@@ -1,0 +1,20 @@
+{
+  "name": "lyendell",
+  "version": "1.0.0",
+  "description": "Sistema de administração da cidade de Lyendell (Casa Luckham)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.18.0",
+    "dotenv": "^18.0.4",
+    "express": "^5.2.1",
+    "multer": "^2.4.0"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  }
+}

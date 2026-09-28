@@ -1,0 +1,104 @@
+require('dotenv').config({ quiet: true });
+
+const path = require('path');
+const express = require('express');
+const multer = require('multer');
+const { db, iniciarBanco } = require('./src/db');
+const { sessao, exigirLogin } = require('./src/auth');
+const { servirArquivo, TAMANHO_MAX_MB } = require('./src/uploads');
+const { erro } = require('./src/util');
+
+const app = express();
+const PORTA = Number(process.env.PORT) || 3000;
+
+app.disable('x-powered-by');
+// Na hospedagem o site fica atrás de proxies; isso faz o Express enxergar o IP real e o HTTPS.
+app.set('trust proxy', true);
+
+app.use((req, res, next) => {
+  res.set({
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'same-origin',
+    'Content-Security-Policy': [
+      "default-src 'self'",
+      "img-src 'self' data: blob:",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "font-src 'self' https://fonts.gstatic.com",
+      "script-src 'self'",
+      "connect-src 'self'",
+      "frame-ancestors 'none'",
+    ].join('; '),
+  });
+  next();
+});
+
+// Usado pelo serviço que visita o site de tempos em tempos para ele não "dormir".
+// Também toca no banco, para ele não ser considerado parado.
+app.get('/api/saude', async (req, res) => {
+  await db.get('SELECT 1 AS ok');
+  res.set('Cache-Control', 'no-store').json({ ok: true });
+});
+
+app.use(express.json({ limit: '1mb' }));
+
+// Pedidos que alteram dados só valem vindos do próprio site.
+app.use('/api', (req, res, next) => {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+  const origem = req.get('origin');
+  if (origem) {
+    let host = null;
+    try { host = new URL(origem).host; } catch { /* origem inválida */ }
+    const permitidos = [req.get('host'), req.get('x-forwarded-host')].filter(Boolean);
+    if (!permitidos.includes(host)) return next(erro(403, 'Origem não permitida.'));
+  }
+  next();
+});
+
+app.use(sessao);
+
+app.use('/api/auth', require('./src/rotas/auth'));
+app.use('/api/usuarios', require('./src/rotas/usuarios'));
+app.use('/api/cargos', require('./src/rotas/cargos'));
+app.use('/api/galeria', require('./src/rotas/galeria'));
+app.use('/api/anuncios', require('./src/rotas/anuncios'));
+app.use('/api/atividades', require('./src/rotas/atividades'));
+app.use('/api', require('./src/rotas/livros'));
+app.use('/api', require('./src/rotas/geral'));
+app.use('/api', (req, res, next) => next(erro(404, 'Rota não encontrada.')));
+
+// Imagens enviadas (guardadas no banco) só aparecem para quem está logado.
+app.get('/uploads/:nome', exigirLogin, servirArquivo);
+app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] }));
+
+app.use((err, req, res, next) => {
+  let status = err.status || err.statusCode || 500;
+  let mensagem = err.message;
+  if (err instanceof multer.MulterError) {
+    status = 400;
+    mensagem = err.code === 'LIMIT_FILE_SIZE' ? `A imagem é grande demais (máximo ${TAMANHO_MAX_MB} MB).` : 'Não foi possível receber o arquivo.';
+  } else if (err.type === 'entity.parse.failed') {
+    mensagem = 'Dados inválidos.';
+  } else if (err.type === 'entity.too.large') {
+    mensagem = 'Conteúdo grande demais.';
+  }
+  if (status >= 500) {
+    console.error(err);
+    mensagem = 'Algo deu errado no servidor. Tente de novo.';
+  }
+  if (req.path.startsWith('/api/')) res.status(status).json({ erro: mensagem });
+  else res.status(status).type('text').send(mensagem);
+});
+
+iniciarBanco()
+  .then(banco => {
+    app.listen(PORTA, () => {
+      console.log('\n  Casa Luckham · Sistema de Lyendell');
+      console.log(`  Banco: ${banco}`);
+      console.log(`  Rodando em http://localhost:${PORTA}\n`);
+    });
+  })
+  .catch(e => {
+    console.error('\n  Não foi possível abrir o banco de dados:', e.message, '\n');
+    process.exit(1);
+  });

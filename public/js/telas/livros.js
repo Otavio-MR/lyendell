@@ -1,0 +1,531 @@
+import {
+  estado, get, post, put, del, h, trocar, icone, pode, cabecalho, vazio, botao, botaoIcone, modal, modalForm, confirmar,
+  aviso, tentar, campo, interruptor, enviarImagem, dataHora, dataCurta, num, normalizar, ErroApi,
+} from '../core.js';
+import { livroDeRegistro, livroDeRegistros } from '../livro-mc.js';
+import { verPagamentos, resumoCobranca } from './pagamentos.js';
+
+// Tabelionato e Guarda do Coelho usam a mesma tela: livros com formulários configuráveis.
+const MODULOS = {
+  tabelionato: {
+    titulo: 'Tabelionato', icone: 'pergaminho',
+    sub: 'Os livros oficiais de Lyendell: moradores, nobreza, comércio, documentos, casamentos e propriedades.',
+    quemComanda: 'a Tabeliã',
+  },
+  guarda: {
+    titulo: 'Guarda do Coelho', icone: 'escudo',
+    sub: 'Prisioneiros, efetivo da guarda e procurados da capital.',
+    quemComanda: 'o Comandante da Guarda',
+  },
+};
+
+const ICONES_LIVRO = ['livro', 'casa', 'coroa', 'loja', 'documento', 'alianca', 'chave', 'escudo', 'grades', 'alvo',
+  'pergaminho', 'balanca', 'mapa', 'moeda', 'espada', 'pena', 'bandeira', 'bau'];
+
+const TIPOS = [
+  ['texto', 'Texto curto'], ['texto_longo', 'Texto longo'], ['numero', 'Número'], ['data', 'Data'],
+  ['selecao', 'Lista de opções'], ['sim_nao', 'Sim ou não'], ['imagem', 'Imagem'],
+];
+
+const idLocal = () => 'c' + Math.random().toString(36).slice(2, 10);
+const numero = id => String(id).padStart(4, '0');
+
+function tituloDe(l, dados) {
+  const c = l.campos.find(x => (x.tipo === 'texto' || x.tipo === 'selecao') && dados[x.id]);
+  return c ? String(dados[c.id]) : 'Registro sem título';
+}
+
+function valorCurto(c, v) {
+  if (v == null || v === '') return '';
+  switch (c.tipo) {
+    case 'data': return dataCurta(v);
+    case 'sim_nao': return v ? 'Sim' : 'Não';
+    case 'numero': return num(v);
+    case 'selecao': return h('span', { class: 'etiqueta' }, v);
+    case 'imagem': return h('img', { class: 'miniatura', src: v, alt: '', loading: 'lazy' });
+    case 'texto_longo': return v.length > 80 ? `${v.slice(0, 80)}…` : v;
+    default: return String(v);
+  }
+}
+
+function valorCompleto(c, v) {
+  switch (c.tipo) {
+    case 'imagem': return h('a', { href: v, target: '_blank', rel: 'noopener' }, h('img', { class: 'doc-imagem', src: v, alt: c.nome }));
+    case 'texto_longo': return h('div', { class: 'texto-livre' }, v);
+    case 'selecao': return String(v);
+    default: return valorCurto(c, v);
+  }
+}
+
+/* ─── Lista de livros de um módulo ────────────────── */
+
+export async function modulo(m) {
+  const info = MODULOS[m];
+  const raiz = h('div', { class: 'pagina' });
+
+  async function desenhar() {
+    const { livros } = await get(`/api/modulos/${m}/livros`);
+    const configurar = pode(`${m}.configurar`);
+    trocar(raiz, 
+      cabecalho({
+        titulo: info.titulo, sub: info.sub, icone: info.icone,
+        acoes: [configurar && botao('Novo livro', {
+          icone: 'mais', classe: 'btn-ouro',
+          onclick: () => configurarLivro(m, null, id => { location.hash = `#/${m}/${id}`; }),
+        })],
+      }),
+      livros.length
+        ? h('div', { class: 'grade-livros' }, livros.map(l => cartaoLivro(m, l)))
+        : vazio('Nenhum livro ainda', configurar ? 'Crie o primeiro livro de registros.' : 'Quando houver livros, eles aparecem aqui.'));
+  }
+
+  await desenhar();
+  return raiz;
+}
+
+function cartaoLivro(m, l) {
+  return h('a', { class: 'livro-card', href: `#/${m}/${l.id}` },
+    h('span', { class: 'livro-icone' }, icone(l.icone)),
+    h('div', { class: 'livro-info' }, h('h3', null, l.nome), l.descricao && h('p', null, l.descricao)),
+    h('div', { class: 'livro-rodape' },
+      h('span', null, h('strong', null, num(l.total)), l.total === 1 ? ' registro' : ' registros'),
+      l.atrasados > 0 && h('span', { class: 'etiqueta pg-atrasado', title: 'Registros com pagamento atrasado' }, icone('alerta'), `${l.atrasados} com pagamento atrasado`),
+      !l.aberto && h('span', { class: 'etiqueta', title: 'Só quem comanda o módulo registra aqui' }, icone('cadeado'), 'Restrito')));
+}
+
+/* ─── Um livro: registros ─────────────────────────── */
+
+export async function livro(m, id) {
+  const info = MODULOS[m];
+  const raiz = h('div', { class: 'pagina' });
+  const filtros = {};
+  let busca = '';
+  let filtroPagamento = '';
+  let d;
+
+  async function carregar() {
+    d = await get(`/api/livros/${id}/registros`);
+    if (d.livro.modulo !== m) throw new ErroApi('Livro não encontrado.', 404);
+    desenhar();
+  }
+
+  // Depois de registrar ou editar, abre o documento (de onde dá para baixar o .book).
+  async function abrirDepois(idRegistro) {
+    await carregar();
+    const reg = d.registros.find(x => x.id === idRegistro);
+    if (reg) verRegistro(m, d, reg, carregar, abrirDepois);
+  }
+
+  const PAGAMENTOS = {
+    atrasado: c => c && c.atrasados > 0,
+    emdia: c => c && !c.semInicio && !c.atrasados && !c.encerrada,
+  };
+
+  function desenhar() {
+    const l = d.livro;
+    const campos = l.campos.filter(c => c.tipo !== 'secao');
+    let colunas = campos.filter(c => c.destaque);
+    if (!colunas.length) colunas = campos.slice(0, 4);
+    const selecoes = campos.filter(c => c.tipo === 'selecao').slice(0, 3);
+
+    const contador = h('span', { class: 'contador' });
+    const lista = h('div', { class: 'tabela-wrap' });
+    const ver = r => verRegistro(m, d, r, carregar, abrirDepois);
+    let visiveis = d.registros;
+
+    const tabela = regs => h('table', { class: 'tabela tabela-clicavel' },
+      h('thead', null, h('tr', null,
+        h('th', { class: 'col-num' }, 'Nº'),
+        colunas.map(c => h('th', null, c.nome)),
+        l.cobranca && h('th', null, 'Pagamentos'),
+        h('th', null, 'Registrado em'))),
+      h('tbody', null, regs.map(r => h('tr', {
+        tabindex: '0',
+        onclick: () => ver(r),
+        onkeydown: e => { if (e.key === 'Enter' && e.target === e.currentTarget) ver(r); },
+      },
+      h('td', { class: 'col-num' }, numero(r.id)),
+      colunas.map(c => h('td', { 'data-rotulo': c.nome }, valorCurto(c, r.dados[c.id]))),
+      l.cobranca && h('td', { 'data-rotulo': 'Pagamentos' },
+        h('button', {
+          class: 'celula-botao', type: 'button', title: 'Ver a tabela de pagamentos',
+          onclick: e => { e.stopPropagation(); verPagamentos(r.id, carregar); },
+        }, resumoCobranca(r.cobranca))),
+      h('td', { class: 'suave', 'data-rotulo': 'Registrado em' }, dataCurta(r.criado_em))))));
+
+    function filtrar() {
+      const q = normalizar(busca.trim());
+      visiveis = d.registros.filter(r =>
+        (!q || normalizar(Object.values(r.dados).join(' ')).includes(q))
+        && selecoes.every(c => !filtros[c.id] || r.dados[c.id] === filtros[c.id])
+        && (!filtroPagamento || PAGAMENTOS[filtroPagamento](r.cobranca)));
+      const total = d.registros.length;
+      contador.textContent = visiveis.length === total
+        ? `${num(total)} ${total === 1 ? 'registro' : 'registros'}`
+        : `${num(visiveis.length)} de ${num(total)}`;
+      trocar(lista, visiveis.length
+        ? tabela(visiveis)
+        : h('p', { class: 'tabela-vazia' }, total ? 'Nada encontrado com esses filtros.' : 'Nenhum registro neste livro ainda.'));
+    }
+
+    trocar(raiz, 
+      cabecalho({
+        titulo: l.nome, sub: l.descricao, icone: l.icone,
+        voltar: { href: `#/${m}`, texto: info.titulo },
+        acoes: [
+          d.permissoes.configurar && botao('Configurar livro', {
+            icone: 'ajustes',
+            onclick: () => configurarLivro(m, { ...l, total: d.registros.length }, () => carregar(), () => { location.hash = `#/${m}`; }),
+          }),
+          l.podeRegistrar && botao('Novo registro', { icone: 'mais', classe: 'btn-ouro', onclick: () => formRegistro(l, null, abrirDepois) }),
+        ],
+      }),
+      !l.aberto && !l.podeRegistrar && pode(`${m}.registrar`)
+        ? h('p', { class: 'nota' }, icone('cadeado'), `Livro restrito: só ${info.quemComanda} registra aqui.`)
+        : null,
+      h('div', { class: 'ferramentas' },
+        h('label', { class: 'busca' }, icone('busca'),
+          h('input', { class: 'input', type: 'search', placeholder: 'Buscar em todos os campos', value: busca, oninput: e => { busca = e.target.value; filtrar(); } })),
+        selecoes.map(c => h('select', {
+          class: 'input filtro', 'aria-label': `Filtrar por ${c.nome}`,
+          onchange: e => { filtros[c.id] = e.target.value; filtrar(); },
+        },
+        h('option', { value: '' }, `${c.nome}: todos`),
+        c.opcoes.map(o => h('option', { value: o, selected: filtros[c.id] === o }, o)))),
+        l.cobranca && h('select', {
+          class: 'input filtro', 'aria-label': 'Filtrar por pagamentos',
+          onchange: e => { filtroPagamento = e.target.value; filtrar(); },
+        },
+        h('option', { value: '' }, 'Pagamentos: todos'),
+        h('option', { value: 'atrasado', selected: filtroPagamento === 'atrasado' }, 'Com atraso'),
+        h('option', { value: 'emdia', selected: filtroPagamento === 'emdia' }, 'Em dia')),
+        contador,
+        botao('Baixar .book', {
+          icone: 'baixar', classe: 'btn-pequeno',
+          titulo: 'Baixa os registros mostrados como um livro para o mod Scribble',
+          onclick: () => {
+            if (!visiveis.length) return aviso('Não há registros para colocar no livro.', 'erro');
+            livroDeRegistros(info.titulo, l, visiveis, estado.eu.nome).baixar();
+          },
+        })),
+      lista);
+    filtrar();
+  }
+
+  await carregar();
+  return raiz;
+}
+
+/* ─── Ver registro (como documento oficial) ───────── */
+
+function verRegistro(m, d, r, recarregar, reabrir) {
+  const l = d.livro;
+  const titulo = tituloDe(l, r.dados);
+  const linhas = [];
+  let secaoPendente = null;
+  for (const c of l.campos) {
+    if (c.tipo === 'secao') { secaoPendente = c; continue; }
+    const v = r.dados[c.id];
+    if (v == null || v === '') continue;
+    if (secaoPendente) { linhas.push(h('h3', { class: 'doc-secao' }, secaoPendente.nome)); secaoPendente = null; }
+    const largo = c.tipo === 'texto_longo' || c.tipo === 'imagem';
+    linhas.push(h('div', { class: `doc-linha ${largo ? 'larga' : ''}`.trim() },
+      h('span', { class: 'doc-rotulo' }, c.nome),
+      h('div', { class: 'doc-valor' }, valorCompleto(c, v))));
+  }
+
+  const doc = h('article', { class: 'documento' },
+    h('header', { class: 'doc-cab' },
+      h('img', { src: '/img/brasao.png', alt: '', class: 'doc-brasao' }),
+      h('p', { class: 'doc-sobre' }, `${MODULOS[m].titulo} de Lyendell`),
+      h('h2', { class: 'doc-titulo' }, titulo),
+      h('p', { class: 'doc-livro' }, `${l.nome} · Registro nº ${numero(r.id)}`)),
+    h('div', { class: 'doc-campos' }, linhas.length ? linhas : h('p', { class: 'suave' }, 'Registro sem informações.')),
+    h('footer', { class: 'doc-assinatura' },
+      h('p', null, `Registrado por ${r.criado_por_nome || 'desconhecido'} em ${dataHora(r.criado_em)}.`),
+      r.atualizado_em && h('p', null, `Alterado por ${r.atualizado_por_nome} em ${dataHora(r.atualizado_em)}.`)));
+
+  const janela = modal({
+    corpo: doc, tamanho: 'medio', classe: 'modal-documento',
+    rodape: [
+      d.permissoes.apagar && botao('Apagar', {
+        icone: 'lixo', classe: 'btn-perigo-texto',
+        onclick: async () => {
+          if (!await confirmar(`O registro "${titulo}" será apagado para sempre.`, { ok: 'Apagar', perigo: true })) return;
+          if (await tentar(() => del(`/api/registros/${r.id}`), 'Registro apagado.')) { janela.fechar(); recarregar(); }
+        },
+      }),
+      h('span', { class: 'espaco' }),
+      l.cobranca && botao('Pagamentos', { icone: 'moeda', onclick: () => verPagamentos(r.id, recarregar) }),
+      botao('Baixar .book', {
+        icone: 'baixar', titulo: 'Baixa este registro como livro para o mod Scribble',
+        onclick: () => livroDeRegistro(MODULOS[m].titulo, l, r, estado.eu.nome).baixar(),
+      }),
+      d.permissoes.editar && botao('Editar', { icone: 'editar', onclick: () => { janela.fechar(); formRegistro(l, r, reabrir || recarregar); } }),
+      botao('Fechar', { onclick: () => janela.fechar() }),
+    ],
+  });
+}
+
+/* ─── Formulário de registro ──────────────────────── */
+
+function formRegistro(l, r, aoSalvar) {
+  const valores = { ...(r?.dados || {}) };
+  const envio = { n: 0 };
+  modalForm({
+    titulo: r ? `Editar registro · ${l.nome}` : `Novo registro · ${l.nome}`,
+    tamanho: 'medio',
+    textoOk: r ? 'Salvar alterações' : 'Registrar',
+    conteudo: h('div', { class: 'form-grade' }, l.campos.map(c => entradaDoCampo(c, valores, envio))),
+    aoEnviar: async () => {
+      if (envio.n) throw new Error('Espere a imagem terminar de enviar.');
+      const faltando = l.campos.find(c => c.obrigatorio && (valores[c.id] == null || String(valores[c.id]).trim() === ''));
+      if (faltando) throw new Error(`Preencha o campo "${faltando.nome}".`);
+      let idSalvo = r?.id;
+      if (r) await put(`/api/registros/${r.id}`, { dados: valores });
+      else idSalvo = (await post(`/api/livros/${l.id}/registros`, { dados: valores })).id;
+      aviso(r ? 'Registro atualizado.' : 'Registro feito.');
+      aoSalvar(idSalvo);
+    },
+  });
+}
+
+function entradaDoCampo(c, valores, envio) {
+  if (c.tipo === 'secao') return h('h3', { class: 'form-secao' }, c.nome);
+  const v = valores[c.id];
+  const definir = x => { valores[c.id] = x; };
+  const opcoes = { ajuda: c.ajuda, obrigatorio: c.obrigatorio };
+
+  switch (c.tipo) {
+    case 'texto_longo':
+      return campo(c.nome, h('textarea', { class: 'input', rows: '4', maxlength: '10000', oninput: e => definir(e.target.value) }, v ?? ''), { ...opcoes, classe: 'largo' });
+    case 'numero':
+      return campo(c.nome, h('input', { class: 'input', type: 'number', step: 'any', value: v ?? '', oninput: e => definir(e.target.value) }), opcoes);
+    case 'data':
+      return campo(c.nome, h('input', { class: 'input', type: 'date', value: v ?? '', oninput: e => definir(e.target.value) }), opcoes);
+    case 'selecao': {
+      const lista = [...c.opcoes];
+      if (v && !lista.includes(v)) lista.push(v);
+      return campo(c.nome, h('select', { class: 'input', onchange: e => definir(e.target.value) },
+        h('option', { value: '' }, 'Escolha uma opção'),
+        lista.map(o => h('option', { value: o, selected: o === v }, o))), opcoes);
+    }
+    case 'sim_nao':
+      return h('div', { class: 'campo' }, interruptor(c.nome, !!v, definir, c.ajuda));
+    case 'imagem':
+      return h('div', { class: 'campo largo' },
+        h('span', { class: 'campo-rotulo' }, c.nome, c.obrigatorio && h('b', { class: 'obrig' }, ' *')),
+        entradaImagem(v, definir, envio),
+        c.ajuda && h('small', { class: 'campo-ajuda' }, c.ajuda));
+    default:
+      return campo(c.nome, h('input', { class: 'input', type: 'text', maxlength: '300', value: v ?? '', oninput: e => definir(e.target.value) }), opcoes);
+  }
+}
+
+export function entradaImagem(inicial, definir, envio) {
+  const arquivo = h('input', { type: 'file', accept: 'image/png,image/jpeg,image/gif,image/webp', hidden: true });
+  const caixa = h('div', { class: 'img-entrada' });
+  let atual = inicial || '';
+
+  function desenhar(previa, enviando) {
+    const url = previa ?? atual;
+    trocar(caixa, 
+      url ? h('img', { src: url, alt: '', class: 'img-previa' }) : h('div', { class: 'img-vazia' }, icone('imagem')),
+      h('div', { class: 'img-acoes' },
+        botao(enviando ? 'Enviando…' : url ? 'Trocar imagem' : 'Escolher imagem', { icone: 'enviar', desativado: enviando, onclick: () => arquivo.click() }),
+        url && !enviando && botao('Remover', { classe: 'btn-fantasma', onclick: () => { atual = ''; definir(''); desenhar(); } }),
+        h('small', { class: 'campo-ajuda' }, 'PNG, JPG, GIF ou WEBP. Fotos grandes são reduzidas automaticamente.')),
+      arquivo);
+  }
+
+  arquivo.addEventListener('change', async () => {
+    const f = arquivo.files[0];
+    if (!f) return;
+    envio.n++;
+    const previa = URL.createObjectURL(f);
+    desenhar(previa, true);
+    try {
+      atual = await enviarImagem(f);
+      definir(atual);
+    } catch (e) {
+      aviso(e.message, 'erro');
+    } finally {
+      envio.n--;
+      arquivo.value = '';
+      URL.revokeObjectURL(previa);
+      desenhar();
+    }
+  });
+
+  desenhar();
+  return caixa;
+}
+
+/* ─── Configurar livro (formulário, seções, opções) ─ */
+
+function marcador(texto, ligado, aoMudar) {
+  return h('label', { class: 'marcador' },
+    h('input', { type: 'checkbox', checked: !!ligado, onchange: e => aoMudar(e.target.checked) }),
+    h('span', null, texto));
+}
+
+function editorOpcoes(c) {
+  const chips = h('div', { class: 'opcoes-chips' });
+  const entrada = h('input', { class: 'input input-pequeno', placeholder: 'Nova opção', maxlength: '60' });
+  const desenhar = () => trocar(chips, ...(c.opcoes.length
+    ? c.opcoes.map((o, i) => h('span', { class: 'opcao-chip' }, o,
+      h('button', { type: 'button', 'aria-label': `Remover ${o}`, onclick: () => { c.opcoes.splice(i, 1); desenhar(); } }, icone('x'))))
+    : [h('span', { class: 'suave' }, 'Nenhuma opção ainda.')]));
+  const adicionar = () => {
+    const v = entrada.value.trim();
+    if (v && !c.opcoes.includes(v)) { c.opcoes.push(v); desenhar(); }
+    entrada.value = '';
+    entrada.focus();
+  };
+  entrada.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); adicionar(); } });
+  desenhar();
+  return h('div', { class: 'opcoes-editor' },
+    h('span', { class: 'campo-rotulo' }, 'Opções da lista'),
+    chips,
+    h('div', { class: 'opcoes-add' }, entrada, botao('Adicionar', { icone: 'mais', onclick: adicionar })));
+}
+
+function configurarLivro(m, l, aoSalvar, aoApagar) {
+  const s = l
+    ? { nome: l.nome, descricao: l.descricao, icone: l.icone, aberto: l.aberto, campos: structuredClone(l.campos) }
+    : { nome: '', descricao: '', icone: 'livro', aberto: true, campos: [{ id: idLocal(), nome: 'Nome', tipo: 'texto', obrigatorio: true, destaque: true }] };
+  s.campos.forEach(c => { if (c.tipo === 'selecao' && !c.opcoes) c.opcoes = []; });
+  if (m === 'tabelionato') s.cobranca = l?.cobranca ? { ...l.cobranca } : { ativo: false, campo: '', intervalo: 14 };
+
+  const listaCampos = h('div', { class: 'campos-cfg' });
+  const grade = h('div', { class: 'icones-grade', role: 'group', 'aria-label': 'Ícone do livro' });
+  const caixaCobranca = h('div', { class: 'cfg-cobranca' });
+
+  // Pagamentos periódicos (só no Tabelionato): cada registro ganha uma tabela de pagamentos.
+  function desenharCobranca() {
+    if (m !== 'tabelionato') return;
+    const datas = s.campos.filter(c => c.tipo === 'data');
+    if (!datas.some(c => c.id === s.cobranca.campo)) s.cobranca.campo = datas[0]?.id || '';
+    trocar(caixaCobranca,
+      h('div', { class: 'cfg-cab' },
+        h('h3', null, 'Pagamentos periódicos'),
+        h('p', { class: 'suave' }, 'Cada registro deste livro ganha uma tabela de pagamentos, como a dos comerciantes. Só quem tem a permissão de pagamentos (a Tabeliã) marca como pago.')),
+      interruptor('Cobrar pagamentos periódicos', s.cobranca.ativo, v => { s.cobranca.ativo = v; desenharCobranca(); }),
+      s.cobranca.ativo && (datas.length
+        ? h('div', { class: 'form-grade' },
+          campo('Contar a partir do campo', h('select', { class: 'input', onchange: e => { s.cobranca.campo = e.target.value; } },
+            datas.map(c => h('option', { value: c.id, selected: c.id === s.cobranca.campo }, c.nome || '(campo sem nome)')))),
+          campo('A cada quantos dias', h('input', {
+            class: 'input', type: 'number', min: '1', max: '365', step: '1', value: String(s.cobranca.intervalo),
+            oninput: e => { s.cobranca.intervalo = Number(e.target.value); },
+          }), { ajuda: 'O primeiro pagamento vence esse número de dias depois da data escolhida.' }))
+        : h('p', { class: 'nota' }, icone('alerta'), 'Adicione ao formulário um campo do tipo Data (ex.: Data de abertura) para os pagamentos terem de onde começar a contar.')));
+  }
+
+  function desenharIcones() {
+    trocar(grade, ...ICONES_LIVRO.map(n => h('button', {
+      type: 'button', class: `icone-opcao ${s.icone === n ? 'ativo' : ''}`.trim(),
+      'aria-pressed': String(s.icone === n), 'aria-label': n,
+      onclick: () => { s.icone = n; desenharIcones(); },
+    }, icone(n))));
+  }
+
+  function desenharCampos() {
+    trocar(listaCampos, ...s.campos.map((c, i) => linhaCampo(c, i)));
+    desenharCobranca();
+  }
+
+  function linhaCampo(c, i) {
+    const mover = passo => {
+      const j = i + passo;
+      if (j < 0 || j >= s.campos.length) return;
+      [s.campos[i], s.campos[j]] = [s.campos[j], s.campos[i]];
+      desenharCampos();
+    };
+    const controles = h('div', { class: 'cfg-controles' },
+      botaoIcone('cima', 'Subir', () => mover(-1)),
+      botaoIcone('baixo', 'Descer', () => mover(1)),
+      botaoIcone('lixo', c.tipo === 'secao' ? 'Remover seção' : 'Remover campo', () => { s.campos.splice(i, 1); desenharCampos(); }, 'perigo'));
+
+    if (c.tipo === 'secao') {
+      return h('div', { class: 'campo-cfg secao' },
+        h('div', { class: 'campo-cfg-linha' },
+          h('span', { class: 'tag-secao' }, icone('secao'), 'Seção'),
+          h('input', { class: 'input', value: c.nome, placeholder: 'Título da seção', maxlength: '60', oninput: e => { c.nome = e.target.value; } }),
+          controles));
+    }
+
+    return h('div', { class: 'campo-cfg' },
+      h('div', { class: 'campo-cfg-linha' },
+        h('input', { class: 'input', value: c.nome, placeholder: 'Nome do campo', maxlength: '60', 'aria-label': 'Nome do campo', oninput: e => { c.nome = e.target.value; } }),
+        h('select', {
+          class: 'input cfg-tipo', 'aria-label': 'Tipo do campo',
+          onchange: e => { c.tipo = e.target.value; if (c.tipo === 'selecao' && !c.opcoes) c.opcoes = []; desenharCampos(); },
+        }, TIPOS.map(([v, n]) => h('option', { value: v, selected: c.tipo === v }, n))),
+        controles),
+      h('div', { class: 'campo-cfg-extras' },
+        marcador('Obrigatório', c.obrigatorio, v => { c.obrigatorio = v; }),
+        marcador('Aparece na lista', c.destaque, v => { c.destaque = v; }),
+        h('input', { class: 'input input-pequeno', value: c.ajuda || '', maxlength: '140', placeholder: 'Dica para quem preenche (opcional)', oninput: e => { c.ajuda = e.target.value; } })),
+      c.tipo === 'selecao' && editorOpcoes(c));
+  }
+
+  const adicionar = tipo => {
+    s.campos.push(tipo === 'secao' ? { id: idLocal(), nome: '', tipo: 'secao' } : { id: idLocal(), nome: '', tipo: 'texto' });
+    desenharCampos();
+    listaCampos.lastElementChild?.querySelector('input')?.focus();
+  };
+
+  desenharIcones();
+  desenharCampos();
+
+  const janela = modalForm({
+    titulo: l ? `Configurar · ${l.nome}` : `Novo livro · ${MODULOS[m].titulo}`,
+    tamanho: 'grande',
+    textoOk: l ? 'Salvar livro' : 'Criar livro',
+    conteudo: [
+      h('div', { class: 'form-grade' },
+        campo('Nome do livro', h('input', { class: 'input', value: s.nome, maxlength: '60', placeholder: 'Ex.: Registro de Nascimentos', oninput: e => { s.nome = e.target.value; } }), { obrigatorio: true }),
+        campo('Descrição', h('input', { class: 'input', value: s.descricao, maxlength: '240', placeholder: 'Para que serve este livro', oninput: e => { s.descricao = e.target.value; } }))),
+      h('div', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Ícone'), grade),
+      interruptor('Registro aberto', s.aberto, v => { s.aberto = v; },
+        `Ligado: quem tem permissão de registrar no módulo pode registrar aqui. Desligado: só ${MODULOS[m].quemComanda} e a Família Nobre.`),
+      h('div', { class: 'cfg-cab' },
+        h('h3', null, 'Formulário de registro'),
+        h('p', { class: 'suave' }, 'Os campos que aparecem ao fazer um registro. Use seções para dividir o formulário em partes. Se remover um campo, o que já foi preenchido nele deixa de aparecer.')),
+      listaCampos,
+      h('div', { class: 'cfg-adicionar' },
+        botao('Adicionar campo', { icone: 'mais', onclick: () => adicionar('campo') }),
+        botao('Adicionar seção', { icone: 'secao', onclick: () => adicionar('secao') })),
+      m === 'tabelionato' && caixaCobranca,
+    ],
+    extraRodape: l && botao('Apagar livro', {
+      icone: 'lixo', classe: 'btn-perigo-texto',
+      onclick: async () => {
+        const qtd = l.total ? ` e ${l.total === 1 ? 'o registro dele' : `os ${l.total} registros dele`}` : '';
+        if (!await confirmar(`O livro "${l.nome}"${qtd} será apagado para sempre.`, { ok: 'Apagar livro', perigo: true })) return;
+        if (await tentar(() => del(`/api/livros/${l.id}`), 'Livro apagado.')) { janela.fechar(); aoApagar?.(); }
+      },
+    }),
+    aoEnviar: async () => {
+      if (!s.nome.trim()) throw new Error('Dê um nome ao livro.');
+      const semNome = s.campos.find(c => !c.nome.trim());
+      if (semNome) throw new Error(semNome.tipo === 'secao' ? 'Toda seção precisa de um título.' : 'Todo campo precisa de um nome.');
+      const semOpcoes = s.campos.find(c => c.tipo === 'selecao' && !c.opcoes.length);
+      if (semOpcoes) throw new Error(`O campo "${semOpcoes.nome}" precisa de pelo menos uma opção.`);
+      if (s.cobranca?.ativo) {
+        if (!s.cobranca.campo) throw new Error('Os pagamentos precisam de um campo de data para começar a contar.');
+        if (!(s.cobranca.intervalo >= 1 && s.cobranca.intervalo <= 365)) throw new Error('O intervalo dos pagamentos precisa ser de 1 a 365 dias.');
+      }
+      if (l) {
+        await put(`/api/livros/${l.id}`, s);
+        aviso('Livro atualizado.');
+        aoSalvar?.(l.id);
+      } else {
+        const { id } = await post(`/api/modulos/${m}/livros`, s);
+        aviso('Livro criado.');
+        aoSalvar?.(id);
+      }
+    },
+  });
+}

@@ -1,0 +1,422 @@
+// Base compartilhada por todas as telas: estado, API, criação de elementos, modais e formatação.
+
+export const estado = { eu: null };
+export const pode = p => !!estado.eu && estado.eu.permissoes.includes(p);
+export const podeAlgum = (...ps) => ps.some(pode);
+
+/* ─── API ─────────────────────────────────────────── */
+
+export class ErroApi extends Error {
+  constructor(mensagem, status) { super(mensagem); this.status = status; }
+}
+
+export async function api(metodo, url, corpo) {
+  const opcoes = { method: metodo, headers: {}, credentials: 'same-origin' };
+  if (corpo instanceof FormData) opcoes.body = corpo;
+  else if (corpo !== undefined) {
+    opcoes.headers['Content-Type'] = 'application/json';
+    opcoes.body = JSON.stringify(corpo);
+  }
+  let resp;
+  try { resp = await fetch(url, opcoes); } catch { throw new ErroApi('Sem conexão com o servidor.', 0); }
+  const json = (resp.headers.get('content-type') || '').includes('application/json') ? await resp.json() : null;
+  if (!resp.ok) {
+    if (resp.status === 401 && estado.eu && !url.includes('/auth/')) {
+      estado.eu = null;
+      window.dispatchEvent(new Event('sessao-expirada'));
+    }
+    throw new ErroApi(json?.erro || 'Algo deu errado.', resp.status);
+  }
+  return json;
+}
+export const get = url => api('GET', url);
+export const post = (url, corpo = {}) => api('POST', url, corpo);
+export const put = (url, corpo = {}) => api('PUT', url, corpo);
+export const patch = (url, corpo = {}) => api('PATCH', url, corpo);
+export const del = url => api('DELETE', url);
+
+// Diminui a imagem antes de enviar (lado maior até 1920px, formato WEBP).
+// Uma captura de tela do Minecraft cai de vários MB para uns 300 KB. GIF fica como está, por causa da animação.
+export async function reduzirImagem(arquivo, { maxLado = 1920, qualidade = 0.85 } = {}) {
+  if (!/^image\/(png|jpeg|webp)$/.test(arquivo.type)) return arquivo;
+  let imagem;
+  try { imagem = await createImageBitmap(arquivo); } catch { return arquivo; }
+  const escala = Math.min(1, maxLado / Math.max(imagem.width, imagem.height));
+  const largura = Math.max(1, Math.round(imagem.width * escala));
+  const altura = Math.max(1, Math.round(imagem.height * escala));
+  const tela = document.createElement('canvas');
+  tela.width = largura;
+  tela.height = altura;
+  tela.getContext('2d').drawImage(imagem, 0, 0, largura, altura);
+  imagem.close?.();
+  const gerar = tipo => new Promise(ok => tela.toBlob(ok, tipo, qualidade));
+  let blob = await gerar('image/webp');
+  // Navegador que não gera WEBP: se a original era JPG, gera JPG; senão manda a original.
+  if (blob?.type !== 'image/webp') blob = arquivo.type === 'image/jpeg' ? await gerar('image/jpeg') : null;
+  if (!blob || blob.size >= arquivo.size) return arquivo;
+  const extensao = blob.type === 'image/webp' ? 'webp' : 'jpg';
+  return new File([blob], `${arquivo.name.replace(/\.\w+$/, '')}.${extensao}`, { type: blob.type });
+}
+
+export async function enviarImagem(arquivo) {
+  const fd = new FormData();
+  fd.append('arquivo', await reduzirImagem(arquivo));
+  return (await api('POST', '/api/upload', fd)).url;
+}
+
+/* ─── Elementos ───────────────────────────────────── */
+
+// h('div', { class: 'x', onclick: fn }, 'texto', filho, [lista]). Texto sempre entra como texto, nunca como HTML.
+export function h(tag, attrs, ...filhos) {
+  if (attrs != null && (typeof attrs !== 'object' || attrs instanceof Node || Array.isArray(attrs))) {
+    filhos.unshift(attrs);
+    attrs = null;
+  }
+  const el = document.createElement(tag);
+  if (attrs) {
+    for (const [k, v] of Object.entries(attrs)) {
+      if (v == null || v === false) continue;
+      if (k === 'class') el.className = v;
+      else if (k === 'style' && typeof v === 'object') {
+        for (const [p, x] of Object.entries(v)) {
+          if (p.startsWith('--')) el.style.setProperty(p, x);
+          else el.style[p] = x;
+        }
+      }
+      else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2).toLowerCase(), v);
+      else if (k === 'value') el.value = v;
+      else if (k === 'checked' || k === 'selected' || k === 'disabled' || k === 'hidden') el[k] = !!v;
+      else el.setAttribute(k, v === true ? '' : v);
+    }
+  }
+  anexar(el, filhos);
+  return el;
+}
+
+// Troca o conteúdo de um elemento ignorando null/false (o replaceChildren nativo escreveria "null").
+export function trocar(el, ...filhos) {
+  el.replaceChildren();
+  return anexar(el, filhos);
+}
+
+export function anexar(el, filhos) {
+  for (const f of [filhos].flat(Infinity)) {
+    if (f == null || f === false || f === '') continue;
+    el.append(f instanceof Node ? f : document.createTextNode(String(f)));
+  }
+  return el;
+}
+
+const ICONES = {
+  casa: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/>',
+  megafone: '<path d="M3 10v4a1 1 0 0 0 1 1h2l7 4V5L6 9H4a1 1 0 0 0-1 1z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path d="M19.5 5.5a9 9 0 0 1 0 13"/>',
+  tarefas: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="m8.5 10 1.5 1.5 3-3"/><path d="M14.5 11H16"/><path d="m8.5 16 1.5 1.5 3-3"/><path d="M14.5 17H16"/>',
+  imagem: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/>',
+  pergaminho: '<path d="M7 4h11a2 2 0 0 1 2 2v1h-3"/><path d="M7 4a2 2 0 0 0-2 2v12a2 2 0 0 1-2 2h11a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2"/><path d="M9 9h5M9 13h5"/>',
+  escudo: '<path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.3 7.5 9.5 4.3-1.2 7.5-4.9 7.5-9.5V6z"/>',
+  usuarios: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8"/><path d="M18.5 14.4c1.8.8 3 2.8 3 5.6"/>',
+  usuario: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/>',
+  chave: '<circle cx="8" cy="15" r="4.5"/><path d="m11.2 11.8 8.8-8.8"/><path d="m16 7 3 3"/><path d="m18.5 4.5 2 2"/>',
+  livro: '<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5"/>',
+  sair: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
+  mais: '<path d="M12 5v14M5 12h14"/>',
+  editar: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
+  lixo: '<path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="m6 7 1 13h10l1-13"/><path d="M9 7V4h6v3"/>',
+  busca: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  ajustes: '<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>',
+  x: '<path d="M6 6l12 12M18 6 6 18"/>',
+  check: '<path d="m5 12.5 4.5 4.5L19 7"/>',
+  alfinete: '<path d="M12 16v5"/><path d="M8 3h8l-1.5 6 3.5 4v1H6v-1l3.5-4z"/>',
+  voltar: '<path d="m15 5-7 7 7 7"/>',
+  frente: '<path d="m9 5 7 7-7 7"/>',
+  cima: '<path d="m6 15 6-6 6 6"/>',
+  baixo: '<path d="m6 9 6 6 6-6"/>',
+  menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+  cadeado: '<rect x="4.5" y="10.5" width="15" height="10.5" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/>',
+  coroa: '<path d="m3 8 4.5 4L12 5l4.5 7L21 8l-2 11H5z"/><path d="M5 19h14"/>',
+  loja: '<path d="M4 9.5 5.5 4h13L20 9.5"/><path d="M4 9.5a2.7 2.7 0 0 0 5.3 0 2.7 2.7 0 0 0 5.4 0 2.7 2.7 0 0 0 5.3 0"/><path d="M5.5 12v9h13v-9"/><path d="M10 21v-5h4v5"/>',
+  documento: '<path d="M6 3h8.5L19 7.5V21H6z"/><path d="M14 3v5h5"/><path d="M9 12.5h7M9 16.5h7"/>',
+  alianca: '<circle cx="9" cy="14" r="5.5"/><circle cx="15" cy="14" r="5.5"/><path d="m10.5 4.5 1.5-2 1.5 2-1.5 2z"/>',
+  grades: '<rect x="3" y="3" width="18" height="18" rx="1.5"/><path d="M7.5 3v18M12 3v18M16.5 3v18M3 12h18"/>',
+  alvo: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r=".8"/>',
+  balanca: '<path d="M12 3v18M7 21h10M5 7h14"/><path d="m5 7-3 6a3 3 0 0 0 6 0z"/><path d="m19 7-3 6a3 3 0 0 0 6 0z"/>',
+  mapa: '<path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/>',
+  moeda: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="5.5"/><path d="M12 9.5v5"/>',
+  espada: '<path d="M14.5 3H21v6.5L10 20.5 3.5 14z"/><path d="m6 11.5 6.5 6.5"/><path d="m3 21 3.5-3.5"/>',
+  pena: '<path d="M20 4C11 4 6 9 5 19"/><path d="M20 4c0 7-4.5 11.5-12 12"/><path d="M4 21l1-2"/>',
+  bandeira: '<path d="M5 21V4"/><path d="M5 4h12l-2.5 4.5L17 13H5"/>',
+  bau: '<rect x="3" y="8" width="18" height="12" rx="1.5"/><path d="M3 12h18"/><path d="M5 8V6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5V8"/><rect x="10.5" y="10.5" width="3" height="4" rx=".6"/>',
+  calendario: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  trofeu: '<path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 5.5H5a3 3 0 0 0 3 4.5M16 5.5h3a3 3 0 0 1-3 4.5"/><path d="M12 13v4M8 21h8M9.5 21v-4h5v4"/>',
+  enviar: '<path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>',
+  pasta: '<path d="M3 6.5A2.5 2.5 0 0 1 5.5 4H9l2 2.5h7.5A2.5 2.5 0 0 1 21 9v8.5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/>',
+  mao: '<path d="M8 12V5.5a1.5 1.5 0 0 1 3 0V11"/><path d="M11 10.5v-6a1.5 1.5 0 0 1 3 0V11"/><path d="M14 10.5V6a1.5 1.5 0 0 1 3 0v7c0 4.5-2.5 8-7 8-3 0-4.5-1.5-6-4l-1.5-3a1.5 1.5 0 0 1 2.6-1.5L8 15"/>',
+  alerta: '<path d="M12 3 2 20h20z"/><path d="M12 10v4.5M12 17.5v.5"/>',
+  olho: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  relogio: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  estrela: '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>',
+  secao: '<path d="M4 6h16M4 12h10M4 18h7"/>',
+  baixar: '<path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>',
+};
+export const NOMES_ICONES = Object.keys(ICONES);
+
+export function icone(nome, classe = '') {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('class', `ico ${classe}`.trim());
+  svg.setAttribute('aria-hidden', 'true');
+  svg.innerHTML = ICONES[nome] || ICONES.livro;
+  return svg;
+}
+
+export function botao(texto, { icone: ic, classe = '', onclick, tipo = 'button', titulo, desativado } = {}) {
+  return h('button', { class: `btn ${classe}`.trim(), type: tipo, onclick, title: titulo, disabled: desativado },
+    ic && icone(ic), texto && h('span', null, texto));
+}
+
+export function botaoIcone(ic, rotulo, onclick, classe = '') {
+  return h('button', { class: `btn-icone ${classe}`.trim(), type: 'button', title: rotulo, 'aria-label': rotulo, onclick }, icone(ic));
+}
+
+export function cabecalho({ titulo, sub, icone: ic, acoes = [], voltar }) {
+  return h('header', { class: 'pag-cab' },
+    h('div', { class: 'pag-cab-texto' },
+      voltar && h('a', { class: 'voltar', href: voltar.href }, icone('voltar'), voltar.texto),
+      h('h1', { class: 'pag-titulo' }, ic && h('span', { class: 'pag-icone' }, icone(ic)), titulo),
+      sub && h('p', { class: 'pag-sub' }, sub)),
+    acoes.filter(Boolean).length ? h('div', { class: 'pag-acoes' }, acoes) : null);
+}
+
+export function vazio(titulo, texto, acao) {
+  return h('div', { class: 'vazio' },
+    h('img', { src: '/img/brasao.png', alt: '', class: 'vazio-brasao' }),
+    h('h3', null, titulo),
+    texto && h('p', null, texto),
+    acao);
+}
+
+export function avatar(nome, classe = '') {
+  return h('span', { class: `avatar ${classe}`.trim(), 'aria-hidden': 'true' }, iniciais(nome));
+}
+
+export function chipCargo(c) {
+  return h('span', { class: 'chip', style: { '--cor': c.cor } }, c.nome);
+}
+
+export function barra(valor, total) {
+  const pct = total ? Math.min(100, (valor / total) * 100) : 0;
+  return h('div', { class: `barra ${pct >= 100 ? 'completa' : ''}`, role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': String(total), 'aria-valuenow': String(valor) },
+    h('div', { class: 'barra-cheia', style: { width: `${pct}%` } }));
+}
+
+/* ─── Avisos, modais e confirmações ──────────────── */
+
+export function aviso(mensagem, tipo = 'ok') {
+  const el = h('div', { class: `toast ${tipo}`, role: 'status' }, icone(tipo === 'erro' ? 'alerta' : 'check'), h('span', null, mensagem));
+  document.getElementById('toasts').append(el);
+  setTimeout(() => { el.classList.add('saindo'); setTimeout(() => el.remove(), 300); }, tipo === 'erro' ? 5000 : 3200);
+}
+
+const pilha = [];
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && pilha.length) pilha[pilha.length - 1].fechar();
+});
+
+export function modal({ titulo, corpo, rodape, tamanho = '', classe = '', fecharFora = true, aoFechar } = {}) {
+  const fundo = h('div', { class: 'modal-fundo' });
+  const caixa = h('div', { class: `modal ${tamanho} ${classe}`.trim(), role: 'dialog', 'aria-modal': 'true' });
+  let fechado = false;
+  const m = {
+    caixa,
+    fechar() {
+      if (fechado) return;
+      fechado = true;
+      pilha.splice(pilha.indexOf(m), 1);
+      fundo.classList.add('saindo');
+      setTimeout(() => fundo.remove(), 160);
+      if (!pilha.length) document.body.classList.remove('sem-rolagem');
+      aoFechar?.();
+    },
+  };
+  if (titulo) {
+    caixa.append(h('header', { class: 'modal-cab' },
+      h('h2', null, titulo),
+      botaoIcone('x', 'Fechar', () => m.fechar())));
+  }
+  caixa.append(h('div', { class: 'modal-corpo' }, corpo));
+  if (rodape) caixa.append(h('footer', { class: 'modal-rodape' }, rodape));
+  fundo.append(caixa);
+  if (fecharFora) fundo.addEventListener('mousedown', e => { if (e.target === fundo) m.fechar(); });
+  document.body.append(fundo);
+  document.body.classList.add('sem-rolagem');
+  pilha.push(m);
+  requestAnimationFrame(() => caixa.querySelector('[autofocus], input:not([type=hidden]):not([type=file]):not([disabled]), textarea, select')?.focus());
+  return m;
+}
+
+// Modal com formulário: cuida do botão de enviar, do "carregando" e da mensagem de erro.
+// aoEnviar pode devolver false para manter o modal aberto.
+let contadorForm = 0;
+export function modalForm({ titulo, conteudo, textoOk = 'Salvar', classeOk = 'btn-ouro', tamanho = '', extraRodape, aoEnviar }) {
+  const id = `form-${++contadorForm}`;
+  const erroEl = h('p', { class: 'form-erro', role: 'alert', hidden: true });
+  const ok = h('button', { class: `btn ${classeOk}`, type: 'submit', form: id }, textoOk);
+  const form = h('form', { class: 'form', id, novalidate: true }, conteudo, erroEl);
+  const m = modal({
+    titulo, tamanho, fecharFora: false, corpo: form,
+    rodape: [extraRodape, h('span', { class: 'espaco' }), h('button', { class: 'btn', type: 'button', onclick: () => m.fechar() }, 'Cancelar'), ok],
+  });
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    erroEl.hidden = true;
+    ok.disabled = true;
+    ok.classList.add('carregando');
+    try {
+      if ((await aoEnviar(form, m)) !== false) m.fechar();
+    } catch (err) {
+      erroEl.textContent = err.message;
+      erroEl.hidden = false;
+    } finally {
+      ok.disabled = false;
+      ok.classList.remove('carregando');
+    }
+  });
+  m.mostrarErro = msg => { erroEl.textContent = msg; erroEl.hidden = false; };
+  return m;
+}
+
+export function confirmar(mensagem, { titulo = 'Tem certeza?', ok = 'Confirmar', perigo = false } = {}) {
+  return new Promise(resolve => {
+    let resposta = false;
+    const m = modal({
+      titulo, tamanho: 'pequeno', aoFechar: () => resolve(resposta),
+      corpo: h('p', { class: 'confirmar-texto' }, mensagem),
+      rodape: [
+        h('span', { class: 'espaco' }),
+        h('button', { class: 'btn', type: 'button', onclick: () => m.fechar() }, 'Cancelar'),
+        h('button', { class: `btn ${perigo ? 'btn-perigo' : 'btn-ouro'}`, type: 'button', autofocus: true, onclick: () => { resposta = true; m.fechar(); } }, ok),
+      ],
+    });
+  });
+}
+
+// Executa uma ação da API mostrando o erro num aviso, se houver.
+export async function tentar(fn, sucesso) {
+  try {
+    const r = await fn();
+    if (sucesso) aviso(sucesso);
+    return r ?? true;
+  } catch (e) {
+    aviso(e.message, 'erro');
+    return null;
+  }
+}
+
+/* ─── Campos de formulário ────────────────────────── */
+
+export function campo(rotulo, entrada, { ajuda, obrigatorio, classe = '' } = {}) {
+  return h('label', { class: `campo ${classe}`.trim() },
+    h('span', { class: 'campo-rotulo' }, rotulo, obrigatorio && h('b', { class: 'obrig', title: 'Obrigatório' }, ' *')),
+    entrada,
+    ajuda && h('small', { class: 'campo-ajuda' }, ajuda));
+}
+
+export function interruptor(rotulo, ligado, aoMudar, ajuda) {
+  const input = h('input', { type: 'checkbox', checked: ligado, onchange: e => aoMudar?.(e.target.checked) });
+  return h('label', { class: 'interruptor' },
+    input, h('span', { class: 'interruptor-trilho' }),
+    h('span', { class: 'interruptor-texto' }, h('strong', null, rotulo), ajuda && h('small', null, ajuda)));
+}
+
+// Entrada de quantidade no estilo Minecraft: pacotes + unidades avulsas.
+export function entradaQuantidade({ pacote = 64, inicial = 0, item = 'itens', aoMudar } = {}) {
+  const pac = h('input', { class: 'input', type: 'number', min: '0', step: '1', inputmode: 'numeric', placeholder: '0' });
+  const avu = h('input', { class: 'input', type: 'number', min: '0', step: '1', inputmode: 'numeric', placeholder: '0' });
+  const rotuloPac = h('span', { class: 'campo-rotulo' });
+  const rotuloAvu = h('span', { class: 'campo-rotulo' });
+  const caixaPac = h('label', { class: 'campo' }, rotuloPac, pac);
+  const total = h('strong');
+  const extra = h('span', { class: 'suave' });
+  const el = h('div', { class: 'qtd' },
+    h('div', { class: 'qtd-linha' }, caixaPac, h('label', { class: 'campo' }, rotuloAvu, avu)),
+    h('p', { class: 'qtd-total' }, 'Total: ', total, extra));
+  let tam = pacote;
+  let nomeItem = item;
+  const valor = () => (tam > 1 ? (parseInt(pac.value, 10) || 0) * tam : 0) + (parseInt(avu.value, 10) || 0);
+  const atualizar = () => {
+    const v = valor();
+    total.textContent = `${num(v)} ${nomeItem}`;
+    extra.textContent = tam > 1 && v >= tam ? ` (${pacotes(v, tam)})` : '';
+    aoMudar?.(v);
+  };
+  function definir(v, novoTam = tam) {
+    tam = novoTam;
+    caixaPac.hidden = tam <= 1;
+    rotuloPac.textContent = `Pacotes (de ${tam})`;
+    rotuloAvu.textContent = tam > 1 ? 'Unidades avulsas' : 'Quantidade';
+    if (tam > 1) {
+      pac.value = v >= tam ? Math.floor(v / tam) : '';
+      avu.value = v % tam || '';
+    } else {
+      pac.value = '';
+      avu.value = v || '';
+    }
+    atualizar();
+  }
+  pac.addEventListener('input', atualizar);
+  avu.addEventListener('input', atualizar);
+  definir(inicial, pacote);
+  return {
+    el, valor, definir,
+    mudarPacote(novo) { const v = valor(); definir(v, novo); },
+    mudarItem(novo) { nomeItem = novo || 'itens'; atualizar(); },
+  };
+}
+
+/* ─── Formatação ──────────────────────────────────── */
+
+const paraData = s => new Date(String(s).replace(' ', 'T') + (String(s).length <= 10 ? 'T12:00:00' : 'Z'));
+
+export function dataHora(s) {
+  if (!s) return '';
+  return paraData(s).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+export function dataCurta(s) {
+  if (!s) return '';
+  return paraData(s).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+export function relativo(s) {
+  if (!s) return '';
+  const d = paraData(s);
+  const seg = (Date.now() - d.getTime()) / 1000;
+  if (seg < 60) return 'agora mesmo';
+  if (seg < 3600) return `há ${Math.floor(seg / 60)} min`;
+  if (seg < 86400) return `há ${Math.floor(seg / 3600)} h`;
+  if (seg < 172800) return 'ontem';
+  if (seg < 604800) return `há ${Math.floor(seg / 86400)} dias`;
+  return dataCurta(s);
+}
+
+export const num = n => Number(n || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+
+export function pacotes(n, tam = 64) {
+  if (!tam || tam <= 1 || n < tam) return '';
+  const p = Math.floor(n / tam);
+  const r = n % tam;
+  return `${p} pacote${p > 1 ? 's' : ''}${r ? ` e ${r}` : ''}`;
+}
+
+export function iniciais(nome = '') {
+  const partes = nome.trim().split(/\s+/).filter(Boolean);
+  if (!partes.length) return '?';
+  return ((partes[0][0] || '') + (partes.length > 1 ? partes[partes.length - 1][0] : '')).toUpperCase();
+}
+
+export const normalizar = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+export function cargoPrincipal(u) {
+  if (u.is_root) return 'Administrador';
+  return u.cargos?.[0]?.nome || 'Morador';
+}

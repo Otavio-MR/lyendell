@@ -1,0 +1,64 @@
+import { estado, get, post, h, icone, cabecalho, campo, aviso, avatar, chipCargo, botao } from '../core.js';
+
+export async function perfil() {
+  const eu = estado.eu;
+  const { catalogo } = await get('/api/auth/catalogo');
+  const minhas = new Set(eu.permissoes);
+
+  const atual = h('input', { class: 'input', type: 'password', autocomplete: 'current-password' });
+  const nova = h('input', { class: 'input', type: 'password', autocomplete: 'new-password', maxlength: '100' });
+  const repetir = h('input', { class: 'input', type: 'password', autocomplete: 'new-password', maxlength: '100' });
+  const erroEl = h('p', { class: 'form-erro', role: 'alert', hidden: true });
+  const salvar = botao('Trocar senha', { classe: 'btn-ouro', tipo: 'submit' });
+
+  const form = h('form', { class: 'form', novalidate: true },
+    campo('Senha atual', atual),
+    campo('Nova senha', nova, { ajuda: 'Mínimo de 4 caracteres.' }),
+    campo('Repita a nova senha', repetir),
+    erroEl,
+    h('div', null, salvar));
+
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    erroEl.hidden = true;
+    const falha = msg => { erroEl.textContent = msg; erroEl.hidden = false; };
+    if (nova.value.length < 4) return falha('A nova senha precisa ter pelo menos 4 caracteres.');
+    if (nova.value !== repetir.value) return falha('As duas senhas novas não são iguais.');
+    salvar.disabled = true;
+    try {
+      await post('/api/auth/senha', { atual: atual.value, nova: nova.value });
+      form.reset();
+      aviso('Senha trocada. Outros aparelhos conectados foram desconectados.');
+    } catch (err) {
+      falha(err.message);
+    } finally {
+      salvar.disabled = false;
+    }
+  });
+
+  const cargos = eu.is_root
+    ? [h('span', { class: 'chip chip-ouro' }, icone('coroa'), 'Administrador')]
+    : eu.cargos.length ? eu.cargos.map(chipCargo) : [h('span', { class: 'chip' }, 'Morador')];
+
+  return h('div', { class: 'pagina pagina-estreita' },
+    cabecalho({ titulo: 'Meu perfil', icone: 'usuario' }),
+    h('section', { class: 'painel perfil-topo' },
+      avatar(eu.nome, 'avatar-g'),
+      h('div', null,
+        h('h2', null, eu.nome),
+        h('div', { class: 'chips' }, cargos),
+        h('p', { class: 'suave' }, 'Todo usuário também é morador de Lyendell.'))),
+    h('section', { class: 'painel' },
+      h('header', { class: 'painel-cab' }, h('h2', null, icone('chave'), 'O que você pode fazer')),
+      h('div', { class: 'perm-grade' }, catalogo.map(g => {
+        const tenho = g.itens.filter(i => minhas.has(i.chave));
+        return h('div', { class: 'perm-grupo' },
+          h('h3', null, g.grupo),
+          tenho.length
+            ? h('ul', { class: 'lista-check' }, tenho.map(i => h('li', null, icone('check'), i.nome)))
+            : h('p', { class: 'suave' }, 'Sem acesso.'));
+      }))),
+    h('section', { class: 'painel' },
+      h('header', { class: 'painel-cab' }, h('h2', null, icone('cadeado'), 'Trocar senha')),
+      form));
+}

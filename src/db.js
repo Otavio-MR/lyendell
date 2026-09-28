@@ -1,0 +1,298 @@
+const path = require('path');
+const fs = require('fs');
+const { createClient } = require('@libsql/client');
+const { hashSenha } = require('./senhas');
+const { CARGOS_PADRAO } = require('./permissoes');
+const { LIVROS_PADRAO, AJUDA_ABERTURA } = require('./livros-padrao');
+const { linha, chaveNome } = require('./util');
+
+// Na internet o banco fica no Turso (TURSO_DATABASE_URL + TURSO_AUTH_TOKEN).
+// No computador, sem essas variáveis, ele usa um arquivo SQLite em data/.
+const REMOTO = !!process.env.TURSO_DATABASE_URL;
+const PASTA_DADOS = path.resolve(process.env.DATA_DIR || path.join(__dirname, '..', 'data'));
+let url = process.env.TURSO_DATABASE_URL;
+if (!REMOTO) {
+  fs.mkdirSync(PASTA_DADOS, { recursive: true });
+  url = `file:${path.join(PASTA_DADOS, 'lyendell.db').replace(/\\/g, '/')}`;
+}
+const cliente = createClient({ url, authToken: process.env.TURSO_AUTH_TOKEN || undefined });
+
+const argumentos = args => args.map(a => (a === undefined ? null : a));
+const paraObjetos = rs => rs.rows.map(l => Object.fromEntries(rs.columns.map((c, i) => [c, l[i]])));
+
+const db = {
+  async all(sql, ...args) {
+    return paraObjetos(await cliente.execute({ sql, args: argumentos(args) }));
+  },
+  async get(sql, ...args) {
+    return (await db.all(sql, ...args))[0];
+  },
+  async run(sql, ...args) {
+    const r = await cliente.execute({ sql, args: argumentos(args) });
+    return { changes: r.rowsAffected, id: r.lastInsertRowid == null ? null : Number(r.lastInsertRowid) };
+  },
+  // Vários comandos ['SQL', arg1, arg2] de uma vez: ou valem todos, ou nenhum.
+  async lote(comandos) {
+    const lista = comandos.filter(Boolean).map(([sql, ...args]) => ({ sql, args: argumentos(args) }));
+    return lista.length ? cliente.batch(lista, 'write') : [];
+  },
+};
+
+const ESQUEMA = `
+CREATE TABLE IF NOT EXISTS meta (
+  chave TEXT PRIMARY KEY,
+  valor TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS usuarios (
+  id INTEGER PRIMARY KEY,
+  nome TEXT NOT NULL,
+  chave TEXT NOT NULL UNIQUE,
+  senha_hash TEXT NOT NULL,
+  is_root INTEGER NOT NULL DEFAULT 0,
+  ativo INTEGER NOT NULL DEFAULT 1,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  ultimo_acesso TEXT
+);
+
+CREATE TABLE IF NOT EXISTS cargos (
+  id INTEGER PRIMARY KEY,
+  nome TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  descricao TEXT NOT NULL DEFAULT '',
+  cor TEXT NOT NULL DEFAULT '#d8b13a',
+  permissoes TEXT NOT NULL DEFAULT '[]',
+  base INTEGER NOT NULL DEFAULT 0,
+  ordem INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS usuario_cargos (
+  usuario_id INTEGER NOT NULL,
+  cargo_id INTEGER NOT NULL,
+  PRIMARY KEY (usuario_id, cargo_id)
+);
+
+CREATE TABLE IF NOT EXISTS sessoes (
+  token_hash TEXT PRIMARY KEY,
+  usuario_id INTEGER NOT NULL,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  expira_em TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sessoes_usuario ON sessoes(usuario_id);
+
+CREATE TABLE IF NOT EXISTS livros (
+  id INTEGER PRIMARY KEY,
+  modulo TEXT NOT NULL,
+  nome TEXT NOT NULL,
+  descricao TEXT NOT NULL DEFAULT '',
+  icone TEXT NOT NULL DEFAULT 'livro',
+  aberto INTEGER NOT NULL DEFAULT 1,
+  campos TEXT NOT NULL DEFAULT '[]',
+  cobranca TEXT,
+  ordem INTEGER NOT NULL DEFAULT 0,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS registros (
+  id INTEGER PRIMARY KEY,
+  livro_id INTEGER NOT NULL,
+  dados TEXT NOT NULL DEFAULT '{}',
+  criado_por INTEGER,
+  criado_por_nome TEXT NOT NULL DEFAULT '',
+  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  atualizado_por_nome TEXT,
+  atualizado_em TEXT,
+  cobranca_fim TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_registros_livro ON registros(livro_id);
+
+CREATE TABLE IF NOT EXISTS pagamentos (
+  id INTEGER PRIMARY KEY,
+  registro_id INTEGER NOT NULL,
+  vencimento TEXT NOT NULL,
+  pago_em TEXT NOT NULL,
+  observacao TEXT NOT NULL,
+  marcado_por INTEGER,
+  marcado_por_nome TEXT NOT NULL DEFAULT '',
+  marcado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (registro_id, vencimento)
+);
+
+CREATE TABLE IF NOT EXISTS albuns (
+  id INTEGER PRIMARY KEY,
+  nome TEXT NOT NULL,
+  descricao TEXT NOT NULL DEFAULT '',
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS fotos (
+  id INTEGER PRIMARY KEY,
+  album_id INTEGER,
+  titulo TEXT NOT NULL DEFAULT '',
+  descricao TEXT NOT NULL DEFAULT '',
+  arquivo TEXT NOT NULL,
+  enviado_por INTEGER,
+  enviado_por_nome TEXT NOT NULL DEFAULT '',
+  enviado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS arquivos (
+  nome TEXT PRIMARY KEY,
+  tipo TEXT NOT NULL,
+  tamanho INTEGER NOT NULL,
+  dados BLOB NOT NULL,
+  enviado_por INTEGER,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS anuncios (
+  id INTEGER PRIMARY KEY,
+  titulo TEXT NOT NULL,
+  conteudo TEXT NOT NULL DEFAULT '',
+  importancia TEXT NOT NULL DEFAULT 'comum',
+  imagem TEXT,
+  fixado INTEGER NOT NULL DEFAULT 0,
+  autor_id INTEGER,
+  autor_nome TEXT NOT NULL DEFAULT '',
+  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  editado_em TEXT
+);
+
+CREATE TABLE IF NOT EXISTS atividades (
+  id INTEGER PRIMARY KEY,
+  titulo TEXT NOT NULL,
+  descricao TEXT NOT NULL DEFAULT '',
+  item TEXT NOT NULL,
+  meta INTEGER NOT NULL,
+  pacote INTEGER NOT NULL DEFAULT 64,
+  recompensa_valor REAL,
+  recompensa_unidade TEXT NOT NULL DEFAULT '',
+  prazo TEXT,
+  status TEXT NOT NULL DEFAULT 'aberta',
+  criado_por INTEGER,
+  criado_por_nome TEXT NOT NULL DEFAULT '',
+  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  concluido_em TEXT
+);
+
+CREATE TABLE IF NOT EXISTS participantes (
+  atividade_id INTEGER NOT NULL,
+  usuario_id INTEGER NOT NULL,
+  usuario_nome TEXT NOT NULL,
+  compromisso INTEGER NOT NULL DEFAULT 0,
+  entrou_em TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (atividade_id, usuario_id)
+);
+
+CREATE TABLE IF NOT EXISTS contribuicoes (
+  id INTEGER PRIMARY KEY,
+  atividade_id INTEGER NOT NULL,
+  usuario_id INTEGER,
+  usuario_nome TEXT NOT NULL,
+  quantidade INTEGER NOT NULL,
+  nota TEXT NOT NULL DEFAULT '',
+  conferida INTEGER NOT NULL DEFAULT 0,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_contribuicoes_atividade ON contribuicoes(atividade_id);
+
+CREATE TABLE IF NOT EXISTS diario (
+  id INTEGER PRIMARY KEY,
+  usuario_id INTEGER,
+  usuario_nome TEXT NOT NULL DEFAULT '',
+  acao TEXT NOT NULL,
+  detalhe TEXT NOT NULL DEFAULT '',
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+`;
+
+/* ─── Atualizações de bancos criados por versões anteriores ─ */
+
+const VERSAO = 2;
+
+async function colunaExiste(tabela, coluna) {
+  return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
+}
+
+async function migrar() {
+  const salvo = await db.get("SELECT valor FROM meta WHERE chave = 'versao'");
+  const versao = salvo ? Number(salvo.valor) : 0;
+
+  if (versao < 1) {
+    // v1: pagamentos periódicos e permissão de marcar pagamentos (cada passo pode rodar de novo sem estragar nada).
+    if (!await colunaExiste('livros', 'cobranca')) await db.run('ALTER TABLE livros ADD COLUMN cobranca TEXT');
+    if (!await colunaExiste('registros', 'cobranca_fim')) await db.run('ALTER TABLE registros ADD COLUMN cobranca_fim TEXT');
+    for (const nome of ['Tabeliã', 'Família Nobre']) {
+      const c = await db.get('SELECT id, permissoes FROM cargos WHERE nome = ?', nome);
+      if (!c) continue;
+      const lista = JSON.parse(c.permissoes);
+      if (!lista.includes('tabelionato.pagamentos')) {
+        lista.push('tabelionato.pagamentos');
+        await db.run('UPDATE cargos SET permissoes = ? WHERE id = ?', JSON.stringify(lista), c.id);
+      }
+    }
+    const comercio = await db.get("SELECT id, campos FROM livros WHERE modulo = 'tabelionato' AND nome = 'Registro de Comerciantes' AND cobranca IS NULL");
+    if (comercio) {
+      const campos = JSON.parse(comercio.campos);
+      const abertura = campos.find(c => c.id === 'abertura' && c.tipo === 'data');
+      if (abertura) {
+        if (!abertura.ajuda) abertura.ajuda = AJUDA_ABERTURA;
+        await db.run('UPDATE livros SET campos = ?, cobranca = ? WHERE id = ?',
+          JSON.stringify(campos), JSON.stringify({ ativo: true, campo: 'abertura', intervalo: 14 }), comercio.id);
+      }
+    }
+  }
+  // v2: imagens passam a ficar dentro do banco (tabela "arquivos", criada no esquema).
+
+  await db.run("INSERT INTO meta (chave, valor) VALUES ('versao', ?) ON CONFLICT (chave) DO UPDATE SET valor = excluded.valor", String(VERSAO));
+}
+
+async function semear() {
+  if (!(await db.get('SELECT COUNT(*) AS n FROM cargos')).n) {
+    await db.lote(CARGOS_PADRAO.map((c, i) => [
+      'INSERT INTO cargos (nome, descricao, cor, permissoes, base, ordem) VALUES (?, ?, ?, ?, ?, ?)',
+      c.nome, c.descricao, c.cor, JSON.stringify(c.permissoes), c.base ? 1 : 0, i,
+    ]));
+  }
+
+  if (!(await db.get('SELECT COUNT(*) AS n FROM livros')).n) {
+    await db.lote(LIVROS_PADRAO.map((l, i) => [
+      'INSERT INTO livros (modulo, nome, descricao, icone, aberto, campos, cobranca, ordem) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      l.modulo, l.nome, l.descricao, l.icone, l.aberto, JSON.stringify(l.campos), l.cobranca ? JSON.stringify(l.cobranca) : null, i,
+    ]));
+  }
+
+  if (!await db.get('SELECT id FROM usuarios WHERE is_root = 1')) {
+    const nome = linha(process.env.ROOT_NOME || 'Evran Luckham', 40);
+    const senha = process.env.ROOT_SENHA;
+    if (!senha) {
+      console.warn('\n  Nenhum administrador existe ainda. Defina ROOT_SENHA e reinicie.\n');
+      return;
+    }
+    await db.run('INSERT INTO usuarios (nome, chave, senha_hash, is_root) VALUES (?, ?, ?, 1)', nome, chaveNome(nome), await hashSenha(senha));
+    console.log(`  Administrador "${nome}" criado.`);
+  }
+}
+
+/* ─── Faxina periódica ────────────────────────────── */
+
+// Sessões vencidas e imagens enviadas que ninguém chegou a usar (ex.: formulário cancelado).
+async function faxina() {
+  await db.run("DELETE FROM sessoes WHERE expira_em <= datetime('now')");
+  await db.run(`
+    DELETE FROM arquivos
+    WHERE criado_em < datetime('now', '-1 day')
+      AND NOT EXISTS (SELECT 1 FROM fotos WHERE fotos.arquivo = '/uploads/' || arquivos.nome)
+      AND NOT EXISTS (SELECT 1 FROM anuncios WHERE anuncios.imagem = '/uploads/' || arquivos.nome)
+      AND NOT EXISTS (SELECT 1 FROM registros WHERE instr(registros.dados, arquivos.nome) > 0)`);
+}
+
+async function iniciarBanco() {
+  await cliente.executeMultiple(ESQUEMA);
+  await migrar();
+  await semear();
+  await faxina();
+  setInterval(() => faxina().catch(e => console.error('Erro na faxina:', e.message)), 6 * 60 * 60 * 1000).unref();
+  return REMOTO ? `Turso (${new URL(url.replace(/^libsql:/, 'https:')).host})` : path.join(PASTA_DADOS, 'lyendell.db');
+}
+
+module.exports = { db, iniciarBanco };
