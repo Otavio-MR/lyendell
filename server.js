@@ -11,6 +11,8 @@ const { iniciarRecreacao } = require('./src/recreacao');
 
 const app = express();
 const PORTA = Number(process.env.PORT) || 3000;
+// Muda a cada atualização (no Render, é o commit publicado). O navegador compara para saber se precisa recarregar.
+const VERSAO_SITE = process.env.RENDER_GIT_COMMIT || String(Date.now());
 
 app.disable('x-powered-by');
 // Na hospedagem o site fica atrás de proxies; isso faz o Express enxergar o IP real e o HTTPS.
@@ -21,6 +23,7 @@ app.use((req, res, next) => {
     'X-Content-Type-Options': 'nosniff',
     'X-Frame-Options': 'DENY',
     'Referrer-Policy': 'same-origin',
+    'X-Versao': VERSAO_SITE,
     'Content-Security-Policy': [
       "default-src 'self'",
       "img-src 'self' data: blob:",

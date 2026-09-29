@@ -2,7 +2,7 @@
 // Formato: NBT sem compressão com "pages" (lista de textos), "author" e, às vezes, "title",
 // igual aos livros salvos pelo próprio Scribble. As páginas usam códigos de cor (§).
 
-import { dataCurta, dataHora, num, pacotes, textoDuracao, listaDeNomes, normalizar } from './core.js';
+import { dataCurta, dataHora, num, pacotes, textoDuracao, listaDeNomes, normalizar, estado, aviso } from './core.js';
 
 /* ─── Métricas da fonte do Minecraft ──────────────── */
 
@@ -23,6 +23,11 @@ const GL = {
 
 function larguraChar(c) {
   if (Object.hasOwn(GL, c)) return GL[c];
+  const n = c.codePointAt(0);
+  // Molduras (═ ─ ╔ ╗...) e ✦ ocupam a casa inteira da fonte: 8px + 1 de espaço (medido no jogo:
+  // 12 cabem numa linha, 13 não). Emojis como o 🐇 são um pouco mais estreitos.
+  if ((n >= 0x2500 && n <= 0x257f) || n === 0x2726) return 9;
+  if (n > 0xffff) return 8;
   const base = c.normalize('NFD').replace(RE_ACENTO, '');
   if (base && base !== c && Object.hasOwn(GL, base[0])) return GL[base[0]];
   return 6;
@@ -72,12 +77,13 @@ function quebrar(textoBruto, negrito = false) {
 /* ─── Linhas e ornamentos (no estilo dos livros da Casa) ─ */
 
 // Cores do Minecraft: 0 preto, 2 verde escuro, 4 vermelho escuro, 6 dourado, 8 cinza, c vermelho.
+// Os mesmos enfeites dos modelos da Casa, que cabem inteiros numa linha do livro.
 const ORN = {
-  caixaTopo: '╔════════════════════╗',
-  caixaBase: '╚════════════════════╝',
-  estrela: '✦ ────────────── ✦',
-  secaoTopo: '╔────── ✦ ──────╗',
-  secaoBase: '╚────── ✦ ──────╝',
+  caixaTopo: '╔══════════╗',
+  caixaBase: '╚══════════╝',
+  estrela: '🐇 ────────── 🐇',
+  secaoTopo: '╔─── ✦ ───╗',
+  secaoBase: '╚─── ✦ ───╝',
 };
 
 const L = (t = '', cor = '0', opcoes = {}) => ({ t, cor, ...opcoes });
@@ -181,6 +187,12 @@ class LivroMC {
 }
 
 function baixarArquivo(bytes, nome) {
+  // Se o site foi atualizado depois que esta aba abriu, recarrega antes: senão o livro sairia no formato velho.
+  if (estado.novaVersao) {
+    aviso('O site foi atualizado. Recarregando a página; depois é só baixar de novo.', 'erro');
+    setTimeout(() => location.reload(), 1500);
+    return;
+  }
   const url = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
   const a = document.createElement('a');
   a.href = url;

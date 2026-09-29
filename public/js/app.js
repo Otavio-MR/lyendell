@@ -59,6 +59,15 @@ async function iniciar() {
   if (estado.eu) montar(); else telaLogin();
 }
 
+// Aviso fixo quando sai uma versão nova do site com a página aberta.
+window.addEventListener('nova-versao', () => {
+  if (document.getElementById('nova-versao')) return;
+  document.body.append(h('div', { id: 'nova-versao', class: 'nova-versao', role: 'status' },
+    icone('alerta'),
+    h('span', null, 'O site foi atualizado. Recarregue para usar a versão nova.'),
+    h('button', { class: 'btn btn-ouro btn-pequeno', type: 'button', onclick: () => location.reload() }, 'Recarregar')));
+});
+
 window.addEventListener('sessao-expirada', () => {
   desligar();
   aviso('Sua sessão terminou. Entre de novo.', 'erro');
@@ -178,6 +187,8 @@ window.addEventListener('perfil-atualizado', () => {
 let geracao = 0;
 
 async function rotear() {
+  // O site foi atualizado com esta aba aberta: troca de tela já carregando a versão nova.
+  if (estado.novaVersao) { location.reload(); return; }
   if (!estado.eu) return;
   const tela = document.getElementById('tela');
   if (!tela) return;

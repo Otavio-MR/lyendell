@@ -19,6 +19,19 @@ export class ErroApi extends Error {
   constructor(mensagem, status) { super(mensagem); this.status = status; }
 }
 
+// Versão do site no servidor. Se mudar com a página aberta, o site foi atualizado
+// e esta aba ainda roda o código antigo (app.js recarrega na próxima troca de tela).
+let versaoDoSite = null;
+function conferirVersao(resp) {
+  const v = resp.headers.get('x-versao');
+  if (!v) return;
+  if (!versaoDoSite) versaoDoSite = v;
+  else if (v !== versaoDoSite && !estado.novaVersao) {
+    estado.novaVersao = true;
+    window.dispatchEvent(new Event('nova-versao'));
+  }
+}
+
 export async function api(metodo, url, corpo) {
   const opcoes = { method: metodo, headers: {}, credentials: 'same-origin' };
   if (corpo instanceof FormData) opcoes.body = corpo;
@@ -28,6 +41,7 @@ export async function api(metodo, url, corpo) {
   }
   let resp;
   try { resp = await fetch(url, opcoes); } catch { throw new ErroApi('Sem conexão com o servidor.', 0); }
+  conferirVersao(resp);
   const json = (resp.headers.get('content-type') || '').includes('application/json') ? await resp.json() : null;
   if (!resp.ok) {
     if (resp.status === 401 && estado.eu && !url.includes('/auth/')) {

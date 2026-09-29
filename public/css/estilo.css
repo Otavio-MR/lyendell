@@ -1054,6 +1054,14 @@ a.jogo-cartao:hover { border-color: var(--ouro-d); color: var(--texto); }
 .pac-bola { display: inline-block; width: var(--tam); height: var(--tam); border-radius: 50%; background: var(--cor); box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.25); }
 .pac-cenoura { font-size: 1rem; line-height: 1; }
 
+/* Aviso de versão nova do site */
+.nova-versao {
+  position: fixed; top: 12px; left: 50%; translate: -50% 0; z-index: 300; display: flex; align-items: center; gap: 10px;
+  max-width: calc(100vw - 32px); padding: 10px 14px 10px 16px; border-radius: var(--raio); background: var(--sup-2);
+  border: 1px solid var(--ouro); box-shadow: var(--sombra); animation: surgir 0.25s ease both;
+}
+.nova-versao .ico { color: var(--ouro); }
+
 /* ─── Celular e tablet ──────────────────────────── */
 @media (max-width: 960px) {
   .lateral { transform: translateX(-100%); transition: transform 0.25s ease; box-shadow: none; }
