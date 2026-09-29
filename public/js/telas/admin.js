@@ -129,7 +129,8 @@ export async function cargos() {
   const raiz = h('div', { class: 'pagina' });
 
   async function desenhar() {
-    const { cargos: lista, catalogo } = await get('/api/cargos');
+    const { cargos: lista, catalogo, exclusivas = [] } = await get('/api/cargos');
+    const extra = { lista, exclusivas };
     const gerenciar = pode('cargos.gerenciar');
     trocar(raiz, 
       cabecalho({
@@ -137,12 +138,12 @@ export async function cargos() {
         sub: gerenciar
           ? 'Cada cargo libera partes do sistema. Uma pessoa pode ter vários cargos: ela soma os poderes de todos.'
           : 'O que cada cargo pode fazer no sistema. Só o administrador altera os cargos.',
-        acoes: [gerenciar && botao('Novo cargo', { icone: 'mais', classe: 'btn-ouro', onclick: () => formCargo(null, catalogo, desenhar) })],
+        acoes: [gerenciar && botao('Novo cargo', { icone: 'mais', classe: 'btn-ouro', onclick: () => formCargo(null, catalogo, desenhar, false, extra) })],
       }),
       h('div', { class: 'grade-cargos' }, lista.map(c => {
         const nomes = new Map(catalogo.flatMap(g => g.itens.map(i => [i.chave, g.grupo])));
         const grupos = [...new Set(c.permissoes.map(p => nomes.get(p)).filter(Boolean))];
-        return h('button', { class: 'cargo-card', type: 'button', style: { '--cor': c.cor }, onclick: () => formCargo(c, catalogo, desenhar, !gerenciar) },
+        return h('button', { class: 'cargo-card', type: 'button', style: { '--cor': c.cor }, onclick: () => formCargo(c, catalogo, desenhar, !gerenciar, extra) },
           h('div', { class: 'cargo-card-topo' },
             h('h3', null, c.nome),
             c.base && h('span', { class: 'etiqueta' }, 'Base de todos')),
@@ -158,10 +159,13 @@ export async function cargos() {
   return raiz;
 }
 
-function formCargo(c, catalogo, depois, somenteLeitura = false) {
+function formCargo(c, catalogo, depois, somenteLeitura = false, { lista = [], exclusivas = [] } = {}) {
   const s = { nome: c?.nome || '', descricao: c?.descricao || '', cor: c?.cor || '#d8b13a', permissoes: new Set(c?.permissoes || []) };
   const minhas = new Set(estado.eu.permissoes);
-  const posso = p => estado.eu.is_root || minhas.has(p);
+  // "Aprovar registros" só pode estar num cargo: se outro já tem, aqui fica travado.
+  const donoDe = chave => (exclusivas.includes(chave) ? lista.find(x => x.id !== c?.id && x.permissoes.includes(chave)) : null);
+  const travada = chave => exclusivas.includes(chave) && (c?.base || !!donoDe(chave));
+  const posso = p => (estado.eu.is_root || minhas.has(p)) && !travada(p);
 
   const grupos = catalogo.map(g => {
     const caixas = g.itens.map(i => h('input', {
@@ -178,7 +182,8 @@ function formCargo(c, catalogo, depois, somenteLeitura = false) {
     };
     return h('fieldset', { class: 'perm-grupo' },
       h('legend', null, g.grupo, !somenteLeitura && h('button', { class: 'link', type: 'button', onclick: todos }, 'marcar/desmarcar tudo')),
-      g.itens.map((i, k) => h('label', { class: 'marcador' }, caixas[k], h('span', null, i.nome))));
+      g.itens.map((i, k) => h('label', { class: 'marcador' }, caixas[k], h('span', null, i.nome,
+        travada(i.chave) && h('small', { class: 'suave' }, donoDe(i.chave) ? ` (já pertence ao cargo "${donoDe(i.chave).nome}")` : ' (não vale para o Morador)')))));
   });
 
   if (somenteLeitura) {

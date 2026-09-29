@@ -287,7 +287,7 @@ r.delete('/livros/:id', async (req, res) => {
 r.get('/livros/:id/registros', async (req, res) => {
   const l = await buscarLivro(idDaRota(req));
   checar(req, `${l.modulo}.ver`);
-  const registros = (await db.all("SELECT * FROM registros WHERE livro_id = ? AND situacao = 'aprovado' ORDER BY id DESC", l.id))
+  const registros = (await db.all("SELECT * FROM registros WHERE livro_id = ? AND situacao = 'aprovado' ORDER BY numero DESC, id DESC", l.id))
     .map(x => ({ ...x, dados: JSON.parse(x.dados) }));
   const aguardando = await db.get(`
     SELECT SUM(situacao = 'pendente') AS aprovar, SUM(situacao <> 'aprovado' AND criado_por = ?) AS meus
@@ -320,11 +320,37 @@ r.post('/livros/:id/registros', async (req, res) => {
   }
   const dados = await limparDados(l, req.body?.dados);
   const situacao = pode(req, `${l.modulo}.aprovar`) ? 'aprovado' : 'pendente';
-  const { id } = await db.run('INSERT INTO registros (livro_id, dados, criado_por, criado_por_nome, situacao) VALUES (?, ?, ?, ?, ?)',
-    l.id, JSON.stringify(dados), req.usuario.id, req.usuario.nome, situacao);
-  await anotar(req, situacao === 'pendente' ? `Enviou para aprovação em "${l.nome}"` : `Registrou em "${l.nome}"`, tituloDoRegistro(l, dados));
-  res.status(201).json({ id, situacao });
+  // Aprovado já nasce com número; pendente só ganha número quando for aprovado.
+  const { id } = await comNumeroLivre(() => (situacao === 'aprovado'
+    ? db.run(`INSERT INTO registros (livro_id, dados, criado_por, criado_por_nome, situacao, numero) VALUES (?, ?, ?, ?, ?, ${PROXIMO_NUMERO})`,
+      l.id, JSON.stringify(dados), req.usuario.id, req.usuario.nome, situacao, l.id, l.id)
+    : db.run('INSERT INTO registros (livro_id, dados, criado_por, criado_por_nome, situacao) VALUES (?, ?, ?, ?, ?)',
+      l.id, JSON.stringify(dados), req.usuario.id, req.usuario.nome, situacao)));
+  const { numero } = await db.get('SELECT numero FROM registros WHERE id = ?', id);
+  await anotar(req, situacao === 'pendente' ? `Enviou para aprovação em "${l.nome}"` : `Registrou em "${l.nome}"`,
+    `${numero ? `nº ${numero}: ` : ''}${tituloDoRegistro(l, dados)}`);
+  res.status(201).json({ id, situacao, numero });
 });
+
+// Número do registro dentro do livro: o menor que estiver livre. Com 1 a 5 e o 5 apagado, o próximo é o 5;
+// se o 3 foi apagado, o próximo é o 3. Tem DOIS "?": passe o id do livro duas vezes, nessa posição.
+const PROXIMO_NUMERO = `(SELECT CASE
+  WHEN NOT EXISTS (SELECT 1 FROM registros WHERE livro_id = ? AND numero = 1) THEN 1
+  ELSE (SELECT MIN(a.numero) + 1 FROM registros a WHERE a.livro_id = ? AND a.numero IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM registros b WHERE b.livro_id = a.livro_id AND b.numero = a.numero + 1))
+  END)`;
+
+// Se duas pessoas pegarem o mesmo número no mesmo instante, o banco recusa a segunda; aí tenta de novo.
+async function comNumeroLivre(fn) {
+  for (let tentativa = 1; ; tentativa++) {
+    try {
+      return await fn();
+    } catch (e) {
+      const colidiu = /UNIQUE constraint failed: registros\.livro_id, registros\.numero/.test(e.message || '');
+      if (!colidiu || tentativa >= 5) throw e;
+    }
+  }
+}
 
 async function buscarRegistro(req) {
   const reg = await db.get('SELECT * FROM registros WHERE id = ?', idDaRota(req));
@@ -402,14 +428,21 @@ async function revisar(req, situacao, motivo) {
   const { reg, livro } = await buscarRegistro(req);
   checar(req, `${livro.modulo}.aprovar`);
   if (reg.situacao !== 'pendente') throw erro(409, 'Este registro não está mais aguardando aprovação.');
-  await db.run("UPDATE registros SET situacao = ?, motivo = ?, revisado_por_nome = ?, revisado_em = datetime('now') WHERE id = ?",
-    situacao, motivo, req.usuario.nome, reg.id);
+  if (situacao === 'aprovado') {
+    // Ao ser aprovado, entra no livro com o menor número livre.
+    await comNumeroLivre(() => db.run(`UPDATE registros SET situacao = 'aprovado', motivo = NULL, revisado_por_nome = ?,
+      revisado_em = datetime('now'), numero = ${PROXIMO_NUMERO} WHERE id = ? AND situacao = 'pendente'`, req.usuario.nome, livro.id, livro.id, reg.id));
+  } else {
+    await db.run("UPDATE registros SET situacao = ?, motivo = ?, revisado_por_nome = ?, revisado_em = datetime('now') WHERE id = ?",
+      situacao, motivo, req.usuario.nome, reg.id);
+  }
+  reg.numero = (await db.get('SELECT numero FROM registros WHERE id = ?', reg.id)).numero;
   return { reg, livro };
 }
 
 r.post('/registros/:id/aprovar', async (req, res) => {
   const { reg, livro } = await revisar(req, 'aprovado', null);
-  await anotar(req, `Aprovou um registro em "${livro.nome}"`, `${tituloDoRegistro(livro, reg.dados)} (enviado por ${reg.criado_por_nome})`);
+  await anotar(req, `Aprovou um registro em "${livro.nome}"`, `nº ${reg.numero}: ${tituloDoRegistro(livro, reg.dados)} (enviado por ${reg.criado_por_nome})`);
   res.json({ ok: true });
 });
 

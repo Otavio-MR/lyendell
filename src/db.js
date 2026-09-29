@@ -2,7 +2,7 @@ const path = require('path');
 const fs = require('fs');
 const { createClient } = require('@libsql/client');
 const { hashSenha } = require('./senhas');
-const { CARGOS_PADRAO, DESCRICOES } = require('./permissoes');
+const { CARGOS_PADRAO, DESCRICOES, EXCLUSIVAS } = require('./permissoes');
 const { LIVROS_PADRAO, AJUDA_ABERTURA, CAMPOS_PENA, CAMPO_GUARDAS } = require('./livros-padrao');
 const { linha, chaveNome } = require('./util');
 
@@ -17,23 +17,28 @@ if (!REMOTO) {
 }
 const cliente = createClient({ url, authToken: process.env.TURSO_AUTH_TOKEN || undefined });
 
-const argumentos = args => args.map(a => (a === undefined ? null : a));
+// O banco ignora valores sobrando sem avisar; aqui um "?" a mais ou a menos vira erro na hora.
+function argumentos(sql, args) {
+  const lugares = (sql.replace(/'[^']*'/g, '').match(/\?/g) || []).length;
+  if (lugares !== args.length) throw new Error(`Comando com ${lugares} "?" recebeu ${args.length} valores: ${sql.trim().slice(0, 80)}`);
+  return args.map(a => (a === undefined ? null : a));
+}
 const paraObjetos = rs => rs.rows.map(l => Object.fromEntries(rs.columns.map((c, i) => [c, l[i]])));
 
 const db = {
   async all(sql, ...args) {
-    return paraObjetos(await cliente.execute({ sql, args: argumentos(args) }));
+    return paraObjetos(await cliente.execute({ sql, args: argumentos(sql, args) }));
   },
   async get(sql, ...args) {
     return (await db.all(sql, ...args))[0];
   },
   async run(sql, ...args) {
-    const r = await cliente.execute({ sql, args: argumentos(args) });
+    const r = await cliente.execute({ sql, args: argumentos(sql, args) });
     return { changes: r.rowsAffected, id: r.lastInsertRowid == null ? null : Number(r.lastInsertRowid) };
   },
   // Vários comandos ['SQL', arg1, arg2] de uma vez: ou valem todos, ou nenhum.
   async lote(comandos) {
-    const lista = comandos.filter(Boolean).map(([sql, ...args]) => ({ sql, args: argumentos(args) }));
+    const lista = comandos.filter(Boolean).map(([sql, ...args]) => ({ sql, args: argumentos(sql, args) }));
     return lista.length ? cliente.batch(lista, 'write') : [];
   },
 };
@@ -106,7 +111,8 @@ CREATE TABLE IF NOT EXISTS registros (
   situacao TEXT NOT NULL DEFAULT 'aprovado',
   revisado_por_nome TEXT,
   revisado_em TEXT,
-  motivo TEXT
+  motivo TEXT,
+  numero INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_registros_livro ON registros(livro_id);
 
@@ -212,7 +218,7 @@ CREATE TABLE IF NOT EXISTS diario (
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 5;
+const VERSAO = 6;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -253,6 +259,7 @@ async function migrar() {
   }
   if (versao < 4) await migrarPrisioneiros();
   if (versao < 5) await migrarAprovacao();
+  if (versao < 6) await migrarNumeracao();
 
   await db.run("INSERT INTO meta (chave, valor) VALUES ('versao', ?) ON CONFLICT (chave) DO UPDATE SET valor = excluded.valor", String(VERSAO));
 }
@@ -305,6 +312,33 @@ async function migrarAprovacao() {
     const descricao = antigas.includes(c.descricao) ? atual : c.descricao;
     if (faltam.length || descricao !== c.descricao) {
       await db.run('UPDATE cargos SET permissoes = ?, descricao = ? WHERE id = ?', JSON.stringify([...lista, ...faltam]), descricao, c.id);
+    }
+  }
+}
+
+// v6: cada livro numera os próprios registros aprovados (1, 2, 3...) e só a Tabeliã e o Comandante aprovam.
+async function migrarNumeracao() {
+  if (!await colunaExiste('registros', 'numero')) await db.run('ALTER TABLE registros ADD COLUMN numero INTEGER');
+  // Registros aprovados que ainda não têm número recebem 1, 2, 3... na ordem em que foram feitos, livro a livro.
+  const semNumero = await db.all("SELECT id, livro_id FROM registros WHERE situacao = 'aprovado' AND numero IS NULL ORDER BY livro_id, id");
+  const proximo = new Map();
+  for (const l of await db.all('SELECT livro_id, MAX(numero) AS m FROM registros WHERE numero IS NOT NULL GROUP BY livro_id')) proximo.set(l.livro_id, l.m);
+  const comandos = semNumero.map(r => {
+    const n = (proximo.get(r.livro_id) || 0) + 1;
+    proximo.set(r.livro_id, n);
+    return ['UPDATE registros SET numero = ? WHERE id = ?', n, r.id];
+  });
+  for (let i = 0; i < comandos.length; i += 200) await db.lote(comandos.slice(i, i + 200));
+  await db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_registros_numero ON registros(livro_id, numero) WHERE numero IS NOT NULL');
+
+  // A permissão de aprovar fica só no cargo dono dela (Tabeliã ou Comandante); sai da Família Nobre e de qualquer outro.
+  for (const c of await db.all('SELECT id, nome, descricao, permissoes FROM cargos')) {
+    const lista = JSON.parse(c.permissoes);
+    const limpa = lista.filter(p => !EXCLUSIVAS[p] || EXCLUSIVAS[p] === c.nome);
+    const [antigas = [], atual] = DESCRICOES[c.nome] || [];
+    const descricao = antigas.includes(c.descricao) ? atual : c.descricao;
+    if (limpa.length !== lista.length || descricao !== c.descricao) {
+      await db.run('UPDATE cargos SET permissoes = ?, descricao = ? WHERE id = ?', JSON.stringify(limpa), descricao, c.id);
     }
   }
 }

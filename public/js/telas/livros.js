@@ -32,7 +32,8 @@ const TIPOS = [
 ];
 
 const idLocal = () => 'c' + Math.random().toString(36).slice(2, 10);
-const numero = id => String(id).padStart(4, '0');
+// Número do registro dentro do livro (1, 2, 3...). Registro que ainda aguarda aprovação não tem número.
+const numeroDe = r => (r.numero ? String(r.numero) : '');
 
 function tituloDe(l, dados) {
   const c = l.campos.find(x => (x.tipo === 'texto' || x.tipo === 'selecao') && dados[x.id]);
@@ -231,7 +232,7 @@ export async function livro(m, id) {
         onclick: () => ver(r),
         onkeydown: e => { if (e.key === 'Enter' && e.target === e.currentTarget) ver(r); },
       },
-      h('td', { class: 'col-num' }, numero(r.id)),
+      h('td', { class: 'col-num' }, numeroDe(r)),
       colunas.map(c => h('td', { 'data-rotulo': c.nome }, valorCurto(c, r.dados[c.id], r.dados))),
       l.cobranca && h('td', { 'data-rotulo': 'Pagamentos' },
         h('button', {
@@ -243,7 +244,7 @@ export async function livro(m, id) {
     function filtrar() {
       const q = normalizar(busca.trim());
       visiveis = d.registros.filter(r =>
-        (!q || normalizar(Object.values(r.dados).join(' ')).includes(q))
+        (!q || normalizar(`${Object.values(r.dados).join(' ')} ${r.numero ?? ''}`).includes(q))
         && selecoes.every(c => !filtros[c.id] || r.dados[c.id] === filtros[c.id])
         && (!filtroPagamento || PAGAMENTOS[filtroPagamento](r.cobranca)));
       const total = d.registros.length;
@@ -341,7 +342,7 @@ function verRegistro(m, d, r, recarregar, reabrir) {
       h('img', { src: '/img/brasao.png', alt: '', class: 'doc-brasao' }),
       h('p', { class: 'doc-sobre' }, `${MODULOS[m].titulo} de Lyendell`),
       h('h2', { class: 'doc-titulo' }, titulo),
-      h('p', { class: 'doc-livro' }, `${l.nome} · Registro nº ${numero(r.id)}`)),
+      h('p', { class: 'doc-livro' }, r.numero ? `${l.nome} · Registro nº ${r.numero}` : `${l.nome} · sem número até ser aprovado`)),
     h('div', { class: 'doc-campos' }, linhas.length ? linhas : h('p', { class: 'suave' }, 'Registro sem informações.')),
     h('footer', { class: 'doc-assinatura' },
       h('p', null, `Registrado por ${r.criado_por_nome || 'desconhecido'} em ${dataHora(r.criado_em)}.`),

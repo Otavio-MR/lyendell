@@ -15,7 +15,7 @@ const CATALOGO = [
     { chave: 'tabelionato.apagar', nome: 'Apagar registros' },
     { chave: 'tabelionato.configurar', nome: 'Criar livros, seções, campos e opções' },
     { chave: 'tabelionato.pagamentos', nome: 'Marcar pagamentos (ex.: de comerciantes) como pagos' },
-    { chave: 'tabelionato.aprovar', nome: 'Aprovar ou recusar os registros enviados (ex.: pelo Escriba)' },
+    { chave: 'tabelionato.aprovar', nome: 'Aprovar ou recusar registros (exclusiva: só um cargo pode ter, a Tabeliã)' },
   ] },
   { grupo: 'Guarda do Coelho', itens: [
     { chave: 'guarda.ver', nome: 'Ver os livros e registros' },
@@ -23,7 +23,7 @@ const CATALOGO = [
     { chave: 'guarda.editar', nome: 'Editar registros' },
     { chave: 'guarda.apagar', nome: 'Apagar registros' },
     { chave: 'guarda.configurar', nome: 'Criar livros, seções, campos e opções' },
-    { chave: 'guarda.aprovar', nome: 'Aprovar ou recusar os registros enviados (ex.: prisioneiros registrados por guardas)' },
+    { chave: 'guarda.aprovar', nome: 'Aprovar ou recusar registros (exclusiva: só um cargo pode ter, o Comandante)' },
   ] },
   { grupo: 'Galeria', itens: [
     { chave: 'galeria.ver', nome: 'Ver as fotos' },
@@ -52,6 +52,10 @@ const MORADOR = ['tabelionato.ver', 'guarda.ver', 'galeria.ver', 'anuncios.ver',
 const MEMBRO = ['anuncios.publicar', 'atividades.criar', 'galeria.enviar'];
 const acoes = (modulo, ...lista) => lista.map(a => `${modulo}.${a}`);
 
+// Aprovar registros é exclusivo de um único cargo em cada módulo (além do administrador principal).
+// Nem a Família Nobre aprova: tudo passa pela Tabeliã ou pelo Comandante.
+const EXCLUSIVAS = { 'tabelionato.aprovar': 'Tabeliã', 'guarda.aprovar': 'Comandante da Guarda' };
+
 // [descrições antigas, descrição atual]: as antigas são trocadas nos bancos que ainda não as mudaram.
 const DESCRICOES = {
   'Tabeliã': [['Comanda o Tabelionato: registra, edita, apaga e configura os livros.', 'Comanda o Tabelionato: registra, edita, apaga, configura os livros e marca os pagamentos.'],
@@ -62,6 +66,8 @@ const DESCRICOES = {
     'Comanda a Guarda do Coelho: aprova os registros, edita, apaga e configura os livros.'],
   Guarda: [['Vê os registros da Guarda e registra prisioneiros.'],
     'Vê os registros da Guarda e registra prisioneiros, que vão para a aprovação do Comandante.'],
+  'Família Nobre': [['Pode tudo, menos adicionar novos usuários.'],
+    'Pode tudo, menos adicionar usuários e aprovar registros (isso é da Tabeliã e do Comandante).'],
 };
 
 const CARGOS_PADRAO = [
@@ -69,8 +75,8 @@ const CARGOS_PADRAO = [
     descricao: 'Todos os usuários são moradores. Veem tudo e podem ajudar nas atividades.',
     permissoes: MORADOR },
   { nome: 'Família Nobre', cor: '#d8b13a',
-    descricao: 'Pode tudo, menos adicionar novos usuários.',
-    permissoes: TODAS.filter(p => p !== 'usuarios.criar' && p !== 'cargos.gerenciar') },
+    descricao: DESCRICOES['Família Nobre'][1],
+    permissoes: TODAS.filter(p => p !== 'usuarios.criar' && p !== 'cargos.gerenciar' && !EXCLUSIVAS[p]) },
   { nome: 'Tabeliã', cor: '#c98b4a',
     descricao: DESCRICOES['Tabeliã'][1],
     permissoes: [...MEMBRO, ...acoes('tabelionato', 'registrar', 'editar', 'apagar', 'configurar', 'pagamentos', 'aprovar')] },
@@ -85,4 +91,4 @@ const CARGOS_PADRAO = [
     permissoes: [...MEMBRO, 'guarda.registrar'] },
 ];
 
-module.exports = { CATALOGO, TODAS, VALIDAS, CARGOS_PADRAO, DESCRICOES };
+module.exports = { CATALOGO, TODAS, VALIDAS, CARGOS_PADRAO, DESCRICOES, EXCLUSIVAS };

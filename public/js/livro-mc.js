@@ -242,7 +242,6 @@ function nbtLivro(paginas, autor, titulo) {
 
 /* ─── Livros prontos para cada parte do sistema ───── */
 
-const numero = id => String(id).padStart(4, '0');
 const hojeBr = () => new Date().toLocaleDateString('pt-BR');
 
 function capaPadrao(linha1, linha2, extras) {
@@ -308,7 +307,7 @@ export function livroDeRegistro(nomeModulo, livro, reg, autor) {
   const mc = new LivroMC(titulo, autor);
   mc.capa(capaPadrao(nomeModulo.toUpperCase(), 'DE LYENDELL', [
     ...texto(livro.nome, '8', { centro: true }),
-    ...texto(`Registro nº ${numero(reg.id)}`, '8', { centro: true }),
+    ...texto(reg.numero ? `Registro nº ${reg.numero}` : 'Aguardando aprovação', '8', { centro: true }),
     vazia(),
     L(ORN.estrela, '8'),
     ...texto(titulo, '0', { centro: true, negrito: true }),
@@ -330,11 +329,11 @@ export function livroDeRegistros(nomeModulo, livro, registros, autor) {
     ...texto(`${registros.length} ${registros.length === 1 ? 'registro' : 'registros'}`, '8', { centro: true }),
     ...texto(`Copiado em ${hojeBr()}`, '8', { centro: true }),
   ]));
-  [...registros].sort((a, b) => a.id - b.id).forEach(reg => {
+  [...registros].sort((a, b) => (a.numero ?? Infinity) - (b.numero ?? Infinity) || a.id - b.id).forEach(reg => {
     mc.bloco([
       L(ORN.estrela, '8'),
       ...texto(tituloDoRegistro(livro, reg.dados), '0', { centro: true, negrito: true }),
-      ...texto(`Registro nº ${numero(reg.id)}`, '8', { centro: true }),
+      ...texto(reg.numero ? `Registro nº ${reg.numero}` : 'Aguardando aprovação', '8', { centro: true }),
       L(ORN.estrela, '8'),
     ], { novaPagina: true });
     camposDoRegistro(mc, livro, reg);
