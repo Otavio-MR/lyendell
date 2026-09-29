@@ -175,6 +175,8 @@ const ICONES = {
   pedra: '<path d="M3.5 15.5 6 9l4.5-3.5 5.5 1L20.5 11l-.5 5.5-3.5 3h-10z"/><path d="m10.5 5.5 1.5 5-6-1.5M12 10.5l4.5 1.5 4-1M12 10.5l-1.5 9"/>',
   papel: '<path d="M6 3h8.5L19 7.5V21H6z"/><path d="M14 3v5h5"/>',
   tesoura: '<circle cx="6" cy="6" r="2.8"/><circle cx="6" cy="18" r="2.8"/><path d="M8.2 7.8 20 19M8.2 16.2 20 5"/>',
+  pergunta: '<circle cx="12" cy="12" r="9"/><path d="M9.3 9.4a2.8 2.8 0 1 1 3.9 2.6c-.8.4-1.2 1-1.2 1.8v.5"/><path d="M12 17.2v.3"/>',
+  coelho: '<path d="M9.5 10.5C7.8 7.6 7.4 3.6 8.8 3.1s2.9 3.2 3 7"/><path d="M14.5 10.5c1.7-2.9 2.1-6.9.7-7.4s-2.9 3.2-3 7"/><circle cx="12" cy="15" r="6"/><path d="M10 14.2v.3M14 14.2v.3M11 17.3c.6.4 1.4.4 2 0"/>',
 };
 export const NOMES_ICONES = Object.keys(ICONES);
 

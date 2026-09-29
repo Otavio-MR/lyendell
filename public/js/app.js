@@ -8,6 +8,8 @@ import { atividades, atividade } from './telas/atividades.js';
 import { usuarios, cargos, diario } from './telas/admin.js';
 import { perfil } from './telas/perfil.js';
 import { recreacao, sala, cobrinha, quebraCabeca } from './telas/recreacao.js';
+import { pacCoelho } from './telas/pac-coelho.js';
+import { perguntasQuiz } from './telas/quiz.js';
 
 const app = document.getElementById('app');
 
@@ -46,6 +48,8 @@ const ROTAS = [
   [/^\/recreacao$/, () => recreacao()],
   [/^\/recreacao\/cobrinha$/, () => cobrinha()],
   [/^\/recreacao\/quebra-cabeca$/, () => quebraCabeca()],
+  [/^\/recreacao\/pac-coelho$/, () => pacCoelho()],
+  [/^\/recreacao\/perguntas$/, () => perguntasQuiz()],
   [/^\/recreacao\/sala\/([0-9a-f]+)$/, id => sala(id)],
   [/^\/perfil$/, () => perfil()],
 ];

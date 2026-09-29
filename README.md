@@ -99,15 +99,27 @@ marcar batata que não entregou. A atividade fecha sozinha quando bate a meta.
 
 Um salão com **chat ao vivo**, a lista de quem está online e os jogos:
 
+- **Quiz de Lyendell**, ao vivo, até 10 pessoas: perguntas de A a D sobre a Família Luckham,
+  coelhos, Minecraft e regras de RP (metagaming, powergaming, anti-RP, flaming...). Quem abre a
+  sala escolhe as categorias e o tamanho (5, 10 ou 15 perguntas) e começa quando quiser.
+  Cada pergunta tem 20 segundos; acertar vale de 500 a 1000 pontos (quanto mais rápido, mais).
+  Sozinho vale como treino. No fim aparece o pódio, e quem abriu pode começar outra rodada.
 - **Jogo da Velha** e **Pedra, Papel e Tesoura** (melhor de três), ao vivo contra outro morador.
   Quem abre a partida espera alguém clicar em **Entrar**; os outros podem **Assistir**.
   No fim dá para pedir revanche (quem não começou, começa).
+- **Pac-Coelho**: o coelho da Casa come os Lírios do labirinto e foge de quatro raposas
+  (Rubra, Ártica, Cinzenta e Fenec, cada uma caça de um jeito). O Lírio grande deixa as raposas
+  com medo; a cenoura é o bônus. Vida extra aos 10.000 pontos.
 - **Cobrinha**, comendo cenouras (setas, W A S D, ou deslizando o dedo no celular).
 - **Quebra-cabeça** com as fotos da Galeria, em 3x3, 4x4 ou 5x5.
 
-Cada jogo tem ranking: vitórias nos jogos ao vivo, cenouras na cobrinha e o menor tempo no
-quebra-cabeça. Quem sai de uma partida no meio perde; quem cai da internet tem 30 segundos
-para voltar. A Família Nobre (e quem tiver o poder "Apagar mensagens de outros no chat") pode
+As perguntas do quiz ficam no banco: quem tem o poder "Criar e editar as perguntas do quiz"
+(a Família Nobre, e o administrador) corrige, apaga e cria perguntas no botão **Perguntas**
+do cartão do quiz. O sistema já vem com umas 115 perguntas.
+
+Cada jogo tem ranking: vitórias e acertos no quiz, vitórias nos jogos de dois, pontos no
+Pac-Coelho, cenouras na cobrinha e o menor tempo no quebra-cabeça. Quem sai de uma partida no
+meio perde (no quiz, fica fora do resultado); quem cai da internet tem 30 segundos para voltar. A Família Nobre (e quem tiver o poder "Apagar mensagens de outros no chat") pode
 apagar mensagens impróprias; cada um pode apagar as suas.
 
 O chat guarda as últimas 2000 mensagens. As partidas em andamento ficam só na memória do

@@ -104,8 +104,8 @@ export function lendoChat(sim) {
   }
 }
 
-export function criarPartida(jogo) {
-  criando = enviar('sala:criar', { jogo });
+export function criarPartida(jogo, opcoes) {
+  criando = enviar('sala:criar', { jogo, opcoes });
 }
 export function entrarNaPartida(id) {
   if (enviar('sala:entrar', { id })) indoPara = id;
@@ -148,15 +148,18 @@ function tratar(m) {
         criando = false;
         indoPara = null;
         if (!estouNaSala(s.id)) location.hash = rotaDaSala(s.id);
-      } else if (s.eu === 0 && antes?.status === 'esperando' && s.status === 'jogando' && !estouNaSala(s.id)) {
-        chamar(`${s.jogadores[1].nome} entrou na sua partida de ${s.nomeJogo}!`, 'Jogar agora', rotaDaSala(s.id), 20_000);
+      } else if (antes && s.eu >= 0 && !estouNaSala(s.id)) {
+        avisarMudanca(antes, s);
       }
       break;
     }
-    case 'sala:fechada':
+    case 'sala:fechada': {
+      const antes = rt.partidas.get(m.id);
       rt.partidas.delete(m.id);
       if (rt.minhaSala === m.id) rt.minhaSala = null;
+      if (m.motivo === 'dono') aviso(`Quem abriu a sala de ${antes?.nomeJogo || 'jogo'} desistiu, e ela foi fechada.`, 'erro');
       break;
+    }
     case 'aviso':
       if (m.de !== rt.eu?.id && !location.hash.startsWith('#/recreacao')) chamar(m.texto, 'Ver', '#/recreacao', 9000);
       break;
@@ -166,6 +169,19 @@ function tratar(m) {
       break;
   }
   atualizarBarra();
+}
+
+// Algo mudou numa partida minha enquanto eu estava em outra tela.
+function avisarMudanca(antes, s) {
+  const comecou = antes.status === 'esperando' && s.status === 'jogando';
+  if (!s.grupo) {
+    if (s.eu === 0 && comecou) chamar(`${s.jogadores[1].nome} entrou na sua partida de ${s.nomeJogo}!`, 'Jogar agora', rotaDaSala(s.id), 20_000);
+    return;
+  }
+  if (comecou) chamar(`O ${s.nomeJogo} começou!`, 'Ir para o quiz', rotaDaSala(s.id), 20_000);
+  else if (s.status === 'esperando' && s.dono === rt.eu?.id && s.jogadores.length > antes.jogadores.length) {
+    chamar(`${s.jogadores[s.jogadores.length - 1].nome} entrou na sua sala do ${s.nomeJogo} (${s.jogadores.length} de ${s.max}).`, 'Ver a sala', rotaDaSala(s.id), 12_000);
+  }
 }
 
 // Aviso com botão (ex.: "Fulano entrou na sua partida"). Fica mais tempo que um aviso comum.
@@ -183,12 +199,21 @@ function chamar(texto, rotulo, href, duracao) {
 // Faixa "você tem uma partida em andamento" quando a pessoa sai da tela do jogo sem sair da partida.
 export function atualizarBarra() {
   const s = rt.minhaSala && rt.partidas.get(rt.minhaSala);
-  const mostrar = s && s.status === 'jogando' && !estouNaSala(s.id) && !!estado.eu;
+  const mostrar = s && (s.status === 'jogando' || (s.grupo && s.status === 'esperando')) && !estouNaSala(s.id) && !!estado.eu;
   let barra = document.getElementById('partida-ativa');
   if (!mostrar) { barra?.remove(); return; }
-  const outro = s.jogadores[1 - s.eu];
-  const minhaVez = s.jogo === 'velha' ? s.estado?.vez === s.eu : !s.estado?.minha;
-  const texto = `Partida de ${s.nomeJogo} contra ${outro?.nome || '...'}${minhaVez ? ' · sua vez!' : ''}`;
+  let minhaVez;
+  let texto;
+  if (s.grupo) {
+    minhaVez = s.status === 'jogando' && s.estado?.fase === 'pergunta' && s.estado.minha == null;
+    texto = s.status === 'esperando'
+      ? `Sala do ${s.nomeJogo} (${s.jogadores.length} de ${s.max}) esperando começar`
+      : `${s.nomeJogo}: pergunta ${s.estado?.numero} de ${s.estado?.total}${minhaVez ? ' · responda!' : ''}`;
+  } else {
+    const outro = s.jogadores[1 - s.eu];
+    minhaVez = s.jogo === 'velha' ? s.estado?.vez === s.eu : !s.estado?.minha;
+    texto = `Partida de ${s.nomeJogo} contra ${outro?.nome || '...'}${minhaVez ? ' · sua vez!' : ''}`;
+  }
   if (!barra) {
     barra = h('a', { id: 'partida-ativa', class: 'partida-ativa' });
     document.body.append(barra);

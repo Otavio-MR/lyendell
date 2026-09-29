@@ -1,4 +1,4 @@
-// Recreação ao vivo: quem está online, chat e partidas (jogo da velha, pedra papel e tesoura).
+// Recreação ao vivo: quem está online, chat e partidas (jogo da velha, pedra papel e tesoura, quiz).
 // Tudo passa por uma conexão WebSocket em /ws, aberta com a mesma sessão (cookie) do site.
 // As partidas ficam na memória do servidor; o chat e os resultados vão para o banco.
 
@@ -7,6 +7,7 @@ const { WebSocketServer } = require('ws');
 const { db } = require('./db');
 const { usuarioDaRequisicao, sessaoAindaValida } = require('./auth');
 const { texto: limparTexto } = require('./util');
+const quiz = require('./quiz');
 
 const ESPERA_MS = Number(process.env.RECREACAO_ESPERA_MS) || 30_000;       // tempo para voltar depois de cair
 const REVALIDAR_MS = Number(process.env.RECREACAO_REVALIDAR_MS) || 120_000; // confere se a sessão ainda vale
@@ -34,7 +35,7 @@ function paraTodos(tipo, dados) {
 const online = () => [...conexoes.keys()].map(id => pessoas.get(id)).filter(Boolean)
   .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 
-/* ─── Jogos ───────────────────────────────────────── */
+/* ─── Jogos de duas pessoas ───────────────────────── */
 
 const LINHAS = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
 const MAOS = ['pedra', 'papel', 'tesoura'];
@@ -42,9 +43,11 @@ const VENCE = { pedra: 'tesoura', papel: 'pedra', tesoura: 'papel' };
 
 // Cada jogo: novo(quem começa), jogar(estado, índice do jogador, jogada) e visao(estado, índice de quem vê).
 // jogar devolve null (continua), { vencedor: 0|1 } ou { empate: true }.
+// O quiz é diferente (várias pessoas, tempo por pergunta) e tem as funções próprias mais abaixo.
 const JOGOS = {
   velha: {
     nome: 'Jogo da Velha',
+    max: 2,
     novo: inicia => ({ tabuleiro: Array(9).fill(null), vez: inicia, simbolos: inicia === 0 ? ['X', 'O'] : ['O', 'X'], linha: null }),
     jogar(e, i, { casa }) {
       if (e.vez !== i) throw new ErroJogo('Não é a sua vez.');
@@ -60,6 +63,7 @@ const JOGOS = {
   },
   ppt: {
     nome: 'Pedra, Papel e Tesoura',
+    max: 2,
     novo: () => ({ escolhas: [null, null], placar: [0, 0], rodadas: [] }),
     jogar(e, i, { escolha }) {
       if (!MAOS.includes(escolha)) throw new ErroJogo('Escolha pedra, papel ou tesoura.');
@@ -77,23 +81,38 @@ const JOGOS = {
     // A escolha do outro só aparece depois que os dois escolheram.
     visao: (e, i) => ({ placar: e.placar, rodadas: e.rodadas, minha: i >= 0 ? e.escolhas[i] : null, escolheu: e.escolhas.map(Boolean) }),
   },
+  quiz: {
+    nome: 'Quiz de Lyendell',
+    max: quiz.MAX_JOGADORES,
+    grupo: true, // várias pessoas; quem abriu a sala decide quando começa
+  },
 };
 
 /* ─── Salas ───────────────────────────────────────── */
 
 const indiceNa = (s, id) => s.jogadores.findIndex(p => p.id === id);
 const salaAtivaDe = id => [...salas.values()].find(s => s.status !== 'fim' && s.jogadores.some(p => p.id === id && !p.saiu));
+const ehGrupo = s => !!JOGOS[s.jogo].grupo;
+const ativos = s => s.jogadores.filter(p => !p.saiu);
+const dono = s => ativos(s)[0] || null; // quem abriu a sala (ou o próximo, se ele saiu)
 
 function visaoSala(s, id) {
   const eu = indiceNa(s, id);
+  const jogo = JOGOS[s.jogo];
+  let estado = null;
+  if (s.estado) estado = jogo.grupo ? visaoQuiz(s, id) : jogo.visao(s.estado, eu);
   return {
     id: s.id,
     jogo: s.jogo,
-    nomeJogo: JOGOS[s.jogo].nome,
+    nomeJogo: jogo.nome,
+    grupo: !!jogo.grupo,
+    max: jogo.max,
+    opcoes: s.opcoes || null,
     status: s.status,
     eu,
+    dono: dono(s)?.id ?? null,
     jogadores: s.jogadores.map(p => ({ id: p.id, nome: p.nome, foto: p.foto, conectado: conexoes.has(p.id), saiu: !!p.saiu })),
-    estado: s.estado ? JOGOS[s.jogo].visao(s.estado, eu) : null,
+    estado,
     vencedor: s.vencedor,
     empate: s.empate,
     motivo: s.motivo,
@@ -109,9 +128,17 @@ function enviarSala(s) {
 
 const resumoSalas = () => [...salas.values()]
   .filter(s => s.status !== 'fim')
-  .map(s => ({ id: s.id, jogo: s.jogo, nomeJogo: JOGOS[s.jogo].nome, status: s.status, jogadores: s.jogadores.map(p => p.nome), espectadores: s.espectadores.size }));
+  .map(s => ({
+    id: s.id, jogo: s.jogo, nomeJogo: JOGOS[s.jogo].nome, status: s.status, grupo: ehGrupo(s), max: JOGOS[s.jogo].max,
+    opcoes: s.opcoes || null, jogadores: ativos(s).map(p => p.nome), espectadores: s.espectadores.size,
+  }));
 
 const avisarLobby = () => paraTodos('salas', { salas: resumoSalas() });
+
+function fecharSala(s) {
+  clearTimeout(s.timer);
+  salas.delete(s.id);
+}
 
 function finalizar(s, resultado, motivo) {
   s.status = 'fim';
@@ -130,9 +157,10 @@ function finalizar(s, resultado, motivo) {
 function sairDaSala(id, s, motivo = 'abandono') {
   if (s.espectadores.delete(id)) { enviarSala(s); return; }
   const i = indiceNa(s, id);
-  if (i < 0) return;
+  if (i < 0 || s.jogadores[i].saiu) return;
+  if (ehGrupo(s)) { sairDoQuiz(id, s, i); return; }
   if (s.status === 'esperando') {
-    salas.delete(s.id);
+    fecharSala(s);
     paraUsuario(id, 'sala:fechada', { id: s.id });
     avisarLobby();
     return;
@@ -142,12 +170,148 @@ function sairDaSala(id, s, motivo = 'abandono') {
   s.revanche.clear();
   enviarSala(s);
   paraUsuario(id, 'sala:fechada', { id: s.id });
-  if (s.jogadores.every(p => p.saiu)) salas.delete(s.id);
+  if (s.jogadores.every(p => p.saiu)) fecharSala(s);
   avisarLobby();
 }
 
+// Sempre uma cópia: cada sala marca "saiu" no seu próprio jogador, sem afetar as outras salas.
 function pessoaDe(u) {
-  return pessoas.get(u.id) || { id: u.id, nome: u.nome, foto: u.foto || null };
+  const p = pessoas.get(u.id);
+  return { id: u.id, nome: p?.nome || u.nome, foto: p ? p.foto : u.foto || null };
+}
+
+/* ─── Quiz ────────────────────────────────────────── */
+
+// Estado do quiz: perguntas sorteadas, a pergunta atual e em que fase ela está
+// ("pergunta": valendo; "resposta": mostrando a certa), as respostas dela e o placar de cada um.
+
+async function comecarQuiz(s) {
+  const perguntas = await quiz.sortear(s.opcoes);
+  if (!salas.has(s.id) || s.status !== 'esperando') return; // a sala fechou enquanto sorteava
+  s.estado = { perguntas, atual: -1, fase: 'pergunta', prazo: 0, proxima: 0, respostas: {}, placar: {} };
+  for (const p of s.jogadores) s.estado.placar[p.id] = { pontos: 0, acertos: 0 };
+  Object.assign(s, { status: 'jogando', vencedor: null, empate: false, motivo: null });
+  s.revanche.clear();
+  abrirPergunta(s, 0);
+  avisarLobby();
+}
+
+function abrirPergunta(s, n) {
+  const e = s.estado;
+  Object.assign(e, { atual: n, fase: 'pergunta', respostas: {}, prazo: Date.now() + quiz.TEMPO_MS });
+  clearTimeout(s.timer);
+  s.timer = setTimeout(() => revelar(s), quiz.TEMPO_MS);
+  enviarSala(s);
+}
+
+function responder(s, i, { alternativa }) {
+  const e = s.estado;
+  const p = s.jogadores[i];
+  if (s.status !== 'jogando' || e.fase !== 'pergunta') throw new ErroJogo('Espere a próxima pergunta.');
+  if (!Number.isInteger(alternativa) || alternativa < 0 || alternativa > 3) throw new ErroJogo('Escolha A, B, C ou D.');
+  if (e.respostas[p.id]) throw new ErroJogo('Você já respondeu esta pergunta.');
+  if (Date.now() > e.prazo + 300) throw new ErroJogo('O tempo acabou.');
+  const certa = alternativa === e.perguntas[e.atual].correta;
+  e.respostas[p.id] = { alt: alternativa, certa, pontos: quiz.pontosDaResposta(certa, e.prazo - Date.now()) };
+  enviarSala(s);
+  conferirRespostas(s);
+}
+
+// Se todos que estão na partida (e conectados) já responderam, não precisa esperar o tempo acabar.
+function conferirRespostas(s) {
+  const e = s.estado;
+  if (s.status !== 'jogando' || e.fase !== 'pergunta') return;
+  const faltam = ativos(s).filter(p => conexoes.has(p.id) && !e.respostas[p.id]);
+  if (faltam.length) return;
+  clearTimeout(s.timer);
+  s.timer = setTimeout(() => revelar(s), 700);
+}
+
+function revelar(s) {
+  const e = s.estado;
+  if (!salas.has(s.id) || s.status !== 'jogando' || e.fase !== 'pergunta') return;
+  e.fase = 'resposta';
+  for (const [id, r] of Object.entries(e.respostas)) {
+    const placar = e.placar[id];
+    placar.pontos += r.pontos;
+    if (r.certa) placar.acertos++;
+  }
+  const ultima = e.atual + 1 >= e.perguntas.length;
+  e.proxima = Date.now() + quiz.REVELAR_MS;
+  clearTimeout(s.timer);
+  s.timer = setTimeout(() => (ultima ? terminarQuiz(s) : abrirPergunta(s, e.atual + 1)), quiz.REVELAR_MS);
+  enviarSala(s);
+}
+
+// Classificação: mais pontos; no empate, mais acertos.
+function classificacao(s) {
+  const e = s.estado;
+  return s.jogadores
+    .map((p, i) => ({ i, id: p.id, nome: p.nome, saiu: !!p.saiu, ...e.placar[p.id] }))
+    .sort((a, b) => a.saiu - b.saiu || b.pontos - a.pontos || b.acertos - a.acertos);
+}
+
+function terminarQuiz(s) {
+  if (!salas.has(s.id) || s.status !== 'jogando') return;
+  const e = s.estado;
+  e.fase = 'fim';
+  const lista = classificacao(s).filter(c => !c.saiu); // quem desistiu não entra no resultado
+  s.status = 'fim';
+  s.terminou = Date.now();
+  s.vencedor = lista[0]?.i ?? null;
+  if (lista.length) {
+    db.lote(lista.map((c, posicao) => [
+      'INSERT INTO quiz_resultados (usuario_id, usuario_nome, pontos, acertos, total, posicao, jogadores) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      c.id, c.nome, c.pontos, c.acertos, e.perguntas.length, posicao + 1, lista.length,
+    ])).catch(err => console.error('Erro ao guardar o quiz:', err.message));
+  }
+  enviarSala(s);
+  avisarLobby();
+}
+
+function sairDoQuiz(id, s, i) {
+  paraUsuario(id, 'sala:fechada', { id: s.id });
+  if (s.status === 'esperando') {
+    if (i === 0) {
+      // Quem abriu a sala desistiu antes de começar: a sala fecha para todos.
+      for (const p of s.jogadores) if (p.id !== id) paraUsuario(p.id, 'sala:fechada', { id: s.id, motivo: 'dono' });
+      for (const x of s.espectadores) paraUsuario(x, 'sala:fechada', { id: s.id, motivo: 'dono' });
+      fecharSala(s);
+    } else {
+      s.jogadores.splice(i, 1);
+      enviarSala(s);
+    }
+    avisarLobby();
+    return;
+  }
+  s.jogadores[i].saiu = true;
+  if (!ativos(s).length) { fecharSala(s); avisarLobby(); return; }
+  if (s.status === 'jogando') conferirRespostas(s);
+  enviarSala(s);
+  avisarLobby();
+}
+
+function visaoQuiz(s, id) {
+  const e = s.estado;
+  const placar = classificacao(s).map(c => ({ id: c.id, pontos: c.pontos, acertos: c.acertos, saiu: c.saiu }));
+  const base = { numero: e.atual + 1, total: e.perguntas.length, fase: e.fase, placar, tempoTotal: quiz.TEMPO_MS };
+  if (e.fase === 'fim') return base;
+  const p = e.perguntas[e.atual];
+  const revelada = e.fase === 'resposta';
+  return {
+    ...base,
+    categoria: quiz.CATEGORIAS[p.categoria],
+    texto: p.texto,
+    alternativas: p.alternativas,
+    restante: revelada ? 0 : Math.max(0, e.prazo - Date.now()),
+    proxima: revelada ? Math.max(0, e.proxima - Date.now()) : null,
+    ultima: e.atual + 1 >= e.perguntas.length,
+    minha: e.respostas[id]?.alt ?? null,
+    responderam: Object.keys(e.respostas).map(Number),
+    // A resposta certa (e o que cada um marcou) só aparece depois que a pergunta fecha.
+    correta: revelada ? p.correta : null,
+    respostas: revelada ? Object.entries(e.respostas).map(([uid, r]) => ({ id: Number(uid), alt: r.alt, pontos: r.pontos })) : null,
+  };
 }
 
 /* ─── O que cada mensagem do navegador faz ────────── */
@@ -174,29 +338,39 @@ const acoes = {
     paraTodos('chat:apagada', { id: msg.id });
   },
 
-  'sala:criar'(u, { jogo }) {
+  async 'sala:criar'(u, { jogo, opcoes }) {
     if (!JOGOS[jogo]) throw new ErroJogo('Jogo desconhecido.');
     if (salaAtivaDe(u.id)) throw new ErroJogo('Você já está numa partida. Termine ou saia dela antes de abrir outra.');
+    let escolhidas = null;
+    if (JOGOS[jogo].grupo) {
+      escolhidas = quiz.validarOpcoes(opcoes);
+      if (!await quiz.contarPerguntas(escolhidas.categorias)) throw new ErroJogo('Ainda não há perguntas nessas categorias.');
+      if (salaAtivaDe(u.id)) throw new ErroJogo('Você já está numa partida.'); // abriu outra enquanto contava
+    }
     const s = {
-      id: crypto.randomBytes(4).toString('hex'), jogo, jogadores: [pessoaDe(u)], status: 'esperando', estado: null,
-      inicia: 0, vencedor: null, empate: false, motivo: null, revanche: new Set(), espectadores: new Set(), criada: Date.now(),
+      id: crypto.randomBytes(4).toString('hex'), jogo, jogadores: [pessoaDe(u)], status: 'esperando', estado: null, opcoes: escolhidas,
+      inicia: 0, vencedor: null, empate: false, motivo: null, revanche: new Set(), espectadores: new Set(), criada: Date.now(), timer: null,
     };
     salas.set(s.id, s);
     enviarSala(s);
     avisarLobby();
-    paraTodos('aviso', { texto: `${u.nome} abriu uma partida de ${JOGOS[jogo].nome}.`, sala: s.id, de: u.id });
+    paraTodos('aviso', { texto: `${u.nome} abriu ${JOGOS[jogo].grupo ? 'uma sala' : 'uma partida'} de ${JOGOS[jogo].nome}.`, sala: s.id, de: u.id });
   },
 
   'sala:entrar'(u, { id }) {
     const s = salas.get(id);
     if (!s) throw new ErroJogo('Essa partida não existe mais.');
-    if (s.jogadores.some(p => p.id === u.id)) { enviarSala(s); return; }
+    const i = indiceNa(s, u.id);
+    if (i >= 0 && !s.jogadores[i].saiu) { enviarSala(s); return; }
     if (s.status !== 'esperando') throw new ErroJogo('Essa partida já começou. Você pode assistir.');
     if (salaAtivaDe(u.id)) throw new ErroJogo('Você já está numa partida. Termine ou saia dela antes.');
+    if (s.jogadores.length >= JOGOS[s.jogo].max) throw new ErroJogo('A sala está cheia.');
     s.jogadores.push(pessoaDe(u));
     s.espectadores.delete(u.id);
-    s.status = 'jogando';
-    s.estado = JOGOS[s.jogo].novo(s.inicia);
+    if (!ehGrupo(s)) {
+      s.status = 'jogando';
+      s.estado = JOGOS[s.jogo].novo(s.inicia);
+    }
     enviarSala(s);
     avisarLobby();
   },
@@ -208,11 +382,28 @@ const acoes = {
     enviarSala(s);
   },
 
+  // Quiz: quem abriu a sala começa quando quiser (sozinho vale como treino).
+  async 'sala:comecar'(u, { id }) {
+    const s = salas.get(id);
+    if (!s || !ehGrupo(s)) throw new ErroJogo('Essa sala não existe mais.');
+    if (dono(s)?.id !== u.id) throw new ErroJogo('Só quem abriu a sala pode começar.');
+    if (s.status !== 'esperando' || s.comecando) return;
+    s.comecando = true;
+    try {
+      await comecarQuiz(s);
+    } catch (e) {
+      throw e instanceof quiz.ErroQuiz ? new ErroJogo(e.message) : e;
+    } finally {
+      s.comecando = false;
+    }
+  },
+
   'sala:jogar'(u, { id, jogada }) {
     const s = salas.get(id);
     const i = s ? indiceNa(s, u.id) : -1;
-    if (!s || i < 0) throw new ErroJogo('Você não está nessa partida.');
+    if (!s || i < 0 || s.jogadores[i].saiu) throw new ErroJogo('Você não está nessa partida.');
     if (s.status !== 'jogando') throw new ErroJogo('A partida não está em andamento.');
+    if (ehGrupo(s)) { responder(s, i, jogada || {}); return; }
     const resultado = JOGOS[s.jogo].jogar(s.estado, i, jogada || {});
     if (resultado) finalizar(s, resultado, resultado.empate ? 'empate' : 'vitoria');
     enviarSala(s);
@@ -223,6 +414,15 @@ const acoes = {
     const s = salas.get(id);
     const i = s ? indiceNa(s, u.id) : -1;
     if (!s || i < 0 || s.status !== 'fim') throw new ErroJogo('Não dá para pedir revanche agora.');
+    if (ehGrupo(s)) {
+      // Quiz: a sala volta a esperar gente, com quem ficou até o fim.
+      if (dono(s)?.id !== u.id) throw new ErroJogo('Só quem abriu a sala pode começar outra rodada.');
+      s.jogadores = ativos(s);
+      Object.assign(s, { status: 'esperando', estado: null, vencedor: null, empate: false, motivo: null, criada: Date.now() });
+      enviarSala(s);
+      avisarLobby();
+      return;
+    }
     if (s.jogadores.length < 2 || s.jogadores.some(p => p.saiu)) throw new ErroJogo('O outro jogador já saiu da partida.');
     if (salaAtivaDe(u.id)) throw new ErroJogo('Você já está em outra partida.');
     s.revanche.add(u.id);
@@ -266,8 +466,9 @@ function conectar(ws, usuario, token) {
     try {
       await acao(usuario, msg.dados && typeof msg.dados === 'object' ? msg.dados : {}, ws);
     } catch (e) {
-      if (!(e instanceof ErroJogo)) console.error('Erro na recreação:', e);
-      enviar(ws, 'erro', { mensagem: e instanceof ErroJogo ? e.message : 'Algo deu errado. Tente de novo.' });
+      const conhecido = e instanceof ErroJogo || e instanceof quiz.ErroQuiz;
+      if (!conhecido) console.error('Erro na recreação:', e);
+      enviar(ws, 'erro', { mensagem: conhecido ? e.message : 'Algo deu errado. Tente de novo.' });
     }
   });
 
@@ -300,7 +501,8 @@ function desconectar(ws) {
   }
   const s = salaAtivaDe(id);
   if (!s) return;
-  enviarSala(s); // mostra para o outro que a pessoa caiu
+  if (ehGrupo(s)) conferirRespostas(s); // o quiz não fica esperando quem caiu
+  enviarSala(s); // mostra para os outros que a pessoa caiu
   // Se não voltar a tempo, perde a partida (ou a sala de espera fecha).
   quedas.set(id, setTimeout(() => {
     quedas.delete(id);
@@ -354,7 +556,7 @@ function iniciarRecreacao(servidor) {
     const agora = Date.now();
     for (const s of salas.values()) {
       if ((s.status === 'fim' && agora - s.terminou > 15 * 60_000) || (s.status === 'esperando' && agora - s.criada > 60 * 60_000)) {
-        salas.delete(s.id);
+        fecharSala(s);
       }
     }
     avisarLobby();

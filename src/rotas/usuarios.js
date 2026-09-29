@@ -60,6 +60,7 @@ const comandosRenomear = (id, nome) => [
   ['UPDATE recordes SET usuario_nome = ? WHERE usuario_id = ?', nome, id],
   ['UPDATE partidas SET jogador1_nome = ? WHERE jogador1_id = ?', nome, id],
   ['UPDATE partidas SET jogador2_nome = ? WHERE jogador2_id = ?', nome, id],
+  ['UPDATE quiz_resultados SET usuario_nome = ? WHERE usuario_id = ?', nome, id],
 ];
 
 async function buscarAlvo(req) {
@@ -181,6 +182,7 @@ r.delete('/:id', exigir('usuarios.remover'), async (req, res) => {
     ['UPDATE recordes SET usuario_id = NULL WHERE usuario_id = ?', id],
     ['UPDATE partidas SET jogador1_id = NULL WHERE jogador1_id = ?', id],
     ['UPDATE partidas SET jogador2_id = NULL WHERE jogador2_id = ?', id],
+    ['UPDATE quiz_resultados SET usuario_id = NULL WHERE usuario_id = ?', id],
     ['DELETE FROM usuarios WHERE id = ?', id],
     comandoApagarArquivo(alvo.foto),
   ]);

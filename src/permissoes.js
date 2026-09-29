@@ -44,6 +44,7 @@ const CATALOGO = [
   { grupo: 'Recreação', itens: [
     { chave: 'recreacao.usar', nome: 'Usar o chat e os jogos' },
     { chave: 'recreacao.moderar', nome: 'Apagar mensagens de outros no chat' },
+    { chave: 'recreacao.perguntas', nome: 'Criar e editar as perguntas do quiz' },
   ] },
 ];
 

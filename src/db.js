@@ -4,6 +4,7 @@ const { createClient } = require('@libsql/client');
 const { hashSenha } = require('./senhas');
 const { CARGOS_PADRAO, DESCRICOES, EXCLUSIVAS } = require('./permissoes');
 const { LIVROS_PADRAO, AJUDA_ABERTURA, CAMPOS_PENA, CAMPO_GUARDAS } = require('./livros-padrao');
+const { PERGUNTAS_PADRAO } = require('./perguntas-padrao');
 const { linha, chaveNome } = require('./util');
 
 // Na internet o banco fica no Turso (TURSO_DATABASE_URL + TURSO_AUTH_TOKEN).
@@ -238,6 +239,29 @@ CREATE TABLE IF NOT EXISTS recordes (
 );
 CREATE INDEX IF NOT EXISTS idx_recordes_jogo ON recordes(jogo, variante);
 
+CREATE TABLE IF NOT EXISTS perguntas (
+  id INTEGER PRIMARY KEY,
+  categoria TEXT NOT NULL,
+  texto TEXT NOT NULL,
+  alternativas TEXT NOT NULL,
+  correta INTEGER NOT NULL DEFAULT 0,
+  criado_por_nome TEXT NOT NULL DEFAULT '',
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_perguntas_categoria ON perguntas(categoria);
+
+CREATE TABLE IF NOT EXISTS quiz_resultados (
+  id INTEGER PRIMARY KEY,
+  usuario_id INTEGER,
+  usuario_nome TEXT NOT NULL,
+  pontos INTEGER NOT NULL,
+  acertos INTEGER NOT NULL,
+  total INTEGER NOT NULL,
+  posicao INTEGER NOT NULL,
+  jogadores INTEGER NOT NULL,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS diario (
   id INTEGER PRIMARY KEY,
   usuario_id INTEGER,
@@ -250,7 +274,7 @@ CREATE TABLE IF NOT EXISTS diario (
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 8;
+const VERSAO = 9;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -293,17 +317,21 @@ async function migrar() {
   if (versao < 5) await migrarAprovacao();
   if (versao < 6) await migrarNumeracao();
   if (versao < 7) await fecharBuracosNaNumeracao();
-  if (versao < 8) {
-    // v8: recreação. Todo morador usa o chat e os jogos; a Família Nobre modera o chat.
-    const novas = { base: ['recreacao.usar'], 'Família Nobre': ['recreacao.moderar'] };
-    for (const c of await db.all('SELECT id, nome, base, permissoes FROM cargos')) {
-      const lista = JSON.parse(c.permissoes);
-      const faltam = [...(c.base ? novas.base : []), ...(novas[c.nome] || [])].filter(p => !lista.includes(p));
-      if (faltam.length) await db.run('UPDATE cargos SET permissoes = ? WHERE id = ?', JSON.stringify([...lista, ...faltam]), c.id);
-    }
-  }
+  // v8: recreação. Todo morador usa o chat e os jogos; a Família Nobre modera o chat.
+  if (versao < 8) await darPermissoes({ base: ['recreacao.usar'], 'Família Nobre': ['recreacao.moderar'] });
+  // v9: quiz. A Família Nobre cuida das perguntas (as perguntas padrão entram no semear).
+  if (versao < 9) await darPermissoes({ 'Família Nobre': ['recreacao.perguntas'] });
 
   await db.run("INSERT INTO meta (chave, valor) VALUES ('versao', ?) ON CONFLICT (chave) DO UPDATE SET valor = excluded.valor", String(VERSAO));
+}
+
+// Acrescenta permissões novas aos cargos que já existem ("base" = o cargo de todos, o Morador).
+async function darPermissoes(novas) {
+  for (const c of await db.all('SELECT id, nome, base, permissoes FROM cargos')) {
+    const lista = JSON.parse(c.permissoes);
+    const faltam = [...(c.base ? novas.base || [] : []), ...(novas[c.nome] || [])].filter(p => !lista.includes(p));
+    if (faltam.length) await db.run('UPDATE cargos SET permissoes = ? WHERE id = ?', JSON.stringify([...lista, ...faltam]), c.id);
+  }
 }
 
 // v4: prisioneiros ganham soltura prevista, pena calculada, multa e guardas escolhidos da lista.
@@ -430,6 +458,16 @@ async function semear() {
       l.modulo, l.nome, l.descricao, l.icone, l.aberto, JSON.stringify(l.campos), l.cobranca ? JSON.stringify(l.cobranca) : null, i,
     ]));
     await resolverReferencias();
+  }
+
+  // As perguntas padrão do quiz entram uma vez só: se alguém apagar todas depois, não voltam.
+  if (!await db.get("SELECT valor FROM meta WHERE chave = 'perguntas_semeadas'")) {
+    await db.lote([
+      ...PERGUNTAS_PADRAO.map(([categoria, texto, ...alternativas]) => [
+        'INSERT INTO perguntas (categoria, texto, alternativas, correta) VALUES (?, ?, ?, 0)', categoria, texto, JSON.stringify(alternativas),
+      ]),
+      ["INSERT INTO meta (chave, valor) VALUES ('perguntas_semeadas', '1')"],
+    ]);
   }
 
   if (!await db.get('SELECT id FROM usuarios WHERE is_root = 1')) {

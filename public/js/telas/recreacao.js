@@ -1,17 +1,20 @@
-// Recreação: salão com chat e partidas ao vivo, e os jogos de uma pessoa só (cobrinha e quebra-cabeça).
+// Recreação: salão com chat e partidas ao vivo, e os jogos de uma pessoa só (Pac-Coelho, cobrinha e quebra-cabeça).
 
-import { h, trocar, icone, botao, botaoIcone, cabecalho, vazio, avatar, aviso, confirmar, get, post, pode, aoSair, dataHora, estado } from '../core.js';
+import { h, trocar, icone, botao, botaoIcone, cabecalho, vazio, avatar, aviso, confirmar, get, post, pode, aoSair, dataHora, estado, num } from '../core.js';
 import { rt, ouvir, enviar, lendoChat, criarPartida, entrarNaPartida } from '../tempo-real.js';
+import { abrirSalaQuiz, telaQuiz, teclaQuiz } from './quiz.js';
 
 const AO_VIVO = [
+  { id: 'quiz', nome: 'Quiz de Lyendell', icone: 'pergunta', texto: 'Perguntas sobre a Casa Luckham, coelhos, Minecraft e regras de RP. Até 10 pessoas.', abrir: abrirSalaQuiz, botao: 'Abrir sala' },
   { id: 'velha', nome: 'Jogo da Velha', icone: 'velha', texto: 'Três em linha, contra outro morador.' },
   { id: 'ppt', nome: 'Pedra, Papel e Tesoura', icone: 'tesoura', texto: 'Melhor de três. A mão do outro só aparece quando os dois escolhem.' },
 ];
 const SOZINHO = [
+  { href: '#/recreacao/pac-coelho', nome: 'Pac-Coelho', icone: 'coelho', texto: 'Coma as moedas, fuja das raposas e pegue a cenoura.' },
   { href: '#/recreacao/cobrinha', nome: 'Cobrinha', icone: 'cobra', texto: 'Coma as cenouras sem bater nas bordas nem em si mesma.' },
   { href: '#/recreacao/quebra-cabeca', nome: 'Quebra-cabeça', icone: 'peca', texto: 'Monte uma foto da galeria no menor tempo.' },
 ];
-const ICONE_JOGO = { velha: 'velha', ppt: 'tesoura' };
+const ICONE_JOGO = { velha: 'velha', ppt: 'tesoura', quiz: 'pergunta' };
 const MAOS = { pedra: 'Pedra', papel: 'Papel', tesoura: 'Tesoura' };
 const VENCE = { pedra: 'tesoura', papel: 'pedra', tesoura: 'papel' };
 const VERBO = { pedra: 'quebra', papel: 'embrulha', tesoura: 'corta' };
@@ -69,16 +72,32 @@ export function recreacao() {
     const minha = rt.minhaSala && rt.partidas.get(rt.minhaSala);
     trocar(jogos,
       minha && h('a', { class: 'nota nota-ouro nota-link', href: `#/recreacao/sala/${minha.id}` },
-        icone('jogos'), h('span', null, minha.status === 'esperando' ? `Sua partida de ${minha.nomeJogo} está esperando um adversário.` : `Você está numa partida de ${minha.nomeJogo}.`),
+        icone('jogos'), h('span', null, textoMinhaSala(minha)),
         h('strong', null, 'Voltar')),
       AO_VIVO.map(j => h('div', { class: 'jogo-cartao' },
         h('span', { class: 'jogo-icone' }, icone(j.icone)),
         h('div', { class: 'jogo-texto' }, h('strong', null, j.nome, h('span', { class: 'ao-vivo' }, 'ao vivo')), h('small', null, j.texto)),
-        botao('Abrir partida', { classe: 'btn-ouro btn-pequeno', desativado: !rt.conectado || !!minha, onclick: () => criarPartida(j.id) }))),
+        h('div', { class: 'jogo-botoes' },
+          botao(j.botao || 'Abrir partida', { classe: 'btn-ouro btn-pequeno', desativado: !rt.conectado || !!minha, onclick: () => (j.abrir ? j.abrir() : criarPartida(j.id)) }),
+          j.id === 'quiz' && pode('recreacao.perguntas') && h('a', { class: 'btn btn-pequeno', href: '#/recreacao/perguntas' }, icone('editar'), h('span', null, 'Perguntas'))))),
       SOZINHO.map(j => h('a', { class: 'jogo-cartao', href: j.href },
         h('span', { class: 'jogo-icone' }, icone(j.icone)),
         h('div', { class: 'jogo-texto' }, h('strong', null, j.nome), h('small', null, j.texto)),
         h('span', { class: 'btn btn-pequeno' }, 'Jogar'))));
+  }
+
+  function textoMinhaSala(m) {
+    if (m.grupo) return m.status === 'esperando' ? `Você está na sala do ${m.nomeJogo} (${m.jogadores.length} de ${m.max}), esperando começar.` : `Você está jogando o ${m.nomeJogo}.`;
+    return m.status === 'esperando' ? `Sua partida de ${m.nomeJogo} está esperando um adversário.` : `Você está numa partida de ${m.nomeJogo}.`;
+  }
+
+  function descricaoSala(s) {
+    if (s.grupo) {
+      return s.status === 'esperando'
+        ? `${s.jogadores[0]} está juntando gente · ${s.jogadores.length} de ${s.max}`
+        : `${s.jogadores.length} ${s.jogadores.length === 1 ? 'pessoa jogando' : 'pessoas jogando'}`;
+    }
+    return s.status === 'esperando' ? `${s.jogadores[0]} espera um adversário` : `${s.jogadores[0]} contra ${s.jogadores[1]}`;
   }
 
   function desenharAbertas() {
@@ -87,14 +106,13 @@ export function recreacao() {
         const minha = s.id === rt.minhaSala;
         let acao;
         if (minha) acao = h('a', { class: 'btn btn-pequeno btn-ouro', href: `#/recreacao/sala/${s.id}` }, 'Voltar');
-        else if (s.status === 'esperando') acao = botao('Entrar', { classe: 'btn-ouro btn-pequeno', desativado: !!rt.minhaSala, onclick: () => entrarNaPartida(s.id) });
+        else if (s.status === 'esperando') acao = botao('Entrar', { classe: 'btn-ouro btn-pequeno', desativado: !!rt.minhaSala || s.jogadores.length >= s.max, onclick: () => entrarNaPartida(s.id) });
         else acao = h('a', { class: 'btn btn-pequeno', href: `#/recreacao/sala/${s.id}` }, icone('olho'), h('span', null, 'Assistir'));
         return h('div', { class: 'sala-linha' },
           h('span', { class: 'jogo-icone pequeno' }, icone(ICONE_JOGO[s.jogo])),
           h('div', { class: 'sala-texto' },
             h('strong', null, s.nomeJogo),
-            h('small', null, s.status === 'esperando' ? `${s.jogadores[0]} espera um adversário` : `${s.jogadores[0]} contra ${s.jogadores[1]}`,
-              s.espectadores ? ` · ${s.espectadores} assistindo` : '')),
+            h('small', null, descricaoSala(s), s.espectadores ? ` · ${s.espectadores} assistindo` : '')),
           acao);
       }))
       : h('p', { class: 'painel-vazio' }, 'Nenhuma partida aberta. Abra uma e chame alguém!'));
@@ -191,9 +209,9 @@ function painelChat() {
 function painelRanking() {
   const corpo = h('div', null, h('p', { class: 'painel-vazio' }, 'Carregando...'));
   let dados = null;
-  let aba = 'velha';
+  let aba = 'quiz';
   let tamanho = '3x3';
-  const ABAS = [['velha', 'Jogo da Velha'], ['ppt', 'Pedra, Papel e Tesoura'], ['cobrinha', 'Cobrinha'], ['quebra', 'Quebra-cabeça']];
+  const ABAS = [['quiz', 'Quiz'], ['velha', 'Jogo da Velha'], ['ppt', 'Pedra, Papel e Tesoura'], ['pacman', 'Pac-Coelho'], ['cobrinha', 'Cobrinha'], ['quebra', 'Quebra-cabeça']];
   const eu = estado.eu.nome;
 
   function tabela(cols, linhas) {
@@ -211,6 +229,13 @@ function painelRanking() {
     let conteudo;
     if (aba === 'velha' || aba === 'ppt') {
       conteudo = tabela([['Vitórias', l => l.vitorias], ['Derrotas', l => l.derrotas], ['Empates', l => l.empates]], dados[aba]);
+    } else if (aba === 'quiz') {
+      conteudo = [
+        tabela([['Vitórias', l => l.vitorias], ['Acertos', l => l.acertos], ['Partidas', l => l.partidas], ['Melhor', l => num(l.melhor)]], dados.quiz),
+        h('p', { class: 'suave ranking-nota' }, 'Vitória conta só em partida com pelo menos duas pessoas.'),
+      ];
+    } else if (aba === 'pacman') {
+      conteudo = tabela([['Pontos', l => num(l.pontos)]], dados.pacman);
     } else if (aba === 'cobrinha') {
       conteudo = tabela([['Cenouras', l => l.pontos]], dados.cobrinha);
     } else {
@@ -255,6 +280,12 @@ export function sala(id) {
       trocar(raiz, pedido && rt.conectado && naoExiste
         ? vazio('Partida não encontrada', 'Ela já terminou ou foi cancelada.', h('a', { class: 'btn', href: '#/recreacao' }, 'Voltar à Recreação'))
         : h('div', { class: 'carregando-tela' }, h('span', { class: 'giro' })));
+      return;
+    }
+    if (s.grupo) {
+      trocar(raiz, telaQuiz(s, acoesQuiz));
+      if (!document.hidden) tituloOriginal();
+      avisarNaAba(s);
       return;
     }
     const eu = s.eu;
@@ -317,6 +348,7 @@ export function sala(id) {
 
   function minhaVez(s) {
     if (s.eu < 0 || s.status !== 'jogando') return false;
+    if (s.grupo) return s.estado?.fase === 'pergunta' && s.estado.minha == null && !s.jogadores[s.eu].saiu;
     return s.jogo === 'velha' ? s.estado.vez === s.eu : !s.estado.minha;
   }
 
@@ -415,6 +447,31 @@ export function sala(id) {
     sair();
   }
 
+  const acoesQuiz = {
+    async sair() {
+      const s = rt.partidas.get(id);
+      const outros = s ? s.jogadores.length - 1 : 0;
+      if (s?.dono === s?.jogadores[s.eu]?.id && outros > 0
+        && !await confirmar(`A sala fecha para todos (${outros === 1 ? '1 pessoa já entrou' : `${outros} pessoas já entraram`}).`, { titulo: 'Fechar a sala?', ok: 'Fechar', perigo: true })) return;
+      sair();
+    },
+    async desistir() {
+      if (!await confirmar('Se sair agora, você não entra no resultado deste quiz.', { titulo: 'Sair do quiz?', ok: 'Sair', perigo: true })) return;
+      sair();
+    },
+    responder: i => enviar('sala:jogar', { id, jogada: { alternativa: i } }),
+    comecar: () => enviar('sala:comecar', { id }),
+    revanche: () => enviar('sala:revanche', { id }),
+  };
+
+  // Contagem regressiva do quiz (os números com data-fim) e as teclas A, B, C e D.
+  const relogioQuiz = setInterval(() => {
+    for (const el of raiz.querySelectorAll('[data-fim]')) el.textContent = Math.max(0, Math.ceil((Number(el.dataset.fim) - Date.now()) / 1000));
+  }, 250);
+  const aoTeclar = ev => teclaQuiz(ev, rt.partidas.get(id), acoesQuiz.responder);
+  document.addEventListener('keydown', aoTeclar);
+  aoSair(() => { clearInterval(relogioQuiz); document.removeEventListener('keydown', aoTeclar); });
+
   // Se a pessoa está em outra aba do navegador, o título avisa que é a vez dela.
   function avisarNaAba(s) {
     if (document.hidden && (minhaVez(s) || (s.status === 'fim' && s.eu >= 0))) document.title = minhaVez(s) ? '(!) Sua vez · Casa Luckham' : '(!) Fim de partida · Casa Luckham';
@@ -425,7 +482,11 @@ export function sala(id) {
   let naoExiste = false;
   escutar('estado', () => { pedido = false; pedir(); desenhar(); });
   escutar('sala', ({ sala: s }) => { if (s.id === id) desenhar(); });
-  escutar('sala:fechada', ({ id: fechada }) => { if (fechada === id) desenhar(); });
+  escutar('sala:fechada', ({ id: fechada, motivo }) => {
+    if (fechada !== id) return;
+    if (motivo === 'dono') location.hash = '#/recreacao'; // quem abriu fechou a sala
+    else desenhar();
+  });
   escutar('erro', () => { if (!rt.partidas.has(id)) { naoExiste = true; desenhar(); } });
 
   aoSair(() => {

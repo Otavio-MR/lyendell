@@ -1,14 +1,16 @@
 const express = require('express');
 const { db } = require('../db');
 const { exigir } = require('../auth');
-const { erro, inteiro, linha } = require('../util');
+const { anotar } = require('../diario');
+const { CATEGORIAS } = require('../quiz');
+const { erro, inteiro, linha, texto, idDaRota } = require('../util');
 
 const r = express.Router();
 r.use(exigir('recreacao.usar'));
 
 const TAMANHOS = ['3x3', '4x4', '5x5'];
 
-// Vitórias, derrotas e empates de cada pessoa num jogo ao vivo.
+// Vitórias, derrotas e empates de cada pessoa num jogo ao vivo de duas pessoas.
 const rankingAoVivo = jogo => db.all(`
   SELECT nome, SUM(v) AS vitorias, SUM(d) AS derrotas, SUM(e) AS empates FROM (
     SELECT jogador1_nome AS nome, vencedor = 1 AS v, vencedor = 2 AS d, vencedor IS NULL AS e FROM partidas WHERE jogo = ?
@@ -16,25 +18,37 @@ const rankingAoVivo = jogo => db.all(`
     SELECT jogador2_nome, vencedor = 2, vencedor = 1, vencedor IS NULL FROM partidas WHERE jogo = ?
   ) GROUP BY nome ORDER BY vitorias DESC, derrotas ASC, nome LIMIT 10`, jogo, jogo);
 
+const melhoresPontos = jogo => db.all(
+  'SELECT usuario_nome AS nome, MAX(pontos) AS pontos FROM recordes WHERE jogo = ? GROUP BY usuario_nome ORDER BY pontos DESC LIMIT 10', jogo);
+
 r.get('/ranking', async (req, res) => {
-  const [velha, ppt, cobrinha, ...quebra] = await Promise.all([
+  const [velha, ppt, cobrinha, pacman, quiz, ...quebra] = await Promise.all([
     rankingAoVivo('velha'),
     rankingAoVivo('ppt'),
-    db.all("SELECT usuario_nome AS nome, MAX(pontos) AS pontos FROM recordes WHERE jogo = 'cobrinha' GROUP BY usuario_nome ORDER BY pontos DESC LIMIT 10"),
+    melhoresPontos('cobrinha'),
+    melhoresPontos('pacman'),
+    // Vitória no quiz só conta em partida com pelo menos duas pessoas.
+    db.all(`
+      SELECT usuario_nome AS nome, SUM(posicao = 1 AND jogadores > 1) AS vitorias, SUM(acertos) AS acertos,
+        COUNT(*) AS partidas, MAX(pontos) AS melhor
+      FROM quiz_resultados GROUP BY usuario_nome ORDER BY vitorias DESC, acertos DESC, nome LIMIT 10`),
     ...TAMANHOS.map(t => db.all(`
       SELECT usuario_nome AS nome, MIN(pontos) AS segundos FROM recordes WHERE jogo = 'quebra' AND variante = ?
       GROUP BY usuario_nome ORDER BY segundos LIMIT 10`, t)),
   ]);
-  res.json({ velha, ppt, cobrinha, quebra: Object.fromEntries(TAMANHOS.map((t, i) => [t, quebra[i]])) });
+  res.json({ velha, ppt, cobrinha, pacman, quiz, quebra: Object.fromEntries(TAMANHOS.map((t, i) => [t, quebra[i]])) });
 });
 
-// Resultado de um jogo que roda no navegador (cobrinha: cenouras comidas; quebra-cabeça: segundos).
+// Resultado de um jogo que roda no navegador.
+// Cobrinha: cenouras comidas. Pac-Coelho: pontos. Quebra-cabeça: segundos (menor é melhor).
+const LIMITES = { cobrinha: 400, pacman: 5_000_000 };
+
 r.post('/recordes', async (req, res) => {
   const jogo = req.body?.jogo;
   let variante = '';
   let pontos;
-  if (jogo === 'cobrinha') {
-    pontos = inteiro(req.body?.pontos, { min: 0, max: 400 });
+  if (LIMITES[jogo]) {
+    pontos = inteiro(req.body?.pontos, { min: 0, max: LIMITES[jogo] });
   } else if (jogo === 'quebra') {
     variante = TAMANHOS.includes(req.body?.variante) ? req.body.variante : null;
     pontos = inteiro(req.body?.pontos, { min: 1, max: 24 * 3600 });
@@ -43,14 +57,76 @@ r.post('/recordes', async (req, res) => {
     throw erro(400, 'Jogo desconhecido.');
   }
   if (pontos == null) throw erro(400, 'Resultado inválido.');
-  const melhorQuery = jogo === 'cobrinha'
-    ? "SELECT MAX(pontos) AS m FROM recordes WHERE jogo = 'cobrinha' AND usuario_id = ?"
-    : "SELECT MIN(pontos) AS m FROM recordes WHERE jogo = 'quebra' AND variante = ? AND usuario_id = ?";
-  const antes = (await (jogo === 'cobrinha' ? db.get(melhorQuery, req.usuario.id) : db.get(melhorQuery, variante, req.usuario.id))).m;
+  const menorMelhor = jogo === 'quebra';
+  const antes = (await db.get(
+    `SELECT ${menorMelhor ? 'MIN' : 'MAX'}(pontos) AS m FROM recordes WHERE jogo = ? AND variante = ? AND usuario_id = ?`,
+    jogo, variante, req.usuario.id)).m;
   await db.run('INSERT INTO recordes (jogo, variante, usuario_id, usuario_nome, pontos, detalhe) VALUES (?, ?, ?, ?, ?, ?)',
     jogo, variante, req.usuario.id, req.usuario.nome, pontos, linha(req.body?.detalhe, 60));
-  const recorde = antes == null || (jogo === 'cobrinha' ? pontos > antes : pontos < antes);
+  const recorde = antes == null || (menorMelhor ? pontos < antes : pontos > antes);
   res.status(201).json({ recorde, anterior: antes });
+});
+
+/* ─── Quiz ────────────────────────────────────────── */
+
+// Categorias e quantas perguntas cada uma tem (para quem vai abrir uma sala).
+r.get('/quiz', async (req, res) => {
+  const contagem = await db.all('SELECT categoria, COUNT(*) AS n FROM perguntas GROUP BY categoria');
+  const n = Object.fromEntries(contagem.map(c => [c.categoria, c.n]));
+  res.json({ categorias: Object.entries(CATEGORIAS).map(([id, nome]) => ({ id, nome, total: n[id] || 0 })) });
+});
+
+function validarPergunta(corpo = {}) {
+  const categoria = CATEGORIAS[corpo.categoria] ? corpo.categoria : null;
+  if (!categoria) throw erro(400, 'Escolha a categoria.');
+  const t = texto(corpo.texto, 300).replace(/\s+/g, ' ');
+  if (t.length < 5) throw erro(400, 'Escreva a pergunta.');
+  const alternativas = Array.isArray(corpo.alternativas) ? corpo.alternativas.map(a => linha(a, 120)) : [];
+  if (alternativas.length !== 4 || alternativas.some(a => !a)) throw erro(400, 'Preencha as quatro alternativas (A, B, C e D).');
+  if (new Set(alternativas.map(a => a.toLowerCase())).size !== 4) throw erro(400, 'As quatro alternativas precisam ser diferentes.');
+  const correta = inteiro(corpo.correta, { min: 0, max: 3 });
+  if (correta == null) throw erro(400, 'Marque qual alternativa é a certa.');
+  return { categoria, texto: t, alternativas, correta };
+}
+
+async function buscarPergunta(req) {
+  const p = await db.get('SELECT * FROM perguntas WHERE id = ?', idDaRota(req));
+  if (!p) throw erro(404, 'Pergunta não encontrada.');
+  return p;
+}
+
+const gerenciar = exigir('recreacao.perguntas');
+
+r.get('/perguntas', gerenciar, async (req, res) => {
+  const lista = await db.all('SELECT * FROM perguntas ORDER BY id DESC');
+  res.json({
+    categorias: CATEGORIAS,
+    perguntas: lista.map(p => ({ ...p, alternativas: JSON.parse(p.alternativas) })),
+  });
+});
+
+r.post('/perguntas', gerenciar, async (req, res) => {
+  const p = validarPergunta(req.body);
+  const { id } = await db.run('INSERT INTO perguntas (categoria, texto, alternativas, correta, criado_por_nome) VALUES (?, ?, ?, ?, ?)',
+    p.categoria, p.texto, JSON.stringify(p.alternativas), p.correta, req.usuario.nome);
+  await anotar(req, 'Criou uma pergunta do quiz', p.texto);
+  res.status(201).json({ id });
+});
+
+r.put('/perguntas/:id', gerenciar, async (req, res) => {
+  const antiga = await buscarPergunta(req);
+  const p = validarPergunta(req.body);
+  await db.run('UPDATE perguntas SET categoria = ?, texto = ?, alternativas = ?, correta = ? WHERE id = ?',
+    p.categoria, p.texto, JSON.stringify(p.alternativas), p.correta, antiga.id);
+  await anotar(req, 'Editou uma pergunta do quiz', p.texto);
+  res.json({ ok: true });
+});
+
+r.delete('/perguntas/:id', gerenciar, async (req, res) => {
+  const p = await buscarPergunta(req);
+  await db.run('DELETE FROM perguntas WHERE id = ?', p.id);
+  await anotar(req, 'Apagou uma pergunta do quiz', p.texto);
+  res.json({ ok: true });
 });
 
 module.exports = r;
