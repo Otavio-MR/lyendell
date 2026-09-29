@@ -1,6 +1,6 @@
 import { estado, get, post, h, trocar, icone, podeAlgum, aviso, avatar, cargoPrincipal, vazio } from './core.js';
 import { inicio } from './telas/inicio.js';
-import { modulo, livro } from './telas/livros.js';
+import { modulo, livro, aprovacoes, envios } from './telas/livros.js';
 import { galeria } from './telas/galeria.js';
 import { anuncios } from './telas/anuncios.js';
 import { atividades, atividade } from './telas/atividades.js';
@@ -34,6 +34,8 @@ const ROTAS = [
   [/^\/atividades\/(\d+)$/, id => atividade(id)],
   [/^\/galeria(?:\/(\d+|sem-album))?$/, album => galeria(album)],
   [/^\/(tabelionato|guarda)$/, m => modulo(m)],
+  [/^\/(tabelionato|guarda)\/aprovacoes$/, m => aprovacoes(m)],
+  [/^\/(tabelionato|guarda)\/envios$/, m => envios(m)],
   [/^\/(tabelionato|guarda)\/(\d+)$/, (m, id) => livro(m, id)],
   [/^\/admin\/usuarios$/, () => usuarios()],
   [/^\/admin\/cargos$/, () => cargos()],
@@ -184,6 +186,7 @@ async function rotear() {
       const titulo = tela.querySelector('.pag-titulo')?.textContent;
       document.title = titulo ? `${titulo} · Casa Luckham` : 'Casa Luckham · Lyendell';
       window.scrollTo(0, 0);
+      atualizarAvisos();
     } catch (err) {
       if (g !== geracao) return;
       trocar(tela, err.status === 403
@@ -196,6 +199,22 @@ async function rotear() {
 }
 
 window.addEventListener('hashchange', rotear);
+
+// Números no menu: registros esperando a sua aprovação (dourado) ou envios seus recusados (vermelho).
+async function atualizarAvisos() {
+  if (!estado.eu) return;
+  let p;
+  try { p = await get('/api/pendencias'); } catch { return; }
+  for (const m of ['tabelionato', 'guarda']) {
+    const item = document.querySelector(`.menu-item[data-rota="/${m}"]`);
+    if (!item) continue;
+    item.querySelector('.menu-aviso')?.remove();
+    const { aprovar = 0, recusados = 0 } = p[m] || {};
+    if (aprovar) item.append(h('span', { class: 'menu-aviso', title: `${aprovar} aguardando a sua aprovação` }, aprovar));
+    else if (recusados) item.append(h('span', { class: 'menu-aviso recusado', title: `${recusados} envio(s) seu(s) recusado(s)` }, recusados));
+  }
+}
+window.addEventListener('avisos', atualizarAvisos);
 export const recarregarTela = rotear;
 
 iniciar();

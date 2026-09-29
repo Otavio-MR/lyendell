@@ -2,7 +2,7 @@ const path = require('path');
 const fs = require('fs');
 const { createClient } = require('@libsql/client');
 const { hashSenha } = require('./senhas');
-const { CARGOS_PADRAO } = require('./permissoes');
+const { CARGOS_PADRAO, DESCRICOES } = require('./permissoes');
 const { LIVROS_PADRAO, AJUDA_ABERTURA, CAMPOS_PENA, CAMPO_GUARDAS } = require('./livros-padrao');
 const { linha, chaveNome } = require('./util');
 
@@ -102,7 +102,11 @@ CREATE TABLE IF NOT EXISTS registros (
   criado_em TEXT NOT NULL DEFAULT (datetime('now')),
   atualizado_por_nome TEXT,
   atualizado_em TEXT,
-  cobranca_fim TEXT
+  cobranca_fim TEXT,
+  situacao TEXT NOT NULL DEFAULT 'aprovado',
+  revisado_por_nome TEXT,
+  revisado_em TEXT,
+  motivo TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_registros_livro ON registros(livro_id);
 
@@ -208,7 +212,7 @@ CREATE TABLE IF NOT EXISTS diario (
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 4;
+const VERSAO = 5;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -248,6 +252,7 @@ async function migrar() {
     if (!await colunaExiste('usuarios', 'foto')) await db.run('ALTER TABLE usuarios ADD COLUMN foto TEXT');
   }
   if (versao < 4) await migrarPrisioneiros();
+  if (versao < 5) await migrarAprovacao();
 
   await db.run("INSERT INTO meta (chave, valor) VALUES ('versao', ?) ON CONFLICT (chave) DO UPDATE SET valor = excluded.valor", String(VERSAO));
 }
@@ -282,6 +287,26 @@ async function migrarPrisioneiros() {
     novos.push(c);
   }
   await db.run('UPDATE livros SET campos = ? WHERE id = ?', JSON.stringify(novos), presos.id);
+}
+
+// v5: registros de quem não aprova (Escriba, Guarda) ficam aguardando a Tabeliã ou o Comandante.
+async function migrarAprovacao() {
+  const colunas = [
+    ['situacao', "TEXT NOT NULL DEFAULT 'aprovado'"], ['revisado_por_nome', 'TEXT'], ['revisado_em', 'TEXT'], ['motivo', 'TEXT'],
+  ];
+  for (const [coluna, tipo] of colunas) {
+    if (!await colunaExiste('registros', coluna)) await db.run(`ALTER TABLE registros ADD COLUMN ${coluna} ${tipo}`);
+  }
+  const novas = { 'Tabeliã': ['tabelionato.aprovar'], 'Comandante da Guarda': ['guarda.aprovar'], 'Família Nobre': ['tabelionato.aprovar', 'guarda.aprovar'] };
+  for (const c of await db.all('SELECT id, nome, descricao, permissoes FROM cargos')) {
+    const lista = JSON.parse(c.permissoes);
+    const faltam = (novas[c.nome] || []).filter(p => !lista.includes(p));
+    const [antigas = [], atual] = DESCRICOES[c.nome] || [];
+    const descricao = antigas.includes(c.descricao) ? atual : c.descricao;
+    if (faltam.length || descricao !== c.descricao) {
+      await db.run('UPDATE cargos SET permissoes = ?, descricao = ? WHERE id = ?', JSON.stringify([...lista, ...faltam]), descricao, c.id);
+    }
+  }
 }
 
 // Campos "Escolher de outro livro" dos livros padrão apontam para "@Nome do livro"; aqui viram o id real.

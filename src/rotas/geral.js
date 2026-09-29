@@ -10,8 +10,8 @@ r.use(exigirLogin);
 // Resumo da página inicial: só mostra o que a pessoa pode ver.
 r.get('/inicio', async (req, res) => {
   const out = { numeros: {} };
-  const contarModulo = async m => (await db.get('SELECT COUNT(*) AS n FROM registros r JOIN livros l ON l.id = r.livro_id WHERE l.modulo = ?', m)).n;
-  const tarefas = [];
+  const contarModulo = async m => (await db.get("SELECT COUNT(*) AS n FROM registros r JOIN livros l ON l.id = r.livro_id WHERE l.modulo = ? AND r.situacao = 'aprovado'", m)).n;
+  const tarefas = [pendencias(req).then(p => { out.pendencias = p; })];
   if (pode(req, 'tabelionato.ver')) tarefas.push(contarModulo('tabelionato').then(n => { out.numeros.tabelionato = n; }));
   if (pode(req, 'guarda.ver')) tarefas.push(contarModulo('guarda').then(n => { out.numeros.guarda = n; }));
   if (pode(req, 'usuarios.ver')) tarefas.push(db.get('SELECT COUNT(*) AS n FROM usuarios WHERE ativo = 1').then(x => { out.numeros.usuarios = x.n; }));
@@ -33,6 +33,21 @@ r.get('/inicio', async (req, res) => {
   await Promise.all(tarefas);
   res.json(out);
 });
+
+// Avisos do menu: registros esperando a minha aprovação e envios meus que foram recusados, por módulo.
+async function pendencias(req) {
+  const linhas = await db.all(`
+    SELECT l.modulo, SUM(r.situacao = 'pendente') AS pendentes, SUM(r.situacao = 'recusado' AND r.criado_por = ?) AS recusados
+    FROM registros r JOIN livros l ON l.id = r.livro_id WHERE r.situacao <> 'aprovado' GROUP BY l.modulo`, req.usuario.id);
+  const out = {};
+  for (const m of ['tabelionato', 'guarda']) {
+    const l = linhas.find(x => x.modulo === m) || {};
+    out[m] = { aprovar: pode(req, `${m}.aprovar`) ? l.pendentes || 0 : 0, recusados: l.recusados || 0 };
+  }
+  return out;
+}
+
+r.get('/pendencias', async (req, res) => res.json(await pendencias(req)));
 
 // Envio avulso de imagem (retratos nos registros, imagens de anúncios).
 const PODE_ENVIAR = ['galeria.enviar', 'anuncios.publicar', 'tabelionato.registrar', 'tabelionato.editar', 'guarda.registrar', 'guarda.editar'];

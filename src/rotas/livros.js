@@ -96,7 +96,7 @@ async function opcoesDoLivro(livroId) {
   const l = await db.get('SELECT * FROM livros WHERE id = ?', livroId);
   if (!l) return { livro: null, opcoes: [] };
   const livro = formatarLivro(l);
-  const registros = await db.all('SELECT id, dados FROM registros WHERE livro_id = ?', livro.id);
+  const registros = await db.all("SELECT id, dados FROM registros WHERE livro_id = ? AND situacao = 'aprovado'", livro.id);
   const vistos = new Set();
   const opcoes = [];
   for (const reg of registros) {
@@ -213,7 +213,8 @@ r.get('/modulos/:modulo/livros', async (req, res) => {
   const m = modulo(req.params.modulo);
   checar(req, `${m}.ver`);
   const livros = await db.all(`
-    SELECT l.*, (SELECT COUNT(*) FROM registros r WHERE r.livro_id = l.id) AS total
+    SELECT l.*, (SELECT COUNT(*) FROM registros r WHERE r.livro_id = l.id AND r.situacao = 'aprovado') AS total,
+      (SELECT COUNT(*) FROM registros r WHERE r.livro_id = l.id AND r.situacao = 'pendente') AS pendentes
     FROM livros l WHERE l.modulo = ? ORDER BY l.ordem, l.id`, m);
   const dia = hoje();
   const saida = [];
@@ -223,15 +224,15 @@ r.get('/modulos/:modulo/livros', async (req, res) => {
     if (f.cobranca) {
       const [pagos, registros] = await Promise.all([
         pagamentosDoLivro(f.id),
-        db.all('SELECT id, dados, cobranca_fim FROM registros WHERE livro_id = ?', f.id),
+        db.all("SELECT id, dados, cobranca_fim FROM registros WHERE livro_id = ? AND situacao = 'aprovado'", f.id),
       ]);
       for (const reg of registros) {
         if (resumo(f, { ...reg, dados: JSON.parse(reg.dados) }, pagos.get(reg.id) || [], dia).atrasados) atrasados++;
       }
     }
-    saida.push({ ...f, podeRegistrar: podeRegistrar(req, f), atrasados });
+    saida.push({ ...f, podeRegistrar: podeRegistrar(req, f), atrasados, pendentes: pode(req, `${m}.aprovar`) ? f.pendentes : 0 });
   }
-  res.json({ livros: saida });
+  res.json({ livros: saida, contagem: await contagemModulo(req, m) });
 });
 
 r.post('/modulos/:modulo/livros', async (req, res) => {
@@ -286,8 +287,11 @@ r.delete('/livros/:id', async (req, res) => {
 r.get('/livros/:id/registros', async (req, res) => {
   const l = await buscarLivro(idDaRota(req));
   checar(req, `${l.modulo}.ver`);
-  const registros = (await db.all('SELECT * FROM registros WHERE livro_id = ? ORDER BY id DESC', l.id))
+  const registros = (await db.all("SELECT * FROM registros WHERE livro_id = ? AND situacao = 'aprovado' ORDER BY id DESC", l.id))
     .map(x => ({ ...x, dados: JSON.parse(x.dados) }));
+  const aguardando = await db.get(`
+    SELECT SUM(situacao = 'pendente') AS aprovar, SUM(situacao <> 'aprovado' AND criado_por = ?) AS meus
+    FROM registros WHERE livro_id = ?`, req.usuario.id, l.id);
   if (l.cobranca) {
     const pagos = await pagamentosDoLivro(l.id);
     const dia = hoje();
@@ -300,7 +304,9 @@ r.get('/livros/:id/registros', async (req, res) => {
       apagar: pode(req, `${l.modulo}.apagar`),
       configurar: pode(req, `${l.modulo}.configurar`),
       pagamentos: l.modulo === 'tabelionato' && pode(req, 'tabelionato.pagamentos'),
+      aprovar: pode(req, `${l.modulo}.aprovar`),
     },
+    aguardando: { aprovar: pode(req, `${l.modulo}.aprovar`) ? aguardando.aprovar || 0 : 0, meus: aguardando.meus || 0 },
     registros,
   });
 });
@@ -313,10 +319,11 @@ r.post('/livros/:id/registros', async (req, res) => {
       : 'Você não tem permissão para registrar aqui.');
   }
   const dados = await limparDados(l, req.body?.dados);
-  const { id } = await db.run('INSERT INTO registros (livro_id, dados, criado_por, criado_por_nome) VALUES (?, ?, ?, ?)',
-    l.id, JSON.stringify(dados), req.usuario.id, req.usuario.nome);
-  await anotar(req, `Registrou em "${l.nome}"`, tituloDoRegistro(l, dados));
-  res.status(201).json({ id });
+  const situacao = pode(req, `${l.modulo}.aprovar`) ? 'aprovado' : 'pendente';
+  const { id } = await db.run('INSERT INTO registros (livro_id, dados, criado_por, criado_por_nome, situacao) VALUES (?, ?, ?, ?, ?)',
+    l.id, JSON.stringify(dados), req.usuario.id, req.usuario.nome, situacao);
+  await anotar(req, situacao === 'pendente' ? `Enviou para aprovação em "${l.nome}"` : `Registrou em "${l.nome}"`, tituloDoRegistro(l, dados));
+  res.status(201).json({ id, situacao });
 });
 
 async function buscarRegistro(req) {
@@ -327,26 +334,89 @@ async function buscarRegistro(req) {
 
 r.put('/registros/:id', async (req, res) => {
   const { reg, livro } = await buscarRegistro(req);
-  checar(req, `${livro.modulo}.editar`);
+  if (!pode(req, `${livro.modulo}.editar`) && !doAutorSemAprovacao(req, reg)) checar(req, `${livro.modulo}.editar`);
   const dados = await limparDados(livro, req.body?.dados, reg.dados);
   const novas = new Set(imagensDe(livro, dados));
+  const situacao = reg.situacao === 'recusado' && !pode(req, `${livro.modulo}.aprovar`) ? 'pendente' : reg.situacao;
   await db.lote([
-    ["UPDATE registros SET dados = ?, atualizado_por_nome = ?, atualizado_em = datetime('now') WHERE id = ?", JSON.stringify(dados), req.usuario.nome, reg.id],
+    ["UPDATE registros SET dados = ?, situacao = ?, atualizado_por_nome = ?, atualizado_em = datetime('now') WHERE id = ?", JSON.stringify(dados), situacao, req.usuario.nome, reg.id],
     ...imagensDe(livro, reg.dados).filter(u => !novas.has(u)).map(comandoApagarArquivo),
   ]);
-  await anotar(req, `Editou um registro em "${livro.nome}"`, tituloDoRegistro(livro, dados));
-  res.json({ ok: true });
+  await anotar(req, situacao !== reg.situacao ? `Reenviou para aprovação em "${livro.nome}"` : `Editou um registro em "${livro.nome}"`, tituloDoRegistro(livro, dados));
+  res.json({ ok: true, situacao });
 });
 
 r.delete('/registros/:id', async (req, res) => {
   const { reg, livro } = await buscarRegistro(req);
-  checar(req, `${livro.modulo}.apagar`);
+  if (!pode(req, `${livro.modulo}.apagar`) && !doAutorSemAprovacao(req, reg)) checar(req, `${livro.modulo}.apagar`);
   await db.lote([
     ['DELETE FROM pagamentos WHERE registro_id = ?', reg.id],
     ['DELETE FROM registros WHERE id = ?', reg.id],
     ...imagensDe(livro, reg.dados).map(comandoApagarArquivo),
   ]);
   await anotar(req, `Apagou um registro de "${livro.nome}"`, tituloDoRegistro(livro, reg.dados));
+  res.json({ ok: true });
+});
+
+/* ─── Aprovação (Tabeliã no Tabelionato, Comandante na Guarda) ─ */
+
+// Quem enviou pode corrigir ou cancelar o próprio registro enquanto ele não foi aprovado.
+const doAutorSemAprovacao = (req, reg) => reg.criado_por === req.usuario.id && reg.situacao !== 'aprovado';
+
+// Números das abas do módulo: quantos aguardam a minha aprovação e quantos envios meus ainda não foram aprovados.
+async function contagemModulo(req, m) {
+  const c = await db.get(`
+    SELECT SUM(r.situacao = 'pendente') AS aprovacoes, SUM(r.situacao <> 'aprovado' AND r.criado_por = ?) AS envios
+    FROM registros r JOIN livros l ON l.id = r.livro_id WHERE l.modulo = ? AND r.situacao <> 'aprovado'`, req.usuario.id, m);
+  return { aprovacoes: pode(req, `${m}.aprovar`) ? c.aprovacoes || 0 : 0, envios: c.envios || 0 };
+}
+
+// Registros não aprovados de um módulo, junto com os livros deles (para montar os formulários).
+async function registrosNaoAprovados(req, m, filtro, ...args) {
+  const registros = (await db.all(`
+    SELECT r.* FROM registros r JOIN livros l ON l.id = r.livro_id
+    WHERE l.modulo = ? AND ${filtro} ORDER BY r.id`, m, ...args)).map(x => ({ ...x, dados: JSON.parse(x.dados) }));
+  const ids = [...new Set(registros.map(x => x.livro_id))];
+  const livros = ids.length ? (await db.all(`SELECT * FROM livros WHERE id IN (${ids.map(() => '?').join(', ')})`, ...ids)).map(formatarLivro) : [];
+  return {
+    registros,
+    livros: Object.fromEntries(livros.map(l => [l.id, l])),
+    permissoes: { editar: pode(req, `${m}.editar`), apagar: pode(req, `${m}.apagar`), aprovar: pode(req, `${m}.aprovar`) },
+    contagem: await contagemModulo(req, m),
+  };
+}
+
+r.get('/modulos/:modulo/aprovacoes', async (req, res) => {
+  const m = modulo(req.params.modulo);
+  checar(req, `${m}.aprovar`);
+  res.json(await registrosNaoAprovados(req, m, "r.situacao = 'pendente'"));
+});
+
+r.get('/modulos/:modulo/envios', async (req, res) => {
+  const m = modulo(req.params.modulo);
+  checar(req, `${m}.ver`);
+  res.json(await registrosNaoAprovados(req, m, "r.situacao <> 'aprovado' AND r.criado_por = ?", req.usuario.id));
+});
+
+async function revisar(req, situacao, motivo) {
+  const { reg, livro } = await buscarRegistro(req);
+  checar(req, `${livro.modulo}.aprovar`);
+  if (reg.situacao !== 'pendente') throw erro(409, 'Este registro não está mais aguardando aprovação.');
+  await db.run("UPDATE registros SET situacao = ?, motivo = ?, revisado_por_nome = ?, revisado_em = datetime('now') WHERE id = ?",
+    situacao, motivo, req.usuario.nome, reg.id);
+  return { reg, livro };
+}
+
+r.post('/registros/:id/aprovar', async (req, res) => {
+  const { reg, livro } = await revisar(req, 'aprovado', null);
+  await anotar(req, `Aprovou um registro em "${livro.nome}"`, `${tituloDoRegistro(livro, reg.dados)} (enviado por ${reg.criado_por_nome})`);
+  res.json({ ok: true });
+});
+
+r.post('/registros/:id/recusar', async (req, res) => {
+  const motivo = texto(req.body?.motivo, 500) || null;
+  const { reg, livro } = await revisar(req, 'recusado', motivo);
+  await anotar(req, `Recusou um registro em "${livro.nome}"`, `${tituloDoRegistro(livro, reg.dados)} (enviado por ${reg.criado_por_nome})${motivo ? `: ${motivo}` : ''}`);
   res.json({ ok: true });
 });
 
@@ -358,6 +428,7 @@ async function contextoCobranca(req) {
   const { reg, livro } = await buscarRegistro(req);
   checar(req, `${livro.modulo}.ver`);
   if (!livro.cobranca) throw erro(400, 'Este livro não tem pagamentos periódicos.');
+  if (reg.situacao !== 'aprovado') throw erro(400, 'Este registro ainda não foi aprovado.');
   return { reg, livro };
 }
 

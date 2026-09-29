@@ -26,10 +26,10 @@ Todo usuário é morador. Os cargos somam poderes em cima disso, e uma pessoa po
 |---|---|
 | Administrador (Evran) | Tudo, inclusive criar usuários e criar ou editar cargos |
 | Família Nobre | Tudo, menos criar usuários e mexer nos cargos |
-| Tabeliã | Tudo no Tabelionato: registrar, editar, apagar, criar livros, seções, campos e opções, e marcar pagamentos |
-| Escriba | Fazer registros no Tabelionato (não edita nem apaga) |
-| Comandante da Guarda | Tudo na Guarda do Coelho |
-| Guarda | Ver a Guarda e registrar prisioneiros |
+| Tabeliã | Tudo no Tabelionato: aprovar registros, editar, apagar, criar livros, seções, campos e opções, e marcar pagamentos |
+| Escriba | Fazer registros no Tabelionato, que vão para a aprovação da Tabeliã |
+| Comandante da Guarda | Tudo na Guarda do Coelho, inclusive aprovar os registros dos guardas |
+| Guarda | Ver a Guarda e registrar prisioneiros, que vão para a aprovação do Comandante |
 | Morador | Ver tudo e ajudar nas atividades |
 
 Quem está acima de morador também publica anúncios, cria atividades e envia fotos.
@@ -49,6 +49,16 @@ o módulo pode, pelo próprio site:
 - editar as opções das listas;
 - deixar um livro **restrito**: só quem comanda o módulo registra nele (ex.: Guardas da Capital);
 - ligar **pagamentos periódicos** num livro do Tabelionato (veja abaixo).
+
+## Aprovação de registros
+
+O que o Escriba registra no Tabelionato fica **aguardando a Tabeliã**; o que o Guarda registra na
+Guarda do Coelho fica **aguardando o Comandante**. As duas filas são separadas. Enquanto não é
+aprovado, o registro não aparece no livro oficial.
+
+- Quem aprova vê a aba **Aguardando aprovação** (e um número no menu) e pode aprovar, editar ou recusar com um motivo.
+- Quem enviou vê a aba **Meus envios**: pode corrigir ou cancelar enquanto não foi aprovado, e os recusados mostram o motivo e podem ser corrigidos e reenviados.
+- Registros de quem já tem a permissão de aprovar (Tabeliã, Comandante, Família Nobre, administrador) entram aprovados direto.
 
 ## Pagamentos dos comerciantes
 

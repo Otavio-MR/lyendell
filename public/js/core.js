@@ -270,7 +270,7 @@ export function modal({ titulo, corpo, rodape, tamanho = '', classe = '', fechar
   document.body.append(fundo);
   document.body.classList.add('sem-rolagem');
   pilha.push(m);
-  requestAnimationFrame(() => caixa.querySelector('[autofocus], input:not([type=hidden]):not([type=file]):not([disabled]), textarea, select')?.focus());
+  setTimeout(() => caixa.querySelector('[autofocus], input:not([type=hidden]):not([type=file]):not([disabled]), textarea, select')?.focus(), 30);
   return m;
 }
 

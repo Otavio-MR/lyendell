@@ -10,18 +10,20 @@ const CATALOGO = [
   ] },
   { grupo: 'Tabelionato', itens: [
     { chave: 'tabelionato.ver', nome: 'Ver os livros e registros' },
-    { chave: 'tabelionato.registrar', nome: 'Fazer novos registros' },
+    { chave: 'tabelionato.registrar', nome: 'Fazer novos registros (vão para aprovação, se a pessoa não aprova)' },
     { chave: 'tabelionato.editar', nome: 'Editar registros' },
     { chave: 'tabelionato.apagar', nome: 'Apagar registros' },
     { chave: 'tabelionato.configurar', nome: 'Criar livros, seções, campos e opções' },
     { chave: 'tabelionato.pagamentos', nome: 'Marcar pagamentos (ex.: de comerciantes) como pagos' },
+    { chave: 'tabelionato.aprovar', nome: 'Aprovar ou recusar os registros enviados (ex.: pelo Escriba)' },
   ] },
   { grupo: 'Guarda do Coelho', itens: [
     { chave: 'guarda.ver', nome: 'Ver os livros e registros' },
-    { chave: 'guarda.registrar', nome: 'Fazer novos registros (ex.: prisioneiros)' },
+    { chave: 'guarda.registrar', nome: 'Fazer novos registros, ex.: prisioneiros (vão para aprovação, se a pessoa não aprova)' },
     { chave: 'guarda.editar', nome: 'Editar registros' },
     { chave: 'guarda.apagar', nome: 'Apagar registros' },
     { chave: 'guarda.configurar', nome: 'Criar livros, seções, campos e opções' },
+    { chave: 'guarda.aprovar', nome: 'Aprovar ou recusar os registros enviados (ex.: prisioneiros registrados por guardas)' },
   ] },
   { grupo: 'Galeria', itens: [
     { chave: 'galeria.ver', nome: 'Ver as fotos' },
@@ -50,6 +52,18 @@ const MORADOR = ['tabelionato.ver', 'guarda.ver', 'galeria.ver', 'anuncios.ver',
 const MEMBRO = ['anuncios.publicar', 'atividades.criar', 'galeria.enviar'];
 const acoes = (modulo, ...lista) => lista.map(a => `${modulo}.${a}`);
 
+// [descrições antigas, descrição atual]: as antigas são trocadas nos bancos que ainda não as mudaram.
+const DESCRICOES = {
+  'Tabeliã': [['Comanda o Tabelionato: registra, edita, apaga e configura os livros.', 'Comanda o Tabelionato: registra, edita, apaga, configura os livros e marca os pagamentos.'],
+    'Comanda o Tabelionato: aprova os registros, edita, apaga, configura os livros e marca os pagamentos.'],
+  Escriba: [['Faz novos registros no Tabelionato, mas não apaga.'],
+    'Faz registros no Tabelionato, que vão para a aprovação da Tabeliã.'],
+  'Comandante da Guarda': [['Comanda a Guarda do Coelho: registra, edita, apaga e configura os livros.'],
+    'Comanda a Guarda do Coelho: aprova os registros, edita, apaga e configura os livros.'],
+  Guarda: [['Vê os registros da Guarda e registra prisioneiros.'],
+    'Vê os registros da Guarda e registra prisioneiros, que vão para a aprovação do Comandante.'],
+};
+
 const CARGOS_PADRAO = [
   { nome: 'Morador', base: 1, cor: '#9a9b74',
     descricao: 'Todos os usuários são moradores. Veem tudo e podem ajudar nas atividades.',
@@ -58,17 +72,17 @@ const CARGOS_PADRAO = [
     descricao: 'Pode tudo, menos adicionar novos usuários.',
     permissoes: TODAS.filter(p => p !== 'usuarios.criar' && p !== 'cargos.gerenciar') },
   { nome: 'Tabeliã', cor: '#c98b4a',
-    descricao: 'Comanda o Tabelionato: registra, edita, apaga, configura os livros e marca os pagamentos.',
-    permissoes: [...MEMBRO, ...acoes('tabelionato', 'registrar', 'editar', 'apagar', 'configurar', 'pagamentos')] },
+    descricao: DESCRICOES['Tabeliã'][1],
+    permissoes: [...MEMBRO, ...acoes('tabelionato', 'registrar', 'editar', 'apagar', 'configurar', 'pagamentos', 'aprovar')] },
   { nome: 'Escriba', cor: '#b9a27a',
-    descricao: 'Faz novos registros no Tabelionato, mas não apaga.',
+    descricao: DESCRICOES.Escriba[1],
     permissoes: [...MEMBRO, 'tabelionato.registrar'] },
   { nome: 'Comandante da Guarda', cor: '#c0553a',
-    descricao: 'Comanda a Guarda do Coelho: registra, edita, apaga e configura os livros.',
-    permissoes: [...MEMBRO, ...acoes('guarda', 'registrar', 'editar', 'apagar', 'configurar')] },
+    descricao: DESCRICOES['Comandante da Guarda'][1],
+    permissoes: [...MEMBRO, ...acoes('guarda', 'registrar', 'editar', 'apagar', 'configurar', 'aprovar')] },
   { nome: 'Guarda', cor: '#6f9a58',
-    descricao: 'Vê os registros da Guarda e registra prisioneiros.',
+    descricao: DESCRICOES.Guarda[1],
     permissoes: [...MEMBRO, 'guarda.registrar'] },
 ];
 
-module.exports = { CATALOGO, TODAS, VALIDAS, CARGOS_PADRAO };
+module.exports = { CATALOGO, TODAS, VALIDAS, CARGOS_PADRAO, DESCRICOES };

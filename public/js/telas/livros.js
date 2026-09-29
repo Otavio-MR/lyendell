@@ -1,7 +1,7 @@
 import {
   estado, get, post, put, del, h, trocar, icone, pode, cabecalho, vazio, botao, botaoIcone, modal, modalForm, confirmar,
   aviso, tentar, campo, interruptor, enviarImagem, dataHora, dataCurta, num, normalizar, ErroApi,
-  textoDuracao, listaDeNomes,
+  textoDuracao, listaDeNomes, relativo,
 } from '../core.js';
 import { livroDeRegistro, livroDeRegistros } from '../livro-mc.js';
 import { verPagamentos, resumoCobranca } from './pagamentos.js';
@@ -12,11 +12,13 @@ const MODULOS = {
     titulo: 'Tabelionato', icone: 'pergaminho',
     sub: 'Os livros oficiais de Lyendell: moradores, nobreza, comércio, documentos, casamentos e propriedades.',
     quemComanda: 'a Tabeliã',
+    aprovador: 'da Tabeliã',
   },
   guarda: {
     titulo: 'Guarda do Coelho', icone: 'escudo',
     sub: 'Prisioneiros, efetivo da guarda e procurados da capital.',
     quemComanda: 'o Comandante da Guarda',
+    aprovador: 'do Comandante da Guarda',
   },
 };
 
@@ -71,7 +73,7 @@ export async function modulo(m) {
   const raiz = h('div', { class: 'pagina' });
 
   async function desenhar() {
-    const { livros } = await get(`/api/modulos/${m}/livros`);
+    const { livros, contagem } = await get(`/api/modulos/${m}/livros`);
     const configurar = pode(`${m}.configurar`);
     trocar(raiz, 
       cabecalho({
@@ -81,6 +83,7 @@ export async function modulo(m) {
           onclick: () => configurarLivro(m, null, id => { location.hash = `#/${m}/${id}`; }),
         })],
       }),
+      abasModulo(m, '', contagem),
       livros.length
         ? h('div', { class: 'grade-livros' }, livros.map(l => cartaoLivro(m, l)))
         : vazio('Nenhum livro ainda', configurar ? 'Crie o primeiro livro de registros.' : 'Quando houver livros, eles aparecem aqui.'));
@@ -96,8 +99,85 @@ function cartaoLivro(m, l) {
     h('div', { class: 'livro-info' }, h('h3', null, l.nome), l.descricao && h('p', null, l.descricao)),
     h('div', { class: 'livro-rodape' },
       h('span', null, h('strong', null, num(l.total)), l.total === 1 ? ' registro' : ' registros'),
+      l.pendentes > 0 && h('span', { class: 'etiqueta etiqueta-ouro', title: 'Registros aguardando a sua aprovação' }, icone('relogio'), `${l.pendentes} aguardando`),
       l.atrasados > 0 && h('span', { class: 'etiqueta pg-atrasado', title: 'Registros com pagamento atrasado' }, icone('alerta'), `${l.atrasados} com pagamento atrasado`),
       !l.aberto && h('span', { class: 'etiqueta', title: 'Só quem comanda o módulo registra aqui' }, icone('cadeado'), 'Restrito')));
+}
+
+/* ─── Abas do módulo: livros, aprovação e meus envios ─ */
+
+function abasModulo(m, atual, contagem = {}) {
+  const abas = [['', 'Livros', null]];
+  if (pode(`${m}.aprovar`)) abas.push(['aprovacoes', 'Aguardando aprovação', contagem.aprovacoes || 0]);
+  if (contagem.envios || (pode(`${m}.registrar`) && !pode(`${m}.aprovar`))) abas.push(['envios', 'Meus envios', contagem.envios || 0]);
+  if (abas.length < 2) return null;
+  return h('nav', { class: 'abas', 'aria-label': 'Seções do módulo' }, abas.map(([k, nome, n]) =>
+    h('a', { class: `aba ${atual === k ? 'ativa' : ''}`.trim(), href: `#/${m}${k ? `/${k}` : ''}` },
+      nome, n != null && h('span', { class: `aba-n ${k === 'aprovacoes' && n ? 'aba-alerta' : ''}`.trim() }, n))));
+}
+
+export const aprovacoes = m => filaModulo(m, 'aprovacoes');
+export const envios = m => filaModulo(m, 'envios');
+
+async function filaModulo(m, modo) {
+  const info = MODULOS[m];
+  const raiz = h('div', { class: 'pagina' });
+
+  async function desenhar() {
+    const { registros, livros, permissoes, contagem } = await get(`/api/modulos/${m}/${modo}`);
+    // Em "Meus envios", os recusados vêm primeiro: são os que precisam de atenção.
+    const lista = modo === 'envios'
+      ? [...registros].sort((a, b) => (b.situacao === 'recusado') - (a.situacao === 'recusado') || b.id - a.id)
+      : registros;
+    trocar(raiz,
+      cabecalho({ titulo: info.titulo, sub: info.sub, icone: info.icone }),
+      abasModulo(m, modo, contagem),
+      h('p', { class: 'fila-intro' }, modo === 'aprovacoes'
+        ? `Registros enviados por quem não aprova (ex.: ${m === 'tabelionato' ? 'Escribas' : 'Guardas'}). Eles só entram no livro oficial depois de aprovados.`
+        : `Seus registros que ainda não entraram no livro oficial. Eles aguardam a aprovação ${info.aprovador}; os recusados podem ser corrigidos e reenviados.`),
+      lista.length
+        ? h('div', { class: 'fila' }, lista.map(r => cartaoPendente(m, r, livros[r.livro_id], permissoes, desenhar, modo)))
+        : vazio(modo === 'aprovacoes' ? 'Nada aguardando aprovação' : 'Nenhum envio pendente',
+          modo === 'aprovacoes' ? 'Quando alguém enviar um registro, ele aparece aqui.' : 'Tudo o que você enviou já foi aprovado.'));
+  }
+
+  await desenhar();
+  return raiz;
+}
+
+function cartaoPendente(m, r, l, permissoes, recarregar, modo) {
+  const d = { livro: l, permissoes: { ...permissoes, configurar: false, pagamentos: false } };
+  const titulo = tituloDe(l, r.dados);
+  const recusado = r.situacao === 'recusado';
+  const meuEnvio = r.criado_por === estado.eu.id;
+  const campos = l.campos.filter(c => c.tipo !== 'secao' && c.tipo !== 'imagem' && temValor(c, r.dados)).slice(0, 8);
+  return h('article', { class: `pendente ${r.situacao}` },
+    h('header', { class: 'pendente-cab' },
+      h('span', { class: 'livro-icone' }, icone(l.icone)),
+      h('div', { class: 'pendente-titulo' }, h('small', null, l.nome), h('h3', null, titulo)),
+      h('span', { class: `status ${recusado ? 'st-recusado' : 'st-pendente'}` }, recusado ? 'Recusado' : 'Aguardando')),
+    recusado && h('p', { class: 'pendente-motivo' }, icone('alerta'),
+      h('span', null, `Recusado por ${r.revisado_por_nome || 'desconhecido'} ${relativo(r.revisado_em)}`, r.motivo ? `: ${r.motivo}` : '.')),
+    campos.length ? h('dl', { class: 'pendente-campos' }, campos.map(c => [h('dt', null, c.nome), h('dd', null, valorCurto(c, r.dados[c.id], r.dados))])) : null,
+    h('p', { class: 'pendente-autor' }, `Enviado por ${r.criado_por_nome || 'desconhecido'} ${relativo(r.criado_em)}`,
+      r.atualizado_em ? ` · alterado ${relativo(r.atualizado_em)}` : ''),
+    h('footer', { class: 'pendente-acoes' },
+      botao('Ver documento', { icone: 'olho', classe: 'btn-pequeno', onclick: () => verRegistro(m, d, r, recarregar, recarregar) }),
+      (permissoes.editar || meuEnvio) && botao(recusado && meuEnvio ? 'Corrigir e reenviar' : 'Editar', {
+        icone: 'editar', classe: 'btn-pequeno', onclick: () => formRegistro(l, r, recarregar),
+      }),
+      h('span', { class: 'espaco' }),
+      modo === 'envios' && meuEnvio && botao('Cancelar envio', {
+        classe: 'btn-pequeno btn-perigo-texto',
+        onclick: async () => {
+          if (!await confirmar(`O envio "${titulo}" será cancelado e apagado.`, { ok: 'Cancelar envio', perigo: true })) return;
+          if (await tentar(() => del(`/api/registros/${r.id}`), 'Envio cancelado.')) { window.dispatchEvent(new Event('avisos')); recarregar(); }
+        },
+      }),
+      modo === 'aprovacoes' && permissoes.aprovar && [
+        botao('Recusar', { classe: 'btn-pequeno', onclick: () => recusar(r, titulo, recarregar) }),
+        botao('Aprovar', { icone: 'check', classe: 'btn-pequeno btn-ouro', onclick: () => aprovar(r, recarregar) }),
+      ]));
 }
 
 /* ─── Um livro: registros ─────────────────────────── */
@@ -190,6 +270,12 @@ export async function livro(m, id) {
       !l.aberto && !l.podeRegistrar && pode(`${m}.registrar`)
         ? h('p', { class: 'nota' }, icone('cadeado'), `Livro restrito: só ${info.quemComanda} registra aqui.`)
         : null,
+      d.aguardando.aprovar > 0 && h('a', { class: 'nota nota-link', href: `#/${m}/aprovacoes` }, icone('relogio'),
+        h('span', null, `${d.aguardando.aprovar} ${d.aguardando.aprovar === 1 ? 'registro deste livro aguarda' : 'registros deste livro aguardam'} a sua aprovação.`),
+        h('strong', null, 'Ver')),
+      d.aguardando.meus > 0 && h('a', { class: 'nota nota-link', href: `#/${m}/envios` }, icone('pena'),
+        h('span', null, `Você tem ${d.aguardando.meus} ${d.aguardando.meus === 1 ? 'envio' : 'envios'} neste livro ainda sem aprovação.`),
+        h('strong', null, 'Meus envios')),
       h('div', { class: 'ferramentas' },
         h('label', { class: 'busca' }, icone('busca'),
           h('input', { class: 'input', type: 'search', placeholder: 'Buscar em todos os campos', value: busca, oninput: e => { busca = e.target.value; filtrar(); } })),
@@ -228,6 +314,11 @@ export async function livro(m, id) {
 function verRegistro(m, d, r, recarregar, reabrir) {
   const l = d.livro;
   const titulo = tituloDe(l, r.dados);
+  const aprovado = !r.situacao || r.situacao === 'aprovado';
+  // Quem enviou pode corrigir ou cancelar o próprio registro enquanto ele não foi aprovado.
+  const meuEnvio = !aprovado && r.criado_por === estado.eu.id;
+  const podeEditar = d.permissoes.editar || meuEnvio;
+  const podeApagar = d.permissoes.apagar || meuEnvio;
   const linhas = [];
   let secaoPendente = null;
   for (const c of l.campos) {
@@ -242,6 +333,10 @@ function verRegistro(m, d, r, recarregar, reabrir) {
   }
 
   const doc = h('article', { class: 'documento' },
+    !aprovado && h('p', { class: `doc-situacao ${r.situacao}` },
+      r.situacao === 'pendente'
+        ? `Aguardando aprovação ${MODULOS[m].aprovador}`
+        : `Recusado por ${r.revisado_por_nome || 'desconhecido'}${r.motivo ? `: ${r.motivo}` : ''}`),
     h('header', { class: 'doc-cab' },
       h('img', { src: '/img/brasao.png', alt: '', class: 'doc-brasao' }),
       h('p', { class: 'doc-sobre' }, `${MODULOS[m].titulo} de Lyendell`),
@@ -250,27 +345,65 @@ function verRegistro(m, d, r, recarregar, reabrir) {
     h('div', { class: 'doc-campos' }, linhas.length ? linhas : h('p', { class: 'suave' }, 'Registro sem informações.')),
     h('footer', { class: 'doc-assinatura' },
       h('p', null, `Registrado por ${r.criado_por_nome || 'desconhecido'} em ${dataHora(r.criado_em)}.`),
-      r.atualizado_em && h('p', null, `Alterado por ${r.atualizado_por_nome} em ${dataHora(r.atualizado_em)}.`)));
+      r.atualizado_em && h('p', null, `Alterado por ${r.atualizado_por_nome} em ${dataHora(r.atualizado_em)}.`),
+      aprovado && r.revisado_por_nome && h('p', null, `Aprovado por ${r.revisado_por_nome} em ${dataHora(r.revisado_em)}.`)));
 
+  const cancelar = meuEnvio && !d.permissoes.apagar;
   const janela = modal({
     corpo: doc, tamanho: 'medio', classe: 'modal-documento',
     rodape: [
-      d.permissoes.apagar && botao('Apagar', {
+      podeApagar && botao(cancelar ? 'Cancelar envio' : 'Apagar', {
         icone: 'lixo', classe: 'btn-perigo-texto',
         onclick: async () => {
-          if (!await confirmar(`O registro "${titulo}" será apagado para sempre.`, { ok: 'Apagar', perigo: true })) return;
-          if (await tentar(() => del(`/api/registros/${r.id}`), 'Registro apagado.')) { janela.fechar(); recarregar(); }
+          const msg = cancelar ? `O envio "${titulo}" será cancelado e apagado.` : `O registro "${titulo}" será apagado para sempre.`;
+          if (!await confirmar(msg, { ok: cancelar ? 'Cancelar envio' : 'Apagar', perigo: true })) return;
+          if (await tentar(() => del(`/api/registros/${r.id}`), cancelar ? 'Envio cancelado.' : 'Registro apagado.')) {
+            janela.fechar();
+            window.dispatchEvent(new Event('avisos'));
+            recarregar();
+          }
         },
       }),
       h('span', { class: 'espaco' }),
-      l.cobranca && botao('Pagamentos', { icone: 'moeda', onclick: () => verPagamentos(r.id, recarregar) }),
+      aprovado && l.cobranca && botao('Pagamentos', { icone: 'moeda', onclick: () => verPagamentos(r.id, recarregar) }),
       botao('Baixar .book', {
         icone: 'baixar', titulo: 'Baixa este registro como livro para o mod Scribble',
         onclick: () => livroDeRegistro(MODULOS[m].titulo, l, r, estado.eu.nome).baixar(),
       }),
-      d.permissoes.editar && botao('Editar', { icone: 'editar', onclick: () => { janela.fechar(); formRegistro(l, r, reabrir || recarregar); } }),
+      podeEditar && botao('Editar', { icone: 'editar', onclick: () => { janela.fechar(); formRegistro(l, r, reabrir || recarregar); } }),
+      d.permissoes.aprovar && r.situacao === 'pendente' && botao('Recusar', { onclick: () => recusar(r, titulo, () => { janela.fechar(); recarregar(); }) }),
+      d.permissoes.aprovar && r.situacao === 'pendente' && botao('Aprovar', {
+        icone: 'check', classe: 'btn-ouro',
+        onclick: () => aprovar(r, () => { janela.fechar(); recarregar(); }),
+      }),
       botao('Fechar', { onclick: () => janela.fechar() }),
     ],
+  });
+}
+
+async function aprovar(r, depois) {
+  if (await tentar(() => post(`/api/registros/${r.id}/aprovar`), 'Registro aprovado. Já está no livro oficial.')) {
+    window.dispatchEvent(new Event('avisos'));
+    depois();
+  }
+}
+
+function recusar(r, titulo, depois) {
+  const motivo = h('textarea', { class: 'input', rows: '3', maxlength: '500', placeholder: 'Ex.: faltou a data de abertura; o nome está errado' });
+  modalForm({
+    titulo: `Recusar · ${titulo}`,
+    textoOk: 'Recusar registro',
+    classeOk: 'btn-perigo',
+    conteudo: [
+      h('p', { class: 'form-intro' }, `${r.criado_por_nome || 'Quem enviou'} vai ver o motivo em "Meus envios" e pode corrigir e mandar de novo.`),
+      campo('Motivo', motivo, { ajuda: 'Opcional, mas ajuda quem enviou a corrigir.' }),
+    ],
+    aoEnviar: async () => {
+      await post(`/api/registros/${r.id}/recusar`, { motivo: motivo.value });
+      aviso('Registro recusado.');
+      window.dispatchEvent(new Event('avisos'));
+      depois();
+    },
   });
 }
 
@@ -302,10 +435,15 @@ async function formRegistro(l, r, aoSalvar) {
         if (ini && fim && fim < ini) throw new Error(`"${nomeDo(c.fim)}" não pode ser antes de "${nomeDo(c.inicio)}".`);
       }
       let idSalvo = r?.id;
-      if (r) await put(`/api/registros/${r.id}`, { dados: valores });
-      else idSalvo = (await post(`/api/livros/${l.id}/registros`, { dados: valores })).id;
-      aviso(r ? 'Registro atualizado.' : 'Registro feito.');
-      aoSalvar(idSalvo);
+      let situacao;
+      if (r) ({ situacao } = await put(`/api/registros/${r.id}`, { dados: valores }));
+      else ({ id: idSalvo, situacao } = await post(`/api/livros/${l.id}/registros`, { dados: valores }));
+      const aprovador = MODULOS[l.modulo].aprovador;
+      if (situacao === 'pendente' && !r) aviso(`Registro enviado para aprovação ${aprovador}. Acompanhe em "Meus envios".`);
+      else if (situacao === 'pendente' && r.situacao === 'recusado') aviso(`Registro corrigido e reenviado para aprovação ${aprovador}.`);
+      else aviso(r ? 'Registro atualizado.' : 'Registro feito.');
+      window.dispatchEvent(new Event('avisos'));
+      aoSalvar(idSalvo, situacao);
     },
   });
 }

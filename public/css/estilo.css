@@ -211,6 +211,22 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .st-encerrada { color: var(--suave); background: rgba(154, 155, 116, 0.12); }
 .nota { display: flex; align-items: center; gap: 8px; padding: 10px 14px; margin-bottom: 16px; border-radius: var(--raio-p); background: var(--sup-2); border: 1px solid var(--borda-2); color: var(--texto-2); }
 .nota .ico { color: var(--ouro); }
+.st-pendente { color: var(--ouro-l); background: var(--ouro-fundo); }
+.st-recusado { color: #f08466; background: var(--vermelho-fundo); }
+a.nota-link { color: var(--texto-2); transition: border-color 0.15s, background 0.15s; }
+a.nota-link:hover { color: var(--texto); border-color: var(--ouro-d); background: var(--sup-3); }
+.nota-link > span { flex: 1; }
+.nota-link strong { font-family: var(--f-titulo); font-size: 0.78rem; color: var(--ouro); white-space: nowrap; }
+.nota-ouro { border-color: rgba(216, 177, 58, 0.45); background: var(--ouro-fundo); }
+.nota-vermelha { border-color: rgba(216, 103, 74, 0.45); background: var(--vermelho-fundo); }
+.nota-vermelha .ico, .nota-vermelha strong { color: #f08466; }
+.avisos-inicio { display: grid; gap: 10px; margin-bottom: 22px; }
+.avisos-inicio .nota { margin-bottom: 0; }
+.menu-aviso {
+  margin-left: auto; min-width: 22px; height: 22px; padding: 0 7px; border-radius: 999px; display: inline-grid; place-items: center;
+  font-family: var(--f-titulo); font-size: 0.72rem; font-weight: 700; color: #1b1403; background: var(--ouro);
+}
+.menu-aviso.recusado { color: #fff; background: #b8492f; }
 
 /* ─── Barra de progresso ────────────────────────── */
 .barra { height: 10px; border-radius: 999px; background: #050a06; border: 1px solid var(--borda-2); overflow: hidden; }
@@ -398,6 +414,9 @@ input[type='date'].input::-webkit-calendar-picker-indicator { filter: invert(0.7
   box-shadow: inset 0 0 0 1px rgba(140, 109, 21, 0.45), inset 0 0 0 6px var(--pergaminho), inset 0 0 0 7px rgba(140, 109, 21, 0.35), inset 0 0 60px rgba(106, 86, 54, 0.25);
 }
 .doc-cab { text-align: center; margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid rgba(106, 86, 54, 0.35); }
+.doc-situacao { text-align: center; font-family: var(--f-titulo); font-size: 0.8rem; letter-spacing: 0.06em; padding: 6px 12px; margin: -8px 0 14px; border-radius: 4px; }
+.doc-situacao.pendente { background: rgba(140, 109, 21, 0.18); color: #6b4f07; border: 1px dashed rgba(140, 109, 21, 0.6); }
+.doc-situacao.recusado { background: rgba(156, 58, 36, 0.14); color: #8a2f1b; border: 1px dashed rgba(156, 58, 36, 0.55); }
 .doc-brasao { width: 74px; height: 74px; object-fit: contain; filter: sepia(0.3) drop-shadow(0 2px 3px rgba(44, 34, 20, 0.3)); }
 .doc-sobre { font-family: var(--f-titulo); font-size: 0.68rem; letter-spacing: 0.3em; text-transform: uppercase; color: var(--tinta-2); margin-top: 6px; }
 .doc-titulo { font-family: var(--f-destaque); font-size: 2rem; font-weight: 700; color: var(--tinta); line-height: 1.15; margin: 4px 0; overflow-wrap: anywhere; }
@@ -449,6 +468,27 @@ input[type='date'].input::-webkit-calendar-picker-indicator { filter: invert(0.7
 .aba:hover { color: var(--texto); }
 .aba.ativa { color: var(--ouro-l); border-bottom-color: var(--ouro); }
 .aba-n { font-family: var(--f-titulo); font-size: 0.68rem; padding: 1px 7px; border-radius: 999px; background: var(--sup-3); color: var(--suave); }
+.aba-n.aba-alerta, .aba.ativa .aba-n.aba-alerta { background: var(--ouro); color: #1b1403; }
+
+/* Fila de aprovação e meus envios */
+.fila-intro { color: var(--texto-2); margin: -4px 0 16px; max-width: 80ch; }
+.fila { display: grid; gap: 14px; }
+.pendente { display: grid; gap: 12px; padding: 16px 18px; border-radius: var(--raio); background: var(--sup); border: 1px solid var(--borda); border-left: 3px solid var(--ouro); }
+.pendente.recusado { border-left-color: var(--vermelho); }
+.pendente-cab { display: flex; align-items: center; gap: 12px; }
+.pendente-cab .livro-icone { width: 40px; height: 40px; flex: none; }
+.pendente-cab .livro-icone .ico { width: 22px; height: 22px; }
+.pendente-titulo { flex: 1; min-width: 0; }
+.pendente-titulo small { display: block; color: var(--suave); font-size: 0.88rem; }
+.pendente-titulo h3 { font-family: var(--f-destaque); font-size: 1.35rem; font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
+.pendente-motivo { display: flex; gap: 8px; align-items: flex-start; padding: 8px 12px; border-radius: var(--raio-p); background: var(--vermelho-fundo); color: #f3a58f; }
+.pendente-motivo .ico { margin-top: 3px; }
+.pendente-campos { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px 18px; margin: 0; }
+.pendente-campos dt { font-family: var(--f-titulo); font-size: 0.64rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--suave); }
+.pendente-campos dd { margin: 0 0 4px; overflow-wrap: anywhere; }
+.pendente-campos dt + dd { grid-column: auto; }
+.pendente-autor { color: var(--suave); font-size: 0.92rem; }
+.pendente-acoes { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding-top: 10px; border-top: 1px solid var(--borda); }
 .aba.ativa .aba-n { background: var(--ouro-fundo); color: var(--ouro); }
 
 /* ─── Livros ────────────────────────────────────── */

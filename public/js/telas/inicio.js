@@ -8,6 +8,26 @@ function saudacao() {
   return 'Boa noite';
 }
 
+// Registros esperando a aprovação de quem entrou, e envios dele que foram recusados.
+function avisosDeAprovacao(p = {}) {
+  const nomes = { tabelionato: 'Tabelionato', guarda: 'Guarda do Coelho' };
+  const itens = [];
+  for (const m of Object.keys(nomes)) {
+    const { aprovar = 0, recusados = 0 } = p[m] || {};
+    if (aprovar) {
+      itens.push(h('a', { class: 'nota nota-link nota-ouro', href: `#/${m}/aprovacoes` }, icone('relogio'),
+        h('span', null, `${aprovar} ${aprovar === 1 ? 'registro aguarda' : 'registros aguardam'} a sua aprovação no ${nomes[m]}.`),
+        h('strong', null, 'Revisar')));
+    }
+    if (recusados) {
+      itens.push(h('a', { class: 'nota nota-link nota-vermelha', href: `#/${m}/envios` }, icone('alerta'),
+        h('span', null, `${recusados} ${recusados === 1 ? 'envio seu foi recusado' : 'envios seus foram recusados'} no ${nomes[m]}.`),
+        h('strong', null, 'Ver e corrigir')));
+    }
+  }
+  return itens.length ? h('div', { class: 'avisos-inicio' }, itens) : null;
+}
+
 export async function inicio() {
   const d = await get('/api/inicio');
   const eu = estado.eu;
@@ -32,6 +52,8 @@ export async function inicio() {
         h('p', { class: 'sobrelinha' }, 'Cidade de Lyendell · Casa Luckham'),
         h('h1', { class: 'pag-titulo bv-titulo' }, `${saudacao()}, ${eu.nome}`),
         h('div', { class: 'chips' }, cargos))),
+
+    avisosDeAprovacao(d.pendencias),
 
     numeros.length ? h('div', { class: 'numeros' }, numeros.map(x =>
       h('a', { class: 'numero', href: x.href },
