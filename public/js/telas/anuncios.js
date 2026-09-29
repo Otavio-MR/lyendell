@@ -39,7 +39,7 @@ function cartao(a, recarregar) {
         a.fixado && h('span', { class: 'etiqueta etiqueta-ouro' }, icone('alfinete'), 'Fixado'),
         a.importancia !== 'comum' && h('span', { class: `etiqueta imp-${a.importancia}` }, a.importancia === 'urgente' ? 'Urgente' : 'Importante')),
       h('h2', null, a.titulo),
-      h('p', { class: 'anuncio-autor' }, avatar(a.autor_nome, 'avatar-p'),
+      h('p', { class: 'anuncio-autor' }, avatar(a.autor_nome, 'avatar-p', a.autor_foto),
         h('span', null, h('strong', null, a.autor_nome || 'desconhecido'), ' · ',
           h('span', { title: dataHora(a.criado_em) }, relativo(a.criado_em)),
           a.editado_em ? ' · editado' : ''))),

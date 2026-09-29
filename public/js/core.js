@@ -195,8 +195,28 @@ export function vazio(titulo, texto, acao) {
     acao);
 }
 
-export function avatar(nome, classe = '') {
-  return h('span', { class: `avatar ${classe}`.trim(), 'aria-hidden': 'true' }, iniciais(nome));
+// Foto de perfil, ou as iniciais do nome quando a pessoa ainda não tem foto.
+export function avatar(nome, classe = '', foto = null) {
+  return h('span', { class: `avatar ${foto ? 'com-foto' : ''} ${classe}`.replace(/\s+/g, ' ').trim(), 'aria-hidden': 'true' },
+    foto ? h('img', { src: foto, alt: '', loading: 'lazy' }) : iniciais(nome));
+}
+
+// Recorta o centro da imagem em quadrado e diminui para foto de perfil (256px, uns poucos KB).
+export async function recortarAvatar(arquivo, lado = 256) {
+  let imagem;
+  try { imagem = await createImageBitmap(arquivo); } catch { throw new Error('Não consegui abrir essa imagem. Tente outra (PNG, JPG ou WEBP).'); }
+  const menor = Math.min(imagem.width, imagem.height);
+  const tela = document.createElement('canvas');
+  tela.width = lado;
+  tela.height = lado;
+  const g = tela.getContext('2d');
+  g.imageSmoothingQuality = 'high';
+  g.drawImage(imagem, (imagem.width - menor) / 2, (imagem.height - menor) / 2, menor, menor, 0, 0, lado, lado);
+  imagem.close?.();
+  const gerar = tipo => new Promise(ok => tela.toBlob(ok, tipo, 0.9));
+  let blob = await gerar('image/webp');
+  if (blob?.type !== 'image/webp') blob = await gerar('image/png');
+  return new File([blob], `perfil.${blob.type === 'image/webp' ? 'webp' : 'png'}`, { type: blob.type });
 }
 
 export function chipCargo(c) {

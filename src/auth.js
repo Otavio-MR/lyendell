@@ -52,6 +52,7 @@ function montarUsuario(u, cargos) {
   return {
     id: u.id,
     nome: u.nome,
+    foto: u.foto || null,
     is_root: !!u.is_root,
     ativo: !!u.ativo,
     cargos: cargos.filter(c => !c.base).map(({ id, nome, cor }) => ({ id, nome, cor })),
@@ -60,13 +61,13 @@ function montarUsuario(u, cargos) {
 }
 
 async function carregarUsuario(id) {
-  const u = await db.get('SELECT id, nome, is_root, ativo FROM usuarios WHERE id = ?', id);
+  const u = await db.get('SELECT id, nome, foto, is_root, ativo FROM usuarios WHERE id = ?', id);
   if (!u) return null;
   return montarUsuario(u, await db.all(SQL_CARGOS, id));
 }
 
 function perfil(u) {
-  return { id: u.id, nome: u.nome, is_root: u.is_root, cargos: u.cargos, permissoes: [...u.permissoes] };
+  return { id: u.id, nome: u.nome, foto: u.foto, is_root: u.is_root, cargos: u.cargos, permissoes: [...u.permissoes] };
 }
 
 const CINCO_MINUTOS = 5 * 60 * 1000;
@@ -75,7 +76,7 @@ async function sessao(req, res, next) {
   const token = lerCookie(req);
   if (token) {
     const u = await db.get(`
-      SELECT u.id, u.nome, u.is_root, u.ativo, u.ultimo_acesso FROM sessoes s JOIN usuarios u ON u.id = s.usuario_id
+      SELECT u.id, u.nome, u.foto, u.is_root, u.ativo, u.ultimo_acesso FROM sessoes s JOIN usuarios u ON u.id = s.usuario_id
       WHERE s.token_hash = ? AND s.expira_em > datetime('now') AND u.ativo = 1`, sha(token));
     if (u) {
       req.usuario = montarUsuario(u, await db.all(SQL_CARGOS, u.id));

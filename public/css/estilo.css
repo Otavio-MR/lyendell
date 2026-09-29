@@ -167,6 +167,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .avatar-p { width: 28px; height: 28px; font-size: 0.64rem; box-shadow: none; }
 .avatar-g { width: 72px; height: 72px; font-size: 1.4rem; }
+.avatar.com-foto { overflow: hidden; background: var(--sup-3); }
+.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar-p.com-foto { box-shadow: 0 0 0 1px var(--ouro-d); }
 
 /* ─── Cabeçalho de página ───────────────────────── */
 .pagina { animation: surgir 0.25s ease both; }
@@ -649,6 +652,20 @@ input[type='date'].input::-webkit-calendar-picker-indicator { filter: invert(0.7
 .perfil-topo { display: flex; align-items: center; gap: 20px; }
 .perfil-topo h2 { font-family: var(--f-destaque); font-size: 1.9rem; margin-bottom: 6px; }
 .perfil-topo .suave { margin-top: 8px; font-size: 0.95rem; }
+.perfil-foto { display: grid; justify-items: center; gap: 10px; flex: none; }
+.perfil-foto .avatar-g { width: 112px; height: 112px; font-size: 2rem; }
+.perfil-foto-botao { position: relative; padding: 0; border: 0; background: none; border-radius: 50%; cursor: pointer; }
+.perfil-foto-camada {
+  position: absolute; inset: 0; display: grid; place-items: center; border-radius: 50%;
+  background: rgba(3, 6, 4, 0.55); color: var(--ouro-l); opacity: 0; transition: opacity 0.15s;
+}
+.perfil-foto-camada .ico { width: 26px; height: 26px; }
+.perfil-foto-botao:hover .perfil-foto-camada, .perfil-foto-botao:focus-visible .perfil-foto-camada, .perfil-foto-botao:disabled .perfil-foto-camada { opacity: 1; }
+.perfil-foto-acoes { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.giro-p { width: 24px; height: 24px; }
+.foto-admin { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--raio-p); background: var(--sup-2); border: 1px solid var(--borda); }
+.foto-admin .avatar { width: 44px; height: 44px; }
+.foto-admin .btn { margin-left: auto; }
 .pagina-estreita .painel .form { max-width: 420px; }
 
 /* ─── Celular e tablet ──────────────────────────── */

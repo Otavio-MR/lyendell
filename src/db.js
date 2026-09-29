@@ -52,7 +52,8 @@ CREATE TABLE IF NOT EXISTS usuarios (
   is_root INTEGER NOT NULL DEFAULT 0,
   ativo INTEGER NOT NULL DEFAULT 1,
   criado_em TEXT NOT NULL DEFAULT (datetime('now')),
-  ultimo_acesso TEXT
+  ultimo_acesso TEXT,
+  foto TEXT
 );
 
 CREATE TABLE IF NOT EXISTS cargos (
@@ -207,7 +208,7 @@ CREATE TABLE IF NOT EXISTS diario (
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 2;
+const VERSAO = 3;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -242,6 +243,10 @@ async function migrar() {
     }
   }
   // v2: imagens passam a ficar dentro do banco (tabela "arquivos", criada no esquema).
+  if (versao < 3) {
+    // v3: foto de perfil.
+    if (!await colunaExiste('usuarios', 'foto')) await db.run('ALTER TABLE usuarios ADD COLUMN foto TEXT');
+  }
 
   await db.run("INSERT INTO meta (chave, valor) VALUES ('versao', ?) ON CONFLICT (chave) DO UPDATE SET valor = excluded.valor", String(VERSAO));
 }
@@ -283,6 +288,7 @@ async function faxina() {
     WHERE criado_em < datetime('now', '-1 day')
       AND NOT EXISTS (SELECT 1 FROM fotos WHERE fotos.arquivo = '/uploads/' || arquivos.nome)
       AND NOT EXISTS (SELECT 1 FROM anuncios WHERE anuncios.imagem = '/uploads/' || arquivos.nome)
+      AND NOT EXISTS (SELECT 1 FROM usuarios WHERE usuarios.foto = '/uploads/' || arquivos.nome)
       AND NOT EXISTS (SELECT 1 FROM registros WHERE instr(registros.dados, arquivos.nome) > 0)`);
 }
 
@@ -295,4 +301,4 @@ async function iniciarBanco() {
   return REMOTO ? `Turso (${new URL(url.replace(/^libsql:/, 'https:')).host})` : path.join(PASTA_DADOS, 'lyendell.db');
 }
 
-module.exports = { db, iniciarBanco };
+module.exports = { db, iniciarBanco, faxina };

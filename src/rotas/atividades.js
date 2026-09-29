@@ -76,8 +76,10 @@ r.get('/', exigir('atividades.ver'), async (req, res) => {
 r.get('/:id', exigir('atividades.ver'), async (req, res) => {
   const a = await buscar(req);
   const [participantes, contribuicoes] = await Promise.all([
-    db.all('SELECT usuario_id, usuario_nome, compromisso, entrou_em FROM participantes WHERE atividade_id = ? ORDER BY entrou_em', a.id),
-    db.all('SELECT * FROM contribuicoes WHERE atividade_id = ? ORDER BY id DESC', a.id),
+    db.all(`SELECT p.usuario_id, p.usuario_nome, p.compromisso, p.entrou_em, u.foto
+      FROM participantes p LEFT JOIN usuarios u ON u.id = p.usuario_id WHERE p.atividade_id = ? ORDER BY p.entrou_em`, a.id),
+    db.all(`SELECT c.*, u.foto AS usuario_foto
+      FROM contribuicoes c LEFT JOIN usuarios u ON u.id = c.usuario_id WHERE c.atividade_id = ? ORDER BY c.id DESC`, a.id),
   ]);
   const ehGestor = gestor(req, a);
 
@@ -85,11 +87,11 @@ r.get('/:id', exigir('atividades.ver'), async (req, res) => {
   const pessoas = new Map();
   const chave = (id, nome) => (id ? `u${id}` : `n${nome}`);
   for (const p of participantes) {
-    pessoas.set(chave(p.usuario_id, p.usuario_nome), { usuario_id: p.usuario_id, nome: p.usuario_nome, compromisso: p.compromisso, entregue: 0, conferido: 0, entregas: 0, participando: true });
+    pessoas.set(chave(p.usuario_id, p.usuario_nome), { usuario_id: p.usuario_id, nome: p.usuario_nome, foto: p.foto, compromisso: p.compromisso, entregue: 0, conferido: 0, entregas: 0, participando: true });
   }
   for (const c of contribuicoes) {
     const k = chave(c.usuario_id, c.usuario_nome);
-    if (!pessoas.has(k)) pessoas.set(k, { usuario_id: c.usuario_id, nome: c.usuario_nome, compromisso: 0, entregue: 0, conferido: 0, entregas: 0, participando: false });
+    if (!pessoas.has(k)) pessoas.set(k, { usuario_id: c.usuario_id, nome: c.usuario_nome, foto: c.usuario_foto, compromisso: 0, entregue: 0, conferido: 0, entregas: 0, participando: false });
     const p = pessoas.get(k);
     p.entregue += c.quantidade;
     p.entregas += 1;

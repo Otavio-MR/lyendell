@@ -4,6 +4,7 @@ const { hashSenha, verificarSenha, HASH_FALSO, validarSenhaNova } = require('../
 const { criarSessao, encerrarSessao, comandoDerrubarSessoes, carregarUsuario, perfil, exigirLogin } = require('../auth');
 const { CATALOGO } = require('../permissoes');
 const { anotar } = require('../diario');
+const { upload, salvarArquivo, comandoApagarArquivo } = require('../uploads');
 const { erro, linha, chaveNome } = require('../util');
 
 const r = express.Router();
@@ -63,6 +64,25 @@ r.post('/logout', async (req, res) => {
 r.get('/me', exigirLogin, (req, res) => res.json(perfil(req.usuario)));
 
 r.get('/catalogo', exigirLogin, (req, res) => res.json({ catalogo: CATALOGO }));
+
+// Foto de perfil: qualquer usuário troca a própria (o site já manda recortada e pequena).
+r.post('/foto', exigirLogin, upload.single('arquivo'), async (req, res) => {
+  if (!req.file) throw erro(400, 'Escolha uma imagem.');
+  const url = await salvarArquivo(req.file, req.usuario.id);
+  await db.lote([
+    ['UPDATE usuarios SET foto = ? WHERE id = ?', url, req.usuario.id],
+    req.usuario.foto ? comandoApagarArquivo(req.usuario.foto) : null,
+  ]);
+  res.json({ foto: url });
+});
+
+r.delete('/foto', exigirLogin, async (req, res) => {
+  await db.lote([
+    ['UPDATE usuarios SET foto = NULL WHERE id = ?', req.usuario.id],
+    req.usuario.foto ? comandoApagarArquivo(req.usuario.foto) : null,
+  ]);
+  res.json({ ok: true });
+});
 
 r.post('/senha', exigirLogin, async (req, res) => {
   const atual = String(req.body?.atual ?? '');

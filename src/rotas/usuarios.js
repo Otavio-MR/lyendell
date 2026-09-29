@@ -3,6 +3,7 @@ const { db } = require('../db');
 const { hashSenha, validarSenhaNova } = require('../senhas');
 const { carregarUsuario, montarUsuario, comandoDerrubarSessoes, exigir } = require('../auth');
 const { anotar } = require('../diario');
+const { comandoApagarArquivo } = require('../uploads');
 const { erro, linha, chaveNome, idDaRota } = require('../util');
 
 const r = express.Router();
@@ -65,7 +66,7 @@ async function buscarAlvo(req) {
 
 r.get('/', exigir('usuarios.ver'), async (req, res) => {
   const [lista, vinculos, todosCargos] = await Promise.all([
-    db.all('SELECT id, nome, is_root, ativo, criado_em, ultimo_acesso FROM usuarios ORDER BY is_root DESC, chave'),
+    db.all('SELECT id, nome, foto, is_root, ativo, criado_em, ultimo_acesso FROM usuarios ORDER BY is_root DESC, chave'),
     db.all('SELECT usuario_id, cargo_id FROM usuario_cargos'),
     db.all('SELECT * FROM cargos ORDER BY ordem, id'),
   ]);
@@ -173,8 +174,19 @@ r.delete('/:id', exigir('usuarios.remover'), async (req, res) => {
     ['UPDATE pagamentos SET marcado_por = NULL WHERE marcado_por = ?', id],
     ['UPDATE arquivos SET enviado_por = NULL WHERE enviado_por = ?', id],
     ['DELETE FROM usuarios WHERE id = ?', id],
+    comandoApagarArquivo(alvo.foto),
   ]);
   await anotar(req, 'Removeu um usuário', alvo.nome);
+  res.json({ ok: true });
+});
+
+// Quem administra usuários pode tirar uma foto de perfil imprópria.
+r.delete('/:id/foto', exigir('usuarios.editar'), async (req, res) => {
+  const alvo = await buscarAlvo(req);
+  if (!podeGerenciar(req.usuario, alvo)) throw erro(403, 'Você não pode editar este usuário.');
+  if (!alvo.foto) return res.json({ ok: true });
+  await db.lote([['UPDATE usuarios SET foto = NULL WHERE id = ?', alvo.id], comandoApagarArquivo(alvo.foto)]);
+  await anotar(req, 'Removeu a foto de perfil de um usuário', alvo.nome);
   res.json({ ok: true });
 });
 

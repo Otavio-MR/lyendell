@@ -26,7 +26,7 @@ export async function usuarios() {
         : u.cargos.length ? u.cargos.map(id => porId.get(id)).filter(Boolean).map(chipCargo) : [h('span', { class: 'chip' }, 'Morador')];
       const eu = u.id === estado.eu.id;
       return h('tr', { class: u.ativo ? '' : 'inativo' },
-        h('td', { 'data-rotulo': 'Personagem' }, h('span', { class: 'pessoa' }, avatar(u.nome, 'avatar-p'), h('strong', null, u.nome), eu && h('small', { class: 'suave' }, ' (você)'))),
+        h('td', { 'data-rotulo': 'Personagem' }, h('span', { class: 'pessoa' }, avatar(u.nome, 'avatar-p', u.foto), h('strong', null, u.nome), eu && h('small', { class: 'suave' }, ' (você)'))),
         h('td', { 'data-rotulo': 'Cargos' }, h('div', { class: 'chips' }, chips)),
         h('td', { 'data-rotulo': 'Situação' }, u.ativo ? h('span', { class: 'status st-aberta' }, 'Ativo') : h('span', { class: 'status st-encerrada' }, 'Desativado')),
         h('td', { 'data-rotulo': 'Último acesso', class: 'suave', title: dataHora(u.ultimo_acesso) }, u.ultimo_acesso ? relativo(u.ultimo_acesso) : 'nunca entrou'),
@@ -82,11 +82,24 @@ function formUsuario(u, cargos, concediveis, depois) {
 
   const senha = h('input', { class: 'input', type: 'text', autocomplete: 'new-password', maxlength: '100', oninput: e => { s.senha = e.target.value; } });
 
+  // Para tirar uma foto de perfil imprópria de outra pessoa.
+  const fotoLinha = u?.foto && !eu ? h('div', { class: 'foto-admin' },
+    avatar(u.nome, '', u.foto),
+    h('span', { class: 'suave' }, 'Foto de perfil'),
+    botao('Remover foto', {
+      classe: 'btn-pequeno btn-perigo-texto',
+      onclick: async () => {
+        if (!await confirmar(`A foto de perfil de ${u.nome} será removida.`, { ok: 'Remover foto', perigo: true })) return;
+        if (await tentar(() => del(`/api/usuarios/${u.id}/foto`), 'Foto removida.')) { fotoLinha.remove(); depois(); }
+      },
+    })) : null;
+
   modalForm({
     titulo: u ? `Editar · ${u.nome}` : 'Novo usuário',
     tamanho: 'medio',
     textoOk: u ? 'Salvar' : 'Criar usuário',
     conteudo: [
+      fotoLinha,
       h('div', { class: 'form-grade' },
         campo('Nome do personagem', h('input', { class: 'input', value: s.nome, maxlength: '40', placeholder: 'Ex.: Alianor Bulton Luckham', autocomplete: 'off', oninput: e => { s.nome = e.target.value; } }),
           { obrigatorio: true, ajuda: 'É o login. Maiúsculas e minúsculas não importam.' }),

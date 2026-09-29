@@ -1,4 +1,6 @@
-import { estado, get, post, h, icone, cabecalho, campo, aviso, avatar, chipCargo, botao } from '../core.js';
+import {
+  estado, get, post, api, del, h, trocar, icone, cabecalho, campo, aviso, tentar, confirmar, avatar, chipCargo, botao, recortarAvatar,
+} from '../core.js';
 
 export async function perfil() {
   const eu = estado.eu;
@@ -36,6 +38,52 @@ export async function perfil() {
     }
   });
 
+  /* Foto de perfil */
+  const arquivo = h('input', { type: 'file', accept: 'image/png,image/jpeg,image/gif,image/webp', hidden: true });
+  const caixaFoto = h('div', { class: 'perfil-foto' });
+
+  function desenharFoto(enviando = false) {
+    trocar(caixaFoto,
+      h('button', { class: 'perfil-foto-botao', type: 'button', title: 'Trocar foto', disabled: enviando, onclick: () => arquivo.click() },
+        avatar(eu.nome, 'avatar-g', eu.foto),
+        h('span', { class: 'perfil-foto-camada' }, enviando ? h('span', { class: 'giro giro-p' }) : icone('editar'))),
+      h('div', { class: 'perfil-foto-acoes' },
+        botao(eu.foto ? 'Trocar foto' : 'Colocar foto', { icone: 'imagem', classe: 'btn-pequeno', desativado: enviando, onclick: () => arquivo.click() }),
+        eu.foto && !enviando && botao('Remover', {
+          classe: 'btn-pequeno btn-fantasma',
+          onclick: async () => {
+            if (!await confirmar('Sua foto de perfil será removida e as suas iniciais voltam a aparecer.', { ok: 'Remover foto' })) return;
+            if (await tentar(() => del('/api/auth/foto'), 'Foto removida.')) atualizarFoto(null);
+          },
+        })),
+      arquivo);
+  }
+
+  function atualizarFoto(url) {
+    eu.foto = url;
+    window.dispatchEvent(new Event('perfil-atualizado'));
+    desenharFoto();
+  }
+
+  arquivo.addEventListener('change', async () => {
+    const f = arquivo.files[0];
+    arquivo.value = '';
+    if (!f) return;
+    desenharFoto(true);
+    try {
+      const fd = new FormData();
+      fd.append('arquivo', await recortarAvatar(f));
+      const { foto } = await api('POST', '/api/auth/foto', fd);
+      aviso('Foto de perfil atualizada.');
+      atualizarFoto(foto);
+    } catch (e) {
+      aviso(e.message, 'erro');
+      desenharFoto();
+    }
+  });
+
+  desenharFoto();
+
   const cargos = eu.is_root
     ? [h('span', { class: 'chip chip-ouro' }, icone('coroa'), 'Administrador')]
     : eu.cargos.length ? eu.cargos.map(chipCargo) : [h('span', { class: 'chip' }, 'Morador')];
@@ -43,11 +91,11 @@ export async function perfil() {
   return h('div', { class: 'pagina pagina-estreita' },
     cabecalho({ titulo: 'Meu perfil', icone: 'usuario' }),
     h('section', { class: 'painel perfil-topo' },
-      avatar(eu.nome, 'avatar-g'),
+      caixaFoto,
       h('div', null,
         h('h2', null, eu.nome),
         h('div', { class: 'chips' }, cargos),
-        h('p', { class: 'suave' }, 'Todo usuário também é morador de Lyendell.'))),
+        h('p', { class: 'suave' }, 'Todo usuário também é morador de Lyendell. A foto é recortada em quadrado automaticamente.'))),
     h('section', { class: 'painel' },
       h('header', { class: 'painel-cab' }, h('h2', null, icone('chave'), 'O que você pode fazer')),
       h('div', { class: 'perm-grade' }, catalogo.map(g => {

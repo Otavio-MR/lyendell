@@ -22,7 +22,9 @@ function ler(req, atual = {}) {
 }
 
 r.get('/', exigir('anuncios.ver'), async (req, res) => {
-  const lista = await db.all('SELECT * FROM anuncios ORDER BY fixado DESC, id DESC LIMIT 200');
+  const lista = await db.all(`
+    SELECT a.*, u.foto AS autor_foto FROM anuncios a LEFT JOIN usuarios u ON u.id = a.autor_id
+    ORDER BY a.fixado DESC, a.id DESC LIMIT 200`);
   res.json({ anuncios: lista.map(a => ({ ...a, fixado: !!a.fixado, podeMexer: podeMexer(req, a) })) });
 });
 

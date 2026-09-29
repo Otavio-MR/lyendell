@@ -127,7 +127,7 @@ function montar() {
     nav,
     h('div', { class: 'eu' },
       h('a', { class: 'eu-link', href: '#/perfil', title: 'Meu perfil' },
-        avatar(eu.nome),
+        meuAvatar(),
         h('span', { class: 'eu-texto' }, h('strong', null, eu.nome), h('small', null, cargoPrincipal(eu)))),
       h('button', { class: 'btn-icone', type: 'button', title: 'Sair', 'aria-label': 'Sair', onclick: sair }, icone('sair'))));
 
@@ -135,7 +135,7 @@ function montar() {
   const topo = h('header', { class: 'topo' },
     h('button', { class: 'btn-icone', type: 'button', 'aria-label': 'Abrir menu', onclick: () => alternarMenu(true) }, icone('menu')),
     h('a', { class: 'marca marca-topo', href: '#/' }, h('img', { src: '/img/brasao.png', alt: '' }), h('strong', null, 'Casa Luckham')),
-    h('a', { href: '#/perfil', 'aria-label': 'Meu perfil' }, avatar(eu.nome)));
+    h('a', { href: '#/perfil', 'aria-label': 'Meu perfil' }, meuAvatar()));
 
   trocar(app, h('div', { class: 'layout' },
     lateral,
@@ -144,6 +144,17 @@ function montar() {
 
   rotear();
 }
+
+function meuAvatar() {
+  const el = avatar(estado.eu.nome, '', estado.eu.foto);
+  el.dataset.meuAvatar = '';
+  return el;
+}
+
+// Quando a pessoa troca a foto no perfil, o menu e o topo atualizam na hora.
+window.addEventListener('perfil-atualizado', () => {
+  document.querySelectorAll('[data-meu-avatar]').forEach(el => el.replaceWith(meuAvatar()));
+});
 
 /* ─── Rotas ───────────────────────────────────────── */
 
