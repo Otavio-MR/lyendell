@@ -1,0 +1,200 @@
+// Conexão ao vivo da Recreação (chat, quem está online e partidas).
+// Uma única conexão para o site todo: ela continua aberta enquanto a pessoa navega,
+// para avisar quando alguém entra na partida dela ou manda mensagem no chat.
+
+import { estado, get, h, icone, aviso } from './core.js';
+
+export const rt = {
+  conectado: false,
+  eu: null,
+  online: [],
+  historico: [],
+  salas: [],        // partidas abertas (resumo para o salão)
+  partidas: new Map(), // id -> visão completa das partidas que eu jogo ou assisto
+  minhaSala: null,
+  naoLidas: 0,
+  lendoChat: false,
+};
+
+const ouvintes = new Map();
+export function ouvir(tipo, fn) {
+  if (!ouvintes.has(tipo)) ouvintes.set(tipo, new Set());
+  ouvintes.get(tipo).add(fn);
+  return () => ouvintes.get(tipo)?.delete(fn);
+}
+function emitir(tipo, dados) {
+  for (const fn of [...(ouvintes.get(tipo) || [])]) {
+    try { fn(dados); } catch (e) { console.error(e); }
+  }
+}
+
+let ws = null;
+let ligado = false;
+let tentativas = 0;
+let relogio = null;
+let criando = false;
+let indoPara = null;
+
+export function ligar() {
+  if (ligado) return;
+  ligado = true;
+  abrir();
+}
+
+export function desligar() {
+  ligado = false;
+  clearTimeout(relogio);
+  const velho = ws;
+  ws = null;
+  velho?.close(1000);
+  Object.assign(rt, { conectado: false, eu: null, online: [], historico: [], salas: [], minhaSala: null, naoLidas: 0 });
+  rt.partidas.clear();
+  document.getElementById('partida-ativa')?.remove();
+  emitir('estado');
+  emitir('naoLidas');
+}
+
+function abrir() {
+  const protocolo = location.protocol === 'https:' ? 'wss' : 'ws';
+  const conexao = new WebSocket(`${protocolo}://${location.host}/ws`);
+  ws = conexao;
+  conexao.onmessage = e => {
+    let m;
+    try { m = JSON.parse(e.data); } catch { return; }
+    tratar(m);
+    emitir(m.tipo, m);
+  };
+  conexao.onclose = () => {
+    if (ws !== conexao) return; // conexão antiga, já substituída
+    ws = null;
+    const estava = rt.conectado;
+    rt.conectado = false;
+    emitir('estado');
+    if (!ligado) return;
+    // Volta a tentar com calma crescente: 1s, 2s, 4s... até 20s.
+    const atraso = estava ? 800 : Math.min(20_000, 1000 * 2 ** tentativas++);
+    relogio = setTimeout(reconectar, atraso);
+  };
+}
+
+async function reconectar() {
+  if (!ligado) return;
+  // Se a sessão acabou, a API avisa (e o site volta para o login) em vez de ficar tentando para sempre.
+  try { await get('/api/pendencias'); } catch (e) {
+    if (e.status === 401 || !estado.eu) return;
+  }
+  if (ligado && !ws) abrir();
+}
+
+export function enviar(tipo, dados = {}, { silencioso = false } = {}) {
+  if (ws?.readyState === 1) {
+    ws.send(JSON.stringify({ tipo, dados }));
+    return true;
+  }
+  if (!silencioso) aviso('Sem conexão com a recreação agora. Tentando reconectar...', 'erro');
+  return false;
+}
+
+// Enquanto o chat está na tela, as mensagens novas não contam como "não lidas".
+export function lendoChat(sim) {
+  rt.lendoChat = sim;
+  if (sim && rt.naoLidas) {
+    rt.naoLidas = 0;
+    emitir('naoLidas');
+  }
+}
+
+export function criarPartida(jogo) {
+  criando = enviar('sala:criar', { jogo });
+}
+export function entrarNaPartida(id) {
+  if (enviar('sala:entrar', { id })) indoPara = id;
+}
+
+const rotaDaSala = id => `#/recreacao/sala/${id}`;
+const estouNaSala = id => location.hash === rotaDaSala(id);
+
+function tratar(m) {
+  switch (m.tipo) {
+    case 'ola':
+      tentativas = 0;
+      Object.assign(rt, { conectado: true, eu: m.eu, online: m.online, historico: m.historico, salas: m.salas, minhaSala: m.minhaSala });
+      emitir('estado');
+      break;
+    case 'online':
+      rt.online = m.online;
+      break;
+    case 'salas':
+      rt.salas = m.salas;
+      break;
+    case 'chat:msg':
+      rt.historico.push(m.msg);
+      if (rt.historico.length > 200) rt.historico.splice(0, rt.historico.length - 200);
+      if (!rt.lendoChat && m.msg.usuario_id !== rt.eu?.id) {
+        rt.naoLidas++;
+        emitir('naoLidas');
+      }
+      break;
+    case 'chat:apagada':
+      rt.historico = rt.historico.filter(x => x.id !== m.id);
+      break;
+    case 'sala': {
+      const s = m.sala;
+      const antes = rt.partidas.get(s.id);
+      rt.partidas.set(s.id, s);
+      if (s.eu >= 0 && s.status !== 'fim' && !s.jogadores[s.eu].saiu) rt.minhaSala = s.id;
+      else if (rt.minhaSala === s.id) rt.minhaSala = null;
+      if (s.eu >= 0 && (criando || indoPara === s.id)) {
+        criando = false;
+        indoPara = null;
+        if (!estouNaSala(s.id)) location.hash = rotaDaSala(s.id);
+      } else if (s.eu === 0 && antes?.status === 'esperando' && s.status === 'jogando' && !estouNaSala(s.id)) {
+        chamar(`${s.jogadores[1].nome} entrou na sua partida de ${s.nomeJogo}!`, 'Jogar agora', rotaDaSala(s.id), 20_000);
+      }
+      break;
+    }
+    case 'sala:fechada':
+      rt.partidas.delete(m.id);
+      if (rt.minhaSala === m.id) rt.minhaSala = null;
+      break;
+    case 'aviso':
+      if (m.de !== rt.eu?.id && !location.hash.startsWith('#/recreacao')) chamar(m.texto, 'Ver', '#/recreacao', 9000);
+      break;
+    case 'erro':
+      if (criando || indoPara) { criando = false; indoPara = null; }
+      aviso(m.mensagem, 'erro');
+      break;
+  }
+  atualizarBarra();
+}
+
+// Aviso com botão (ex.: "Fulano entrou na sua partida"). Fica mais tempo que um aviso comum.
+function chamar(texto, rotulo, href, duracao) {
+  const el = h('div', { class: 'toast chamada', role: 'status' },
+    icone('jogos'),
+    h('div', { class: 'chamada-texto' },
+      h('span', null, texto),
+      h('a', { class: 'btn btn-ouro btn-pequeno', href, onclick: () => el.remove() }, rotulo)),
+    h('button', { class: 'chamada-fechar', type: 'button', 'aria-label': 'Fechar', onclick: () => el.remove() }, icone('x')));
+  document.getElementById('toasts').append(el);
+  setTimeout(() => { el.classList.add('saindo'); setTimeout(() => el.remove(), 300); }, duracao);
+}
+
+// Faixa "você tem uma partida em andamento" quando a pessoa sai da tela do jogo sem sair da partida.
+export function atualizarBarra() {
+  const s = rt.minhaSala && rt.partidas.get(rt.minhaSala);
+  const mostrar = s && s.status === 'jogando' && !estouNaSala(s.id) && !!estado.eu;
+  let barra = document.getElementById('partida-ativa');
+  if (!mostrar) { barra?.remove(); return; }
+  const outro = s.jogadores[1 - s.eu];
+  const minhaVez = s.jogo === 'velha' ? s.estado?.vez === s.eu : !s.estado?.minha;
+  const texto = `Partida de ${s.nomeJogo} contra ${outro?.nome || '...'}${minhaVez ? ' · sua vez!' : ''}`;
+  if (!barra) {
+    barra = h('a', { id: 'partida-ativa', class: 'partida-ativa' });
+    document.body.append(barra);
+  }
+  barra.href = rotaDaSala(s.id);
+  barra.classList.toggle('minha-vez', minhaVez);
+  barra.replaceChildren(icone('jogos'), h('span', null, texto), h('strong', null, 'Voltar'));
+}
+window.addEventListener('hashchange', atualizarBarra);

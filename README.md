@@ -1,7 +1,7 @@
 # Casa Luckham · Sistema de Lyendell
 
 Sistema de administração da cidade de Lyendell: Tabelionato, Guarda do Coelho, Galeria,
-Mural de Anúncios e Mural de Atividades, com login por nome de personagem e níveis de acesso.
+Mural de Anúncios, Mural de Atividades e Recreação, com login por nome de personagem e níveis de acesso.
 
 ## Como rodar
 
@@ -30,7 +30,7 @@ Todo usuário é morador. Os cargos somam poderes em cima disso, e uma pessoa po
 | Escriba | Fazer registros no Tabelionato, que vão para a aprovação da Tabeliã |
 | Comandante da Guarda | Tudo na Guarda do Coelho, inclusive aprovar os registros dos guardas |
 | Guarda | Ver a Guarda e registrar prisioneiros, que vão para a aprovação do Comandante |
-| Morador | Ver tudo e ajudar nas atividades |
+| Morador | Ver tudo, ajudar nas atividades e usar a Recreação |
 
 Quem está acima de morador também publica anúncios, cria atividades e envia fotos.
 
@@ -94,6 +94,25 @@ quanto e a porcentagem de cada um. Se houver recompensa, ela é dividida proporc
 
 Quem criou a atividade (ou quem gerencia atividades) **confere** as entregas, para ninguém
 marcar batata que não entregou. A atividade fecha sozinha quando bate a meta.
+
+## Recreação
+
+Um salão com **chat ao vivo**, a lista de quem está online e os jogos:
+
+- **Jogo da Velha** e **Pedra, Papel e Tesoura** (melhor de três), ao vivo contra outro morador.
+  Quem abre a partida espera alguém clicar em **Entrar**; os outros podem **Assistir**.
+  No fim dá para pedir revanche (quem não começou, começa).
+- **Cobrinha**, comendo cenouras (setas, W A S D, ou deslizando o dedo no celular).
+- **Quebra-cabeça** com as fotos da Galeria, em 3x3, 4x4 ou 5x5.
+
+Cada jogo tem ranking: vitórias nos jogos ao vivo, cenouras na cobrinha e o menor tempo no
+quebra-cabeça. Quem sai de uma partida no meio perde; quem cai da internet tem 30 segundos
+para voltar. A Família Nobre (e quem tiver o poder "Apagar mensagens de outros no chat") pode
+apagar mensagens impróprias; cada um pode apagar as suas.
+
+O chat guarda as últimas 2000 mensagens. As partidas em andamento ficam só na memória do
+servidor: se o site reiniciar (por exemplo, depois de um `git push`), elas se perdem, mas o
+chat, os resultados e os recordes ficam salvos.
 
 ## Onde ficam os dados
 

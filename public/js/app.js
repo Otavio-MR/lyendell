@@ -1,4 +1,5 @@
-import { estado, get, post, h, trocar, icone, podeAlgum, aviso, avatar, cargoPrincipal, vazio } from './core.js';
+import { estado, get, post, h, trocar, icone, pode, podeAlgum, aviso, avatar, cargoPrincipal, vazio, limparTela } from './core.js';
+import { ligar, desligar, ouvir, rt } from './tempo-real.js';
 import { inicio } from './telas/inicio.js';
 import { modulo, livro, aprovacoes, envios } from './telas/livros.js';
 import { galeria } from './telas/galeria.js';
@@ -6,6 +7,7 @@ import { anuncios } from './telas/anuncios.js';
 import { atividades, atividade } from './telas/atividades.js';
 import { usuarios, cargos, diario } from './telas/admin.js';
 import { perfil } from './telas/perfil.js';
+import { recreacao, sala, cobrinha, quebraCabeca } from './telas/recreacao.js';
 
 const app = document.getElementById('app');
 
@@ -15,6 +17,7 @@ const MENU = [
     { rota: '/anuncios', nome: 'Mural de Anúncios', icone: 'megafone', perm: ['anuncios.ver'] },
     { rota: '/atividades', nome: 'Mural de Atividades', icone: 'tarefas', perm: ['atividades.ver'] },
     { rota: '/galeria', nome: 'Galeria', icone: 'imagem', perm: ['galeria.ver'] },
+    { rota: '/recreacao', nome: 'Recreação', icone: 'jogos', perm: ['recreacao.usar'] },
   ] },
   { secao: 'Registros', itens: [
     { rota: '/tabelionato', nome: 'Tabelionato', icone: 'pergaminho', perm: ['tabelionato.ver'] },
@@ -40,6 +43,10 @@ const ROTAS = [
   [/^\/admin\/usuarios$/, () => usuarios()],
   [/^\/admin\/cargos$/, () => cargos()],
   [/^\/admin\/diario$/, () => diario()],
+  [/^\/recreacao$/, () => recreacao()],
+  [/^\/recreacao\/cobrinha$/, () => cobrinha()],
+  [/^\/recreacao\/quebra-cabeca$/, () => quebraCabeca()],
+  [/^\/recreacao\/sala\/([0-9a-f]+)$/, id => sala(id)],
   [/^\/perfil$/, () => perfil()],
 ];
 
@@ -49,6 +56,7 @@ async function iniciar() {
 }
 
 window.addEventListener('sessao-expirada', () => {
+  desligar();
   aviso('Sua sessão terminou. Entre de novo.', 'erro');
   telaLogin();
 });
@@ -56,6 +64,7 @@ window.addEventListener('sessao-expirada', () => {
 /* ─── Login ───────────────────────────────────────── */
 
 function telaLogin() {
+  limparTela();
   document.title = 'Entrar · Casa Luckham';
   const nome = h('input', { class: 'input', name: 'nome', autocomplete: 'username', placeholder: 'Ex.: Evran Luckham', required: true, autofocus: true });
   const senha = h('input', { class: 'input', type: 'password', name: 'senha', autocomplete: 'current-password', required: true });
@@ -116,6 +125,7 @@ function montar() {
     }));
 
   const sair = async () => {
+    desligar();
     await post('/api/auth/logout').catch(() => {});
     estado.eu = null;
     location.hash = '';
@@ -144,6 +154,7 @@ function montar() {
     h('div', { class: 'veu', onclick: () => alternarMenu(false) }),
     h('div', { class: 'principal' }, topo, h('main', { id: 'tela', class: 'tela' }))));
 
+  if (pode('recreacao.usar')) ligar();
   rotear();
 }
 
@@ -175,6 +186,7 @@ async function rotear() {
   });
 
   const g = ++geracao;
+  limparTela();
   for (const [re, fn] of ROTAS) {
     const m = caminho.match(re);
     if (!m) continue;
@@ -215,6 +227,14 @@ async function atualizarAvisos() {
   }
 }
 window.addEventListener('avisos', atualizarAvisos);
+
+// Mensagens do chat que chegaram enquanto a pessoa estava em outra parte do site.
+ouvir('naoLidas', () => {
+  const item = document.querySelector('.menu-item[data-rota="/recreacao"]');
+  if (!item) return;
+  item.querySelector('.menu-aviso')?.remove();
+  if (rt.naoLidas) item.append(h('span', { class: 'menu-aviso chat', title: `${rt.naoLidas} mensagem(ns) nova(s) no chat` }, rt.naoLidas > 99 ? '99+' : rt.naoLidas));
+});
 export const recarregarTela = rotear;
 
 iniciar();

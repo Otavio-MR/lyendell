@@ -7,6 +7,7 @@ const { db, iniciarBanco } = require('./src/db');
 const { sessao, exigirLogin } = require('./src/auth');
 const { servirArquivo, TAMANHO_MAX_MB } = require('./src/uploads');
 const { erro } = require('./src/util');
+const { iniciarRecreacao } = require('./src/recreacao');
 
 const app = express();
 const PORTA = Number(process.env.PORT) || 3000;
@@ -26,7 +27,8 @@ app.use((req, res, next) => {
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "script-src 'self'",
-      "connect-src 'self'",
+      // A recreação (chat e jogos ao vivo) conversa por WebSocket com o próprio site.
+      `connect-src 'self' wss://${req.get('host')} ws://${req.get('host')}`,
       "frame-ancestors 'none'",
     ].join('; '),
   });
@@ -63,6 +65,7 @@ app.use('/api/cargos', require('./src/rotas/cargos'));
 app.use('/api/galeria', require('./src/rotas/galeria'));
 app.use('/api/anuncios', require('./src/rotas/anuncios'));
 app.use('/api/atividades', require('./src/rotas/atividades'));
+app.use('/api/recreacao', require('./src/rotas/recreacao'));
 app.use('/api', require('./src/rotas/livros'));
 app.use('/api', require('./src/rotas/geral'));
 app.use('/api', (req, res, next) => next(erro(404, 'Rota não encontrada.')));
@@ -92,11 +95,12 @@ app.use((err, req, res, next) => {
 
 iniciarBanco()
   .then(banco => {
-    app.listen(PORTA, () => {
+    const servidor = app.listen(PORTA, () => {
       console.log('\n  Casa Luckham · Sistema de Lyendell');
       console.log(`  Banco: ${banco}`);
       console.log(`  Rodando em http://localhost:${PORTA}\n`);
     });
+    iniciarRecreacao(servidor);
   })
   .catch(e => {
     console.error('\n  Não foi possível abrir o banco de dados:', e.message, '\n');

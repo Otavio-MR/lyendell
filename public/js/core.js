@@ -1,6 +1,15 @@
 // Base compartilhada por todas as telas: estado, API, criação de elementos, modais e formatação.
 
 export const estado = { eu: null };
+
+// Coisas que uma tela deixa rodando (relógio de jogo, teclado, conexão) e que param quando se troca de tela.
+const limpezas = [];
+export function aoSair(fn) { limpezas.push(fn); }
+export function limparTela() {
+  while (limpezas.length) {
+    try { limpezas.pop()(); } catch (e) { console.error(e); }
+  }
+}
 export const pode = p => !!estado.eu && estado.eu.permissoes.includes(p);
 export const podeAlgum = (...ps) => ps.some(pode);
 
@@ -157,6 +166,15 @@ const ICONES = {
   estrela: '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>',
   secao: '<path d="M4 6h16M4 12h10M4 18h7"/>',
   baixar: '<path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>',
+  jogos: '<rect x="2.5" y="7" width="19" height="11" rx="5"/><path d="M7.5 10.5v4M5.5 12.5h4"/><circle cx="15.5" cy="11.5" r=".9"/><circle cx="17.8" cy="13.8" r=".9"/>',
+  chat: '<path d="M4 5h16v11H10l-5 4v-4H4z"/><path d="M8 9.5h8M8 12.5h5"/>',
+  aviao: '<path d="M21 3 3 10.5l7.2 2.8L13 21z"/><path d="m10.2 13.3 4.3-4.3"/>',
+  velha: '<path d="M9 4v16M15 4v16M4 9h16M4 15h16"/>',
+  peca: '<path d="M4 8h4a2 2 0 1 1 4 0h4v4a2 2 0 1 1 0 4v4H4v-4a2 2 0 1 0 0-4z"/>',
+  cobra: '<path d="M4 17c0-3 3-3 3-6s-3-3-3-6"/><path d="M7 11c3 0 3 6 6 6s3-6 6-6"/><circle cx="19" cy="11" r="1.6"/>',
+  pedra: '<path d="M3.5 15.5 6 9l4.5-3.5 5.5 1L20.5 11l-.5 5.5-3.5 3h-10z"/><path d="m10.5 5.5 1.5 5-6-1.5M12 10.5l4.5 1.5 4-1M12 10.5l-1.5 9"/>',
+  papel: '<path d="M6 3h8.5L19 7.5V21H6z"/><path d="M14 3v5h5"/>',
+  tesoura: '<circle cx="6" cy="6" r="2.8"/><circle cx="6" cy="18" r="2.8"/><path d="M8.2 7.8 20 19M8.2 16.2 20 5"/>',
 };
 export const NOMES_ICONES = Object.keys(ICONES);
 

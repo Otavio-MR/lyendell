@@ -206,6 +206,38 @@ CREATE TABLE IF NOT EXISTS contribuicoes (
 );
 CREATE INDEX IF NOT EXISTS idx_contribuicoes_atividade ON contribuicoes(atividade_id);
 
+CREATE TABLE IF NOT EXISTS chat_mensagens (
+  id INTEGER PRIMARY KEY,
+  usuario_id INTEGER,
+  usuario_nome TEXT NOT NULL,
+  texto TEXT NOT NULL,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS partidas (
+  id INTEGER PRIMARY KEY,
+  jogo TEXT NOT NULL,
+  jogador1_id INTEGER,
+  jogador1_nome TEXT NOT NULL,
+  jogador2_id INTEGER,
+  jogador2_nome TEXT NOT NULL,
+  vencedor INTEGER,
+  motivo TEXT NOT NULL DEFAULT '',
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS recordes (
+  id INTEGER PRIMARY KEY,
+  jogo TEXT NOT NULL,
+  variante TEXT NOT NULL DEFAULT '',
+  usuario_id INTEGER,
+  usuario_nome TEXT NOT NULL,
+  pontos INTEGER NOT NULL,
+  detalhe TEXT NOT NULL DEFAULT '',
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_recordes_jogo ON recordes(jogo, variante);
+
 CREATE TABLE IF NOT EXISTS diario (
   id INTEGER PRIMARY KEY,
   usuario_id INTEGER,
@@ -218,7 +250,7 @@ CREATE TABLE IF NOT EXISTS diario (
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 7;
+const VERSAO = 8;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -261,6 +293,15 @@ async function migrar() {
   if (versao < 5) await migrarAprovacao();
   if (versao < 6) await migrarNumeracao();
   if (versao < 7) await fecharBuracosNaNumeracao();
+  if (versao < 8) {
+    // v8: recreação. Todo morador usa o chat e os jogos; a Família Nobre modera o chat.
+    const novas = { base: ['recreacao.usar'], 'Família Nobre': ['recreacao.moderar'] };
+    for (const c of await db.all('SELECT id, nome, base, permissoes FROM cargos')) {
+      const lista = JSON.parse(c.permissoes);
+      const faltam = [...(c.base ? novas.base : []), ...(novas[c.nome] || [])].filter(p => !lista.includes(p));
+      if (faltam.length) await db.run('UPDATE cargos SET permissoes = ? WHERE id = ?', JSON.stringify([...lista, ...faltam]), c.id);
+    }
+  }
 
   await db.run("INSERT INTO meta (chave, valor) VALUES ('versao', ?) ON CONFLICT (chave) DO UPDATE SET valor = excluded.valor", String(VERSAO));
 }
@@ -408,6 +449,8 @@ async function semear() {
 // Sessões vencidas e imagens enviadas que ninguém chegou a usar (ex.: formulário cancelado).
 async function faxina() {
   await db.run("DELETE FROM sessoes WHERE expira_em <= datetime('now')");
+  // O chat guarda só as 2000 mensagens mais recentes.
+  await db.run('DELETE FROM chat_mensagens WHERE id NOT IN (SELECT id FROM chat_mensagens ORDER BY id DESC LIMIT 2000)');
   await db.run(`
     DELETE FROM arquivos
     WHERE criado_em < datetime('now', '-1 day')

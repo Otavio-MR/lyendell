@@ -72,18 +72,31 @@ function perfil(u) {
 
 const CINCO_MINUTOS = 5 * 60 * 1000;
 
-async function sessao(req, res, next) {
+// Quem está logado nesta requisição (serve para as páginas e para a conexão em tempo real).
+async function usuarioDaRequisicao(req) {
   const token = lerCookie(req);
-  if (token) {
-    const u = await db.get(`
-      SELECT u.id, u.nome, u.foto, u.is_root, u.ativo, u.ultimo_acesso FROM sessoes s JOIN usuarios u ON u.id = s.usuario_id
-      WHERE s.token_hash = ? AND s.expira_em > datetime('now') AND u.ativo = 1`, sha(token));
-    if (u) {
-      req.usuario = montarUsuario(u, await db.all(SQL_CARGOS, u.id));
-      req.tokenSessao = token;
-      const ultimo = u.ultimo_acesso ? Date.parse(`${u.ultimo_acesso.replace(' ', 'T')}Z`) : 0;
-      if (Date.now() - ultimo > CINCO_MINUTOS) await db.run("UPDATE usuarios SET ultimo_acesso = datetime('now') WHERE id = ?", u.id);
-    }
+  if (!token) return null;
+  const u = await db.get(`
+    SELECT u.id, u.nome, u.foto, u.is_root, u.ativo, u.ultimo_acesso FROM sessoes s JOIN usuarios u ON u.id = s.usuario_id
+    WHERE s.token_hash = ? AND s.expira_em > datetime('now') AND u.ativo = 1`, sha(token));
+  if (!u) return null;
+  return { usuario: montarUsuario(u, await db.all(SQL_CARGOS, u.id)), token, ultimoAcesso: u.ultimo_acesso };
+}
+
+// A sessão continua valendo? (usuário não foi desativado nem removido, e ela não venceu)
+async function sessaoAindaValida(token) {
+  return !!await db.get(`
+    SELECT 1 AS ok FROM sessoes s JOIN usuarios u ON u.id = s.usuario_id
+    WHERE s.token_hash = ? AND s.expira_em > datetime('now') AND u.ativo = 1`, sha(token));
+}
+
+async function sessao(req, res, next) {
+  const s = await usuarioDaRequisicao(req);
+  if (s) {
+    req.usuario = s.usuario;
+    req.tokenSessao = s.token;
+    const ultimo = s.ultimoAcesso ? Date.parse(`${s.ultimoAcesso.replace(' ', 'T')}Z`) : 0;
+    if (Date.now() - ultimo > CINCO_MINUTOS) await db.run("UPDATE usuarios SET ultimo_acesso = datetime('now') WHERE id = ?", s.usuario.id);
   }
   next();
 }
@@ -103,5 +116,5 @@ const exigir = (...perms) => (req, res, next) => {
 
 module.exports = {
   criarSessao, encerrarSessao, comandoDerrubarSessoes, carregarUsuario, montarUsuario, perfil,
-  sessao, pode, checar, exigirLogin, exigir,
+  sessao, usuarioDaRequisicao, sessaoAindaValida, pode, checar, exigirLogin, exigir,
 };

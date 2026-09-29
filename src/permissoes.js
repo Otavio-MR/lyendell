@@ -41,13 +41,17 @@ const CATALOGO = [
     { chave: 'atividades.criar', nome: 'Criar atividades' },
     { chave: 'atividades.gerenciar', nome: 'Conferir entregas e gerenciar atividades de outros' },
   ] },
+  { grupo: 'Recreação', itens: [
+    { chave: 'recreacao.usar', nome: 'Usar o chat e os jogos' },
+    { chave: 'recreacao.moderar', nome: 'Apagar mensagens de outros no chat' },
+  ] },
 ];
 
 const TODAS = CATALOGO.flatMap(g => g.itens.map(i => i.chave));
 const VALIDAS = new Set(TODAS);
 
 // Todo usuário é morador: estas permissões valem para qualquer um.
-const MORADOR = ['tabelionato.ver', 'guarda.ver', 'galeria.ver', 'anuncios.ver', 'atividades.ver', 'atividades.participar'];
+const MORADOR = ['tabelionato.ver', 'guarda.ver', 'galeria.ver', 'anuncios.ver', 'atividades.ver', 'atividades.participar', 'recreacao.usar'];
 // Quem está acima de morador publica anúncios, cria atividades e envia fotos.
 const MEMBRO = ['anuncios.publicar', 'atividades.criar', 'galeria.enviar'];
 const acoes = (modulo, ...lista) => lista.map(a => `${modulo}.${a}`);
