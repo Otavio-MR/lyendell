@@ -218,7 +218,7 @@ CREATE TABLE IF NOT EXISTS diario (
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 6;
+const VERSAO = 7;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -260,6 +260,7 @@ async function migrar() {
   if (versao < 4) await migrarPrisioneiros();
   if (versao < 5) await migrarAprovacao();
   if (versao < 6) await migrarNumeracao();
+  if (versao < 7) await fecharBuracosNaNumeracao();
 
   await db.run("INSERT INTO meta (chave, valor) VALUES ('versao', ?) ON CONFLICT (chave) DO UPDATE SET valor = excluded.valor", String(VERSAO));
 }
@@ -341,6 +342,20 @@ async function migrarNumeracao() {
       await db.run('UPDATE cargos SET permissoes = ?, descricao = ? WHERE id = ?', JSON.stringify(limpa), descricao, c.id);
     }
   }
+}
+
+// v7: numeração corrida. Se ficou algum buraco (ex.: 1, 2, 4), os de cima descem: 1, 2, 3, mantendo a ordem.
+// Vai do menor para o maior, então cada número novo nunca está ocupado por outro registro.
+async function fecharBuracosNaNumeracao() {
+  const registros = await db.all('SELECT id, livro_id, numero FROM registros WHERE numero IS NOT NULL ORDER BY livro_id, numero, id');
+  const contagem = new Map();
+  const comandos = [];
+  for (const r of registros) {
+    const n = (contagem.get(r.livro_id) || 0) + 1;
+    contagem.set(r.livro_id, n);
+    if (r.numero !== n) comandos.push(['UPDATE registros SET numero = ? WHERE id = ?', n, r.id]);
+  }
+  for (let i = 0; i < comandos.length; i += 200) await db.lote(comandos.slice(i, i + 200));
 }
 
 // Campos "Escolher de outro livro" dos livros padrão apontam para "@Nome do livro"; aqui viram o id real.

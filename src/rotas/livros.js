@@ -323,7 +323,7 @@ r.post('/livros/:id/registros', async (req, res) => {
   // Aprovado já nasce com número; pendente só ganha número quando for aprovado.
   const { id } = await comNumeroLivre(() => (situacao === 'aprovado'
     ? db.run(`INSERT INTO registros (livro_id, dados, criado_por, criado_por_nome, situacao, numero) VALUES (?, ?, ?, ?, ?, ${PROXIMO_NUMERO})`,
-      l.id, JSON.stringify(dados), req.usuario.id, req.usuario.nome, situacao, l.id, l.id)
+      l.id, JSON.stringify(dados), req.usuario.id, req.usuario.nome, situacao, l.id)
     : db.run('INSERT INTO registros (livro_id, dados, criado_por, criado_por_nome, situacao) VALUES (?, ?, ?, ?, ?)',
       l.id, JSON.stringify(dados), req.usuario.id, req.usuario.nome, situacao)));
   const { numero } = await db.get('SELECT numero FROM registros WHERE id = ?', id);
@@ -332,13 +332,17 @@ r.post('/livros/:id/registros', async (req, res) => {
   res.status(201).json({ id, situacao, numero });
 });
 
-// Número do registro dentro do livro: o menor que estiver livre. Com 1 a 5 e o 5 apagado, o próximo é o 5;
-// se o 3 foi apagado, o próximo é o 3. Tem DOIS "?": passe o id do livro duas vezes, nessa posição.
-const PROXIMO_NUMERO = `(SELECT CASE
-  WHEN NOT EXISTS (SELECT 1 FROM registros WHERE livro_id = ? AND numero = 1) THEN 1
-  ELSE (SELECT MIN(a.numero) + 1 FROM registros a WHERE a.livro_id = ? AND a.numero IS NOT NULL
-    AND NOT EXISTS (SELECT 1 FROM registros b WHERE b.livro_id = a.livro_id AND b.numero = a.numero + 1))
-  END)`;
+// Número do registro dentro do livro: numeração corrida, sempre 1, 2, 3... sem buracos.
+// O novo registro fica com o último número + 1. Ao apagar um, os seguintes descem (veja comandosDescerNumeros).
+// Tem UM "?": passe o id do livro nessa posição.
+const PROXIMO_NUMERO = '(SELECT COALESCE(MAX(numero), 0) + 1 FROM registros WHERE livro_id = ?)';
+
+// Apagou o 3 de um livro que vai até 10: o 4 vira 3, o 5 vira 4... o 10 vira 9, e o próximo registro será o 10.
+// Em duas etapas (primeiro negativos) para o banco nunca ver dois registros com o mesmo número no meio do caminho.
+const comandosDescerNumeros = (livroId, apagado) => [
+  ['UPDATE registros SET numero = -(numero - 1) WHERE livro_id = ? AND numero > ?', livroId, apagado],
+  ['UPDATE registros SET numero = -numero WHERE livro_id = ? AND numero < 0', livroId],
+];
 
 // Se duas pessoas pegarem o mesmo número no mesmo instante, o banco recusa a segunda; aí tenta de novo.
 async function comNumeroLivre(fn) {
@@ -375,12 +379,15 @@ r.put('/registros/:id', async (req, res) => {
 r.delete('/registros/:id', async (req, res) => {
   const { reg, livro } = await buscarRegistro(req);
   if (!pode(req, `${livro.modulo}.apagar`) && !doAutorSemAprovacao(req, reg)) checar(req, `${livro.modulo}.apagar`);
+  const descer = reg.numero ? comandosDescerNumeros(livro.id, reg.numero) : [];
   await db.lote([
     ['DELETE FROM pagamentos WHERE registro_id = ?', reg.id],
     ['DELETE FROM registros WHERE id = ?', reg.id],
+    ...descer,
     ...imagensDe(livro, reg.dados).map(comandoApagarArquivo),
   ]);
-  await anotar(req, `Apagou um registro de "${livro.nome}"`, tituloDoRegistro(livro, reg.dados));
+  await anotar(req, `Apagou um registro de "${livro.nome}"`,
+    `${reg.numero ? `nº ${reg.numero}: ` : ''}${tituloDoRegistro(livro, reg.dados)}${reg.numero ? ' (os números seguintes desceram um)' : ''}`);
   res.json({ ok: true });
 });
 
@@ -431,7 +438,7 @@ async function revisar(req, situacao, motivo) {
   if (situacao === 'aprovado') {
     // Ao ser aprovado, entra no livro com o menor número livre.
     await comNumeroLivre(() => db.run(`UPDATE registros SET situacao = 'aprovado', motivo = NULL, revisado_por_nome = ?,
-      revisado_em = datetime('now'), numero = ${PROXIMO_NUMERO} WHERE id = ? AND situacao = 'pendente'`, req.usuario.nome, livro.id, livro.id, reg.id));
+      revisado_em = datetime('now'), numero = ${PROXIMO_NUMERO} WHERE id = ? AND situacao = 'pendente'`, req.usuario.nome, livro.id, reg.id));
   } else {
     await db.run("UPDATE registros SET situacao = ?, motivo = ?, revisado_por_nome = ?, revisado_em = datetime('now') WHERE id = ?",
       situacao, motivo, req.usuario.nome, reg.id);
