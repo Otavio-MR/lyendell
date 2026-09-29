@@ -1,8 +1,8 @@
 // Gera arquivos .book para o mod Scribble (Minecraft 1.21).
-// Formato: NBT sem compressão com "pages" (lista de textos), "author" e "title",
+// Formato: NBT sem compressão com "pages" (lista de textos), "author" e, às vezes, "title",
 // igual aos livros salvos pelo próprio Scribble. As páginas usam códigos de cor (§).
 
-import { dataCurta, dataHora, num, pacotes, textoDuracao, listaDeNomes } from './core.js';
+import { dataCurta, dataHora, num, pacotes, textoDuracao, listaDeNomes, normalizar } from './core.js';
 
 /* ─── Métricas da fonte do Minecraft ──────────────── */
 
@@ -176,15 +176,19 @@ class LivroMC {
   }
 
   baixar(nome = this.titulo) {
-    const url = URL.createObjectURL(new Blob([this.bytes()], { type: 'application/octet-stream' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${nomeArquivo(nome)}.book`;
-    document.body.append(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    baixarArquivo(this.bytes(), nome);
   }
+}
+
+function baixarArquivo(bytes, nome) {
+  const url = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${nomeArquivo(nome)}.book`;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
 // O título de livro assinado no Minecraft tem no máximo 32 caracteres.
@@ -234,8 +238,10 @@ function nbtLivro(paginas, autor, titulo) {
   paginas.forEach(str);
   nome(0x08, 'author');
   str(autor);
-  nome(0x08, 'title');
-  str(titulo);
+  if (titulo != null) { // os modelos de registro da Casa não têm título
+    nome(0x08, 'title');
+    str(titulo);
+  }
   b.push(0x00);              // fim da raiz
   return new Uint8Array(b);
 }
@@ -273,73 +279,247 @@ function valorDoCampo(c, v, dados) {
   }
 }
 
-function tituloDoRegistro(livro, dados) {
+function tituloDoRegistro(livro, dados, semNome = 'Registro') {
   const c = livro.campos.find(x => (x.tipo === 'texto' || x.tipo === 'selecao') && dados[x.id]);
-  return c ? String(dados[c.id]) : 'Registro';
+  return c ? String(dados[c.id]) : semNome;
 }
 
-// Campos do registro, na ordem do formulário, com as seções viradas cabeçalhos.
-function camposDoRegistro(livroMc, livro, reg) {
-  let secao = null;
-  for (const c of livro.campos) {
-    if (c.tipo === 'secao') { secao = c; continue; }
-    const v = reg.dados[c.id];
-    if (c.tipo === 'imagem') continue;
-    const valor = c.tipo === 'duracao' ? valorDoCampo(c, v, reg.dados) : (v == null || v === '' || (Array.isArray(v) && !v.length) ? '' : valorDoCampo(c, v, reg.dados));
-    if (!valor) continue;
-    if (secao) { livroMc.bloco(cabecalhoSecao(secao.nome), { comProximo: true }); secao = null; }
-    const linhas = campoLinhas(c.nome, valor);
-    livroMc.bloco(linhas, { junto: linhas.length <= 8 });
+/* ─── Fichas de registro (modelo da Casa) ─────────── */
+
+// Os modelos de Moradores, Nobres e Outros são copiados letra por letra dos livros feitos
+// pela Casa no jogo: cada valor entra na linha em branco logo abaixo do rótulo.
+// Os outros livros seguem o mesmo desenho, com os próprios campos.
+
+const SEP = '🐇 ────────── 🐇';
+const FIM = '§4   §6  Casa Luckham';
+const TABELIONATO = ['      TABELIONATO', '      DE LYENDELL'];
+
+// Nomes que cada campo do modelo pode ter no formulário do site (sem acento e sem maiúscula).
+const CAMPOS_FICHA = {
+  nickname: ['nickname', 'nick', 'nick do minecraft'],
+  nome: ['nome', 'nome do personagem', 'nome completo'],
+  idade: ['idade'],
+  cargo: ['cargo'],
+  residencia: ['residencia', 'endereco', 'moradia'],
+  estadoCivil: ['estado civil'],
+  profissao: ['profissao', 'oficio'],
+  genero: ['genero', 'sexo'],
+  endereco: ['endereco', 'residencia', 'moradia'],
+  familia: ['a qual familia pertence', 'familia'],
+  cargoFamilia: ['cargo na familia'],
+};
+
+const semCodigos = s => s.replace(/§./g, '');
+// Valor numa linha só, sem § (que o Minecraft leria como código de cor).
+const umaLinha = v => String(v ?? '').replace(/§/g, '').replace(/\s*\n\s*/g, ' ').trim();
+const nomeDoCampo = c => normalizar(c.nome).replace(/:\s*$/, '').trim();
+
+// Centraliza pela largura real das letras (o mesmo desenho dos modelos).
+function centralizar(t) {
+  const sobra = LARGURA - largura(t);
+  return sobra > 0 ? ' '.repeat(Math.floor((sobra - 4) / 8)) + t : t;
+}
+
+function valorFormatado(c, reg) {
+  const v = reg.dados?.[c.id];
+  if (c.tipo === 'duracao') return valorDoCampo(c, v, reg.dados || {});
+  if (v == null || v === '' || (Array.isArray(v) && !v.length)) return '';
+  return valorDoCampo(c, v, reg.dados);
+}
+
+function valorDaFicha(livro, reg, chave) {
+  const nomes = CAMPOS_FICHA[chave];
+  const c = livro.campos.find(x => x.tipo !== 'imagem' && x.tipo !== 'secao' && nomes.includes(nomeDoCampo(x)));
+  return c ? umaLinha(valorFormatado(c, reg)) : '';
+}
+
+const numeroDoRegistro = reg => (reg.numero ? String(reg.numero).padStart(4, '0') : '----');
+const quemRegistrou = reg => umaLinha(reg.criado_por_nome) || '---';
+const quandoRegistrou = reg => (reg.criado_em ? dataHora(reg.criado_em) : '--/--/----, --:--');
+
+// Página 1: cabeçalho, tipo do registro, número e o nome registrado entre os coelhos.
+function capaDaFicha({ cor, fecho = '', cabecalho = TABELIONATO, tipo, numero, titulo }) {
+  const nome = umaLinha(titulo) || '---';
+  let linhasNome = [`§0${centralizar(nome)}§l`];
+  if (largura(nome) > LARGURA) {
+    const partes = quebrar(nome);
+    linhasNome = partes.map((p, i) => `${i === 0 ? '§0' : ''}${centralizar(p)}${i === partes.length - 1 ? '§l' : ''}`);
   }
+  return [
+    `§${cor}╔══════════╗`, '', cabecalho[0], cabecalho[1], '', `╚══════════╝${fecho}`,
+    '§4', tipo[0], tipo[1], `   Registro nº ${numero}§8`,
+    ...(linhasNome.length > 1 ? [] : ['']), // nome comprido: tira a linha em branco para caber
+    SEP, ...linhasNome, `§8${SEP}`,
+  ].join('\n');
 }
 
-function linhasDeRegistrado(reg) {
+const rodapeMoradores = reg => `§8${SEP}\nRegistrado por: ${quemRegistrou(reg)}§0\n§8em ${quandoRegistrou(reg)}\n${SEP}\n${FIM}`;
+const rodapePadrao = reg => `§8${SEP}\n§0Registrado por: ${quemRegistrou(reg)}\nem ${quandoRegistrou(reg)}§8\n${SEP}\n${FIM}`;
+// Valor em preto na linha em branco; o §4 no fim devolve o vermelho para o próximo rótulo.
+const vaga = v => (v ? `§0${v}§4` : '');
+
+function fichaMoradoresOuNobres(livro, reg, nobres) {
+  const v = chave => valorDaFicha(livro, reg, chave);
+  const cargo = v('cargo');
   return [
-    ...texto('Registrado por', '8'),
-    ...texto(reg.criado_por_nome || 'desconhecido', '0'),
-    ...texto(`em ${dataHora(reg.criado_em)}`, '8'),
-    ...(reg.atualizado_em ? [vazia(), ...texto(`Alterado por ${reg.atualizado_por_nome} em ${dataHora(reg.atualizado_em)}`, '8')] : []),
+    capaDaFicha({
+      cor: nobres ? '6' : '2', fecho: nobres ? '§2' : '',
+      tipo: ['       Registro de', nobres ? '         Nobres' : '       Moradores'],
+      numero: numeroDoRegistro(reg), titulo: v('nome') || v('nickname'),
+    }),
+    `§4\nNickname:\n${vaga(v('nickname'))}\n\nNome:\n${vaga(v('nome'))}\n§0\n§4Idade:\n${vaga(v('idade'))}\n\nCargo:${cargo ? `\n${vaga(cargo)}` : ''}`,
+    `§4Residência:\n§0${v('residencia')}\n§4Estado Civil:\n${vaga(v('estadoCivil'))}\nProfissão:§0\n${v('profissao')}\n\n${nobres ? rodapePadrao(reg) : rodapeMoradores(reg)}`,
   ];
 }
 
-export function livroDeRegistro(nomeModulo, livro, reg, autor) {
-  const titulo = tituloDoRegistro(livro, reg.dados);
-  const mc = new LivroMC(titulo, autor);
-  mc.capa(capaPadrao(nomeModulo.toUpperCase(), 'DE LYENDELL', [
-    ...texto(livro.nome, '8', { centro: true }),
-    ...texto(reg.numero ? `Registro nº ${reg.numero}` : 'Aguardando aprovação', '8', { centro: true }),
-    vazia(),
-    L(ORN.estrela, '8'),
-    ...texto(titulo, '0', { centro: true, negrito: true }),
-    L(ORN.estrela, '8'),
-  ]));
-  camposDoRegistro(mc, livro, reg);
-  mc.bloco(assinatura(linhasDeRegistrado(reg)));
-  return mc;
+function fichaOutros(livro, reg) {
+  const v = chave => valorDaFicha(livro, reg, chave);
+  return [
+    capaDaFicha({
+      cor: '3', fecho: '§2', tipo: ['       Registro de', '         Outros'],
+      numero: numeroDoRegistro(reg), titulo: v('nickname') || v('nome'),
+    }),
+    `§4\nNickname:\n${vaga(v('nickname'))}\n\nIdade:\n${vaga(v('idade'))}\n\nGênero:\n${vaga(v('genero'))}\n\nEstado civil:\n${vaga(v('estadoCivil'))}`,
+    `§4Endereço:\n${vaga(v('endereco'))}\nA qual família pertence:\n${vaga(v('familia'))}\nCargo na família:§0\n${v('cargoFamilia')}\n\n${rodapePadrao(reg)}`,
+  ];
 }
 
-// Vários registros num livro só (ex.: o Registro de Prisioneiros inteiro).
-export function livroDeRegistros(nomeModulo, livro, registros, autor) {
-  const mc = new LivroMC(livro.nome, autor);
-  mc.capa(capaPadrao(nomeModulo.toUpperCase(), 'DE LYENDELL', [
-    L(ORN.estrela, '8'),
-    ...texto(livro.nome, '0', { centro: true, negrito: true }),
-    L(ORN.estrela, '8'),
-    vazia(),
-    ...texto(`${registros.length} ${registros.length === 1 ? 'registro' : 'registros'}`, '8', { centro: true }),
-    ...texto(`Copiado em ${hojeBr()}`, '8', { centro: true }),
-  ]));
-  [...registros].sort((a, b) => (a.numero ?? Infinity) - (b.numero ?? Infinity) || a.id - b.id).forEach(reg => {
-    mc.bloco([
-      L(ORN.estrela, '8'),
-      ...texto(tituloDoRegistro(livro, reg.dados), '0', { centro: true, negrito: true }),
-      ...texto(reg.numero ? `Registro nº ${reg.numero}` : 'Aguardando aprovação', '8', { centro: true }),
-      L(ORN.estrela, '8'),
-    ], { novaPagina: true });
-    camposDoRegistro(mc, livro, reg);
-    mc.bloco([vazia(), ...texto(`Registrado por ${reg.criado_por_nome || 'desconhecido'} em ${dataCurta(reg.criado_em)}.`, '8')]);
+// "Registro de Comerciantes" vira "Registro de" / "Comerciantes"; outros nomes são divididos em duas linhas.
+function tipoDoLivro(nome) {
+  const n = umaLinha(nome);
+  const m = n.match(/^registro de\s+(.+)$/i);
+  if (m) return ['       Registro de', centralizar(m[1])];
+  if (largura(n) <= LARGURA - 20 || !n.includes(' ')) return ['', centralizar(n)];
+  const palavras = n.split(' ');
+  let melhor = 1;
+  for (let i = 1; i < palavras.length; i++) {
+    const dif = Math.abs(largura(palavras.slice(0, i).join(' ')) - largura(palavras.slice(i).join(' ')));
+    const atual = Math.abs(largura(palavras.slice(0, melhor).join(' ')) - largura(palavras.slice(melhor).join(' ')));
+    if (dif < atual) melhor = i;
+  }
+  return [centralizar(palavras.slice(0, melhor).join(' ')), centralizar(palavras.slice(melhor).join(' '))];
+}
+
+// Linhas que uma linha do livro ocupa na tela (a página quebra o texto comprido).
+const linhasNaTela = linha => quebrar(semCodigos(linha)).length;
+
+// Qualquer livro sem modelo próprio: mesma capa e mesmo desenho, com os campos do formulário.
+function fichaGenerica(nomeModulo, livro, reg) {
+  const guarda = normalizar(nomeModulo).includes('guarda');
+  const capa = capaDaFicha({
+    cor: guarda ? '4' : '2',
+    cabecalho: guarda ? [centralizar('GUARDA DO COELHO'), TABELIONATO[1]] : TABELIONATO,
+    tipo: tipoDoLivro(livro.nome), numero: numeroDoRegistro(reg), titulo: tituloDoRegistro(livro, reg.dados || {}, ''),
   });
-  return mc;
+  const blocos = [];
+  for (const c of livro.campos) {
+    if (c.tipo === 'imagem') continue;
+    if (c.tipo === 'secao') { blocos.push([`§8✦ ${umaLinha(c.nome).toUpperCase()} ✦§4`]); continue; }
+    const valor = String(valorFormatado(c, reg)).replace(/§/g, '');
+    const linhasValor = valor ? valor.split('\n').map(p => (p.trim() ? `§0${p.trim()}§4` : '')) : [''];
+    blocos.push([`${umaLinha(c.nome)}:`, ...linhasValor, '']);
+  }
+  blocos.push(rodapePadrao(reg).split('\n'));
+
+  // Enche as páginas sem separar um campo do seu valor (a não ser que ele sozinho passe de uma página).
+  const paginas = [];
+  let atual = ['§4'];
+  let ocupadas = 1;
+  const fechar = () => { paginas.push(atual.join('\n')); atual = []; ocupadas = 0; };
+  for (const bloco of blocos) {
+    const tamanho = bloco.reduce((s, l) => s + linhasNaTela(l), 0);
+    if (ocupadas && ocupadas + tamanho > LINHAS && tamanho <= LINHAS) fechar();
+    for (const l of bloco) {
+      const n = linhasNaTela(l);
+      if (ocupadas && ocupadas + n > LINHAS) fechar();
+      if (!atual.length && !l) continue; // página nova não começa com linha em branco
+      atual.push(!atual.length && !l.startsWith('§') ? `§4${l}` : l);
+      ocupadas += n;
+    }
+  }
+  if (atual.length) fechar();
+  return [capa, ...paginas];
+}
+
+// Se um valor comprido fizer uma página passar de 14 linhas, o resto vai para a página seguinte,
+// continuando com a mesma cor.
+function caberNasPaginas(paginas) {
+  const saida = [];
+  for (const pagina of paginas) {
+    let atual = [];
+    let ocupadas = 0;
+    let cor = '';
+    for (let linha of pagina.split('\n')) {
+      const n = linhasNaTela(linha);
+      if (ocupadas && ocupadas + n > LINHAS) {
+        saida.push(atual.join('\n'));
+        atual = [];
+        ocupadas = 0;
+        linha = cor + linha;
+      }
+      atual.push(linha);
+      ocupadas += n;
+      const cores = linha.match(/§[0-9a-f]/gi);
+      if (cores) cor = cores[cores.length - 1];
+    }
+    saida.push(atual.join('\n'));
+  }
+  return saida;
+}
+
+function modeloDoLivro(nomeModulo, livro) {
+  if (livro.modulo ? livro.modulo !== 'tabelionato' : normalizar(nomeModulo) !== 'tabelionato') return null;
+  const n = normalizar(livro.nome);
+  if (n.includes('morador')) return 'moradores';
+  if (n.includes('nobre')) return 'nobres';
+  if (n.includes('outro')) return 'outros';
+  return null;
+}
+
+export function paginasDoRegistro(nomeModulo, livro, reg) {
+  const modelo = modeloDoLivro(nomeModulo, livro);
+  let paginas;
+  if (modelo === 'moradores' || modelo === 'nobres') paginas = fichaMoradoresOuNobres(livro, reg, modelo === 'nobres');
+  else if (modelo === 'outros') paginas = fichaOutros(livro, reg);
+  else paginas = fichaGenerica(nomeModulo, livro, reg);
+  return caberNasPaginas(paginas);
+}
+
+// Livro já montado (páginas prontas). Como os modelos da Casa, sai só com páginas e autor.
+class LivroPronto {
+  constructor(titulo, autor, paginas) {
+    this.titulo = titulo;
+    this.autor = autor;
+    this.paginas = paginas;
+  }
+
+  bytes() {
+    return nbtLivro(this.paginas, this.autor || 'Casa Luckham', null);
+  }
+
+  baixar(nome = this.titulo) {
+    baixarArquivo(this.bytes(), nome);
+  }
+}
+
+export function livroDeRegistro(nomeModulo, livro, reg, autor) {
+  return new LivroPronto(tituloDoRegistro(livro, reg.dados || {}), autor, paginasDoRegistro(nomeModulo, livro, reg));
+}
+
+// Vários registros num livro só (ex.: o Registro de Moradores inteiro), um depois do outro, cada um no seu modelo.
+export function livroDeRegistros(nomeModulo, livro, registros, autor) {
+  const paginas = [];
+  const ordem = [...registros].sort((a, b) => (a.numero ?? Infinity) - (b.numero ?? Infinity) || a.id - b.id);
+  for (let i = 0; i < ordem.length; i++) {
+    const deste = paginasDoRegistro(nomeModulo, livro, ordem[i]);
+    if (paginas.length + deste.length > MAX_PAGINAS - (i < ordem.length - 1 ? 1 : 0)) {
+      const faltam = ordem.length - i;
+      paginas.push([`§8${SEP}`, '', ...quebrar(`O livro chegou ao limite de ${MAX_PAGINAS} páginas. ${faltam === 1 ? 'Falta 1 registro, que está' : `Faltam ${faltam} registros, que estão`} no sistema da Casa Luckham.`).map(l => `§0${l}`), '', `§8${SEP}`, FIM].join('\n'));
+      break;
+    }
+    paginas.push(...deste);
+  }
+  return new LivroPronto(livro.nome, autor, paginas);
 }
 
 export function livroDeAnuncio(a, autor) {

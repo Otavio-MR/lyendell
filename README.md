@@ -82,8 +82,20 @@ O arquivo é o mesmo formato que o mod **Scribble** salva. Para usar no jogo:
 1. coloque o `.book` na pasta `books` do perfil do Minecraft (no Modrinth: `ModrinthApp\profiles\<perfil>\books`);
 2. no jogo, abra um livro e pena e use o botão do Scribble para carregar um livro salvo.
 
-As páginas saem com no máximo 14 linhas, quebradas pela largura da fonte do Minecraft, no mesmo
-estilo dos livros da Casa (moldura, cabeçalhos com ✦ e cores).
+As fichas de **Moradores**, **Nobres** e **Outros** saem exatamente no modelo feito pela Casa no
+jogo: capa com o cabeçalho do Tabelionato (verde, dourado e azul, nessa ordem), o número do
+registro com 4 dígitos e o nome entre os coelhos; depois os campos do modelo (Nickname, Nome,
+Idade, Cargo, Residência, Estado Civil e Profissão; no Outros: Nickname, Idade, Gênero, Estado
+civil, Endereço, família e cargo na família), cada valor na linha logo abaixo do rótulo, e no fim
+quem registrou e quando. Uma ficha em branco sai igual, byte por byte, ao arquivo modelo.
+Os campos são achados pelo nome no formulário, então o Tabelionato pode ter outros campos além
+desses (eles só não entram no livro).
+
+Os outros livros (Comerciantes, Casamentos, Prisioneiros...) seguem o mesmo desenho, com os
+próprios campos. O livro inteiro junta as fichas uma atrás da outra, até 100 páginas. Se um valor
+for comprido demais, o que não cabe passa para a página seguinte.
+
+Anúncios, atividades e pagamentos continuam no estilo antigo (moldura e cabeçalhos com ✦).
 
 ## Mural de Atividades
 

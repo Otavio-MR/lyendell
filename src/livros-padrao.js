@@ -12,14 +12,38 @@ const CAMPOS_PENA = [
 // "@Nome do livro" vira o id do livro quando os livros são criados.
 const CAMPO_GUARDAS = { id: 'guarda', nome: 'Guardas responsáveis', tipo: 'referencia', multiplo: true };
 
+// Campos das fichas no modelo dos livros .book da Casa (Moradores e Nobres têm os mesmos).
+// "sinonimos" servem para achar o campo mesmo que o nome no formulário seja um pouco diferente.
+const CAMPOS_FICHA = {
+  nome: { nome: 'Nome', sinonimos: ['nome', 'nome do personagem', 'nome completo'] },
+  nickname: { nome: 'Nickname', sinonimos: ['nickname', 'nick', 'nick do minecraft'], ajuda: 'O nick do jogador no Minecraft.' },
+  idade: { nome: 'Idade', sinonimos: ['idade'] },
+  cargo: { nome: 'Cargo', sinonimos: ['cargo'] },
+  residencia: { nome: 'Residência', sinonimos: ['residencia', 'endereco', 'moradia'] },
+  estado_civil: { nome: 'Estado civil', sinonimos: ['estado civil'] },
+  profissao: { nome: 'Profissão', sinonimos: ['profissao', 'oficio'] },
+};
+const FICHAS = {
+  'registro de moradores': ['nome', 'nickname', 'idade', 'cargo', 'residencia', 'estado_civil', 'profissao'],
+  'registro de nobres': ['nome', 'nickname', 'idade', 'cargo', 'residencia', 'estado_civil', 'profissao'],
+};
+const NICKNAME = { id: 'nickname', nome: 'Nickname', tipo: 'texto', ajuda: CAMPOS_FICHA.nickname.ajuda };
+const FICHA_PESSOA = [
+  NICKNAME,
+  { id: 'idade', nome: 'Idade', tipo: 'texto' },
+  { id: 'cargo', nome: 'Cargo', tipo: 'texto' },
+];
+
 const LIVROS_PADRAO = [
   {
     modulo: 'tabelionato', nome: 'Registro de Moradores', icone: 'casa', aberto: 1,
     descricao: 'Todos os cidadãos que vivem em Lyendell.',
     campos: [
       { id: 'nome', nome: 'Nome do personagem', tipo: 'texto', obrigatorio: true, destaque: true },
-      { id: 'profissao', nome: 'Profissão', tipo: 'texto', destaque: true },
+      ...FICHA_PESSOA,
       { id: 'residencia', nome: 'Residência', tipo: 'texto', destaque: true, ajuda: 'Casa ou endereço na capital' },
+      { id: 'estado_civil', nome: 'Estado civil', tipo: 'texto' },
+      { id: 'profissao', nome: 'Profissão', tipo: 'texto', destaque: true },
       { id: 'chegada', nome: 'Data de chegada', tipo: 'data' },
       { id: 'situacao', nome: 'Situação', tipo: 'selecao', destaque: true, opcoes: ['Ativo', 'Viajando', 'Inativo', 'Exilado', 'Falecido'] },
       { id: 'retrato', nome: 'Retrato', tipo: 'imagem' },
@@ -31,12 +55,29 @@ const LIVROS_PADRAO = [
     descricao: 'Títulos, casas e domínios da nobreza.',
     campos: [
       { id: 'nome', nome: 'Nome', tipo: 'texto', obrigatorio: true, destaque: true },
+      ...FICHA_PESSOA,
+      { id: 'residencia', nome: 'Residência', tipo: 'texto' },
+      { id: 'estado_civil', nome: 'Estado civil', tipo: 'texto' },
+      { id: 'profissao', nome: 'Profissão', tipo: 'texto' },
       { id: 'titulo', nome: 'Título', tipo: 'selecao', destaque: true, opcoes: ['Rei', 'Rainha', 'Príncipe', 'Princesa', 'Duque', 'Duquesa', 'Marquês', 'Marquesa', 'Conde', 'Condessa', 'Visconde', 'Viscondessa', 'Barão', 'Baronesa', 'Cavaleiro', 'Dama'] },
       { id: 'casa', nome: 'Casa', tipo: 'texto', destaque: true },
       { id: 'dominios', nome: 'Terras e domínios', tipo: 'texto' },
       { id: 'nomeacao', nome: 'Data de nomeação', tipo: 'data' },
       { id: 'brasao', nome: 'Brasão', tipo: 'imagem' },
       obs,
+    ],
+  },
+  {
+    modulo: 'tabelionato', nome: 'Registro de Outros', icone: 'usuarios', aberto: 1,
+    descricao: 'Gente de outras famílias que vive ou passa por Lyendell.',
+    campos: [
+      { ...NICKNAME, obrigatorio: true, destaque: true },
+      { id: 'idade', nome: 'Idade', tipo: 'texto' },
+      { id: 'genero', nome: 'Gênero', tipo: 'texto' },
+      { id: 'estado_civil', nome: 'Estado civil', tipo: 'texto' },
+      { id: 'endereco', nome: 'Endereço', tipo: 'texto', destaque: true },
+      { id: 'familia', nome: 'A qual família pertence', tipo: 'texto', destaque: true },
+      { id: 'cargo_familia', nome: 'Cargo na família', tipo: 'texto', destaque: true },
     ],
   },
   {
@@ -134,4 +175,4 @@ const LIVROS_PADRAO = [
   },
 ];
 
-module.exports = { LIVROS_PADRAO, AJUDA_ABERTURA, CAMPOS_PENA, CAMPO_GUARDAS };
+module.exports = { LIVROS_PADRAO, AJUDA_ABERTURA, CAMPOS_PENA, CAMPO_GUARDAS, CAMPOS_FICHA, FICHAS };

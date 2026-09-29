@@ -3,7 +3,7 @@ const fs = require('fs');
 const { createClient } = require('@libsql/client');
 const { hashSenha } = require('./senhas');
 const { CARGOS_PADRAO, DESCRICOES, EXCLUSIVAS } = require('./permissoes');
-const { LIVROS_PADRAO, AJUDA_ABERTURA, CAMPOS_PENA, CAMPO_GUARDAS } = require('./livros-padrao');
+const { LIVROS_PADRAO, AJUDA_ABERTURA, CAMPOS_PENA, CAMPO_GUARDAS, CAMPOS_FICHA, FICHAS } = require('./livros-padrao');
 const { PERGUNTAS_PADRAO } = require('./perguntas-padrao');
 const { linha, chaveNome } = require('./util');
 
@@ -274,7 +274,7 @@ CREATE TABLE IF NOT EXISTS diario (
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 9;
+const VERSAO = 10;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -321,8 +321,45 @@ async function migrar() {
   if (versao < 8) await darPermissoes({ base: ['recreacao.usar'], 'Família Nobre': ['recreacao.moderar'] });
   // v9: quiz. A Família Nobre cuida das perguntas (as perguntas padrão entram no semear).
   if (versao < 9) await darPermissoes({ 'Família Nobre': ['recreacao.perguntas'] });
+  // v10: fichas iguais aos modelos .book da Casa (Moradores, Nobres e o novo Registro de Outros).
+  if (versao < 10) await alinharFichas();
 
   await db.run("INSERT INTO meta (chave, valor) VALUES ('versao', ?) ON CONFLICT (chave) DO UPDATE SET valor = excluded.valor", String(VERSAO));
+}
+
+// Moradores e Nobres ganham os campos do modelo que faltarem (Nickname, Idade, Cargo, Estado civil...),
+// na ordem do modelo e antes dos outros campos, que continuam lá. Nada é apagado.
+// Também cria o Registro de Outros, se ainda não existir.
+async function alinharFichas() {
+  const livros = await db.all("SELECT id, nome, campos FROM livros WHERE modulo = 'tabelionato'");
+  if (!livros.length) return; // banco novo: o semear já cria os livros no modelo
+  const nomeDoCampo = c => chaveNome(c.nome).replace(/:$/, '').trim();
+  for (const l of livros) {
+    const ordem = FICHAS[chaveNome(l.nome)];
+    if (!ordem) continue;
+    const campos = JSON.parse(l.campos);
+    const usados = new Set();
+    const primeiros = [];
+    for (const chave of ordem) {
+      const ficha = CAMPOS_FICHA[chave];
+      let c = campos.find(x => !usados.has(x) && x.tipo !== 'imagem' && x.tipo !== 'secao' && ficha.sinonimos.includes(nomeDoCampo(x)));
+      if (!c) {
+        let id = chave;
+        for (let n = 2; campos.some(x => x.id === id) || primeiros.some(x => x.id === id); n++) id = `${chave}_${n}`;
+        c = { id, nome: ficha.nome, tipo: 'texto', ...(ficha.ajuda ? { ajuda: ficha.ajuda } : {}) };
+      }
+      usados.add(c);
+      primeiros.push(c);
+    }
+    const novos = [...primeiros, ...campos.filter(x => !usados.has(x))];
+    if (JSON.stringify(novos) !== JSON.stringify(campos)) await db.run('UPDATE livros SET campos = ? WHERE id = ?', JSON.stringify(novos), l.id);
+  }
+  if (!livros.some(l => chaveNome(l.nome) === 'registro de outros')) {
+    const o = LIVROS_PADRAO.find(l => l.nome === 'Registro de Outros');
+    const { m } = await db.get('SELECT COALESCE(MAX(ordem), 0) AS m FROM livros');
+    await db.run('INSERT INTO livros (modulo, nome, descricao, icone, aberto, campos, cobranca, ordem) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      o.modulo, o.nome, o.descricao, o.icone, o.aberto, JSON.stringify(o.campos), null, m + 1);
+  }
 }
 
 // Acrescenta permissões novas aos cargos que já existem ("base" = o cargo de todos, o Morador).
