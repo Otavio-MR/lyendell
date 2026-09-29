@@ -3,6 +3,15 @@
 const obs = { id: 'obs', nome: 'Observações', tipo: 'texto_longo' };
 const AJUDA_ABERTURA = 'Os pagamentos contam a partir desta data.';
 
+// Prisioneiros: a pena é calculada entre a data da prisão e a soltura prevista.
+const CAMPOS_PENA = [
+  { id: 'soltura', nome: 'Data prevista de soltura', tipo: 'data', ajuda: 'Deixe em branco se não houver data prevista.' },
+  { id: 'duracao', nome: 'Pena', tipo: 'duracao', inicio: 'data', fim: 'soltura', destaque: true },
+  { id: 'multa', nome: 'Multa', tipo: 'texto', ajuda: 'Opcional. Ex.: 20 Lírios.' },
+];
+// "@Nome do livro" vira o id do livro quando os livros são criados.
+const CAMPO_GUARDAS = { id: 'guarda', nome: 'Guardas responsáveis', tipo: 'referencia', multiplo: true };
+
 const LIVROS_PADRAO = [
   {
     modulo: 'tabelionato', nome: 'Registro de Moradores', icone: 'casa', aberto: 1,
@@ -90,11 +99,11 @@ const LIVROS_PADRAO = [
       { id: 'retrato', nome: 'Retrato', tipo: 'imagem' },
       { id: 's_crime', nome: 'Crime e pena', tipo: 'secao' },
       { id: 'crime', nome: 'Crime', tipo: 'texto', obrigatorio: true, destaque: true },
-      { id: 'data', nome: 'Data da prisão', tipo: 'data', destaque: true },
-      { id: 'pena', nome: 'Pena', tipo: 'texto', destaque: true, ajuda: 'Ex.: 3 dias de cela, multa de 20 moedas' },
+      { id: 'data', nome: 'Data da prisão', tipo: 'data', obrigatorio: true },
+      ...CAMPOS_PENA,
       { id: 'cela', nome: 'Cela', tipo: 'texto' },
       { id: 'situacao', nome: 'Situação', tipo: 'selecao', destaque: true, opcoes: ['Preso', 'Cumprindo pena', 'Solto', 'Foragido', 'Transferido'] },
-      { id: 'guarda', nome: 'Guarda responsável', tipo: 'texto' },
+      { ...CAMPO_GUARDAS, livro: '@Guardas da Capital' },
       obs,
     ],
   },
@@ -125,4 +134,4 @@ const LIVROS_PADRAO = [
   },
 ];
 
-module.exports = { LIVROS_PADRAO, AJUDA_ABERTURA };
+module.exports = { LIVROS_PADRAO, AJUDA_ABERTURA, CAMPOS_PENA, CAMPO_GUARDAS };

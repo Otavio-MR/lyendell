@@ -10,7 +10,8 @@ const { erro, texto, linha, inteiro, idDaRota, dataValida } = require('../util')
 // Tabelionato e Guarda funcionam igual: cada módulo tem "livros", cada livro tem
 // um formulário próprio (campos) e uma pilha de registros.
 const MODULOS = { tabelionato: 'Tabelionato', guarda: 'Guarda do Coelho' };
-const TIPOS = ['texto', 'texto_longo', 'numero', 'data', 'selecao', 'sim_nao', 'imagem', 'secao'];
+// referencia: escolhe registros de outro livro (ex.: guardas). duracao: tempo calculado entre duas datas (ex.: pena).
+const TIPOS = ['texto', 'texto_longo', 'numero', 'data', 'selecao', 'sim_nao', 'imagem', 'referencia', 'duracao', 'secao'];
 const ICONES = ['livro', 'casa', 'coroa', 'loja', 'documento', 'alianca', 'chave', 'escudo', 'grades', 'alvo',
   'pergaminho', 'balanca', 'mapa', 'moeda', 'espada', 'pena', 'bandeira', 'bau'];
 
@@ -53,8 +54,17 @@ function limparCampos(bruto) {
       if (!opcoes.length) throw erro(400, `O campo "${nome}" precisa de pelo menos uma opção.`);
       campo.opcoes = opcoes;
     }
+    if (tipo === 'referencia') {
+      campo.livro = inteiro(c.livro, { min: 1 });
+      if (campo.livro == null) throw erro(400, `Escolha de qual livro o campo "${nome}" puxa os registros.`);
+      if (c.multiplo) campo.multiplo = true;
+    }
+    if (tipo === 'duracao') {
+      campo.inicio = String(c.inicio ?? '');
+      campo.fim = String(c.fim ?? '');
+    }
     if (tipo !== 'secao') {
-      if (c.obrigatorio) campo.obrigatorio = true;
+      if (c.obrigatorio && tipo !== 'duracao') campo.obrigatorio = true;
       if (c.destaque) campo.destaque = true;
     }
     const ajuda = linha(c?.ajuda, 140);
@@ -62,7 +72,41 @@ function limparCampos(bruto) {
     return campo;
   });
   if (!campos.some(c => c.tipo !== 'secao')) throw erro(400, 'O livro precisa de pelo menos um campo.');
+  // O tempo calculado precisa de duas datas diferentes do próprio formulário.
+  const datas = new Set(campos.filter(c => c.tipo === 'data').map(c => c.id));
+  for (const c of campos.filter(x => x.tipo === 'duracao')) {
+    if (!datas.has(c.inicio) || !datas.has(c.fim) || c.inicio === c.fim) {
+      throw erro(400, `O campo "${c.nome}" precisa de duas datas diferentes do formulário (início e fim).`);
+    }
+  }
   return campos;
+}
+
+// Todo campo "Escolher de outro livro" precisa apontar para um livro que existe.
+async function conferirReferencias(campos) {
+  const ids = [...new Set(campos.filter(c => c.tipo === 'referencia').map(c => c.livro))];
+  if (!ids.length) return;
+  const existem = new Set((await db.all(`SELECT id FROM livros WHERE id IN (${ids.map(() => '?').join(', ')})`, ...ids)).map(l => l.id));
+  const quebrado = campos.find(c => c.tipo === 'referencia' && !existem.has(c.livro));
+  if (quebrado) throw erro(400, `O livro de onde o campo "${quebrado.nome}" puxa os registros não existe mais.`);
+}
+
+// Nomes (títulos) dos registros de um livro, para escolher num campo "Escolher de outro livro".
+async function opcoesDoLivro(livroId) {
+  const l = await db.get('SELECT * FROM livros WHERE id = ?', livroId);
+  if (!l) return { livro: null, opcoes: [] };
+  const livro = formatarLivro(l);
+  const registros = await db.all('SELECT id, dados FROM registros WHERE livro_id = ?', livro.id);
+  const vistos = new Set();
+  const opcoes = [];
+  for (const reg of registros) {
+    const titulo = tituloDoRegistro(livro, JSON.parse(reg.dados));
+    if (titulo === 'sem título' || vistos.has(titulo)) continue;
+    vistos.add(titulo);
+    opcoes.push({ id: reg.id, titulo });
+  }
+  opcoes.sort((a, b) => a.titulo.localeCompare(b.titulo, 'pt-BR'));
+  return { livro, opcoes };
 }
 
 // Pagamentos periódicos só existem no Tabelionato (ex.: comerciantes a cada 14 dias).
@@ -77,10 +121,11 @@ function lerCobranca(bruto, campos, mod) {
   return { ativo: true, campo: campo.id, intervalo };
 }
 
-function lerLivro(req, atual, mod) {
+async function lerLivro(req, atual, mod) {
   const nome = linha(req.body?.nome ?? atual?.nome, 60);
   if (!nome) throw erro(400, 'Dê um nome ao livro.');
   const campos = limparCampos(req.body?.campos ?? atual?.campos ?? [{ nome: 'Nome', tipo: 'texto', obrigatorio: true, destaque: true }]);
+  await conferirReferencias(campos);
   return {
     nome,
     descricao: texto(req.body?.descricao ?? atual?.descricao, 240),
@@ -105,12 +150,26 @@ async function pagamentosDoLivro(livroId) {
 }
 
 // Confere e normaliza os valores de um registro segundo os campos do livro.
-function limparDados(livro, bruto, anterior = {}) {
+async function limparDados(livro, bruto, anterior = {}) {
   const dados = {};
+  const titulosPorLivro = new Map();
+  const titulos = async id => {
+    if (!titulosPorLivro.has(id)) titulosPorLivro.set(id, new Set((await opcoesDoLivro(id)).opcoes.map(o => o.titulo)));
+    return titulosPorLivro.get(id);
+  };
   for (const c of livro.campos) {
-    if (c.tipo === 'secao') continue;
+    if (c.tipo === 'secao' || c.tipo === 'duracao') continue;
     let v = bruto?.[c.id];
     switch (c.tipo) {
+      case 'referencia': {
+        const lista = [...new Set((Array.isArray(v) ? v : v ? [v] : []).map(x => linha(x, 120)).filter(Boolean))].slice(0, 30);
+        const validos = await titulos(c.livro);
+        const antes = new Set([].concat(anterior[c.id] ?? []));
+        const invalido = lista.find(x => !validos.has(x) && !antes.has(x));
+        if (invalido) throw erro(400, `"${invalido}" não está registrado no livro de onde "${c.nome}" puxa os nomes.`);
+        v = lista.length ? (c.multiplo ? lista : lista[0]) : '';
+        break;
+      }
       case 'texto': v = linha(v, 300); break;
       case 'texto_longo': v = texto(v, 10000); break;
       case 'numero':
@@ -130,6 +189,14 @@ function limparDados(livro, bruto, anterior = {}) {
     }
     if (c.obrigatorio && (v === '' || v == null)) throw erro(400, `Preencha o campo "${c.nome}".`);
     if (v !== '') dados[c.id] = v;
+  }
+  for (const c of livro.campos.filter(x => x.tipo === 'duracao')) {
+    const ini = dados[c.inicio];
+    const fim = dados[c.fim];
+    if (ini && fim && fim < ini) {
+      const nome = id => livro.campos.find(x => x.id === id)?.nome || id;
+      throw erro(400, `"${nome(c.fim)}" não pode ser antes de "${nome(c.inicio)}".`);
+    }
   }
   return dados;
 }
@@ -170,7 +237,7 @@ r.get('/modulos/:modulo/livros', async (req, res) => {
 r.post('/modulos/:modulo/livros', async (req, res) => {
   const m = modulo(req.params.modulo);
   checar(req, `${m}.configurar`);
-  const l = lerLivro(req, null, m);
+  const l = await lerLivro(req, null, m);
   const ordem = ((await db.get('SELECT MAX(ordem) AS o FROM livros WHERE modulo = ?', m)).o ?? 0) + 1;
   const { id } = await db.run('INSERT INTO livros (modulo, nome, descricao, icone, aberto, campos, cobranca, ordem) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     m, l.nome, l.descricao, l.icone, l.aberto, JSON.stringify(l.campos), l.cobranca ? JSON.stringify(l.cobranca) : null, ordem);
@@ -181,16 +248,29 @@ r.post('/modulos/:modulo/livros', async (req, res) => {
 r.put('/livros/:id', async (req, res) => {
   const atual = await buscarLivro(idDaRota(req));
   checar(req, `${atual.modulo}.configurar`);
-  const l = lerLivro(req, atual, atual.modulo);
+  const l = await lerLivro(req, atual, atual.modulo);
   await db.run('UPDATE livros SET nome = ?, descricao = ?, icone = ?, aberto = ?, campos = ?, cobranca = ? WHERE id = ?',
     l.nome, l.descricao, l.icone, l.aberto, JSON.stringify(l.campos), l.cobranca ? JSON.stringify(l.cobranca) : null, atual.id);
   await anotar(req, `Configurou um livro (${MODULOS[atual.modulo]})`, l.nome);
   res.json({ ok: true });
 });
 
+// Nomes dos registros de um livro, para os campos "Escolher de outro livro" (ex.: lista de guardas).
+r.get('/livros/:id/opcoes', async (req, res) => {
+  const { livro, opcoes } = await opcoesDoLivro(idDaRota(req));
+  if (!livro) throw erro(404, 'Livro não encontrado.');
+  checar(req, `${livro.modulo}.ver`);
+  res.json({ livro: { id: livro.id, nome: livro.nome, modulo: livro.modulo }, opcoes });
+});
+
 r.delete('/livros/:id', async (req, res) => {
   const l = await buscarLivro(idDaRota(req));
   checar(req, `${l.modulo}.configurar`);
+  // Não apaga um livro que outro livro usa para escolher nomes (ex.: Guardas da Capital nos prisioneiros).
+  for (const outro of await db.all('SELECT nome, campos FROM livros WHERE id <> ?', l.id)) {
+    const campo = JSON.parse(outro.campos).find(c => c.tipo === 'referencia' && c.livro === l.id);
+    if (campo) throw erro(400, `Este livro não pode ser apagado: o campo "${campo.nome}" do livro "${outro.nome}" escolhe nomes daqui.`);
+  }
   const registros = await db.all('SELECT dados FROM registros WHERE livro_id = ?', l.id);
   await db.lote([
     ['DELETE FROM pagamentos WHERE registro_id IN (SELECT id FROM registros WHERE livro_id = ?)', l.id],
@@ -232,7 +312,7 @@ r.post('/livros/:id/registros', async (req, res) => {
       ? 'Este livro é restrito: só quem comanda o módulo pode registrar nele.'
       : 'Você não tem permissão para registrar aqui.');
   }
-  const dados = limparDados(l, req.body?.dados);
+  const dados = await limparDados(l, req.body?.dados);
   const { id } = await db.run('INSERT INTO registros (livro_id, dados, criado_por, criado_por_nome) VALUES (?, ?, ?, ?)',
     l.id, JSON.stringify(dados), req.usuario.id, req.usuario.nome);
   await anotar(req, `Registrou em "${l.nome}"`, tituloDoRegistro(l, dados));
@@ -248,7 +328,7 @@ async function buscarRegistro(req) {
 r.put('/registros/:id', async (req, res) => {
   const { reg, livro } = await buscarRegistro(req);
   checar(req, `${livro.modulo}.editar`);
-  const dados = limparDados(livro, req.body?.dados, reg.dados);
+  const dados = await limparDados(livro, req.body?.dados, reg.dados);
   const novas = new Set(imagensDe(livro, dados));
   await db.lote([
     ["UPDATE registros SET dados = ?, atualizado_por_nome = ?, atualizado_em = datetime('now') WHERE id = ?", JSON.stringify(dados), req.usuario.nome, reg.id],

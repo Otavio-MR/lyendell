@@ -421,6 +421,34 @@ export function relativo(s) {
 
 export const num = n => Number(n || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 });
 
+export function hojeIso() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+const diaNumero = s => Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10)) / 864e5;
+const dias = n => `${n} ${n === 1 ? 'dia' : 'dias'}`;
+
+// Campo "tempo entre duas datas" (ex.: pena entre a prisão e a soltura prevista).
+// relativo: acrescenta quanto falta ou se já foi cumprida, contando a partir de hoje.
+export function textoDuracao(c, dados, { relativo = true } = {}) {
+  const ini = dados?.[c.inicio];
+  const fim = dados?.[c.fim];
+  if (!ini) return '';
+  if (!fim) return 'Sem data prevista';
+  const total = diaNumero(fim) - diaNumero(ini);
+  const base = total <= 0 ? 'Menos de 1 dia' : dias(total);
+  if (!relativo) return base;
+  const hoje = diaNumero(hojeIso());
+  if (hoje > diaNumero(fim)) return `${base} · cumprida`;
+  if (hoje === diaNumero(fim)) return `${base} · termina hoje`;
+  if (hoje >= diaNumero(ini)) return `${base} · faltam ${dias(diaNumero(fim) - hoje)}`;
+  return base;
+}
+
+// Valor de um campo "Escolher de outro livro": um nome ou uma lista de nomes.
+export const listaDeNomes = v => (Array.isArray(v) ? v : v ? [v] : []);
+
 export function pacotes(n, tam = 64) {
   if (!tam || tam <= 1 || n < tam) return '';
   const p = Math.floor(n / tam);

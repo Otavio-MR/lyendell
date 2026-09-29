@@ -3,7 +3,7 @@ const fs = require('fs');
 const { createClient } = require('@libsql/client');
 const { hashSenha } = require('./senhas');
 const { CARGOS_PADRAO } = require('./permissoes');
-const { LIVROS_PADRAO, AJUDA_ABERTURA } = require('./livros-padrao');
+const { LIVROS_PADRAO, AJUDA_ABERTURA, CAMPOS_PENA, CAMPO_GUARDAS } = require('./livros-padrao');
 const { linha, chaveNome } = require('./util');
 
 // Na internet o banco fica no Turso (TURSO_DATABASE_URL + TURSO_AUTH_TOKEN).
@@ -208,7 +208,7 @@ CREATE TABLE IF NOT EXISTS diario (
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 3;
+const VERSAO = 4;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -247,8 +247,58 @@ async function migrar() {
     // v3: foto de perfil.
     if (!await colunaExiste('usuarios', 'foto')) await db.run('ALTER TABLE usuarios ADD COLUMN foto TEXT');
   }
+  if (versao < 4) await migrarPrisioneiros();
 
   await db.run("INSERT INTO meta (chave, valor) VALUES ('versao', ?) ON CONFLICT (chave) DO UPDATE SET valor = excluded.valor", String(VERSAO));
+}
+
+// v4: prisioneiros ganham soltura prevista, pena calculada, multa e guardas escolhidos da lista.
+// Só mexe nos campos que ainda estão como vieram no modelo original.
+async function migrarPrisioneiros() {
+  const presos = await db.get("SELECT id, campos FROM livros WHERE modulo = 'guarda' AND nome = 'Registro de Prisioneiros'");
+  if (!presos) return;
+  const campos = JSON.parse(presos.campos);
+  if (campos.some(c => c.tipo === 'duracao') || !campos.some(c => c.id === 'data' && c.tipo === 'data')) return;
+  const guardas = await db.get("SELECT id FROM livros WHERE modulo = 'guarda' AND nome = 'Guardas da Capital'");
+  const registros = (await db.all('SELECT dados FROM registros WHERE livro_id = ?', presos.id)).map(r => JSON.parse(r.dados));
+  const penaEmUso = registros.some(d => d.pena);
+  const ids = new Set(campos.map(c => c.id));
+  const novos = [];
+  for (const c of campos) {
+    if (c.id === 'pena' && c.tipo === 'texto') {
+      // O que já foi escrito na pena antiga continua guardado, com outro nome.
+      if (penaEmUso) { const { destaque, ajuda, ...resto } = c; novos.push({ ...resto, nome: 'Anotação da pena' }); }
+      continue;
+    }
+    if (c.id === 'guarda' && c.tipo === 'texto' && guardas) {
+      novos.push({ ...CAMPO_GUARDAS, livro: guardas.id });
+      continue;
+    }
+    if (c.id === 'data' && c.tipo === 'data') {
+      const { destaque, ...resto } = c;
+      novos.push({ ...resto, obrigatorio: true }, ...CAMPOS_PENA.filter(x => !ids.has(x.id) || x.id === 'duracao'));
+      continue;
+    }
+    novos.push(c);
+  }
+  await db.run('UPDATE livros SET campos = ? WHERE id = ?', JSON.stringify(novos), presos.id);
+}
+
+// Campos "Escolher de outro livro" dos livros padrão apontam para "@Nome do livro"; aqui viram o id real.
+async function resolverReferencias() {
+  const livros = await db.all('SELECT id, modulo, nome, campos FROM livros');
+  const porNome = new Map(livros.map(l => [`${l.modulo}:${l.nome}`, l.id]));
+  for (const l of livros) {
+    const campos = JSON.parse(l.campos);
+    let mudou = false;
+    for (const c of campos) {
+      if (typeof c.livro === 'string' && c.livro.startsWith('@')) {
+        c.livro = porNome.get(`${l.modulo}:${c.livro.slice(1)}`) ?? null;
+        mudou = true;
+      }
+    }
+    if (mudou) await db.run('UPDATE livros SET campos = ? WHERE id = ?', JSON.stringify(campos), l.id);
+  }
 }
 
 async function semear() {
@@ -264,6 +314,7 @@ async function semear() {
       'INSERT INTO livros (modulo, nome, descricao, icone, aberto, campos, cobranca, ordem) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       l.modulo, l.nome, l.descricao, l.icone, l.aberto, JSON.stringify(l.campos), l.cobranca ? JSON.stringify(l.cobranca) : null, i,
     ]));
+    await resolverReferencias();
   }
 
   if (!await db.get('SELECT id FROM usuarios WHERE is_root = 1')) {

@@ -1,6 +1,7 @@
 import {
   estado, get, post, put, del, h, trocar, icone, pode, cabecalho, vazio, botao, botaoIcone, modal, modalForm, confirmar,
   aviso, tentar, campo, interruptor, enviarImagem, dataHora, dataCurta, num, normalizar, ErroApi,
+  textoDuracao, listaDeNomes,
 } from '../core.js';
 import { livroDeRegistro, livroDeRegistros } from '../livro-mc.js';
 import { verPagamentos, resumoCobranca } from './pagamentos.js';
@@ -25,6 +26,7 @@ const ICONES_LIVRO = ['livro', 'casa', 'coroa', 'loja', 'documento', 'alianca', 
 const TIPOS = [
   ['texto', 'Texto curto'], ['texto_longo', 'Texto longo'], ['numero', 'Número'], ['data', 'Data'],
   ['selecao', 'Lista de opções'], ['sim_nao', 'Sim ou não'], ['imagem', 'Imagem'],
+  ['referencia', 'Escolher de outro livro'], ['duracao', 'Tempo entre duas datas'],
 ];
 
 const idLocal = () => 'c' + Math.random().toString(36).slice(2, 10);
@@ -35,25 +37,30 @@ function tituloDe(l, dados) {
   return c ? String(dados[c.id]) : 'Registro sem título';
 }
 
-function valorCurto(c, v) {
+// Campos calculados (tempo entre datas) não têm valor guardado: saem dos outros campos do registro.
+const temValor = (c, dados) => (c.tipo === 'duracao' ? !!textoDuracao(c, dados) : dados[c.id] != null && dados[c.id] !== '');
+
+function valorCurto(c, v, dados) {
+  if (c.tipo === 'duracao') return textoDuracao(c, dados);
   if (v == null || v === '') return '';
   switch (c.tipo) {
     case 'data': return dataCurta(v);
     case 'sim_nao': return v ? 'Sim' : 'Não';
     case 'numero': return num(v);
     case 'selecao': return h('span', { class: 'etiqueta' }, v);
+    case 'referencia': return listaDeNomes(v).join(', ');
     case 'imagem': return h('img', { class: 'miniatura', src: v, alt: '', loading: 'lazy' });
     case 'texto_longo': return v.length > 80 ? `${v.slice(0, 80)}…` : v;
     default: return String(v);
   }
 }
 
-function valorCompleto(c, v) {
+function valorCompleto(c, v, dados) {
   switch (c.tipo) {
     case 'imagem': return h('a', { href: v, target: '_blank', rel: 'noopener' }, h('img', { class: 'doc-imagem', src: v, alt: c.nome }));
     case 'texto_longo': return h('div', { class: 'texto-livre' }, v);
     case 'selecao': return String(v);
-    default: return valorCurto(c, v);
+    default: return valorCurto(c, v, dados);
   }
 }
 
@@ -145,7 +152,7 @@ export async function livro(m, id) {
         onkeydown: e => { if (e.key === 'Enter' && e.target === e.currentTarget) ver(r); },
       },
       h('td', { class: 'col-num' }, numero(r.id)),
-      colunas.map(c => h('td', { 'data-rotulo': c.nome }, valorCurto(c, r.dados[c.id]))),
+      colunas.map(c => h('td', { 'data-rotulo': c.nome }, valorCurto(c, r.dados[c.id], r.dados))),
       l.cobranca && h('td', { 'data-rotulo': 'Pagamentos' },
         h('button', {
           class: 'celula-botao', type: 'button', title: 'Ver a tabela de pagamentos',
@@ -226,12 +233,12 @@ function verRegistro(m, d, r, recarregar, reabrir) {
   for (const c of l.campos) {
     if (c.tipo === 'secao') { secaoPendente = c; continue; }
     const v = r.dados[c.id];
-    if (v == null || v === '') continue;
+    if (!temValor(c, r.dados)) continue;
     if (secaoPendente) { linhas.push(h('h3', { class: 'doc-secao' }, secaoPendente.nome)); secaoPendente = null; }
     const largo = c.tipo === 'texto_longo' || c.tipo === 'imagem';
     linhas.push(h('div', { class: `doc-linha ${largo ? 'larga' : ''}`.trim() },
       h('span', { class: 'doc-rotulo' }, c.nome),
-      h('div', { class: 'doc-valor' }, valorCompleto(c, v))));
+      h('div', { class: 'doc-valor' }, valorCompleto(c, v, r.dados))));
   }
 
   const doc = h('article', { class: 'documento' },
@@ -269,18 +276,31 @@ function verRegistro(m, d, r, recarregar, reabrir) {
 
 /* ─── Formulário de registro ──────────────────────── */
 
-function formRegistro(l, r, aoSalvar) {
+async function formRegistro(l, r, aoSalvar) {
   const valores = { ...(r?.dados || {}) };
-  const envio = { n: 0 };
+  // Antes de abrir, busca os nomes dos campos "Escolher de outro livro" (ex.: a lista de guardas).
+  const fontes = {};
+  await Promise.all([...new Set(l.campos.filter(c => c.tipo === 'referencia').map(c => c.livro))].map(async id => {
+    fontes[id] = await get(`/api/livros/${id}/opcoes`).catch(() => null);
+  }));
+  const calculados = [];
+  const ctx = { envio: { n: 0 }, fontes, calculados, mudou: () => calculados.forEach(f => f()) };
+  const nomeDo = id => l.campos.find(x => x.id === id)?.nome || id;
+
   modalForm({
     titulo: r ? `Editar registro · ${l.nome}` : `Novo registro · ${l.nome}`,
     tamanho: 'medio',
     textoOk: r ? 'Salvar alterações' : 'Registrar',
-    conteudo: h('div', { class: 'form-grade' }, l.campos.map(c => entradaDoCampo(c, valores, envio))),
+    conteudo: h('div', { class: 'form-grade' }, l.campos.map(c => entradaDoCampo(c, valores, ctx))),
     aoEnviar: async () => {
-      if (envio.n) throw new Error('Espere a imagem terminar de enviar.');
+      if (ctx.envio.n) throw new Error('Espere a imagem terminar de enviar.');
       const faltando = l.campos.find(c => c.obrigatorio && (valores[c.id] == null || String(valores[c.id]).trim() === ''));
       if (faltando) throw new Error(`Preencha o campo "${faltando.nome}".`);
+      for (const c of l.campos.filter(x => x.tipo === 'duracao')) {
+        const ini = valores[c.inicio];
+        const fim = valores[c.fim];
+        if (ini && fim && fim < ini) throw new Error(`"${nomeDo(c.fim)}" não pode ser antes de "${nomeDo(c.inicio)}".`);
+      }
       let idSalvo = r?.id;
       if (r) await put(`/api/registros/${r.id}`, { dados: valores });
       else idSalvo = (await post(`/api/livros/${l.id}/registros`, { dados: valores })).id;
@@ -290,13 +310,26 @@ function formRegistro(l, r, aoSalvar) {
   });
 }
 
-function entradaDoCampo(c, valores, envio) {
+function entradaDoCampo(c, valores, ctx) {
   if (c.tipo === 'secao') return h('h3', { class: 'form-secao' }, c.nome);
   const v = valores[c.id];
-  const definir = x => { valores[c.id] = x; };
+  const definir = x => { valores[c.id] = x; ctx.mudou(); };
   const opcoes = { ajuda: c.ajuda, obrigatorio: c.obrigatorio };
 
   switch (c.tipo) {
+    case 'duracao': {
+      // Calculado na hora, conforme as datas são preenchidas.
+      const saida = h('p', { class: 'calculado' });
+      const atualizar = () => { saida.textContent = textoDuracao(c, valores) || 'Preencha as datas para calcular.'; };
+      ctx.calculados.push(atualizar);
+      atualizar();
+      return h('div', { class: 'campo' },
+        h('span', { class: 'campo-rotulo' }, c.nome),
+        saida,
+        h('small', { class: 'campo-ajuda' }, c.ajuda || 'Calculado automaticamente.'));
+    }
+    case 'referencia':
+      return entradaReferencia(c, v, definir, ctx.fontes[c.livro]);
     case 'texto_longo':
       return campo(c.nome, h('textarea', { class: 'input', rows: '4', maxlength: '10000', oninput: e => definir(e.target.value) }, v ?? ''), { ...opcoes, classe: 'largo' });
     case 'numero':
@@ -315,11 +348,60 @@ function entradaDoCampo(c, valores, envio) {
     case 'imagem':
       return h('div', { class: 'campo largo' },
         h('span', { class: 'campo-rotulo' }, c.nome, c.obrigatorio && h('b', { class: 'obrig' }, ' *')),
-        entradaImagem(v, definir, envio),
+        entradaImagem(v, definir, ctx.envio),
         c.ajuda && h('small', { class: 'campo-ajuda' }, c.ajuda));
     default:
       return campo(c.nome, h('input', { class: 'input', type: 'text', maxlength: '300', value: v ?? '', oninput: e => definir(e.target.value) }), opcoes);
   }
+}
+
+// Escolher nomes já registrados em outro livro (ex.: guardas responsáveis pela prisão).
+function entradaReferencia(c, v, definir, fonte) {
+  const rotulo = h('span', { class: 'campo-rotulo' }, c.nome, c.obrigatorio && h('b', { class: 'obrig' }, ' *'));
+  const ajuda = c.ajuda && h('small', { class: 'campo-ajuda' }, c.ajuda);
+  if (!fonte) {
+    return h('div', { class: 'campo largo' }, rotulo,
+      h('p', { class: 'nota' }, icone('alerta'), 'Não foi possível carregar a lista de nomes deste campo.'));
+  }
+  const nomes = fonte.opcoes.map(o => o.titulo);
+  const semNinguem = !nomes.length && h('small', { class: 'campo-ajuda' }, `Ainda não há ninguém registrado em "${fonte.livro.nome}".`);
+
+  if (!c.multiplo) {
+    const atual = listaDeNomes(v)[0] || '';
+    const lista = atual && !nomes.includes(atual) ? [...nomes, atual] : nomes;
+    return h('div', { class: 'campo' }, rotulo,
+      h('select', { class: 'input', onchange: e => definir(e.target.value) },
+        h('option', { value: '' }, `Escolha em "${fonte.livro.nome}"`),
+        lista.map(n => h('option', { value: n, selected: n === atual }, n))),
+      semNinguem, ajuda);
+  }
+
+  const escolhidos = [...listaDeNomes(v)];
+  const chips = h('div', { class: 'opcoes-chips' });
+  const seletor = h('select', {
+    class: 'input', 'aria-label': `Adicionar em ${c.nome}`,
+    onchange: e => {
+      if (e.target.value && !escolhidos.includes(e.target.value)) {
+        escolhidos.push(e.target.value);
+        definir([...escolhidos]);
+      }
+      desenhar();
+    },
+  });
+  function desenhar() {
+    trocar(chips, ...(escolhidos.length
+      ? escolhidos.map((n, i) => h('span', { class: 'opcao-chip' }, n,
+        h('button', { type: 'button', 'aria-label': `Tirar ${n}`, onclick: () => { escolhidos.splice(i, 1); definir([...escolhidos]); desenhar(); } }, icone('x'))))
+      : [h('span', { class: 'suave' }, 'Ninguém escolhido ainda.')]));
+    const restantes = nomes.filter(n => !escolhidos.includes(n));
+    trocar(seletor,
+      h('option', { value: '' }, restantes.length ? `Adicionar de "${fonte.livro.nome}"` : 'Todos já foram escolhidos'),
+      ...restantes.map(n => h('option', { value: n }, n)));
+    seletor.value = '';
+    seletor.disabled = !restantes.length;
+  }
+  desenhar();
+  return h('div', { class: 'campo largo' }, rotulo, chips, seletor, semNinguem, ajuda);
 }
 
 export function entradaImagem(inicial, definir, envio) {
@@ -390,7 +472,12 @@ function editorOpcoes(c) {
     h('div', { class: 'opcoes-add' }, entrada, botao('Adicionar', { icone: 'mais', onclick: adicionar })));
 }
 
-function configurarLivro(m, l, aoSalvar, aoApagar) {
+async function configurarLivro(m, l, aoSalvar, aoApagar) {
+  // Livros que podem servir de lista para um campo "Escolher de outro livro".
+  const outrosLivros = (await Promise.all(Object.keys(MODULOS).map(mm =>
+    get(`/api/modulos/${mm}/livros`).then(r => r.livros.map(x => ({ id: x.id, nome: x.nome, modulo: mm }))).catch(() => []))))
+    .flat().filter(x => x.id !== l?.id);
+
   const s = l
     ? { nome: l.nome, descricao: l.descricao, icone: l.icone, aberto: l.aberto, campos: structuredClone(l.campos) }
     : { nome: '', descricao: '', icone: 'livro', aberto: true, campos: [{ id: idLocal(), nome: 'Nome', tipo: 'texto', obrigatorio: true, destaque: true }] };
@@ -460,14 +547,54 @@ function configurarLivro(m, l, aoSalvar, aoApagar) {
         h('input', { class: 'input', value: c.nome, placeholder: 'Nome do campo', maxlength: '60', 'aria-label': 'Nome do campo', oninput: e => { c.nome = e.target.value; } }),
         h('select', {
           class: 'input cfg-tipo', 'aria-label': 'Tipo do campo',
-          onchange: e => { c.tipo = e.target.value; if (c.tipo === 'selecao' && !c.opcoes) c.opcoes = []; desenharCampos(); },
+          onchange: e => { c.tipo = e.target.value; prepararTipo(c); desenharCampos(); },
         }, TIPOS.map(([v, n]) => h('option', { value: v, selected: c.tipo === v }, n))),
         controles),
       h('div', { class: 'campo-cfg-extras' },
-        marcador('Obrigatório', c.obrigatorio, v => { c.obrigatorio = v; }),
+        c.tipo !== 'duracao' && marcador('Obrigatório', c.obrigatorio, v => { c.obrigatorio = v; }),
         marcador('Aparece na lista', c.destaque, v => { c.destaque = v; }),
         h('input', { class: 'input input-pequeno', value: c.ajuda || '', maxlength: '140', placeholder: 'Dica para quem preenche (opcional)', oninput: e => { c.ajuda = e.target.value; } })),
-      c.tipo === 'selecao' && editorOpcoes(c));
+      c.tipo === 'selecao' && editorOpcoes(c),
+      c.tipo === 'referencia' && editorReferencia(c),
+      c.tipo === 'duracao' && editorDuracao(c));
+  }
+
+  // Valores iniciais ao trocar o tipo de um campo.
+  function prepararTipo(c) {
+    if (c.tipo === 'selecao' && !c.opcoes) c.opcoes = [];
+    if (c.tipo === 'referencia' && !c.livro) c.livro = outrosLivros[0]?.id;
+    if (c.tipo === 'duracao') {
+      const datas = s.campos.filter(x => x.tipo === 'data');
+      c.inicio = c.inicio || datas[0]?.id || '';
+      c.fim = c.fim || datas.find(x => x.id !== c.inicio)?.id || '';
+    }
+  }
+
+  function editorReferencia(c) {
+    if (!outrosLivros.length) return h('p', { class: 'nota' }, icone('alerta'), 'Não há outro livro para escolher nomes.');
+    if (!outrosLivros.some(x => x.id === c.livro)) c.livro = outrosLivros[0].id;
+    const nomeModulo = mm => MODULOS[mm].titulo;
+    return h('div', { class: 'opcoes-editor' },
+      h('div', { class: 'form-grade' },
+        campo('Puxar os nomes do livro', h('select', { class: 'input', onchange: e => { c.livro = Number(e.target.value); } },
+          Object.keys(MODULOS).map(mm => h('optgroup', { label: nomeModulo(mm) },
+            outrosLivros.filter(x => x.modulo === mm).map(x => h('option', { value: String(x.id), selected: x.id === c.livro }, x.nome)))))),
+        h('div', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Quantos'),
+          marcador('Pode escolher vários', c.multiplo, v => { c.multiplo = v; }))));
+  }
+
+  function editorDuracao(c) {
+    const datas = s.campos.filter(x => x.tipo === 'data');
+    if (datas.length < 2) return h('p', { class: 'nota' }, icone('alerta'), 'Este cálculo precisa de dois campos do tipo Data no formulário (ex.: prisão e soltura).');
+    if (!datas.some(x => x.id === c.inicio)) c.inicio = datas[0].id;
+    if (!datas.some(x => x.id === c.fim) || c.fim === c.inicio) c.fim = datas.find(x => x.id !== c.inicio).id;
+    const seletor = (valor, definir) => h('select', { class: 'input', onchange: e => definir(e.target.value) },
+      datas.map(x => h('option', { value: x.id, selected: x.id === valor }, x.nome || '(campo sem nome)')));
+    return h('div', { class: 'opcoes-editor' },
+      h('div', { class: 'form-grade' },
+        campo('Contar a partir de', seletor(c.inicio, v => { c.inicio = v; })),
+        campo('Até', seletor(c.fim, v => { c.fim = v; }))),
+      h('small', { class: 'campo-ajuda' }, 'Mostra quantos dias há entre as duas datas e quanto falta. Se a data final ficar em branco, aparece "Sem data prevista".'));
   }
 
   const adicionar = tipo => {
@@ -511,6 +638,10 @@ function configurarLivro(m, l, aoSalvar, aoApagar) {
       if (!s.nome.trim()) throw new Error('Dê um nome ao livro.');
       const semNome = s.campos.find(c => !c.nome.trim());
       if (semNome) throw new Error(semNome.tipo === 'secao' ? 'Toda seção precisa de um título.' : 'Todo campo precisa de um nome.');
+      const semLivro = s.campos.find(c => c.tipo === 'referencia' && !c.livro);
+      if (semLivro) throw new Error(`Escolha de qual livro o campo "${semLivro.nome}" puxa os nomes.`);
+      const semDatas = s.campos.find(c => c.tipo === 'duracao' && (!c.inicio || !c.fim || c.inicio === c.fim));
+      if (semDatas) throw new Error(`O campo "${semDatas.nome}" precisa de duas datas diferentes (início e fim).`);
       const semOpcoes = s.campos.find(c => c.tipo === 'selecao' && !c.opcoes.length);
       if (semOpcoes) throw new Error(`O campo "${semOpcoes.nome}" precisa de pelo menos uma opção.`);
       if (s.cobranca?.ativo) {

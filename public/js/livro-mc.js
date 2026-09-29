@@ -2,7 +2,7 @@
 // Formato: NBT sem compressão com "pages" (lista de textos), "author" e "title",
 // igual aos livros salvos pelo próprio Scribble. As páginas usam códigos de cor (§).
 
-import { dataCurta, dataHora, num, pacotes } from './core.js';
+import { dataCurta, dataHora, num, pacotes, textoDuracao, listaDeNomes } from './core.js';
 
 /* ─── Métricas da fonte do Minecraft ──────────────── */
 
@@ -262,11 +262,14 @@ function assinatura(linhas) {
   return [vazia(), L(ORN.estrela, '8'), ...linhas, L(ORN.estrela, '8'), ...texto('Casa Luckham', '4', { centro: true })];
 }
 
-function valorDoCampo(c, v) {
+function valorDoCampo(c, v, dados) {
   switch (c.tipo) {
     case 'data': return dataCurta(v);
     case 'sim_nao': return v ? 'Sim' : 'Não';
     case 'numero': return num(v);
+    case 'referencia': return listaDeNomes(v).join(', ');
+    // No livro fica só o tamanho da pena; "faltam X dias" mudaria com o tempo.
+    case 'duracao': return textoDuracao(c, dados, { relativo: false });
     default: return String(v);
   }
 }
@@ -282,9 +285,11 @@ function camposDoRegistro(livroMc, livro, reg) {
   for (const c of livro.campos) {
     if (c.tipo === 'secao') { secao = c; continue; }
     const v = reg.dados[c.id];
-    if (v == null || v === '' || c.tipo === 'imagem') continue;
+    if (c.tipo === 'imagem') continue;
+    const valor = c.tipo === 'duracao' ? valorDoCampo(c, v, reg.dados) : (v == null || v === '' || (Array.isArray(v) && !v.length) ? '' : valorDoCampo(c, v, reg.dados));
+    if (!valor) continue;
     if (secao) { livroMc.bloco(cabecalhoSecao(secao.nome), { comProximo: true }); secao = null; }
-    const linhas = campoLinhas(c.nome, valorDoCampo(c, v));
+    const linhas = campoLinhas(c.nome, valor);
     livroMc.bloco(linhas, { junto: linhas.length <= 8 });
   }
 }
