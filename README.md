@@ -170,6 +170,21 @@ O chat guarda as últimas 2000 mensagens. As partidas em andamento ficam só na 
 servidor: se o site reiniciar (por exemplo, depois de um `git push`), elas se perdem, mas o
 chat, os resultados e os recordes ficam salvos.
 
+## Mapa de Lyendell
+
+A tela **Mapa de Lyendell** mostra a capital vista de cima, num desenho escuro no estilo do site:
+o rio, as muralhas, as torres e o portão com a ponte, as casinhas, as 4 avenidas (douradas) e as
+10 ruas com o nome escrito ao longo delas, os prédios públicos (Septo, Coliseu, Toca do Coelho,
+Tabelionato, Banco e Quartel General) e o Centro da cidade (a estrela roxa, no Tabelionato).
+
+- Arraste para andar pelo mapa; use a rodinha, a pinça no celular ou os botões + e − para o zoom.
+- Clique numa rua ou prédio (no mapa ou na lista ao lado) para destacar e ver onde fica.
+- **Baixar imagem** gera um PNG do mapa inteiro, bom para mandar no Discord.
+
+Os dados ficam em `public/js/mapa-lyendell.js`, com as coordenadas tiradas da vista de cima do
+jogo (imagem de 1154 x 773, norte para cima). Para acrescentar algo (ex.: as casas), é só marcar o
+ponto nessa mesma imagem e anotar o x e o y.
+
 ## Perfil e Comunidade
 
 Em **Meu perfil** cada pessoa escolhe a foto (ou a cabeça da skin do Minecraft, pelo nick), a

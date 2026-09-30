@@ -8,6 +8,7 @@ import { atividades, atividade } from './telas/atividades.js';
 import { usuarios, cargos, diario } from './telas/admin.js';
 import { perfil } from './telas/perfil.js';
 import { pessoa, comunidade } from './telas/pessoas.js';
+import { mapa } from './telas/mapa.js';
 import { radioDoCanto, carregarTrilha, pararTudo } from './trilha.js';
 import { recreacao, sala, cobrinha, quebraCabeca, assistir } from './telas/recreacao.js';
 import { pacCoelho } from './telas/pac-coelho.js';
@@ -19,6 +20,7 @@ const MENU = [
   { secao: 'Cidade', itens: [
     { rota: '/', nome: 'Início', icone: 'casa' },
     { rota: '/comunidade', nome: 'Comunidade', icone: 'usuarios' },
+    { rota: '/mapa', nome: 'Mapa de Lyendell', icone: 'mapa' },
     { rota: '/anuncios', nome: 'Mural de Anúncios', icone: 'megafone', perm: ['anuncios.ver'] },
     { rota: '/congresso', nome: 'Congresso', icone: 'coluna', perm: ['congresso.ver'] },
     { rota: '/atividades', nome: 'Mural de Atividades', icone: 'tarefas', perm: ['atividades.ver'] },
@@ -58,6 +60,7 @@ const ROTAS = [
   [/^\/recreacao\/sala\/([0-9a-f]+)$/, id => sala(id)],
   [/^\/recreacao\/assistir\/(\d+)$/, id => assistir(id)],
   [/^\/comunidade$/, () => comunidade()],
+  [/^\/mapa$/, () => mapa()],
   [/^\/pessoa\/(\d+)$/, id => pessoa(id)],
   [/^\/perfil$/, () => perfil()],
 ];

@@ -130,7 +130,7 @@ export function anexar(el, filhos) {
   return el;
 }
 
-const ICONES = {
+export const ICONES = {
   casa: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/>',
   megafone: '<path d="M3 10v4a1 1 0 0 0 1 1h2l7 4V5L6 9H4a1 1 0 0 0-1 1z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path d="M19.5 5.5a9 9 0 0 1 0 13"/>',
   tarefas: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="m8.5 10 1.5 1.5 3-3"/><path d="M14.5 11H16"/><path d="m8.5 16 1.5 1.5 3-3"/><path d="M14.5 17H16"/>',
