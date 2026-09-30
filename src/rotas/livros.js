@@ -4,6 +4,7 @@ const { db } = require('../db');
 const { checar, pode, exigirLogin } = require('../auth');
 const { anotar } = require('../diario');
 const { urlValida, comandoApagarArquivo } = require('../uploads');
+const progresso = require('../progresso');
 const { hoje, cronograma, resumo } = require('../cobranca');
 const { erro, texto, linha, inteiro, idDaRota, dataValida } = require('../util');
 
@@ -329,6 +330,7 @@ r.post('/livros/:id/registros', async (req, res) => {
   const { numero } = await db.get('SELECT numero FROM registros WHERE id = ?', id);
   await anotar(req, situacao === 'pendente' ? `Enviou para aprovação em "${l.nome}"` : `Registrou em "${l.nome}"`,
     `${numero ? `nº ${numero}: ` : ''}${tituloDoRegistro(l, dados)}`);
+  await progresso.registrar(req.usuario.id, 'registro');
   res.status(201).json({ id, situacao, numero });
 });
 

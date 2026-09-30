@@ -134,9 +134,55 @@ Pac-Coelho, cenouras na cobrinha e o menor tempo no quebra-cabeça. Quem sai de 
 meio perde (no quiz, fica fora do resultado); quem cai da internet tem 30 segundos para voltar. A Família Nobre (e quem tiver o poder "Apagar mensagens de outros no chat") pode
 apagar mensagens impróprias; cada um pode apagar as suas.
 
+Dá para **assistir qualquer jogo**: as partidas ao vivo (quiz, velha, pedra, papel e tesoura) e
+também quem está jogando sozinho. Quem abre o Pac-Coelho, a Cobrinha ou o Quebra-cabeça aparece
+em **Jogando agora**, no salão; clicando em Assistir, dá para ver o jogo ao vivo, com o chat do
+lado. Quem joga vê quantas pessoas estão assistindo.
+
 O chat guarda as últimas 2000 mensagens. As partidas em andamento ficam só na memória do
 servidor: se o site reiniciar (por exemplo, depois de um `git push`), elas se perdem, mas o
 chat, os resultados e os recordes ficam salvos.
+
+## Perfil e Comunidade
+
+Em **Meu perfil** cada pessoa escolhe a foto (ou a cabeça da skin do Minecraft, pelo nick), a
+capa (8 prontas ou uma imagem própria), a cor de destaque (aparece no perfil e no nome no chat),
+a moldura da foto, uma frase, o "sobre mim" e até 3 conquistas para mostrar em destaque.
+
+A **Comunidade** mostra todo mundo, com quem está online e quem está jogando. O perfil público
+de cada um tem nível, sequência de dias, números da Recreação, conquistas e um **mural de
+recados**. Quem escreveu, o dono do perfil e a moderação apagam recados.
+
+## Níveis, missões e conquistas
+
+Para incentivar a visita de todo dia:
+
+- **XP e níveis**: conversar no chat, jogar, ganhar partidas, acertar no quiz, ter entregas
+  conferidas nas atividades, publicar anúncios, enviar fotos, registrar e deixar recados dão XP
+  (com um limite por dia, para ninguém ganhar XP mandando mensagem à toa). Cada nível tem um título
+  de coelho (Filhote, Láparo, Coelho do Campo... até Coelho Coroado) e libera molduras novas
+  (bronze no 5, prata no 10, ouro no 15, esmeralda no 20 e coroa no 25).
+- **Sequência de dias**: entrar todo dia aumenta a sequência e o XP da visita.
+- **Missões do dia**: três por dia, as mesmas para todo mundo, que renovam à meia-noite.
+- **Conquistas**: 24 no total (Tagarela, Sábio da Toca, Terror das Raposas, Braço forte...).
+
+Conquistas, missões cumpridas, nível novo e recado novo aparecem na hora, em qualquer tela.
+A tela de início mostra o progresso, as missões, as conquistas recentes e os mais ativos da semana.
+
+## Trilha sonora
+
+Um player na barra lateral toca música medieval enquanto a pessoa navega (no celular, pelo botão
+de música no topo). Na tela **Trilha sonora**, quem tem o poder "Adicionar, editar e tirar
+músicas da trilha sonora" (a Família Nobre e o administrador) pode:
+
+- **enviar arquivos de música** (MP3, OGG, M4A ou WEBM, até 8 MB): tocam para todos, de graça e
+  sem anúncio, no rádio da Casa;
+- **colar links diretos** de áudio (por exemplo do archive.org);
+- **colar playlists do Spotify ou vídeos e playlists do YouTube**: abrem numa janelinha com o
+  player oficial. No Spotify, quem está logado ouve as músicas inteiras; sem login, só 30 segundos.
+
+O site já vem com duas playlists medievais do Spotify. A tela também indica onde achar música
+medieval grátis (Pixabay Music, Kevin MacLeod e OpenGameArt).
 
 ## Onde ficam os dados
 

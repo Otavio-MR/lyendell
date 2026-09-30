@@ -14,6 +14,8 @@ export const rt = {
   minhaSala: null,
   naoLidas: 0,
   lendoChat: false,
+  transmissoes: [], // quem está jogando Pac-Coelho, Cobrinha ou Quebra-cabeça agora (dá para assistir)
+  plateia: 0,       // quantas pessoas me assistem jogar
 };
 
 const ouvintes = new Map();
@@ -47,7 +49,7 @@ export function desligar() {
   const velho = ws;
   ws = null;
   velho?.close(1000);
-  Object.assign(rt, { conectado: false, eu: null, online: [], historico: [], salas: [], minhaSala: null, naoLidas: 0 });
+  Object.assign(rt, { conectado: false, eu: null, online: [], historico: [], salas: [], minhaSala: null, naoLidas: 0, transmissoes: [], plateia: 0 });
   rt.partidas.clear();
   document.getElementById('partida-ativa')?.remove();
   emitir('estado');
@@ -118,7 +120,7 @@ function tratar(m) {
   switch (m.tipo) {
     case 'ola':
       tentativas = 0;
-      Object.assign(rt, { conectado: true, eu: m.eu, online: m.online, historico: m.historico, salas: m.salas, minhaSala: m.minhaSala });
+      Object.assign(rt, { conectado: true, eu: m.eu, online: m.online, historico: m.historico, salas: m.salas, minhaSala: m.minhaSala, transmissoes: m.transmissoes || [] });
       emitir('estado');
       break;
     case 'online':
@@ -163,6 +165,15 @@ function tratar(m) {
     case 'aviso':
       if (m.de !== rt.eu?.id && !location.hash.startsWith('#/recreacao')) chamar(m.texto, 'Ver', '#/recreacao', 9000);
       break;
+    case 'transmissoes':
+      rt.transmissoes = m.transmissoes;
+      break;
+    case 'solo:plateia':
+      rt.plateia = m.espectadores;
+      break;
+    case 'progresso':
+      m.notas.slice(0, 4).forEach(mostrarNota);
+      break;
     case 'erro':
       if (criando || indoPara) { criando = false; indoPara = null; }
       aviso(m.mensagem, 'erro');
@@ -185,15 +196,47 @@ function avisarMudanca(antes, s) {
 }
 
 // Aviso com botão (ex.: "Fulano entrou na sua partida"). Fica mais tempo que um aviso comum.
-function chamar(texto, rotulo, href, duracao) {
-  const el = h('div', { class: 'toast chamada', role: 'status' },
-    icone('jogos'),
+function chamar(texto, rotulo, href, duracao, ic = 'jogos', classe = '') {
+  const el = h('div', { class: `toast chamada ${classe}`.trim(), role: 'status' },
+    icone(ic),
     h('div', { class: 'chamada-texto' },
       h('span', null, texto),
       h('a', { class: 'btn btn-ouro btn-pequeno', href, onclick: () => el.remove() }, rotulo)),
     h('button', { class: 'chamada-fechar', type: 'button', 'aria-label': 'Fechar', onclick: () => el.remove() }, icone('x')));
   document.getElementById('toasts').append(el);
   setTimeout(() => { el.classList.add('saindo'); setTimeout(() => el.remove(), 300); }, duracao);
+}
+
+// Conquista, missão cumprida, nível novo ou recado: aparece na hora, em qualquer tela.
+function mostrarNota(n) {
+  const meuPerfil = `#/pessoa/${rt.eu?.id || estado.eu?.id}`;
+  if (n.tipo === 'conquista') chamar(`Conquista desbloqueada: ${n.nome}! ${n.desc}`, 'Ver no perfil', meuPerfil, 9000, n.icone || 'trofeu', 'chamada-ouro');
+  else if (n.tipo === 'missao') chamar(`Missão do dia cumprida: ${n.texto}. +${n.xp} XP`, 'Ver missões', '#/', 7000, 'check', 'chamada-verde');
+  else if (n.tipo === 'nivel') chamar(`Você subiu para o nível ${n.nivel}: ${n.titulo}!${n.moldura ? ` Moldura ${n.moldura} liberada.` : ''}`, 'Personalizar', '#/perfil', 10000, 'estrela', 'chamada-ouro');
+  else if (n.tipo === 'recado') chamar(`${n.de} deixou um recado no seu perfil: "${n.texto.length > 80 ? `${n.texto.slice(0, 80)}…` : n.texto}"`, 'Ver recado', meuPerfil, 10000, 'chat');
+  emitir('nota', n);
+}
+
+/* ─── Transmitir os jogos de uma pessoa só ─── */
+
+let ultimoQuadro = 0;
+// Avisa que estou jogando (aparece para todos em "Jogando agora").
+export function transmitir(jogo, info = {}) {
+  ultimoQuadro = 0;
+  enviar('solo:inicio', { jogo, info }, { silencioso: true });
+}
+// Manda o estado do jogo; no máximo uns 15 por segundo (ou sempre, com urgente).
+export function enviarQuadro(q, urgente = false) {
+  if (!rt.conectado) return;
+  const agora = performance.now();
+  if (!urgente && agora - ultimoQuadro < 66) return;
+  if (agora - ultimoQuadro < 42) return;
+  ultimoQuadro = agora;
+  enviar('solo:quadro', { q }, { silencioso: true });
+}
+export function pararTransmissao() {
+  rt.plateia = 0;
+  enviar('solo:fim', {}, { silencioso: true });
 }
 
 // Faixa "você tem uma partida em andamento" quando a pessoa sai da tela do jogo sem sair da partida.

@@ -1,7 +1,8 @@
 // Recreação: salão com chat e partidas ao vivo, e os jogos de uma pessoa só (Pac-Coelho, cobrinha e quebra-cabeça).
 
-import { h, trocar, icone, botao, botaoIcone, cabecalho, vazio, avatar, aviso, confirmar, get, post, pode, aoSair, dataHora, estado, num } from '../core.js';
-import { rt, ouvir, enviar, lendoChat, criarPartida, entrarNaPartida } from '../tempo-real.js';
+import { h, trocar, icone, botao, botaoIcone, cabecalho, vazio, avatar, avatarPessoa, aviso, confirmar, get, post, pode, aoSair, dataHora, estado, num } from '../core.js';
+import { rt, ouvir, enviar, lendoChat, criarPartida, entrarNaPartida, transmitir, enviarQuadro, pararTransmissao } from '../tempo-real.js';
+import { assistirPac } from './pac-coelho.js';
 import { abrirSalaQuiz, telaQuiz, teclaQuiz } from './quiz.js';
 
 const AO_VIVO = [
@@ -15,10 +16,14 @@ const SOZINHO = [
   { href: '#/recreacao/quebra-cabeca', nome: 'Quebra-cabeça', icone: 'peca', texto: 'Monte uma foto da galeria no menor tempo.' },
 ];
 const ICONE_JOGO = { velha: 'velha', ppt: 'tesoura', quiz: 'pergunta' };
+const ICONE_SOLO = { pacman: 'coelho', cobrinha: 'cobra', quebra: 'peca' };
 const MAOS = { pedra: 'Pedra', papel: 'Papel', tesoura: 'Tesoura' };
 const VENCE = { pedra: 'tesoura', papel: 'pedra', tesoura: 'papel' };
 const VERBO = { pedra: 'quebra', papel: 'embrulha', tesoura: 'corta' };
 const TAMANHOS = ['3x3', '4x4', '5x5'];
+
+// Nome ou foto que levam ao perfil da pessoa.
+const linkPerfil = (id, filho) => (id ? h('a', { class: 'link-perfil', href: `#/pessoa/${id}` }, filho) : filho);
 
 // Ouve um evento da conexão só enquanto a tela estiver aberta.
 const escutar = (tipo, fn) => aoSair(ouvir(tipo, fn));
@@ -101,8 +106,15 @@ export function recreacao() {
   }
 
   function desenharAbertas() {
-    trocar(abertas, rt.salas.length
-      ? h('div', { class: 'lista-salas' }, rt.salas.map(s => {
+    const solos = rt.transmissoes.filter(t => t.id !== rt.eu?.id);
+    trocar(abertas, rt.salas.length || solos.length
+      ? h('div', { class: 'lista-salas' }, solos.map(t => h('div', { class: 'sala-linha' },
+        h('span', { class: 'jogo-icone pequeno' }, icone(ICONE_SOLO[t.jogo])),
+        h('div', { class: 'sala-texto' },
+          h('strong', null, t.nomeJogo),
+          h('small', null, `${t.nome} está jogando`, t.espectadores ? ` · ${t.espectadores} assistindo` : '')),
+        h('a', { class: 'btn btn-pequeno', href: `#/recreacao/assistir/${t.id}` }, icone('olho'), h('span', null, 'Assistir')))),
+      rt.salas.map(s => {
         const minha = s.id === rt.minhaSala;
         let acao;
         if (minha) acao = h('a', { class: 'btn btn-pequeno btn-ouro', href: `#/recreacao/sala/${s.id}` }, 'Voltar');
@@ -115,14 +127,14 @@ export function recreacao() {
             h('small', null, descricaoSala(s), s.espectadores ? ` · ${s.espectadores} assistindo` : '')),
           acao);
       }))
-      : h('p', { class: 'painel-vazio' }, 'Nenhuma partida aberta. Abra uma e chame alguém!'));
+      : h('p', { class: 'painel-vazio' }, 'Ninguém jogando agora. Abra uma partida e chame alguém!'));
   }
 
   function desenharOnline() {
-    const jogando = new Set(rt.salas.filter(s => s.status === 'jogando').flatMap(s => s.jogadores));
+    const jogando = new Set([...rt.salas.filter(s => s.status === 'jogando').flatMap(s => s.jogadores), ...rt.transmissoes.map(t => t.nome)]);
     trocar(online, !rt.conectado
       ? h('p', { class: 'painel-vazio' }, 'Conectando...')
-      : h('div', { class: 'online-lista' }, rt.online.map(p => h('div', { class: 'online-pessoa' },
+      : h('div', { class: 'online-lista' }, rt.online.map(p => h('a', { class: 'online-pessoa', href: `#/pessoa/${p.id}` },
         h('span', { class: 'online-av' }, avatar(p.nome, 'avatar-p', p.foto)),
         h('span', { class: 'online-nome' }, p.nome),
         jogando.has(p.nome) && h('span', { class: 'etiqueta etiqueta-ouro' }, 'jogando')))));
@@ -134,6 +146,7 @@ export function recreacao() {
   escutar('estado', tudo);
   escutar('online', desenharOnline);
   escutar('salas', () => { desenharAbertas(); desenharOnline(); desenharJogos(); });
+  escutar('transmissoes', () => { desenharAbertas(); desenharOnline(); });
   escutar('sala', desenharJogos);
   escutar('sala:fechada', desenharJogos);
   tudo();
@@ -144,7 +157,7 @@ export function recreacao() {
       chat,
       h('div', { class: 'rec-lado' },
         h('section', { class: 'painel' }, h('div', { class: 'painel-cab' }, h('h2', null, icone('jogos'), 'Jogos')), jogos),
-        h('section', { class: 'painel' }, h('div', { class: 'painel-cab' }, h('h2', null, icone('bandeira'), 'Partidas abertas')), abertas),
+        h('section', { class: 'painel' }, h('div', { class: 'painel-cab' }, h('h2', null, icone('bandeira'), 'Jogando agora')), abertas),
         h('section', { class: 'painel' }, h('div', { class: 'painel-cab' }, h('h2', null, icone('usuarios'), tituloOnline)), online))),
     ranking);
 }
@@ -171,9 +184,11 @@ function painelChat() {
     const minha = m.usuario_id != null && m.usuario_id === rt.eu?.id;
     const podeApagar = minha || rt.eu?.moderar;
     return h('div', { class: `chat-msg ${junto ? 'junto' : ''} ${minha ? 'minha' : ''}`.replace(/\s+/g, ' ').trim() },
-      junto ? h('span', { class: 'chat-av' }) : h('span', { class: 'chat-av' }, avatar(m.usuario_nome, 'avatar-p', m.foto)),
+      junto ? h('span', { class: 'chat-av' }) : h('span', { class: 'chat-av' }, linkPerfil(m.usuario_id, avatarPessoa({ nome: m.usuario_nome, foto: m.foto, moldura: m.moldura }, 'avatar-p'))),
       h('div', { class: 'chat-corpo' },
-        !junto && h('div', { class: 'chat-cab' }, h('strong', null, m.usuario_nome), h('time', { title: dataHora(m.criado_em) }, hora(m.criado_em))),
+        !junto && h('div', { class: 'chat-cab' },
+          linkPerfil(m.usuario_id, h('strong', { style: m.cor ? { color: m.cor } : null }, m.usuario_nome)),
+          h('time', { title: dataHora(m.criado_em) }, hora(m.criado_em))),
         h('p', { class: 'chat-texto' }, m.texto)),
       podeApagar && botaoIcone('lixo', 'Apagar mensagem', async () => {
         if (await confirmar(minha ? 'Apagar sua mensagem do chat?' : `Apagar a mensagem de ${m.usuario_nome}?`, { ok: 'Apagar', perigo: true })) enviar('chat:apagar', { id: m.id });
@@ -513,12 +528,79 @@ const DIRECOES = {
   ArrowLeft: [-1, 0], KeyA: [-1, 0], ArrowRight: [1, 0], KeyD: [1, 0],
 };
 
+const N_COBRA = 20;
+const LADO_COBRA = 600;
+const C_COBRA = LADO_COBRA / N_COBRA;
+
+// Desenha o tabuleiro da cobrinha: e = { cobra: [{x, y}], comida: {x, y} | null, direcao: [dx, dy], bateu }.
+function desenharCobrinha(g, { cobra, comida, direcao, bateu }) {
+  const C = C_COBRA;
+  for (let y = 0; y < N_COBRA; y++) {
+    for (let x = 0; x < N_COBRA; x++) {
+      g.fillStyle = (x + y) % 2 ? '#0c170f' : '#0f1c12';
+      g.fillRect(x * C, y * C, C, C);
+    }
+  }
+  if (comida) {
+    const cx = comida.x * C + C / 2;
+    const cy = comida.y * C + C / 2;
+    g.fillStyle = '#5b8c3e';
+    g.beginPath();
+    g.ellipse(cx - C * 0.1, cy - C * 0.3, C * 0.08, C * 0.18, -0.5, 0, Math.PI * 2);
+    g.ellipse(cx + C * 0.1, cy - C * 0.3, C * 0.08, C * 0.18, 0.5, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = '#e8812f';
+    g.beginPath();
+    g.moveTo(cx - C * 0.24, cy - C * 0.16);
+    g.quadraticCurveTo(cx, cy - C * 0.28, cx + C * 0.24, cy - C * 0.16);
+    g.lineTo(cx, cy + C * 0.42);
+    g.closePath();
+    g.fill();
+    g.strokeStyle = 'rgba(120, 50, 10, 0.6)';
+    g.lineWidth = 1.5;
+    g.beginPath();
+    g.moveTo(cx - C * 0.12, cy);
+    g.lineTo(cx - C * 0.02, cy);
+    g.moveTo(cx + C * 0.04, cy + C * 0.14);
+    g.lineTo(cx + C * 0.12, cy + C * 0.14);
+    g.stroke();
+  }
+  cobra.forEach((p, i) => {
+    const t = i / Math.max(1, cobra.length - 1);
+    g.fillStyle = i === 0 ? (bateu ? '#d8674a' : '#d8b13a') : `rgb(${Math.round(127 - 50 * t)}, ${Math.round(176 - 60 * t)}, ${Math.round(105 - 40 * t)})`;
+    const m = i === 0 ? 1.5 : 3;
+    g.beginPath();
+    if (g.roundRect) g.roundRect(p.x * C + m, p.y * C + m, C - m * 2, C - m * 2, i === 0 ? 9 : 7);
+    else g.rect(p.x * C + m, p.y * C + m, C - m * 2, C - m * 2);
+    g.fill();
+  });
+  // Olhinhos na direção em que a cobra anda.
+  const cab = cobra[0];
+  if (!cab) return;
+  const [dx, dy] = direcao;
+  g.fillStyle = '#1b1403';
+  for (const lado of [-1, 1]) {
+    const ex = cab.x * C + C / 2 + dx * C * 0.18 + dy * lado * C * 0.2;
+    const ey = cab.y * C + C / 2 + dy * C * 0.18 + dx * lado * C * 0.2;
+    g.beginPath();
+    g.arc(ex, ey, C * 0.09, 0, Math.PI * 2);
+    g.fill();
+  }
+}
+
+// Mostra quantas pessoas estão assistindo quem joga.
+function contadorPlateia() {
+  const el = h('span', { class: 'plateia', hidden: !rt.plateia });
+  const desenhar = () => { el.hidden = !rt.plateia; trocar(el, icone('olho'), ` ${rt.plateia} assistindo`); };
+  escutar('solo:plateia', desenhar);
+  desenhar();
+  return el;
+}
+
 export function cobrinha() {
   exigirAcesso();
-  const N = 20;
-  const LADO = 600;
-  const C = LADO / N;
-  const tela = h('canvas', { class: 'cobra-tela', width: LADO, height: LADO, 'aria-label': 'Tabuleiro da cobrinha' });
+  const N = N_COBRA;
+  const tela = h('canvas', { class: 'cobra-tela', width: LADO_COBRA, height: LADO_COBRA, 'aria-label': 'Tabuleiro da cobrinha' });
   const g = tela.getContext('2d');
   const pontosEl = h('strong', null, '0');
   const recordeEl = h('strong', null, '...');
@@ -615,6 +697,7 @@ export function cobrinha() {
   }
 
   function mostrarSobre(extra) {
+    transmitirQuadro();
     if (situacao === 'jogando') { sobre.hidden = true; return; }
     sobre.hidden = false;
     const toque = matchMedia('(pointer: coarse)').matches;
@@ -634,63 +717,20 @@ export function cobrinha() {
     }
   }
 
+  let bateuAgora = false;
   function desenharTudo(bateu = false) {
-    for (let y = 0; y < N; y++) {
-      for (let x = 0; x < N; x++) {
-        g.fillStyle = (x + y) % 2 ? '#0c170f' : '#0f1c12';
-        g.fillRect(x * C, y * C, C, C);
-      }
-    }
-    if (comida) desenharCenoura(comida.x, comida.y);
-    cobra.forEach((p, i) => {
-      const t = i / Math.max(1, cobra.length - 1);
-      g.fillStyle = i === 0 ? (bateu ? '#d8674a' : '#d8b13a') : `rgb(${Math.round(127 - 50 * t)}, ${Math.round(176 - 60 * t)}, ${Math.round(105 - 40 * t)})`;
-      const m = i === 0 ? 1.5 : 3;
-      arredondado(p.x * C + m, p.y * C + m, C - m * 2, C - m * 2, i === 0 ? 9 : 7);
-    });
-    // Olhinhos na direção em que a cobra anda.
-    const cab = cobra[0];
-    const [dx, dy] = direcao;
-    g.fillStyle = '#1b1403';
-    for (const lado of [-1, 1]) {
-      const ex = cab.x * C + C / 2 + dx * C * 0.18 + dy * lado * C * 0.2;
-      const ey = cab.y * C + C / 2 + dy * C * 0.18 + dx * lado * C * 0.2;
-      g.beginPath();
-      g.arc(ex, ey, C * 0.09, 0, Math.PI * 2);
-      g.fill();
-    }
+    bateuAgora = bateu;
+    desenharCobrinha(g, { cobra, comida, direcao, bateu });
+    transmitirQuadro();
   }
 
-  function arredondado(x, y, w, hh, r) {
-    g.beginPath();
-    g.roundRect ? g.roundRect(x, y, w, hh, r) : g.rect(x, y, w, hh);
-    g.fill();
+  // Quem assiste recebe a cobra, a cenoura e a situação a cada passo.
+  function transmitirQuadro() {
+    if (!cobra) return;
+    enviarQuadro({ c: cobra.flatMap(p => [p.x, p.y]), f: comida ? [comida.x, comida.y] : null, d: direcao, pts: pontos, s: situacao, b: bateuAgora ? 1 : 0 }, true);
   }
-
-  function desenharCenoura(x, y) {
-    const cx = x * C + C / 2;
-    const cy = y * C + C / 2;
-    g.fillStyle = '#5b8c3e';
-    g.beginPath();
-    g.ellipse(cx - C * 0.1, cy - C * 0.3, C * 0.08, C * 0.18, -0.5, 0, Math.PI * 2);
-    g.ellipse(cx + C * 0.1, cy - C * 0.3, C * 0.08, C * 0.18, 0.5, 0, Math.PI * 2);
-    g.fill();
-    g.fillStyle = '#e8812f';
-    g.beginPath();
-    g.moveTo(cx - C * 0.24, cy - C * 0.16);
-    g.quadraticCurveTo(cx, cy - C * 0.28, cx + C * 0.24, cy - C * 0.16);
-    g.lineTo(cx, cy + C * 0.42);
-    g.closePath();
-    g.fill();
-    g.strokeStyle = 'rgba(120, 50, 10, 0.6)';
-    g.lineWidth = 1.5;
-    g.beginPath();
-    g.moveTo(cx - C * 0.12, cy);
-    g.lineTo(cx - C * 0.02, cy);
-    g.moveTo(cx + C * 0.04, cy + C * 0.14);
-    g.lineTo(cx + C * 0.12, cy + C * 0.14);
-    g.stroke();
-  }
+  escutar('estado', () => { if (rt.conectado) { transmitir('cobrinha'); transmitirQuadro(); } });
+  if (rt.conectado) transmitir('cobrinha');
 
   // Teclado
   const aoTeclar = e => {
@@ -722,6 +762,7 @@ export function cobrinha() {
   aoSair(() => {
     clearTimeout(timer);
     situacao = 'fim';
+    pararTransmissao();
     document.removeEventListener('keydown', aoTeclar);
     document.removeEventListener('visibilitychange', aoEsconder);
   });
@@ -747,6 +788,7 @@ export function cobrinha() {
       h('div', { class: 'jogo-area' },
         h('div', { class: 'cobra-placar-linha' },
           h('span', null, 'Cenouras: ', pontosEl),
+          contadorPlateia(),
           h('span', null, icone('trofeu'), ' Seu recorde: ', recordeEl)),
         h('div', { class: 'cobra-moldura' }, tela, sobre),
         h('div', { class: 'dpad' },
@@ -765,16 +807,23 @@ export function quebraCabeca() {
   exigirAcesso();
   const raiz = h('div', { class: 'pagina' });
   let urlImagem = null;
+  let fonteAtual = null;
   let cronometro = null;
+  let transmissao = null; // { info, estado() } enquanto monta uma imagem
   aoSair(() => {
     clearInterval(cronometro);
+    pararTransmissao();
     if (urlImagem) URL.revokeObjectURL(urlImagem);
+  });
+  escutar('estado', () => {
+    if (rt.conectado && transmissao) { transmitir('quebra', transmissao.info); enviarQuadro(transmissao.estado(), true); }
   });
 
   const cab = sub => cabecalho({ titulo: 'Quebra-cabeça', icone: 'peca', voltar: { href: '#/recreacao', texto: 'Recreação' }, sub });
 
   function escolher() {
     clearInterval(cronometro);
+    if (transmissao) { transmissao = null; pararTransmissao(); }
     const grade = h('div', { class: 'qc-fotos' }, h('div', { class: 'carregando-tela' }, h('span', { class: 'giro' })));
     const tamanhos = h('div', { class: 'segmentado' });
     const desenharTamanhos = () => trocar(tamanhos, TAMANHOS.map(t =>
@@ -803,6 +852,7 @@ export function quebraCabeca() {
       const novo = await recortarQuadrado(src);
       if (urlImagem) URL.revokeObjectURL(urlImagem);
       urlImagem = novo;
+      fonteAtual = src;
     } catch {
       aviso('Não consegui abrir essa imagem. Escolha outra.', 'erro');
       escolher();
@@ -832,28 +882,31 @@ export function quebraCabeca() {
     const segundos = () => (comeco ? (Date.now() - comeco) / 1000 : 0);
 
     function desenhar() {
-      trocar(tabuleiro, pecas.map((p, i) => {
-        const lin = Math.floor(p / n);
-        const col = p % n;
-        return h('button', {
-          class: `qc-peca ${selecionada === i ? 'selecionada' : ''}`.trim(),
-          type: 'button',
-          'data-i': i,
-          'aria-label': `Peça ${i + 1}`,
-          style: {
-            backgroundImage: `url("${urlImagem}")`,
-            backgroundSize: `${n * 100}% ${n * 100}%`,
-            backgroundPosition: `${(col / (n - 1)) * 100}% ${(lin / (n - 1)) * 100}%`,
-          },
-        });
-      }));
+      trocar(tabuleiro, pecas.map((p, i) => h('button', {
+        class: `qc-peca ${selecionada === i ? 'selecionada' : ''}`.trim(),
+        type: 'button',
+        'data-i': i,
+        'aria-label': `Peça ${i + 1}`,
+        style: estiloPeca(urlImagem, n, p),
+      })));
+      if (transmissao) enviarQuadro(transmissao.estado(), true);
     }
+
+    // Quem assiste vê a mesma imagem e a posição de cada peça.
+    transmissao = {
+      info: { src: fonteAtual, n, titulo, variante },
+      estado: () => ({ p: pecas, mov: movimentos, seg: Math.round(segundos()), ok: resolvido ? 1 : 0 }),
+    };
+    if (rt.conectado) transmitir('quebra', transmissao.info);
 
     function trocarPecas(a, b) {
       if (resolvido || a === b) return;
       if (!comeco) {
         comeco = Date.now();
-        cronometro = setInterval(() => { tempoEl.textContent = relogio(segundos()); }, 250);
+        cronometro = setInterval(() => {
+          tempoEl.textContent = relogio(segundos());
+          if (transmissao) enviarQuadro(transmissao.estado());
+        }, 1000);
       }
       [pecas[a], pecas[b]] = [pecas[b], pecas[a]];
       movimentos++;
@@ -902,6 +955,7 @@ export function quebraCabeca() {
     async function terminou() {
       resolvido = true;
       clearInterval(cronometro);
+      setTimeout(() => { if (transmissao) enviarQuadro(transmissao.estado(), true); }, 80);
       const s = Math.max(1, Math.round(segundos()));
       tempoEl.textContent = relogio(s);
       tabuleiro.classList.add('resolvido');
@@ -938,6 +992,7 @@ export function quebraCabeca() {
           h('div', { class: 'cobra-placar-linha' },
             h('span', null, icone('relogio'), ' ', tempoEl),
             h('span', null, 'Trocas: ', movEl),
+            contadorPlateia(),
             h('span', { class: 'suave' }, variante)),
           h('div', { class: 'qc-moldura' }, tabuleiro, previa),
           resultado,
@@ -956,6 +1011,160 @@ export function quebraCabeca() {
 
   escolher();
   return raiz;
+}
+
+// Fundo de uma peça do quebra-cabeça: a parte certa da imagem para a peça p.
+function estiloPeca(url, n, p) {
+  const lin = Math.floor(p / n);
+  const col = p % n;
+  return {
+    backgroundImage: `url("${url}")`,
+    backgroundSize: `${n * 100}% ${n * 100}%`,
+    backgroundPosition: `${(col / (n - 1)) * 100}% ${(lin / (n - 1)) * 100}%`,
+  };
+}
+
+/* ─── Assistir quem joga sozinho ──────────────────── */
+
+function assistirCobrinha() {
+  const tela = h('canvas', { class: 'cobra-tela', width: LADO_COBRA, height: LADO_COBRA, 'aria-label': 'Tabuleiro da cobrinha' });
+  const g = tela.getContext('2d');
+  const pontosEl = h('strong', null, '0');
+  const aviso_ = h('div', { class: 'assistir-aviso', hidden: true });
+  desenharCobrinha(g, { cobra: [], comida: null, direcao: [1, 0] });
+  return {
+    el: h('div', { class: 'jogo-area' },
+      h('div', { class: 'cobra-placar-linha' }, h('span', null, 'Cenouras: ', pontosEl)),
+      h('div', { class: 'cobra-moldura' }, tela, aviso_)),
+    quadro(q) {
+      const cobra = [];
+      for (let i = 0; i + 1 < (q.c || []).length; i += 2) cobra.push({ x: q.c[i], y: q.c[i + 1] });
+      desenharCobrinha(g, { cobra, comida: q.f ? { x: q.f[0], y: q.f[1] } : null, direcao: q.d || [1, 0], bateu: !!q.b });
+      pontosEl.textContent = q.pts ?? 0;
+      const texto = { pronto: 'Preparando...', pausado: 'Pausado', fim: `Fim de jogo: ${q.pts} ${q.pts === 1 ? 'cenoura' : 'cenouras'}` }[q.s];
+      aviso_.hidden = !texto;
+      if (texto) aviso_.textContent = texto;
+    },
+    parar() {},
+  };
+}
+
+function assistirQuebra(t) {
+  const info = t.info || {};
+  const n = Math.min(5, Math.max(3, Number(info.n) || 3));
+  const tabuleiro = h('div', { class: 'qc-tabuleiro espectador', style: { '--n': n } });
+  const tempoEl = h('strong', null, '0:00');
+  const movEl = h('strong', null, '0');
+  const aviso_ = h('div', { class: 'assistir-aviso', hidden: true });
+  let url = null;
+  let ultimo = null;
+  let parado = false;
+  const desenhar = q => {
+    if (!url || !Array.isArray(q?.p)) return;
+    trocar(tabuleiro, q.p.map(peca => h('div', { class: 'qc-peca', style: estiloPeca(url, n, peca) })));
+    tabuleiro.classList.toggle('resolvido', !!q.ok);
+  };
+  recortarQuadrado(info.src || '/img/brasao.png')
+    .then(u => { if (parado) { URL.revokeObjectURL(u); return; } url = u; desenhar(ultimo); })
+    .catch(() => { aviso_.hidden = false; aviso_.textContent = 'Não consegui abrir a imagem deste quebra-cabeça.'; });
+  return {
+    el: h('div', { class: 'jogo-area' },
+      h('div', { class: 'cobra-placar-linha' },
+        h('span', null, icone('relogio'), ' ', tempoEl),
+        h('span', null, 'Trocas: ', movEl),
+        h('span', { class: 'suave' }, [info.variante, info.titulo].filter(Boolean).join(' · '))),
+      h('div', { class: 'qc-moldura' }, tabuleiro, aviso_)),
+    quadro(q) {
+      ultimo = q;
+      desenhar(q);
+      tempoEl.textContent = relogio(q.seg || 0);
+      movEl.textContent = q.mov || 0;
+      aviso_.hidden = !q.ok;
+      if (q.ok) aviso_.textContent = 'Montado!';
+    },
+    parar() { parado = true; if (url) URL.revokeObjectURL(url); },
+  };
+}
+
+const TELA_DO_JOGO = { pacman: '#/recreacao/pac-coelho', cobrinha: '#/recreacao/cobrinha', quebra: '#/recreacao/quebra-cabeca' };
+
+export function assistir(id) {
+  exigirAcesso();
+  id = Number(id);
+  lendoChat(!document.hidden);
+  const aoVisibilidade = () => lendoChat(!document.hidden);
+  document.addEventListener('visibilitychange', aoVisibilidade);
+  aoSair(() => { document.removeEventListener('visibilitychange', aoVisibilidade); lendoChat(false); });
+
+  const topo = h('div');
+  const area = h('div', { class: 'assistir-area' }, h('div', { class: 'carregando-tela' }, h('span', { class: 'giro' })));
+  let visor = null;
+  let chave = null;
+  let atual = null;
+  let acabou = false;
+  let pedido = false;
+  const pedir = () => { if (rt.conectado && !pedido) pedido = enviar('solo:assistir', { id }, { silencioso: true }); };
+
+  function desenharTopo() {
+    const t = atual;
+    trocar(topo, cabecalho({
+      titulo: t ? `${t.nome} ${acabou ? 'parou de jogar' : 'está jogando'}` : 'Assistir', icone: 'olho',
+      voltar: { href: '#/recreacao', texto: 'Recreação' },
+      sub: t ? `${t.nomeJogo}${!acabou && t.espectadores > 1 ? ` · ${t.espectadores} pessoas assistindo` : ''}` : 'Conectando...',
+      acoes: t ? [
+        h('a', { class: 'btn', href: `#/pessoa/${t.id}` }, icone('usuario'), h('span', null, 'Ver perfil')),
+        h('a', { class: 'btn btn-ouro', href: TELA_DO_JOGO[t.jogo] }, icone('jogos'), h('span', null, 'Jogar também')),
+      ] : [],
+    }));
+  }
+
+  function montar(t) {
+    atual = t;
+    acabou = false;
+    area.querySelector('.assistir-parou')?.remove();
+    const nova = `${t.jogo}:${JSON.stringify(t.info || {})}`;
+    if (nova !== chave || !visor) {
+      visor?.parar();
+      chave = nova;
+      visor = t.jogo === 'pacman' ? assistirPac() : t.jogo === 'cobrinha' ? assistirCobrinha() : assistirQuebra(t);
+      trocar(area, visor.el);
+    }
+    if (t.quadro) visor.quadro(t.quadro);
+    desenharTopo();
+  }
+
+  escutar('solo:info', ({ t }) => { if (t.id === id) montar(t); });
+  escutar('solo:quadro', ({ id: de, q }) => {
+    if (de !== id || !visor) return;
+    try { visor.quadro(q); } catch (e) { console.error(e); }
+  });
+  escutar('solo:fim', ({ id: de }) => {
+    if (de !== id) return;
+    acabou = true;
+    pedido = false;
+    desenharTopo();
+    if (!area.querySelector('.assistir-parou')) {
+      area.prepend(h('p', { class: 'nota assistir-parou' }, icone('relogio'),
+        h('span', null, `${atual?.nome || 'A pessoa'} saiu do jogo. Se voltar a jogar, a transmissão continua aqui sozinha.`)));
+    }
+  });
+  escutar('transmissoes', () => {
+    const t = rt.transmissoes.find(x => x.id === id);
+    if (t && acabou) pedir();
+    else if (t && atual && !acabou) { atual.espectadores = t.espectadores; desenharTopo(); }
+  });
+  escutar('estado', () => { pedido = false; pedir(); });
+  escutar('erro', ({ mensagem }) => {
+    if (!visor && /não está jogando/.test(mensagem)) {
+      trocar(area, vazio('Essa pessoa não está jogando agora', 'Quando ela começar um jogo, a transmissão aparece aqui e em "Jogando agora" na Recreação.',
+        h('a', { class: 'btn', href: '#/recreacao' }, 'Voltar à Recreação')));
+    }
+  });
+  aoSair(() => { visor?.parar(); enviar('solo:sair', { id }, { silencioso: true }); });
+
+  pedir();
+  desenharTopo();
+  return h('div', { class: 'pagina assistir' }, topo, h('div', { class: 'assistir-grade' }, area, painelChat()));
 }
 
 function embaralhar(total) {

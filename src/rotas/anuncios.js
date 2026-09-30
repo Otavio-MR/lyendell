@@ -2,6 +2,7 @@ const express = require('express');
 const { db } = require('../db');
 const { exigir, exigirLogin, pode, checar } = require('../auth');
 const { anotar } = require('../diario');
+const progresso = require('../progresso');
 const { urlValida, comandoApagarArquivo } = require('../uploads');
 const { erro, linha, texto, idDaRota } = require('../util');
 
@@ -34,6 +35,7 @@ r.post('/', exigir('anuncios.publicar'), async (req, res) => {
   const { id } = await db.run('INSERT INTO anuncios (titulo, conteudo, importancia, imagem, fixado, autor_id, autor_nome) VALUES (?, ?, ?, ?, ?, ?, ?)',
     a.titulo, a.conteudo, a.importancia, a.imagem, fixado, req.usuario.id, req.usuario.nome);
   await anotar(req, 'Publicou um anúncio', a.titulo);
+  await progresso.registrar(req.usuario.id, 'anuncio');
   res.status(201).json({ id });
 });
 

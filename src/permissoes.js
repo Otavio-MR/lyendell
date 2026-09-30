@@ -46,6 +46,9 @@ const CATALOGO = [
     { chave: 'recreacao.moderar', nome: 'Apagar mensagens de outros no chat' },
     { chave: 'recreacao.perguntas', nome: 'Criar e editar as perguntas do quiz' },
   ] },
+  { grupo: 'Trilha sonora', itens: [
+    { chave: 'trilha.gerenciar', nome: 'Adicionar, editar e tirar músicas da trilha sonora' },
+  ] },
 ];
 
 const TODAS = CATALOGO.flatMap(g => g.itens.map(i => i.chave));

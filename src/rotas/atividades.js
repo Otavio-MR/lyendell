@@ -2,6 +2,7 @@ const express = require('express');
 const { db } = require('../db');
 const { exigir, exigirLogin, pode } = require('../auth');
 const { anotar } = require('../diario');
+const progresso = require('../progresso');
 const { erro, linha, texto, idDaRota, inteiro, dataValida } = require('../util');
 
 // Mural de Atividades: a cidade pede algo (ex.: 960 batatas), cada um assume
@@ -190,6 +191,7 @@ r.post('/:id/contribuicoes', exigir('atividades.participar'), async (req, res) =
     ...comandosAjustarStatus(a.id),
   ]);
   await anotar(req, 'Registrou uma entrega', `${quantidade} ${a.item} em "${a.titulo}"`);
+  if (gestor(req, a)) await progresso.registrar(req.usuario.id, 'entrega'); // já nasce conferida
   res.status(201).json({ ok: true });
 });
 
@@ -206,6 +208,7 @@ r.patch('/contribuicoes/:id', async (req, res) => {
   const conferida = req.body?.conferida ? 1 : 0;
   await db.run('UPDATE contribuicoes SET conferida = ? WHERE id = ?', conferida, c.id);
   if (conferida) await anotar(req, 'Conferiu uma entrega', `${c.quantidade} ${a.item} de ${c.usuario_nome}`);
+  if (conferida && !c.conferida) await progresso.registrar(c.usuario_id, 'entrega');
   res.json({ ok: true });
 });
 

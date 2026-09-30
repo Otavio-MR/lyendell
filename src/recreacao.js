@@ -8,6 +8,7 @@ const { db } = require('./db');
 const { usuarioDaRequisicao, sessaoAindaValida } = require('./auth');
 const { texto: limparTexto } = require('./util');
 const quiz = require('./quiz');
+const progresso = require('./progresso');
 
 const ESPERA_MS = Number(process.env.RECREACAO_ESPERA_MS) || 30_000;       // tempo para voltar depois de cair
 const REVALIDAR_MS = Number(process.env.RECREACAO_REVALIDAR_MS) || 120_000; // confere se a sessão ainda vale
@@ -150,6 +151,10 @@ function finalizar(s, resultado, motivo) {
   if (!a || !b) return;
   db.run('INSERT INTO partidas (jogo, jogador1_id, jogador1_nome, jogador2_id, jogador2_nome, vencedor, motivo) VALUES (?, ?, ?, ?, ?, ?, ?)',
     s.jogo, a.id, a.nome, b.id, b.nome, s.empate ? null : s.vencedor + 1, motivo)
+    .then(async () => {
+      for (const p of [a, b]) await progresso.registrar(p.id, 'partida');
+      if (!s.empate) await progresso.registrar(s.jogadores[s.vencedor].id, 'vitoria');
+    })
     .catch(e => console.error('Erro ao guardar partida:', e.message));
 }
 
@@ -175,6 +180,12 @@ function sairDaSala(id, s, motivo = 'abandono') {
 }
 
 // Sempre uma cópia: cada sala marca "saiu" no seu próprio jogador, sem afetar as outras salas.
+// Cor e moldura escolhidas no perfil (aparecem no chat).
+async function visualDe(id) {
+  const v = await db.get('SELECT foto, cor, moldura FROM usuarios WHERE id = ?', id);
+  return { foto: v?.foto || null, cor: v?.cor || null, moldura: v?.moldura || null };
+}
+
 function pessoaDe(u) {
   const p = pessoas.get(u.id);
   return { id: u.id, nome: p?.nome || u.nome, foto: p ? p.foto : u.foto || null };
@@ -263,7 +274,13 @@ function terminarQuiz(s) {
     db.lote(lista.map((c, posicao) => [
       'INSERT INTO quiz_resultados (usuario_id, usuario_nome, pontos, acertos, total, posicao, jogadores) VALUES (?, ?, ?, ?, ?, ?, ?)',
       c.id, c.nome, c.pontos, c.acertos, e.perguntas.length, posicao + 1, lista.length,
-    ])).catch(err => console.error('Erro ao guardar o quiz:', err.message));
+    ])).then(async () => {
+      for (const [posicao, c] of lista.entries()) {
+        if (c.acertos) await progresso.registrar(c.id, 'quiz_acerto', c.acertos);
+        if (lista.length > 1) await progresso.registrar(c.id, 'partida');
+        if (lista.length > 1 && posicao === 0) await progresso.registrar(c.id, 'vitoria');
+      }
+    }).catch(err => console.error('Erro ao guardar o quiz:', err.message));
   }
   enviarSala(s);
   avisarLobby();
@@ -314,6 +331,32 @@ function visaoQuiz(s, id) {
   };
 }
 
+/* ─── Jogos de uma pessoa só, transmitidos ao vivo ─── */
+
+// Quem joga Pac-Coelho, Cobrinha ou Quebra-cabeça manda o estado do jogo algumas vezes por segundo,
+// e o servidor repassa para quem está assistindo. Nada disso vai para o banco.
+const SOLO = { pacman: 'Pac-Coelho', cobrinha: 'Cobrinha', quebra: 'Quebra-cabeça' };
+const transmissoes = new Map(); // id de quem joga -> transmissão
+
+const resumoTransmissoes = () => [...transmissoes.values()].map(t => ({
+  id: t.id, nome: t.nome, foto: t.foto, jogo: t.jogo, nomeJogo: SOLO[t.jogo], espectadores: t.espectadores.size,
+}));
+const avisarTransmissoes = () => paraTodos('transmissoes', { transmissoes: resumoTransmissoes() });
+const avisarPlateia = t => paraUsuario(t.id, 'solo:plateia', { espectadores: t.espectadores.size });
+const infoTransmissao = t => ({
+  id: t.id, nome: t.nome, foto: t.foto, jogo: t.jogo, nomeJogo: SOLO[t.jogo], info: t.info, espectadores: t.espectadores.size,
+  // O mapa das moedas do Pac-Coelho só vem quando muda; quem chega depois recebe o último.
+  quadro: t.quadro ? { ...t.quadro, m: t.moedas ?? t.quadro.m } : null,
+});
+
+function encerrarTransmissao(id) {
+  const t = transmissoes.get(id);
+  if (!t) return;
+  transmissoes.delete(id);
+  for (const e of t.espectadores) paraUsuario(e, 'solo:fim', { id });
+  avisarTransmissoes();
+}
+
 /* ─── O que cada mensagem do navegador faz ────────── */
 
 const acoes = {
@@ -327,7 +370,8 @@ const acoes = {
     envios.set(u.id, recentes);
     const { id } = await db.run('INSERT INTO chat_mensagens (usuario_id, usuario_nome, texto) VALUES (?, ?, ?)', u.id, u.nome, t);
     const msg = await db.get('SELECT * FROM chat_mensagens WHERE id = ?', id);
-    paraTodos('chat:msg', { msg: { ...msg, foto: pessoaDe(u).foto } });
+    paraTodos('chat:msg', { msg: { ...msg, ...(await visualDe(u.id)) } });
+    progresso.registrar(u.id, 'chat');
   },
 
   async 'chat:apagar'(u, { id }) {
@@ -440,6 +484,55 @@ const acoes = {
     const s = salas.get(id);
     if (s) sairDaSala(u.id, s, 'abandono');
   },
+
+  'solo:inicio'(u, { jogo, info }) {
+    if (!SOLO[jogo]) throw new ErroJogo('Jogo desconhecido.');
+    const antes = transmissoes.get(u.id);
+    const mesma = antes && antes.jogo === jogo;
+    if (antes && !mesma) for (const e of antes.espectadores) paraUsuario(e, 'solo:fim', { id: u.id });
+    const t = {
+      id: u.id, nome: u.nome, foto: pessoaDe(u).foto, jogo, info: info && typeof info === 'object' ? info : {},
+      quadro: null, moedas: null, espectadores: mesma ? antes.espectadores : new Set(), ultimo: 0,
+    };
+    transmissoes.set(u.id, t);
+    for (const e of t.espectadores) paraUsuario(e, 'solo:info', { t: infoTransmissao(t) });
+    avisarPlateia(t);
+    avisarTransmissoes();
+  },
+
+  'solo:quadro'(u, { q }) {
+    const t = transmissoes.get(u.id);
+    if (!t || !q || typeof q !== 'object') return;
+    const agora = Date.now();
+    if (agora - t.ultimo < 40) return; // no máximo uns 25 quadros por segundo
+    t.ultimo = agora;
+    if (q.m != null) t.moedas = q.m;
+    t.quadro = q;
+    for (const e of t.espectadores) paraUsuario(e, 'solo:quadro', { id: u.id, q });
+  },
+
+  'solo:fim'(u) {
+    encerrarTransmissao(u.id);
+  },
+
+  'solo:assistir'(u, { id }) {
+    const t = transmissoes.get(Number(id));
+    if (!t) throw new ErroJogo('Essa pessoa não está jogando agora.');
+    if (t.id !== u.id) {
+      t.espectadores.add(u.id);
+      avisarPlateia(t);
+      avisarTransmissoes();
+    }
+    paraUsuario(u.id, 'solo:info', { t: infoTransmissao(t) });
+  },
+
+  'solo:sair'(u, { id }) {
+    const t = transmissoes.get(Number(id));
+    if (t && t.espectadores.delete(u.id)) {
+      avisarPlateia(t);
+      avisarTransmissoes();
+    }
+  },
 };
 
 /* ─── Conexões ────────────────────────────────────── */
@@ -473,13 +566,13 @@ function conectar(ws, usuario, token) {
   });
 
   db.all(`SELECT * FROM (
-      SELECT c.*, u.foto FROM chat_mensagens c LEFT JOIN usuarios u ON u.id = c.usuario_id ORDER BY c.id DESC LIMIT ?
+      SELECT c.*, u.foto, u.cor, u.moldura FROM chat_mensagens c LEFT JOIN usuarios u ON u.id = c.usuario_id ORDER BY c.id DESC LIMIT ?
     ) ORDER BY id`, HISTORICO)
     .then(historico => {
       const minha = salaAtivaDe(id);
       enviar(ws, 'ola', {
         eu: { id, nome: usuario.nome, moderar: usuario.permissoes.has('recreacao.moderar') },
-        online: online(), historico, salas: resumoSalas(), minhaSala: minha ? minha.id : null,
+        online: online(), historico, salas: resumoSalas(), minhaSala: minha ? minha.id : null, transmissoes: resumoTransmissoes(),
       });
       if (minha) enviarSala(minha); // voltou a tempo: a partida continua
     })
@@ -499,6 +592,10 @@ function desconectar(ws) {
   for (const s of salas.values()) {
     if (s.espectadores.delete(id)) enviarSala(s);
   }
+  encerrarTransmissao(id);
+  for (const t of transmissoes.values()) {
+    if (t.espectadores.delete(id)) { avisarPlateia(t); avisarTransmissoes(); }
+  }
   const s = salaAtivaDe(id);
   if (!s) return;
   if (ehGrupo(s)) conferirRespostas(s); // o quiz não fica esperando quem caiu
@@ -511,6 +608,9 @@ function desconectar(ws) {
 }
 
 function iniciarRecreacao(servidor) {
+  // Conquistas, missões e níveis chegam na hora para quem está no site.
+  progresso.definirNotificador((id, notas) => paraUsuario(id, 'progresso', { notas }));
+
   const wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 });
 
   servidor.on('upgrade', async (req, socket, head) => {

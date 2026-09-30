@@ -3,6 +3,7 @@ const { db } = require('../db');
 const { exigir } = require('../auth');
 const { anotar } = require('../diario');
 const { CATEGORIAS } = require('../quiz');
+const progresso = require('../progresso');
 const { erro, inteiro, linha, texto, idDaRota } = require('../util');
 
 const r = express.Router();
@@ -64,6 +65,7 @@ r.post('/recordes', async (req, res) => {
   await db.run('INSERT INTO recordes (jogo, variante, usuario_id, usuario_nome, pontos, detalhe) VALUES (?, ?, ?, ?, ?, ?)',
     jogo, variante, req.usuario.id, req.usuario.nome, pontos, linha(req.body?.detalhe, 60));
   const recorde = antes == null || (menorMelhor ? pontos < antes : pontos > antes);
+  await progresso.registrar(req.usuario.id, 'solo');
   res.status(201).json({ recorde, anterior: antes });
 });
 

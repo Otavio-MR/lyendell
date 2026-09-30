@@ -191,6 +191,17 @@ const ICONES = {
   tesoura: '<circle cx="6" cy="6" r="2.8"/><circle cx="6" cy="18" r="2.8"/><path d="M8.2 7.8 20 19M8.2 16.2 20 5"/>',
   pergunta: '<circle cx="12" cy="12" r="9"/><path d="M9.3 9.4a2.8 2.8 0 1 1 3.9 2.6c-.8.4-1.2 1-1.2 1.8v.5"/><path d="M12 17.2v.3"/>',
   coelho: '<path d="M9.5 10.5C7.8 7.6 7.4 3.6 8.8 3.1s2.9 3.2 3 7"/><path d="M14.5 10.5c1.7-2.9 2.1-6.9.7-7.4s-2.9 3.2-3 7"/><circle cx="12" cy="15" r="6"/><path d="M10 14.2v.3M14 14.2v.3M11 17.3c.6.4 1.4.4 2 0"/>',
+  fogo: '<path d="M12 3c1 3.5 5 5.6 5 10.2a5 5 0 0 1-10 0c0-2.6 1.2-4.2 2.6-5.2.2 1.9 1 3.1 2.2 3.6C11 9 11 6 12 3z"/>',
+  musica: '<path d="M9 18V5.5l11-2V16"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>',
+  play: '<path d="M7.5 4.8v14.4L19 12z"/>',
+  pausa: '<path d="M8.5 5v14M15.5 5v14"/>',
+  proxima: '<path d="M6 5.5l9 6.5-9 6.5z"/><path d="M18.5 5v14"/>',
+  anterior: '<path d="M18 5.5 9 12l9 6.5z"/><path d="M5.5 5v14"/>',
+  volume: '<path d="M4 9.5v5h3.5L13 19V5L7.5 9.5z"/><path d="M16.5 8.8a4.5 4.5 0 0 1 0 6.4"/><path d="M19 6.3a8 8 0 0 1 0 11.4"/>',
+  mudo: '<path d="M4 9.5v5h3.5L13 19V5L7.5 9.5z"/><path d="m16.5 9.5 5 5M21.5 9.5l-5 5"/>',
+  aleatorio: '<path d="M3 7h3.5c2 0 3.3 1 4.5 3l2 4c1.2 2 2.5 3 4.5 3H21"/><path d="M3 17h3.5c1.4 0 2.4-.5 3.3-1.5"/><path d="M14.2 8.5C15.1 7.5 16.1 7 17.5 7H21"/><path d="m18 4 3 3-3 3M18 14l3 3-3 3"/>',
+  paleta: '<path d="M12 3a9 9 0 1 0 0 18c1.2 0 1.8-.9 1.4-2l-.4-1a1.8 1.8 0 0 1 1.7-2.5H17a4 4 0 0 0 4-4C21 6.6 17 3 12 3z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10" cy="7" r="1.2"/><circle cx="14.5" cy="7" r="1.2"/>',
+  presente: '<rect x="3.5" y="9" width="17" height="11" rx="1.5"/><path d="M3 9h18v-3H3zM12 6v14"/><path d="M12 6c-1-2.5-4.5-3.5-5-1.5S9.5 6 12 6zM12 6c1-2.5 4.5-3.5 5-1.5S14.5 6 12 6z"/>',
 };
 export const NOMES_ICONES = Object.keys(ICONES);
 
@@ -233,6 +244,18 @@ export function vazio(titulo, texto, acao) {
 export function avatar(nome, classe = '', foto = null) {
   return h('span', { class: `avatar ${foto ? 'com-foto' : ''} ${classe}`.replace(/\s+/g, ' ').trim(), 'aria-hidden': 'true' },
     foto ? h('img', { src: foto, alt: '', loading: 'lazy' }) : iniciais(nome));
+}
+
+// Foto com a moldura escolhida no perfil (bronze, prata, ouro...). p = { nome, foto, moldura }.
+export function avatarPessoa(p, classe = '') {
+  const el = avatar(p.nome, classe, p.foto);
+  if (p.moldura && p.moldura !== 'simples') el.classList.add('moldura', `moldura-${p.moldura}`);
+  return el;
+}
+
+// Nível no formato "Nv 5" com o título do coelho no balão.
+export function seloNivel(n, classe = '') {
+  return h('span', { class: `selo-nivel ${classe}`.trim(), title: `${n.titulo} · ${n.xp} XP` }, `Nv ${n.nivel}`);
 }
 
 // Recorta o centro da imagem em quadrado e diminui para foto de perfil (256px, uns poucos KB).

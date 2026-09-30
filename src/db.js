@@ -5,6 +5,12 @@ const { hashSenha } = require('./senhas');
 const { CARGOS_PADRAO, DESCRICOES, EXCLUSIVAS } = require('./permissoes');
 const { LIVROS_PADRAO, AJUDA_ABERTURA, CAMPOS_PENA, CAMPO_GUARDAS, CAMPOS_FICHA, FICHAS } = require('./livros-padrao');
 const { PERGUNTAS_PADRAO } = require('./perguntas-padrao');
+
+// Playlists públicas de música medieval no Spotify (pesquisadas em 2026-09).
+const TRILHA_PADRAO = [
+  { tipo: 'spotify', titulo: 'Fantasy Medieval / Tavern Music', autor: 'The Soul of Wind', url: 'playlist/0B6tKmhvX0DWeELJfOzIXZ' },
+  { tipo: 'spotify', titulo: 'Medieval Tavern Music', autor: 'Everrealm Records', url: 'playlist/1clltbVLHs6KxuPMgDXEoD' },
+];
 const { linha, chaveNome } = require('./util');
 
 // Na internet o banco fica no Turso (TURSO_DATABASE_URL + TURSO_AUTH_TOKEN).
@@ -250,6 +256,43 @@ CREATE TABLE IF NOT EXISTS perguntas (
 );
 CREATE INDEX IF NOT EXISTS idx_perguntas_categoria ON perguntas(categoria);
 
+CREATE TABLE IF NOT EXISTS eventos_dia (
+  usuario_id INTEGER NOT NULL,
+  dia TEXT NOT NULL,
+  tipo TEXT NOT NULL,
+  qtd INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (usuario_id, dia, tipo)
+);
+
+CREATE TABLE IF NOT EXISTS conquistas_usuario (
+  usuario_id INTEGER NOT NULL,
+  chave TEXT NOT NULL,
+  em TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (usuario_id, chave)
+);
+
+CREATE TABLE IF NOT EXISTS recados (
+  id INTEGER PRIMARY KEY,
+  perfil_id INTEGER NOT NULL,
+  autor_id INTEGER,
+  autor_nome TEXT NOT NULL,
+  texto TEXT NOT NULL,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_recados_perfil ON recados(perfil_id, id);
+
+CREATE TABLE IF NOT EXISTS musicas (
+  id INTEGER PRIMARY KEY,
+  tipo TEXT NOT NULL,
+  titulo TEXT NOT NULL,
+  autor TEXT NOT NULL DEFAULT '',
+  url TEXT NOT NULL,
+  credito TEXT NOT NULL DEFAULT '',
+  ordem INTEGER NOT NULL DEFAULT 0,
+  criado_por_nome TEXT NOT NULL DEFAULT '',
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS quiz_resultados (
   id INTEGER PRIMARY KEY,
   usuario_id INTEGER,
@@ -274,7 +317,7 @@ CREATE TABLE IF NOT EXISTS diario (
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 10;
+const VERSAO = 11;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -323,6 +366,21 @@ async function migrar() {
   if (versao < 9) await darPermissoes({ 'Família Nobre': ['recreacao.perguntas'] });
   // v10: fichas iguais aos modelos .book da Casa (Moradores, Nobres e o novo Registro de Outros).
   if (versao < 10) await alinharFichas();
+  if (versao < 11) {
+    // v11: perfil personalizável, níveis, conquistas e trilha sonora.
+    const colunas = {
+      titulo_perfil: 'TEXT', bio: 'TEXT', cor: 'TEXT', capa: 'TEXT', moldura: 'TEXT', mc_nick: 'TEXT', emblemas: 'TEXT',
+      xp: 'INTEGER NOT NULL DEFAULT 0', sequencia: 'INTEGER NOT NULL DEFAULT 0', sequencia_max: 'INTEGER NOT NULL DEFAULT 0', ultimo_dia: 'TEXT',
+    };
+    for (const [c, tipo] of Object.entries(colunas)) {
+      if (!await colunaExiste('usuarios', c)) await db.run(`ALTER TABLE usuarios ADD COLUMN ${c} ${tipo}`);
+    }
+    await darPermissoes({ 'Família Nobre': ['trilha.gerenciar'] });
+    // Mensagens que já existiam contam para as conquistas do chat.
+    await db.run(`INSERT INTO eventos_dia (usuario_id, dia, tipo, qtd)
+      SELECT usuario_id, '2000-01-01', 'chat', COUNT(*) FROM chat_mensagens WHERE usuario_id IS NOT NULL GROUP BY usuario_id
+      ON CONFLICT (usuario_id, dia, tipo) DO NOTHING`);
+  }
 
   await db.run("INSERT INTO meta (chave, valor) VALUES ('versao', ?) ON CONFLICT (chave) DO UPDATE SET valor = excluded.valor", String(VERSAO));
 }
@@ -497,6 +555,14 @@ async function semear() {
     await resolverReferencias();
   }
 
+  // A trilha sonora começa com playlists medievais do Spotify (dá para trocar ou apagar na tela da Trilha).
+  if (!await db.get("SELECT valor FROM meta WHERE chave = 'trilha_semeada'")) {
+    await db.lote([
+      ...TRILHA_PADRAO.map((m, i) => ['INSERT INTO musicas (tipo, titulo, autor, url, ordem) VALUES (?, ?, ?, ?, ?)', m.tipo, m.titulo, m.autor, m.url, i]),
+      ["INSERT INTO meta (chave, valor) VALUES ('trilha_semeada', '1')"],
+    ]);
+  }
+
   // As perguntas padrão do quiz entram uma vez só: se alguém apagar todas depois, não voltam.
   if (!await db.get("SELECT valor FROM meta WHERE chave = 'perguntas_semeadas'")) {
     await db.lote([
@@ -532,6 +598,8 @@ async function faxina() {
       AND NOT EXISTS (SELECT 1 FROM fotos WHERE fotos.arquivo = '/uploads/' || arquivos.nome)
       AND NOT EXISTS (SELECT 1 FROM anuncios WHERE anuncios.imagem = '/uploads/' || arquivos.nome)
       AND NOT EXISTS (SELECT 1 FROM usuarios WHERE usuarios.foto = '/uploads/' || arquivos.nome)
+      AND NOT EXISTS (SELECT 1 FROM usuarios WHERE usuarios.capa = '/uploads/' || arquivos.nome)
+      AND NOT EXISTS (SELECT 1 FROM musicas WHERE musicas.url = '/uploads/' || arquivos.nome)
       AND NOT EXISTS (SELECT 1 FROM registros WHERE instr(registros.dados, arquivos.nome) > 0)`);
 }
 

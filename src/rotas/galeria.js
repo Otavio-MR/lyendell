@@ -2,6 +2,7 @@ const express = require('express');
 const { db } = require('../db');
 const { exigir, exigirLogin, pode, checar } = require('../auth');
 const { anotar } = require('../diario');
+const progresso = require('../progresso');
 const { upload, salvarArquivo, comandoApagarArquivo } = require('../uploads');
 const { erro, linha, texto, idDaRota, inteiro } = require('../util');
 
@@ -78,6 +79,7 @@ r.post('/fotos', exigir('galeria.enviar'), upload.single('arquivo'), async (req,
   const { id } = await db.run('INSERT INTO fotos (album_id, titulo, descricao, arquivo, enviado_por, enviado_por_nome) VALUES (?, ?, ?, ?, ?, ?)',
     album, titulo, texto(req.body?.descricao, 500), url, req.usuario.id, req.usuario.nome);
   await anotar(req, 'Enviou uma foto para a galeria', titulo);
+  await progresso.registrar(req.usuario.id, 'foto');
   res.status(201).json({ id });
 });
 

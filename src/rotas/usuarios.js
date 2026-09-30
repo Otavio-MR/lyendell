@@ -61,6 +61,7 @@ const comandosRenomear = (id, nome) => [
   ['UPDATE partidas SET jogador1_nome = ? WHERE jogador1_id = ?', nome, id],
   ['UPDATE partidas SET jogador2_nome = ? WHERE jogador2_id = ?', nome, id],
   ['UPDATE quiz_resultados SET usuario_nome = ? WHERE usuario_id = ?', nome, id],
+  ['UPDATE recados SET autor_nome = ? WHERE autor_id = ?', nome, id],
 ];
 
 async function buscarAlvo(req) {
@@ -167,6 +168,7 @@ r.delete('/:id', exigir('usuarios.remover'), async (req, res) => {
   if (!podeGerenciar(req.usuario, alvo)) throw erro(403, 'Você não pode remover este usuário.');
   // O que a pessoa fez continua registrado, só perde o vínculo com a conta.
   const id = alvo.id;
+  const { capa } = await db.get('SELECT capa FROM usuarios WHERE id = ?', id);
   await db.lote([
     ['DELETE FROM sessoes WHERE usuario_id = ?', id],
     ['DELETE FROM usuario_cargos WHERE usuario_id = ?', id],
@@ -183,8 +185,13 @@ r.delete('/:id', exigir('usuarios.remover'), async (req, res) => {
     ['UPDATE partidas SET jogador1_id = NULL WHERE jogador1_id = ?', id],
     ['UPDATE partidas SET jogador2_id = NULL WHERE jogador2_id = ?', id],
     ['UPDATE quiz_resultados SET usuario_id = NULL WHERE usuario_id = ?', id],
+    ['UPDATE recados SET autor_id = NULL WHERE autor_id = ?', id],
+    ['DELETE FROM recados WHERE perfil_id = ?', id],
+    ['DELETE FROM conquistas_usuario WHERE usuario_id = ?', id],
+    ['DELETE FROM eventos_dia WHERE usuario_id = ?', id],
     ['DELETE FROM usuarios WHERE id = ?', id],
     comandoApagarArquivo(alvo.foto),
+    comandoApagarArquivo(capa),
   ]);
   await anotar(req, 'Removeu um usuário', alvo.nome);
   res.json({ ok: true });

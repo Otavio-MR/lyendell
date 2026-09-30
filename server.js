@@ -26,7 +26,11 @@ app.use((req, res, next) => {
     'X-Versao': VERSAO_SITE,
     'Content-Security-Policy': [
       "default-src 'self'",
-      "img-src 'self' data: blob:",
+      // Cabeça da skin do Minecraft (foto de perfil opcional).
+      "img-src 'self' data: blob: https://mc-heads.net",
+      // Trilha sonora: músicas do próprio site ou links diretos de áudio; playlists do Spotify e do YouTube em janelinha.
+      "media-src 'self' blob: https:",
+      'frame-src https://open.spotify.com https://www.youtube-nocookie.com https://www.youtube.com',
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "script-src 'self'",
@@ -69,6 +73,8 @@ app.use('/api/galeria', require('./src/rotas/galeria'));
 app.use('/api/anuncios', require('./src/rotas/anuncios'));
 app.use('/api/atividades', require('./src/rotas/atividades'));
 app.use('/api/recreacao', require('./src/rotas/recreacao'));
+app.use('/api/pessoas', require('./src/rotas/pessoas'));
+app.use('/api/trilha', require('./src/rotas/trilha'));
 app.use('/api', require('./src/rotas/livros'));
 app.use('/api', require('./src/rotas/geral'));
 app.use('/api', (req, res, next) => next(erro(404, 'Rota não encontrada.')));

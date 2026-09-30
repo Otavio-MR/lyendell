@@ -1,4 +1,5 @@
-import { estado, get, h, icone, chipCargo, barra, num, pacotes, relativo, dataCurta } from '../core.js';
+import { estado, get, h, icone, chipCargo, barra, num, pacotes, relativo, dataCurta, seloNivel, avatarPessoa } from '../core.js';
+import { barraNivel } from './pessoas.js';
 
 function saudacao() {
   const hora = new Date().getHours();
@@ -28,8 +29,55 @@ function avisosDeAprovacao(p = {}) {
   return itens.length ? h('div', { class: 'avisos-inicio' }, itens) : null;
 }
 
+// Nível, sequência de dias e as missões de hoje: o motivo para voltar amanhã.
+function painelProgresso(pr) {
+  const feitas = pr.missoes.filter(m => m.feito >= m.meta).length;
+  return h('section', { class: 'painel progresso-inicio' },
+    h('div', { class: 'progresso-topo' },
+      seloNivel(pr.nivel, 'grande'),
+      h('div', { class: 'progresso-nivel' },
+        h('strong', null, pr.nivel.titulo),
+        barraNivel(pr.nivel)),
+      h('div', { class: 'perfil-sequencia', title: 'Dias seguidos entrando no site' },
+        icone('fogo'), h('strong', null, pr.sequencia), h('small', null, pr.sequencia === 1 ? 'dia seguido' : 'dias seguidos'))),
+    h('div', { class: 'missoes' },
+      h('div', { class: 'missoes-cab' },
+        h('h3', null, icone('tarefas'), 'Missões de hoje'),
+        h('small', { class: 'suave' }, feitas === pr.missoes.length ? 'Todas cumpridas! Amanhã tem mais.' : `${feitas} de ${pr.missoes.length} cumpridas · renovam à meia-noite`)),
+      h('ul', null, pr.missoes.map(m => {
+        const pronta = m.feito >= m.meta;
+        return h('li', { class: `missao ${pronta ? 'pronta' : ''}`.trim() },
+          h('span', { class: 'missao-marca' }, icone(pronta ? 'check' : 'alvo')),
+          h('div', { class: 'missao-texto' },
+            h('span', null, m.texto),
+            m.meta > 1 && !pronta && h('div', { class: 'missao-barra' }, barra(m.feito, m.meta), h('small', null, `${m.feito}/${m.meta}`))),
+          h('span', { class: 'missao-xp' }, `+${m.xp} XP`));
+      }))),
+    h('p', { class: 'progresso-dica suave' }, 'Ganhe XP conversando no chat, jogando, ajudando nas atividades e deixando recados. Subir de nível libera molduras novas para a foto.'));
+}
+
+function painelComunidade(pr) {
+  if (!pr.novidades.length && !pr.semana.length) return null;
+  return h('div', { class: 'inicio-grade' },
+    h('section', { class: 'painel' },
+      h('header', { class: 'painel-cab' }, h('h2', null, icone('estrela'), 'Conquistas recentes'), h('a', { href: '#/comunidade' }, 'Comunidade')),
+      pr.novidades.length
+        ? h('div', { class: 'novidades' }, pr.novidades.map(n => h('a', { class: 'novidade', href: `#/pessoa/${n.id}` },
+          avatarPessoa(n, 'avatar-p'),
+          h('span', null, h('strong', null, n.nome), ' ganhou ', h('strong', { class: 'novidade-conquista' }, icone(n.conquista.icone), n.conquista.nome)),
+          h('small', null, relativo(n.em)))))
+        : h('p', { class: 'painel-vazio' }, 'Ninguém ganhou conquistas ainda.')),
+    h('section', { class: 'painel' },
+      h('header', { class: 'painel-cab' }, h('h2', null, icone('fogo'), 'Mais ativos da semana')),
+      pr.semana.length
+        ? h('ol', { class: 'mini-ranking' }, pr.semana.map(p => h('li', { class: p.id === estado.eu.id ? 'eu-linha' : '' },
+          h('a', { href: `#/pessoa/${p.id}`, class: 'semana-pessoa' }, avatarPessoa(p, 'avatar-p'), h('span', null, p.nome)),
+          h('strong', null, `${num(p.xp)} XP`))))
+        : h('p', { class: 'painel-vazio' }, 'Ainda ninguém nesta semana.')));
+}
+
 export async function inicio() {
-  const d = await get('/api/inicio');
+  const [d, pr] = await Promise.all([get('/api/inicio'), get('/api/auth/progresso').catch(() => null)]);
   const eu = estado.eu;
   const n = d.numeros;
 
@@ -54,6 +102,8 @@ export async function inicio() {
         h('div', { class: 'chips' }, cargos))),
 
     avisosDeAprovacao(d.pendencias),
+
+    pr && painelProgresso(pr),
 
     numeros.length ? h('div', { class: 'numeros' }, numeros.map(x =>
       h('a', { class: 'numero', href: x.href },
@@ -88,6 +138,8 @@ export async function inicio() {
                 pacotes(a.meta, a.pacote) ? ` (${pacotes(a.meta, a.pacote)})` : '',
                 a.prazo ? ` · até ${dataCurta(a.prazo)}` : ''))))
           : h('p', { class: 'painel-vazio' }, 'Nenhuma atividade aberta no momento.'))),
+
+    pr && painelComunidade(pr),
 
     d.fotos && d.fotos.length ? h('section', { class: 'painel' },
       h('header', { class: 'painel-cab' }, h('h2', null, icone('imagem'), 'Da galeria'), h('a', { href: '#/galeria' }, 'Abrir galeria')),
