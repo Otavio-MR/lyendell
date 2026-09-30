@@ -8,8 +8,7 @@ import { atividades, atividade } from './telas/atividades.js';
 import { usuarios, cargos, diario } from './telas/admin.js';
 import { perfil } from './telas/perfil.js';
 import { pessoa, comunidade } from './telas/pessoas.js';
-import { paginaTrilha } from './telas/trilha.js';
-import { painelTrilha, botaoTrilhaTopo, carregarTrilha, pararTudo } from './trilha.js';
+import { radioDoCanto, carregarTrilha, pararTudo } from './trilha.js';
 import { recreacao, sala, cobrinha, quebraCabeca, assistir } from './telas/recreacao.js';
 import { pacCoelho } from './telas/pac-coelho.js';
 import { perguntasQuiz } from './telas/quiz.js';
@@ -24,7 +23,6 @@ const MENU = [
     { rota: '/atividades', nome: 'Mural de Atividades', icone: 'tarefas', perm: ['atividades.ver'] },
     { rota: '/galeria', nome: 'Galeria', icone: 'imagem', perm: ['galeria.ver'] },
     { rota: '/recreacao', nome: 'Recreação', icone: 'jogos', perm: ['recreacao.usar'] },
-    { rota: '/trilha', nome: 'Trilha sonora', icone: 'musica' },
   ] },
   { secao: 'Registros', itens: [
     { rota: '/tabelionato', nome: 'Tabelionato', icone: 'pergaminho', perm: ['tabelionato.ver'] },
@@ -59,7 +57,6 @@ const ROTAS = [
   [/^\/recreacao\/assistir\/(\d+)$/, id => assistir(id)],
   [/^\/comunidade$/, () => comunidade()],
   [/^\/pessoa\/(\d+)$/, id => pessoa(id)],
-  [/^\/trilha$/, () => paginaTrilha()],
   [/^\/perfil$/, () => perfil()],
 ];
 
@@ -161,7 +158,6 @@ function montar() {
       h('img', { src: '/img/brasao.png', alt: '' }),
       h('span', null, h('strong', null, 'Casa Luckham'), h('small', null, 'Lyendell'))),
     nav,
-    painelTrilha(),
     h('div', { class: 'eu' },
       h('a', { class: 'eu-link', href: `#/pessoa/${eu.id}`, title: 'Meu perfil' },
         meuAvatar(),
@@ -172,14 +168,13 @@ function montar() {
   const topo = h('header', { class: 'topo' },
     h('button', { class: 'btn-icone', type: 'button', 'aria-label': 'Abrir menu', onclick: () => alternarMenu(true) }, icone('menu')),
     h('a', { class: 'marca marca-topo', href: '#/' }, h('img', { src: '/img/brasao.png', alt: '' }), h('strong', null, 'Casa Luckham')),
-    h('div', { class: 'topo-direita' },
-      botaoTrilhaTopo(),
-      h('a', { href: `#/pessoa/${eu.id}`, 'aria-label': 'Meu perfil' }, meuAvatar())));
+    h('a', { href: `#/pessoa/${eu.id}`, 'aria-label': 'Meu perfil' }, meuAvatar()));
 
   trocar(app, h('div', { class: 'layout' },
     lateral,
     h('div', { class: 'veu', onclick: () => alternarMenu(false) }),
-    h('div', { class: 'principal' }, topo, h('main', { id: 'tela', class: 'tela' }))));
+    h('div', { class: 'principal' }, topo, h('main', { id: 'tela', class: 'tela' })),
+    radioDoCanto()));
 
   if (pode('recreacao.usar')) ligar();
   carregarTrilha();

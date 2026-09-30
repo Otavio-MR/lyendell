@@ -1267,60 +1267,60 @@ button.emblema.ativo { background: var(--ouro-fundo); border-color: var(--ouro);
 a.online-pessoa { color: var(--texto); border-radius: var(--raio-p); }
 a.online-pessoa:hover { background: var(--sup-2); color: var(--texto); }
 
-/* ─── Trilha sonora ─────────────────────────────── */
-.player { margin: 0 12px 10px; padding: 10px; border-radius: var(--raio-p); background: var(--sup-2); border: 1px solid var(--borda); display: grid; gap: 8px; }
-.player-titulo { display: flex; align-items: center; gap: 10px; min-width: 0; color: var(--texto); }
-.player-titulo:hover { color: var(--ouro-l); }
-.player-titulo > .ico { color: var(--ouro); }
-.player-disco { display: grid; place-items: center; width: 32px; height: 32px; flex: none; border-radius: 50%; background: radial-gradient(circle, var(--sup-3) 30%, #070d09 32%, #1a2b1f 70%); color: var(--ouro); }
-.player-disco .ico { width: 15px; height: 15px; }
-.player-disco.girando { animation: girar 3.5s linear infinite; }
-.player-texto { min-width: 0; display: grid; }
-.player-texto strong { font-size: 0.92rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.player-texto small { font-size: 0.76rem; color: var(--suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.player-botoes { display: flex; align-items: center; justify-content: space-between; }
-.player-botoes .btn-icone { width: 32px; height: 32px; }
-.player-botoes .btn-icone .ico { width: 17px; height: 17px; }
-.player-botoes .btn-icone.ativo { color: var(--ouro-l); background: var(--ouro-fundo); }
-.player-play { background: var(--ouro-fundo); color: var(--ouro-l); }
-.player-volume { width: 100%; accent-color: var(--ouro); height: 16px; }
-.player-externa { justify-content: center; }
-.topo-direita { display: flex; align-items: center; gap: 6px; }
-.topo-musica.ativo { color: var(--ouro-l); background: var(--ouro-fundo); }
-.radio-externa {
-  position: fixed; right: 18px; bottom: 18px; z-index: 180; width: min(380px, calc(100vw - 24px)); border-radius: var(--raio);
-  background: var(--sup-2); border: 1px solid var(--ouro-d); box-shadow: var(--sombra); overflow: hidden; animation: surgir 0.2s ease both;
+/* ─── Trilha sonora: player do canto da tela ────── */
+.radio {
+  position: fixed; right: 18px; bottom: 18px; z-index: 90; width: 300px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 10px 10px 8px 12px;
+  border-radius: var(--raio); background: rgba(14, 22, 17, 0.96); border: 1px solid var(--ouro-d); box-shadow: var(--sombra);
+  backdrop-filter: blur(6px); animation: surgir 0.2s ease both;
 }
-.radio-externa-cab { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 12px; }
-.radio-externa-cab .ico { color: var(--ouro); }
-.radio-externa-cab strong { flex: 1; min-width: 0; font-size: 0.92rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.radio-externa iframe { display: block; width: 100%; border: 0; }
-.radio-externa.spotify iframe { height: 352px; }
-.radio-externa.youtube iframe { aspect-ratio: 16 / 9; min-height: 200px; }
-.trilha-grade { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 18px; align-items: start; margin-bottom: 18px; }
-.trilha-grade .painel + .painel { margin-top: 0; }
-.trilha-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.trilha-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 8px 10px; border-radius: var(--raio-p); background: var(--sup-2); border: 1px solid transparent; }
-.trilha-item.atual { border-color: var(--ouro-d); background: var(--ouro-fundo); }
-.trilha-play { background: var(--sup-3); }
-.trilha-item.atual .trilha-play { background: var(--ouro); color: #1b1403; }
-.trilha-texto { display: grid; min-width: 0; }
-.trilha-texto strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.trilha-texto small { color: var(--suave); font-size: 0.84rem; }
-.trilha-credito { font-style: italic; }
-.trilha-acoes { display: flex; gap: 2px; }
-.trilha-acoes .btn-icone { width: 30px; height: 30px; }
-.trilha-externas { display: grid; gap: 10px; }
-.trilha-externa { position: relative; display: grid; gap: 4px; padding: 12px 14px; border-radius: var(--raio-p); background: var(--sup-2); border: 1px solid var(--borda); }
-.trilha-externa.spotify { border-left: 3px solid #1db954; }
-.trilha-externa.youtube { border-left: 3px solid #e0463a; }
-.trilha-marca { font-family: var(--f-titulo); font-size: 0.62rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--suave); }
-.trilha-externa-botoes { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
-.trilha-externa .trilha-acoes { position: absolute; top: 6px; right: 6px; }
-.trilha-nota { font-size: 0.88rem; margin-top: 12px; }
-.trilha-fontes { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--borda); }
-.trilha-fontes h3 { font-family: var(--f-titulo); font-size: 0.86rem; color: var(--ouro); margin-bottom: 8px; }
-.trilha-fontes ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; color: var(--texto-2); font-size: 0.95rem; }
+.radio.mini { width: auto; padding: 0; border-radius: 50%; background: none; border: 0; box-shadow: none; backdrop-filter: none; }
+.radio-bolinha {
+  display: grid; place-items: center; width: 54px; height: 54px; padding: 0; border-radius: 50%; cursor: pointer;
+  background: var(--sup-2); border: 1px solid var(--ouro-d); box-shadow: var(--sombra); transition: border-color 0.15s, transform 0.15s;
+}
+.radio-bolinha:hover { border-color: var(--ouro); transform: scale(1.06); }
+.radio-bolinha .radio-disco { width: 44px; height: 44px; }
+.radio-bolinha .radio-disco .ico { width: 18px; height: 18px; }
+.radio-cab { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.radio-disco { display: grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: 50%; background: radial-gradient(circle, var(--sup-3) 30%, #070d09 32%, #1a2b1f 70%); color: var(--ouro); }
+.radio-disco .ico { width: 15px; height: 15px; }
+.radio-disco.girando { animation: girar 3.5s linear infinite; }
+.radio-texto { flex: 1; min-width: 0; display: grid; }
+.radio-texto strong { font-size: 0.92rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.radio-texto small { font-size: 0.76rem; color: var(--suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.radio-cab .btn-icone { width: 30px; height: 30px; flex: none; }
+.radio .btn-icone.ativo { color: var(--ouro-l); background: var(--ouro-fundo); }
+.radio-tempo { width: 100%; height: 14px; margin: 0; accent-color: var(--ouro); cursor: pointer; }
+.radio-botoes { display: flex; align-items: center; gap: 2px; }
+.radio-botoes .btn-icone { width: 32px; height: 32px; flex: none; }
+.radio-botoes .btn-icone .ico { width: 17px; height: 17px; }
+.radio-play { background: var(--ouro-fundo); color: var(--ouro-l); }
+.radio-volume { flex: 1; min-width: 0; margin-left: 4px; height: 16px; accent-color: var(--ouro); cursor: pointer; }
+.radio-menu {
+  position: absolute; right: 0; bottom: calc(100% + 8px); width: 320px; max-width: calc(100vw - 24px); display: grid; gap: 8px; padding: 12px;
+  border-radius: var(--raio); background: var(--sup-2); border: 1px solid var(--ouro-d); box-shadow: var(--sombra); animation: surgir 0.15s ease both;
+}
+.radio-menu-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.radio-menu-cab strong { font-family: var(--f-titulo); font-size: 0.86rem; color: var(--ouro); letter-spacing: 0.04em; }
+.radio-menu-cab small, .radio-menu-vazio { color: var(--suave); font-size: 0.84rem; }
+.radio-menu-vazio { margin: 4px 0; }
+.radio-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; max-height: min(320px, 50vh); overflow-y: auto; }
+.radio-item { display: flex; align-items: center; gap: 4px; border-radius: var(--raio-p); }
+.radio-item:hover { background: var(--sup-3); }
+.radio-item.atual { background: var(--ouro-fundo); }
+.radio-item-tocar { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 7px 8px; background: none; border: 0; color: var(--texto); text-align: left; cursor: pointer; font: inherit; }
+.radio-item-tocar > .ico { width: 15px; height: 15px; flex: none; color: var(--suave); }
+.radio-item.atual .radio-item-tocar > .ico { color: var(--ouro-l); }
+.radio-item-tocar > span { min-width: 0; display: grid; }
+.radio-item-tocar strong { font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.radio-item-tocar small { color: var(--suave); font-size: 0.76rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.radio-item .btn-icone { width: 30px; height: 30px; flex: none; }
+.radio-menu-pe { display: grid; gap: 6px; padding-top: 10px; border-top: 1px solid var(--borda); }
+.radio-menu-pe small { color: var(--suave); font-size: 0.78rem; }
+/* Espaço para o player não cobrir o fim da página nem os avisos */
+body.com-radio .tela { padding-bottom: 140px; }
+body.com-radio #toasts { bottom: 122px; }
+body.com-radio.radio-mini #toasts { bottom: 86px; }
 
 /* ─── Assistir quem joga ────────────────────────── */
 .plateia { display: inline-flex; align-items: center; gap: 4px; color: var(--ouro-l); font-size: 0.92rem; }
@@ -1348,10 +1348,11 @@ a.online-pessoa:hover { background: var(--sup-2); color: var(--texto); }
   .marca-topo { padding: 0; gap: 8px; }
   .marca-topo img { width: 34px; height: 34px; }
   .tela { padding: 20px 16px 48px; }
-  .rec-grade, .jogo-solo, .quiz-jogo, .perfil-grade, .trilha-grade, .assistir-grade { grid-template-columns: 1fr; }
+  .rec-grade, .jogo-solo, .quiz-jogo, .perfil-grade, .assistir-grade { grid-template-columns: 1fr; }
   .quiz-placar { position: static; }
   .rec-chat { height: 520px; min-height: 0; }
   .jogo-lateral { position: static; }
+  body.menu-aberto .radio { display: none; }
 }
 
 @media (max-width: 640px) {
@@ -1404,8 +1405,10 @@ a.online-pessoa:hover { background: var(--sup-2); color: var(--texto); }
   .perfil-progresso { padding: 14px 16px; }
   .perfil-emblemas { padding: 0 16px 14px; }
   .comunidade { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
-  .radio-externa { right: 12px; bottom: 12px; }
-  .radio-externa.spotify iframe { height: 152px; }
+  .radio { right: 12px; bottom: 12px; width: calc(100vw - 24px); }
+  .radio.mini { width: auto; }
+  .radio-menu { width: 100%; }
+  body:has(.partida-ativa) .radio { bottom: 78px; }
   .missao { grid-template-columns: auto minmax(0, 1fr); }
   .missao-xp { grid-column: 2; }
   .quiz-alt { min-height: 54px; }

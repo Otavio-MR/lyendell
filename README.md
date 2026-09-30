@@ -171,18 +171,20 @@ A tela de início mostra o progresso, as missões, as conquistas recentes e os m
 
 ## Trilha sonora
 
-Um player na barra lateral toca música medieval enquanto a pessoa navega (no celular, pelo botão
-de música no topo). Na tela **Trilha sonora**, quem tem o poder "Adicionar, editar e tirar
-músicas da trilha sonora" (a Família Nobre e o administrador) pode:
+Um player pequeno no canto da tela toca a trilha enquanto a pessoa navega pelo site (a música não
+para ao trocar de tela). Ele tem tocar/pausar, anterior, próxima, ordem aleatória, volume e a barra
+para avançar; a setinha recolhe o player numa bolinha (no celular ele já começa recolhido).
 
-- **enviar arquivos de música** (MP3, OGG, M4A ou WEBM, até 8 MB): tocam para todos, de graça e
-  sem anúncio, no rádio da Casa;
-- **colar links diretos** de áudio (por exemplo do archive.org);
-- **colar playlists do Spotify ou vídeos e playlists do YouTube**: abrem numa janelinha com o
-  player oficial. No Spotify, quem está logado ouve as músicas inteiras; sem login, só 30 segundos.
+Nos **três pontinhos** fica a lista de músicas (clique para tocar). Quem tem o poder "Adicionar e
+tirar músicas da trilha sonora" (a Família Nobre e o administrador) também vê ali:
 
-O site já vem com duas playlists medievais do Spotify. A tela também indica onde achar música
-medieval grátis (Pixabay Music, Kevin MacLeod e OpenGameArt).
+- **Adicionar música**: escolhe um ou vários arquivos (MP3, OGG, M4A ou WEBM, até 8 MB cada). O
+  título vem do nome do arquivo (`Taverna_do_Coelho.mp3` vira "Taverna do Coelho");
+- a **lixeira** em cada música, que tira a música da trilha e apaga o arquivo do site.
+
+As músicas ficam guardadas no próprio site: tocam inteiras para todo mundo, de graça, sem anúncio e
+sem conta em lugar nenhum. Música medieval grátis para baixar: Kevin MacLeod (incompetech.com, pede
+crédito), OpenGameArt (muitas em domínio público) e Pixabay Music.
 
 ## Onde ficam os dados
 

@@ -153,6 +153,7 @@ const ICONES = {
   voltar: '<path d="m15 5-7 7 7 7"/>',
   frente: '<path d="m9 5 7 7-7 7"/>',
   cima: '<path d="m6 15 6-6 6 6"/>',
+  pontos: '<circle cx="12" cy="5" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/><circle cx="12" cy="19" r="1.3" fill="currentColor"/>',
   baixo: '<path d="m6 9 6 6 6-6"/>',
   menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
   cadeado: '<rect x="4.5" y="10.5" width="15" height="10.5" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/>',

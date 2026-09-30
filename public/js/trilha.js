@@ -1,24 +1,26 @@
-// Trilha sonora: um rádio que continua tocando enquanto a pessoa navega pelo site.
-// As músicas enviadas (ou links diretos de áudio) tocam aqui; playlists do Spotify e do YouTube
-// abrem numa janelinha com o player oficial deles.
+// Trilha sonora: o player do canto da tela, que continua tocando enquanto a pessoa navega pelo site.
+// As músicas são arquivos enviados para o próprio site (grátis e sem conta em lugar nenhum).
+// Nos três pontinhos ficam a lista de músicas e, para quem cuida da trilha, adicionar e tirar músicas.
 
-import { get, h, trocar, icone } from './core.js';
+import { get, api, del, h, trocar, icone, aviso, confirmar } from './core.js';
 
 const CHAVE = 'lyendell-trilha';
+const TAMANHO_MAX = 8 * 1024 * 1024;
+const ACEITA = 'audio/mpeg,audio/ogg,audio/mp4,audio/x-m4a,audio/aac,audio/webm,.mp3,.ogg,.m4a,.webm,.opus';
 const audio = new Audio();
 audio.preload = 'none';
 
 export const trilha = {
-  fila: [],       // músicas que o rádio toca (arquivos e links diretos)
-  externas: [],   // playlists do Spotify e do YouTube
+  fila: [],
   atual: -1,
   tocando: false,
   carregando: false,
   volume: 0.5,
   mudo: false,
   aleatorio: false,
+  mini: false,       // player recolhido numa bolinha
   podeGerenciar: false,
-  externaAberta: null,
+  enviando: null,    // texto do envio em andamento ("Enviando 2 de 3...")
 };
 
 const ouvintes = new Set();
@@ -34,7 +36,7 @@ function lerPreferencias() {
 function salvarPreferencias() {
   try {
     localStorage.setItem(CHAVE, JSON.stringify({
-      volume: trilha.volume, mudo: trilha.mudo, aleatorio: trilha.aleatorio, musica: trilha.fila[trilha.atual]?.id ?? null,
+      volume: trilha.volume, mudo: trilha.mudo, aleatorio: trilha.aleatorio, mini: trilha.mini, musica: trilha.fila[trilha.atual]?.id ?? null,
     }));
   } catch {}
 }
@@ -43,6 +45,8 @@ const pref = lerPreferencias();
 trilha.volume = typeof pref.volume === 'number' ? pref.volume : 0.5;
 trilha.mudo = !!pref.mudo;
 trilha.aleatorio = !!pref.aleatorio;
+// No celular o player começa recolhido para não cobrir a tela.
+trilha.mini = typeof pref.mini === 'boolean' ? pref.mini : matchMedia('(max-width: 640px)').matches;
 audio.volume = trilha.volume;
 audio.muted = trilha.mudo;
 
@@ -50,8 +54,7 @@ export async function carregarTrilha() {
   let dados;
   try { dados = await get('/api/trilha'); } catch { return; }
   const tocandoAntes = trilha.fila[trilha.atual]?.id;
-  trilha.fila = dados.musicas.filter(m => m.tipo === 'arquivo' || m.tipo === 'link');
-  trilha.externas = dados.musicas.filter(m => m.tipo === 'spotify' || m.tipo === 'youtube');
+  trilha.fila = dados.musicas;
   trilha.podeGerenciar = dados.podeGerenciar;
   const procurar = tocandoAntes ?? pref.musica;
   const i = trilha.fila.findIndex(m => m.id === procurar);
@@ -77,7 +80,6 @@ function carregarMusica(i) {
 
 export async function tocar(i = trilha.atual) {
   if (!trilha.fila.length) return;
-  fecharExterna(); // duas músicas ao mesmo tempo não dá
   if (i < 0) i = 0;
   if (i !== trilha.atual || !audio.src) carregarMusica(i);
   trilha.carregando = true;
@@ -129,11 +131,24 @@ export function alternarAleatorio() {
   salvarPreferencias();
   avisar();
 }
-export function pararTudo() {
+function recolher(mini) {
+  trilha.mini = mini;
+  salvarPreferencias();
+  avisar();
+}
+function esvaziarAudio() {
   audio.pause();
   audio.removeAttribute('src');
-  audio.load();
-  fecharExterna();
+  audio.load(); // o load() descarta o evento 'pause' que estava na fila, então o estado muda aqui mesmo
+  trilha.tocando = false;
+  trilha.carregando = false;
+  avisar();
+}
+// Ao sair da conta: para a música e tira o player da tela.
+export function pararTudo() {
+  esvaziarAudio();
+  desmontar?.();
+  desmontar = null;
 }
 
 let errosSeguidos = 0;
@@ -141,9 +156,9 @@ audio.addEventListener('play', () => { trilha.tocando = true; avisar(); });
 audio.addEventListener('pause', () => { trilha.tocando = false; avisar(); });
 audio.addEventListener('playing', () => { errosSeguidos = 0; });
 audio.addEventListener('ended', proxima);
-// Música que não abre (link quebrado): pula para a próxima, sem ficar em volta se todas falharem.
+// Música que não abre: pula para a próxima, sem ficar em volta se todas falharem.
 audio.addEventListener('error', () => {
-  if (!audio.src) return;
+  if (!audio.getAttribute('src')) return;
   errosSeguidos++;
   if (errosSeguidos < trilha.fila.length) proxima();
   else { trilha.tocando = false; avisar(); }
@@ -156,100 +171,199 @@ if ('mediaSession' in navigator) {
   navigator.mediaSession.setActionHandler('previoustrack', anterior);
 }
 
-/* ─── Playlists do Spotify e do YouTube (janelinha) ─── */
+/* ─── Adicionar e tirar músicas ───────────────────── */
 
-export function enderecoExterno(m) {
-  if (m.tipo === 'spotify') return `https://open.spotify.com/embed/${m.url}?utm_source=generator&theme=0`;
-  if (m.url.startsWith('list:')) return `https://www.youtube-nocookie.com/embed/videoseries?list=${m.url.slice(5)}&autoplay=1`;
-  return `https://www.youtube-nocookie.com/embed/${m.url.slice(2)}?autoplay=1`;
-}
-export function linkOriginal(m) {
-  if (m.tipo === 'spotify') return `https://open.spotify.com/${m.url}`;
-  if (m.url.startsWith('list:')) return `https://www.youtube.com/playlist?list=${m.url.slice(5)}`;
-  return `https://www.youtube.com/watch?v=${m.url.slice(2)}`;
-}
-
-export function abrirExterna(m) {
-  pausar();
-  fecharExterna();
-  const janela = h('div', { id: 'radio-externa', class: `radio-externa ${m.tipo}`, role: 'dialog', 'aria-label': m.titulo },
-    h('div', { class: 'radio-externa-cab' },
-      icone('musica'),
-      h('strong', null, m.titulo),
-      h('button', { class: 'btn-icone', type: 'button', title: 'Fechar', 'aria-label': 'Fechar', onclick: fecharExterna }, icone('x'))),
-    h('iframe', {
-      src: enderecoExterno(m), title: m.titulo, loading: 'lazy',
-      allow: 'autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture',
-      referrerpolicy: 'strict-origin-when-cross-origin',
-    }));
-  document.body.append(janela);
-  trilha.externaAberta = m.id;
-  avisar();
+async function adicionar(arquivos) {
+  let certas = 0;
+  for (const [n, arq] of arquivos.entries()) {
+    if (arq.size > TAMANHO_MAX) {
+      aviso(`"${arq.name}" passa de 8 MB. Tente uma versão menor (128 kbps já fica bom).`, 'erro');
+      continue;
+    }
+    trilha.enviando = arquivos.length > 1 ? `Enviando ${n + 1} de ${arquivos.length}...` : 'Enviando...';
+    avisar();
+    const fd = new FormData();
+    fd.append('arquivo', arq);
+    try {
+      await api('POST', '/api/trilha/arquivo', fd);
+      certas++;
+    } catch (e) {
+      aviso(`"${arq.name}": ${e.message}`, 'erro');
+    }
+  }
+  trilha.enviando = null;
+  await carregarTrilha();
+  if (certas) aviso(certas === 1 ? 'Música adicionada à trilha.' : `${certas} músicas adicionadas à trilha.`);
 }
 
-export function fecharExterna() {
-  const j = document.getElementById('radio-externa');
-  if (!j) return;
-  j.remove();
-  trilha.externaAberta = null;
-  avisar();
+async function remover(m) {
+  if (!await confirmar(`Tirar "${m.titulo}" da trilha sonora? O arquivo também é apagado do site.`, { ok: 'Tirar', perigo: true })) return;
+  const eraAtual = musicaAtual()?.id === m.id;
+  const tocava = eraAtual && trilha.tocando;
+  const posicao = trilha.atual;
+  try {
+    await del(`/api/trilha/${m.id}`);
+  } catch (e) {
+    aviso(e.message, 'erro');
+    return;
+  }
+  if (eraAtual) esvaziarAudio();
+  await carregarTrilha();
+  // Tirou a que estava tocando: segue para a que ficou no lugar dela.
+  if (eraAtual) {
+    trilha.atual = trilha.fila.length ? Math.min(posicao, trilha.fila.length - 1) : -1;
+    if (tocava) tocar(trilha.atual);
+    else avisar();
+  }
+  aviso('Música tirada da trilha.');
 }
 
-/* ─── O player da barra lateral ───────────────────── */
+/* ─── O player do canto da tela ───────────────────── */
 
-export function painelTrilha() {
-  const el = h('div', { class: 'player', 'aria-label': 'Trilha sonora' });
-  const volume = h('input', {
-    class: 'player-volume', type: 'range', min: '0', max: '1', step: '0.05', value: String(trilha.volume), 'aria-label': 'Volume',
-    oninput: e => definirVolume(Number(e.target.value)),
+const mmss = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+let barraTempo = null;
+let desmontar = null;
+
+function atualizarTempo() {
+  if (!barraTempo || document.activeElement === barraTempo) return;
+  const d = audio.duration;
+  const ok = Number.isFinite(d) && d > 0;
+  barraTempo.value = ok ? String(Math.round((audio.currentTime / d) * 1000)) : '0';
+  barraTempo.style.setProperty('--p', ok ? `${(audio.currentTime / d) * 100}%` : '0%');
+  barraTempo.title = ok ? `${mmss(audio.currentTime)} de ${mmss(d)}` : '';
+}
+audio.addEventListener('timeupdate', atualizarTempo);
+audio.addEventListener('loadedmetadata', atualizarTempo);
+audio.addEventListener('emptied', atualizarTempo);
+
+export function radioDoCanto() {
+  desmontar?.();
+  let menuAberto = false;
+  const el = h('div', { class: 'radio', role: 'region', 'aria-label': 'Trilha sonora', hidden: true });
+
+  const escolher = h('input', {
+    type: 'file', accept: ACEITA, multiple: true, hidden: true,
+    onchange: e => {
+      const arquivos = [...e.target.files];
+      e.target.value = '';
+      if (arquivos.length) adicionar(arquivos);
+    },
   });
+  // Soltar o controle devolve o teclado para a tela (as setas dos jogos não mexem no volume).
+  const volume = h('input', {
+    class: 'radio-volume', type: 'range', min: '0', max: '1', step: '0.05', 'aria-label': 'Volume',
+    oninput: e => definirVolume(Number(e.target.value)),
+    onchange: e => e.target.blur(),
+  });
+  barraTempo = h('input', {
+    class: 'radio-tempo', type: 'range', min: '0', max: '1000', step: '1', value: '0', 'aria-label': 'Posição na música',
+    oninput: e => {
+      if (Number.isFinite(audio.duration)) audio.currentTime = (Number(e.target.value) / 1000) * audio.duration;
+      e.target.style.setProperty('--p', `${Number(e.target.value) / 10}%`);
+    },
+    onchange: e => { e.target.blur(); atualizarTempo(); },
+  });
+
+  const botao = (ic, rotulo, onclick, classe = '') =>
+    h('button', { class: `btn-icone ${classe}`.trim(), type: 'button', title: rotulo, 'aria-label': rotulo, onclick }, ic);
+  const disco = () => h('span', { class: `radio-disco ${trilha.tocando ? 'girando' : ''}`.trim() }, icone('musica'));
+
+  function linha(m, i) {
+    const atual = i === trilha.atual;
+    return h('li', { class: `radio-item ${atual ? 'atual' : ''}`.trim() },
+      h('button', { class: 'radio-item-tocar', type: 'button', title: `Tocar "${m.titulo}"`, onclick: () => tocar(i) },
+        icone(atual && trilha.tocando ? 'volume' : 'play'),
+        h('span', null, h('strong', null, m.titulo), m.autor && h('small', null, m.autor))),
+      trilha.podeGerenciar && botao(icone('lixo'), `Tirar "${m.titulo}" da trilha`, () => remover(m), 'perigo'));
+  }
+
+  function menu() {
+    const n = trilha.fila.length;
+    return h('div', { class: 'radio-menu' },
+      h('div', { class: 'radio-menu-cab' },
+        h('strong', null, 'Músicas'),
+        n > 0 && h('small', null, `${n} ${n === 1 ? 'música' : 'músicas'}`)),
+      n
+        ? h('ol', { class: 'radio-lista' }, trilha.fila.map(linha))
+        : h('p', { class: 'radio-menu-vazio' }, trilha.podeGerenciar ? 'Nenhuma música ainda. Adicione a primeira!' : 'Nenhuma música ainda.'),
+      trilha.podeGerenciar && h('div', { class: 'radio-menu-pe' },
+        h('button', { class: 'btn btn-ouro btn-pequeno', type: 'button', disabled: !!trilha.enviando, onclick: () => escolher.click() },
+          trilha.enviando ? h('span', { class: 'giro giro-p' }) : icone('mais'),
+          h('span', null, trilha.enviando || 'Adicionar música')),
+        h('small', null, 'Arquivo MP3, OGG, M4A ou WEBM, até 8 MB cada. Dá para escolher várias de uma vez.')));
+  }
 
   function desenhar() {
     const m = musicaAtual();
+    const vazia = !trilha.fila.length;
+    el.hidden = vazia && !trilha.podeGerenciar; // sem música e sem poder adicionar, não há o que mostrar
+    el.classList.toggle('mini', trilha.mini);
+    document.body.classList.toggle('com-radio', !el.hidden);
+    document.body.classList.toggle('radio-mini', !el.hidden && trilha.mini);
     volume.value = String(trilha.mudo ? 0 : trilha.volume);
-    if (!trilha.fila.length) {
-      const primeira = trilha.externas[0];
+
+    if (trilha.mini) {
+      menuAberto = false;
       trocar(el,
-        h('a', { class: 'player-titulo', href: '#/trilha' }, icone('musica'), h('span', null, 'Trilha sonora')),
-        primeira
-          ? h('button', { class: 'btn btn-pequeno player-externa', type: 'button', onclick: () => (trilha.externaAberta ? fecharExterna() : abrirExterna(primeira)) },
-            icone(trilha.externaAberta ? 'x' : 'play'), h('span', null, trilha.externaAberta ? 'Fechar a playlist' : 'Ouvir a playlist'))
-          : h('small', { class: 'suave' }, 'Ainda sem músicas.'));
+        h('button', {
+          class: 'radio-bolinha', type: 'button', 'aria-label': 'Abrir o player da trilha sonora',
+          title: m ? `${trilha.tocando ? 'Tocando' : 'Trilha sonora'}: ${m.titulo}` : 'Trilha sonora', onclick: () => recolher(false),
+        }, disco()),
+        escolher);
       return;
     }
+
+    const rolagem = el.querySelector('.radio-lista')?.scrollTop || 0; // a lista não volta ao topo ao trocar de música
+    const subtitulo = trilha.enviando
+      || (vazia ? 'Nenhuma música ainda' : [m?.autor, `${trilha.atual + 1} de ${trilha.fila.length}`].filter(Boolean).join(' · '));
     trocar(el,
-      h('a', { class: 'player-titulo', href: '#/trilha', title: 'Abrir a trilha sonora' },
-        h('span', { class: `player-disco ${trilha.tocando ? 'girando' : ''}`.trim() }, icone('musica')),
-        h('span', { class: 'player-texto' },
-          h('strong', null, m?.titulo || 'Trilha sonora'),
-          h('small', null, trilha.tocando ? (m?.autor || 'Tocando') : 'Trilha de Lyendell'))),
-      h('div', { class: 'player-botoes' },
-        h('button', { class: 'btn-icone', type: 'button', title: 'Anterior', 'aria-label': 'Anterior', onclick: anterior }, icone('anterior')),
-        h('button', { class: 'btn-icone player-play', type: 'button', title: trilha.tocando ? 'Pausar' : 'Tocar', 'aria-label': trilha.tocando ? 'Pausar' : 'Tocar', onclick: alternar },
-          trilha.carregando ? h('span', { class: 'giro giro-p' }) : icone(trilha.tocando ? 'pausa' : 'play')),
-        h('button', { class: 'btn-icone', type: 'button', title: 'Próxima', 'aria-label': 'Próxima', onclick: proxima }, icone('proxima')),
-        h('button', { class: `btn-icone ${trilha.aleatorio ? 'ativo' : ''}`.trim(), type: 'button', title: 'Ordem aleatória', 'aria-label': 'Ordem aleatória', onclick: alternarAleatorio }, icone('aleatorio')),
-        h('button', { class: 'btn-icone', type: 'button', title: trilha.mudo ? 'Ligar o som' : 'Sem som', 'aria-label': 'Sem som', onclick: alternarMudo }, icone(trilha.mudo ? 'mudo' : 'volume'))),
-      volume);
+      menuAberto && menu(),
+      h('div', { class: 'radio-cab' },
+        disco(),
+        h('div', { class: 'radio-texto' },
+          h('strong', { title: m?.titulo || '' }, m?.titulo || 'Trilha sonora'),
+          h('small', null, subtitulo)),
+        h('button', {
+          class: `btn-icone radio-pontos ${menuAberto ? 'ativo' : ''}`.trim(), type: 'button',
+          title: trilha.podeGerenciar ? 'Músicas (adicionar e tirar)' : 'Músicas', 'aria-label': 'Músicas', 'aria-expanded': String(menuAberto),
+          onclick: () => { menuAberto = !menuAberto; desenhar(); },
+        }, icone('pontos')),
+        botao(icone('baixo'), 'Recolher o player', () => recolher(true))),
+      !vazia && barraTempo,
+      !vazia && h('div', { class: 'radio-botoes' },
+        botao(icone('anterior'), 'Anterior', anterior),
+        botao(trilha.carregando ? h('span', { class: 'giro giro-p' }) : icone(trilha.tocando ? 'pausa' : 'play'),
+          trilha.tocando ? 'Pausar' : 'Tocar', alternar, 'radio-play'),
+        botao(icone('proxima'), 'Próxima', proxima),
+        botao(icone('aleatorio'), trilha.aleatorio ? 'Ordem aleatória (ligada)' : 'Ordem aleatória', alternarAleatorio, trilha.aleatorio ? 'ativo' : ''),
+        botao(icone(trilha.mudo ? 'mudo' : 'volume'), trilha.mudo ? 'Ligar o som' : 'Sem som', alternarMudo),
+        volume),
+      escolher);
+    const lista = el.querySelector('.radio-lista');
+    if (lista) lista.scrollTop = rolagem;
+    atualizarTempo();
   }
-  ouvirTrilha(desenhar);
+
+  // Clicar fora ou apertar Esc fecha os três pontinhos (a confirmação de tirar música não conta como fora).
+  const fora = e => {
+    if (!menuAberto || el.contains(e.target) || e.target.closest?.('.modal-fundo')) return;
+    menuAberto = false;
+    desenhar();
+  };
+  const esc = e => {
+    if (e.key !== 'Escape' || !menuAberto || document.querySelector('.modal-fundo')) return;
+    menuAberto = false;
+    desenhar();
+  };
+  document.addEventListener('pointerdown', fora);
+  document.addEventListener('keydown', esc);
+  const parar = ouvirTrilha(desenhar);
+  desmontar = () => {
+    parar();
+    document.removeEventListener('pointerdown', fora);
+    document.removeEventListener('keydown', esc);
+    document.body.classList.remove('com-radio', 'radio-mini');
+  };
   desenhar();
   return el;
-}
-
-// Botão pequeno do topo (celular): toca e pausa.
-export function botaoTrilhaTopo() {
-  const b = h('button', { class: 'btn-icone topo-musica', type: 'button', 'aria-label': 'Trilha sonora' });
-  const desenhar = () => {
-    b.classList.toggle('ativo', trilha.tocando);
-    b.title = trilha.tocando ? 'Pausar a trilha' : 'Tocar a trilha';
-    trocar(b, icone(trilha.tocando ? 'pausa' : 'musica'));
-  };
-  b.addEventListener('click', () => {
-    if (trilha.fila.length) alternar();
-    else location.hash = '#/trilha';
-  });
-  ouvirTrilha(desenhar);
-  desenhar();
-  return b;
 }

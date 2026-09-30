@@ -5,12 +5,6 @@ const { hashSenha } = require('./senhas');
 const { CARGOS_PADRAO, DESCRICOES, EXCLUSIVAS } = require('./permissoes');
 const { LIVROS_PADRAO, AJUDA_ABERTURA, CAMPOS_PENA, CAMPO_GUARDAS, CAMPOS_FICHA, FICHAS } = require('./livros-padrao');
 const { PERGUNTAS_PADRAO } = require('./perguntas-padrao');
-
-// Playlists públicas de música medieval no Spotify (pesquisadas em 2026-09).
-const TRILHA_PADRAO = [
-  { tipo: 'spotify', titulo: 'Fantasy Medieval / Tavern Music', autor: 'The Soul of Wind', url: 'playlist/0B6tKmhvX0DWeELJfOzIXZ' },
-  { tipo: 'spotify', titulo: 'Medieval Tavern Music', autor: 'Everrealm Records', url: 'playlist/1clltbVLHs6KxuPMgDXEoD' },
-];
 const { linha, chaveNome } = require('./util');
 
 // Na internet o banco fica no Turso (TURSO_DATABASE_URL + TURSO_AUTH_TOKEN).
@@ -317,7 +311,7 @@ CREATE TABLE IF NOT EXISTS diario (
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 11;
+const VERSAO = 12;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -381,6 +375,8 @@ async function migrar() {
       SELECT usuario_id, '2000-01-01', 'chat', COUNT(*) FROM chat_mensagens WHERE usuario_id IS NOT NULL GROUP BY usuario_id
       ON CONFLICT (usuario_id, dia, tipo) DO NOTHING`);
   }
+  // v12: a trilha fica só com músicas em arquivo (sem Spotify, YouTube ou links de fora).
+  if (versao < 12) await db.run("DELETE FROM musicas WHERE tipo <> 'arquivo'");
 
   await db.run("INSERT INTO meta (chave, valor) VALUES ('versao', ?) ON CONFLICT (chave) DO UPDATE SET valor = excluded.valor", String(VERSAO));
 }
@@ -553,14 +549,6 @@ async function semear() {
       l.modulo, l.nome, l.descricao, l.icone, l.aberto, JSON.stringify(l.campos), l.cobranca ? JSON.stringify(l.cobranca) : null, i,
     ]));
     await resolverReferencias();
-  }
-
-  // A trilha sonora começa com playlists medievais do Spotify (dá para trocar ou apagar na tela da Trilha).
-  if (!await db.get("SELECT valor FROM meta WHERE chave = 'trilha_semeada'")) {
-    await db.lote([
-      ...TRILHA_PADRAO.map((m, i) => ['INSERT INTO musicas (tipo, titulo, autor, url, ordem) VALUES (?, ?, ?, ?, ?)', m.tipo, m.titulo, m.autor, m.url, i]),
-      ["INSERT INTO meta (chave, valor) VALUES ('trilha_semeada', '1')"],
-    ]);
   }
 
   // As perguntas padrão do quiz entram uma vez só: se alguém apagar todas depois, não voltam.

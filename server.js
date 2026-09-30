@@ -28,9 +28,8 @@ app.use((req, res, next) => {
       "default-src 'self'",
       // Cabeça da skin do Minecraft (foto de perfil opcional).
       "img-src 'self' data: blob: https://mc-heads.net",
-      // Trilha sonora: músicas do próprio site ou links diretos de áudio; playlists do Spotify e do YouTube em janelinha.
-      "media-src 'self' blob: https:",
-      'frame-src https://open.spotify.com https://www.youtube-nocookie.com https://www.youtube.com',
+      // Trilha sonora: só as músicas enviadas para o próprio site.
+      "media-src 'self' blob:",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "script-src 'self'",
