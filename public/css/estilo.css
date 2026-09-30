@@ -1376,6 +1376,57 @@ body.com-radio.radio-mini #toasts { bottom: 86px; }
 .mapa-num.predio { background: #0b110d; color: var(--ouro-l); border: 1px solid var(--ouro); }
 .mapa-num .ico { width: 14px; height: 14px; }
 
+/* Lig 4 */
+.lig4 { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; width: min(100%, 470px); padding: 10px; border-radius: var(--raio); background: #1a3b5c; box-shadow: inset 0 0 0 2px #2b5580, var(--sombra); }
+.lig4-coluna { display: grid; grid-template-rows: repeat(6, 1fr); gap: 6px; padding: 4px 2px; border: 0; border-radius: 10px; background: none; cursor: default; }
+.lig4.pode .lig4-coluna:not(:disabled) { cursor: pointer; }
+.lig4.pode .lig4-coluna:not(:disabled):hover { background: rgba(255, 255, 255, 0.08); }
+.lig4-casa { display: block; aspect-ratio: 1; border-radius: 50%; background: #0b1a29; box-shadow: inset 0 3px 6px rgba(0, 0, 0, 0.55); }
+.lig4-casa.p0, .lig4-disco.p0 { background: radial-gradient(circle at 35% 30%, #fbe39a, #d8b13a 55%, #9c7a1c); box-shadow: inset 0 -3px 6px rgba(0, 0, 0, 0.3); }
+.lig4-casa.p1, .lig4-disco.p1 { background: radial-gradient(circle at 35% 30%, #f6a08a, #d8674a 55%, #9b3b25); box-shadow: inset 0 -3px 6px rgba(0, 0, 0, 0.3); }
+.lig4-casa.nova { animation: lig4-cair 0.38s cubic-bezier(0.4, 0, 1, 1) both; }
+@keyframes lig4-cair { from { transform: translateY(calc(var(--queda, 1) * -115%)); } 80% { transform: translateY(4%); } to { transform: none; } }
+.lig4-casa.vencedora { outline: 3px solid #ffffff; outline-offset: -3px; animation: piscar 1s ease-in-out 3; }
+.lig4.terminou .lig4-casa.p0:not(.vencedora), .lig4.terminou .lig4-casa.p1:not(.vencedora) { opacity: 0.55; }
+.lig4-disco { display: inline-block; width: 22px; height: 22px; border-radius: 50%; flex: none; }
+
+/* Cobrinha ao vivo */
+.cobras-jogo { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 20px; align-items: start; }
+.cobras-area { display: grid; gap: 12px; justify-items: center; }
+.cobras-moldura { position: relative; width: 100%; max-width: min(800px, calc((100vh - 230px) * 4 / 3)); }
+.cobras-tela { display: block; width: 100%; aspect-ratio: 4 / 3; border-radius: var(--raio); border: 1px solid var(--borda-2); touch-action: none; background: #0c170f; }
+.cobras-aviso {
+  position: absolute; left: 50%; top: 50%; translate: -50% -50%; padding: 12px 22px; border-radius: var(--raio); pointer-events: none; text-align: center;
+  background: rgba(8, 14, 10, 0.88); border: 1px solid var(--ouro-d); font-family: var(--f-titulo); font-size: 1.2rem; color: var(--ouro-l);
+}
+.cobras-aviso.contagem { font-size: 3rem; min-width: 110px; }
+.cobras-dica { font-size: 0.9rem; text-align: center; }
+.cobras-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.cobras-lista li { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--raio-p); background: var(--sup-2); }
+.cobras-lista li.fora { opacity: 0.55; }
+.cobras-lista .coroa { position: static; transform: none; color: var(--ouro); display: inline-grid; }
+.cobras-nome { flex: 1; min-width: 0; display: grid; }
+.cobras-nome strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cobras-nome small { color: var(--suave); font-size: 0.8rem; }
+.cobras-pontos { font-family: var(--f-titulo); color: var(--ouro-l); font-weight: 700; min-width: 24px; text-align: right; }
+.cobras-cor { display: inline-block; width: 14px; height: 14px; border-radius: 4px; flex: none; vertical-align: -1px; }
+
+/* Jogo da Memória */
+.mem-moldura { position: relative; width: 100%; max-width: min(620px, calc((100vh - 260px) * var(--colunas, 4) / var(--linhas, 4) * 0.8)); }
+.mem-grade { display: grid; grid-template-columns: repeat(var(--colunas, 4), minmax(0, 1fr)); gap: 10px; width: 100%; }
+.mem-carta { position: relative; aspect-ratio: 4 / 5; padding: 0; border: 0; background: none; cursor: pointer; transform-style: preserve-3d; transition: transform 0.35s ease; }
+.mem-carta:disabled { cursor: default; }
+.mem-carta.virada, .mem-carta.achada { transform: rotateY(180deg); }
+.mem-verso, .mem-frente { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 10px; backface-visibility: hidden; }
+.mem-verso { background: repeating-linear-gradient(45deg, #1a2b1f 0 8px, #16241a 8px 16px); border: 1px solid var(--ouro-d); color: var(--ouro-d); }
+.mem-verso .ico { width: 38%; height: 38%; opacity: 0.75; }
+.mem-carta:not(:disabled):hover .mem-verso { border-color: var(--ouro); color: var(--ouro); }
+.mem-frente { transform: rotateY(180deg); background: var(--sup-2); border: 1px solid var(--ouro); color: var(--ouro-l); }
+.mem-frente .ico { width: 55%; height: 55%; }
+.mem-carta.achada .mem-frente { border-color: var(--verde); color: #b9e0a4; background: rgba(127, 176, 105, 0.12); }
+.mem-sobre { border-radius: var(--raio); }
+.mem-grade.espectador .mem-carta { cursor: default; }
+
 /* Casas do mapa: ficha, edição e lista */
 .mapa-ficha {
   position: absolute; z-index: 3; width: 290px; max-width: calc(100% - 16px); display: grid; gap: 4px; padding: 12px 14px;
@@ -1387,7 +1438,7 @@ body.com-radio.radio-mini #toasts { bottom: 86px; }
 .mapa-ficha-sit { justify-self: start; font-family: var(--f-titulo); font-size: 0.64rem; letter-spacing: 0.08em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; border: 1px solid; }
 .sit-ocupada { color: #e0bd5a; border-color: rgba(224, 189, 90, 0.5); }
 .sit-comercio { color: #6fc1b5; border-color: rgba(111, 193, 181, 0.5); }
-.sit-sem_dono, .sit-sem_morador { color: #a39d86; border-color: rgba(163, 157, 134, 0.45); }
+.sit-sem_dono { color: #a39d86; border-color: rgba(163, 157, 134, 0.45); }
 .mapa-moradores { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 10px; }
 .mapa-moradores li { display: flex; gap: 10px; align-items: flex-start; }
 .avatar-m { width: 46px; height: 46px; font-size: 0.9rem; flex: none; }
@@ -1425,7 +1476,7 @@ body.com-radio.radio-mini #toasts { bottom: 86px; }
 .mapa-num.casa { width: 26px; font-size: 0.7rem; border-radius: 4px; }
 .mapa-num.casa.sit-ocupada { background: #5c4a1f; border: 1px solid #e0bd5a; color: #fff3d0; }
 .mapa-num.casa.sit-comercio { background: #173f3b; border: 1px solid #6fc1b5; color: #e8fbf7; }
-.mapa-num.casa.sit-sem_dono, .mapa-num.casa.sit-sem_morador { background: #1b201b; border: 1px dashed #77725f; color: #a39d86; }
+.mapa-num.casa.sit-sem_dono { background: #1b201b; border: 1px dashed #77725f; color: #a39d86; }
 
 /* ─── Celular e tablet ──────────────────────────── */
 @media (max-width: 960px) {
@@ -1441,7 +1492,7 @@ body.com-radio.radio-mini #toasts { bottom: 86px; }
   .marca-topo { padding: 0; gap: 8px; }
   .marca-topo img { width: 34px; height: 34px; }
   .tela { padding: 20px 16px 48px; }
-  .rec-grade, .jogo-solo, .quiz-jogo, .perfil-grade, .assistir-grade, .mapa-listas { grid-template-columns: 1fr; }
+  .rec-grade, .jogo-solo, .quiz-jogo, .perfil-grade, .assistir-grade, .mapa-listas, .cobras-jogo { grid-template-columns: 1fr; }
   .quiz-placar { position: static; }
   .rec-chat { height: 520px; min-height: 0; }
   .jogo-lateral { position: static; }

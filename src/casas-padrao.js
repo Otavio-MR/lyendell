@@ -6,7 +6,7 @@ const CASAS_PADRAO = [
   { numero: '02', via: 'av4', lado: 'esquerda', x: 302, y: 125, situacao: 'ocupada', texto: 'Layla Weeslay' },
   { numero: '04', via: 'av4', lado: 'esquerda', x: 302, y: 165, situacao: 'ocupada', texto: 'Casa da Família Lombardi' },
   { numero: '06', via: 'av4', lado: 'esquerda', x: 302, y: 241, situacao: 'ocupada', texto: 'Casa da Família Velkaris' },
-  { numero: '08', via: 'av4', lado: 'esquerda', x: 302, y: 281, situacao: 'sem_morador', texto: '' },
+  { numero: '08', via: 'av4', lado: 'esquerda', x: 302, y: 281, situacao: 'sem_dono', texto: '' },
   { numero: '10', via: 'av4', lado: 'esquerda', x: 302, y: 321, situacao: 'comercio', texto: 'Bar sem dono' },
   { numero: '11', via: 'av4', lado: 'esquerda', x: 302, y: 359, situacao: 'sem_dono', texto: '' },
   { numero: '12', via: 'av4', lado: 'esquerda', x: 302, y: 399, situacao: 'ocupada', texto: 'Castaigne' },

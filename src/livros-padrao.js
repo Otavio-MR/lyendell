@@ -226,6 +226,21 @@ const LIVROS_PADRAO = [
       { id: 'documento', nome: 'Imagem do documento', tipo: 'imagem' },
     ],
   },
+  {
+    modulo: 'leis', nome: 'Leis da Capital', icone: 'balanca', aberto: 1,
+    descricao: 'As leis de Lyendell, feitas pelo Lorde Comandante e pela Família Nobre.',
+    campos: [
+      { id: 'titulo', nome: 'Título', tipo: 'texto', obrigatorio: true, destaque: true, ajuda: 'Ex.: Lei do Toque de Recolher' },
+      { id: 'tipo', nome: 'Tipo', tipo: 'selecao', obrigatorio: true, destaque: true, opcoes: ['Lei', 'Decreto', 'Edital', 'Proibição', 'Imposto', 'Regra', 'Outro'] },
+      { id: 'data', nome: 'Data', tipo: 'data', obrigatorio: true, destaque: true, ajuda: 'Quando a lei foi feita.' },
+      { id: 'autoria', nome: 'Feita por', tipo: 'selecao', destaque: true, opcoes: ['Lorde Comandante', 'Família Nobre', 'Lorde Comandante e Família Nobre'] },
+      { id: 'texto', nome: 'O que diz a lei', tipo: 'texto_longo', obrigatorio: true },
+      { id: 'pena', nome: 'Pena para quem descumprir', tipo: 'texto', ajuda: 'Ex.: multa de 20 Lírios, 2 dias de prisão' },
+      { id: 'vigor', nome: 'Vale a partir de', tipo: 'data' },
+      { id: 'situacao', nome: 'Situação', tipo: 'selecao', destaque: true, opcoes: ['Em vigor', 'Suspensa', 'Revogada'] },
+      { id: 'documento', nome: 'Imagem do documento', tipo: 'imagem' },
+    ],
+  },
 ];
 
 module.exports = { LIVROS_PADRAO, AJUDA_ABERTURA, CAMPOS_PENA, CAMPO_GUARDAS, CAMPOS_FICHA, FICHAS };

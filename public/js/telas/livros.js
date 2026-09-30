@@ -33,6 +33,12 @@ export const MODULOS = {
     quemComanda: 'a Senadora',
     aprovador: 'da Senadora',
   },
+  leis: {
+    titulo: 'Leis da Capital', icone: 'balanca', no: 'nas Leis da Capital', enviam: 'outros cargos',
+    sub: 'As leis de Lyendell, feitas pelo Lorde Comandante e pela Família Nobre.',
+    quemComanda: 'o Lorde Comandante e a Família Nobre',
+    aprovador: 'do Lorde Comandante ou da Família Nobre',
+  },
 };
 
 const ICONES_LIVRO = ['livro', 'casa', 'coroa', 'loja', 'documento', 'alianca', 'chave', 'escudo', 'grades', 'alvo',

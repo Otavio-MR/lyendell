@@ -124,12 +124,12 @@ export function encaixar([x, y]) {
 
 const COMERCIO = /\b(bar|taverna|peixaria|pousada|estalagem|hospedaria|loja|mercado|mercearia|padaria|ferraria|acougue|armazem|oficina|alfaiataria|botica|boticario|farmacia|estabulo|joalheria|carpintaria|restaurante|emporio|feira)\b/;
 
-// "Sem Dono", "Sem Morador", comércio ("Bar sem dono", "Pousada Estrela Cadente") ou quem mora ali.
+// "Sem Dono" ou "Sem Morador" (é a mesma coisa), comércio ("Bar sem dono", "Pousada Estrela Cadente") ou quem mora ali.
 export function classificar(bruto) {
   const texto = String(bruto ?? '').replace(/\s+/g, ' ').trim().replace(/\b([Ff])amilia\b/g, '$1amília');
   const n = normalizar(texto);
   if (!n || /^sem dono$/.test(n)) return { situacao: 'sem_dono', texto: '' };
-  if (/^sem morador(es)?$/.test(n)) return { situacao: 'sem_morador', texto: '' };
+  if (/^sem morador(es)?$/.test(n)) return { situacao: 'sem_dono', texto: '' };
   if (COMERCIO.test(n)) return { situacao: 'comercio', texto };
   return { situacao: 'ocupada', texto };
 }

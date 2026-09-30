@@ -107,9 +107,8 @@ const ESTILO = `
 .m-casa text { font-size: 6.5px; font-weight: 700; text-anchor: middle; fill: #fff3d0; pointer-events: none; }
 .m-sit-ocupada rect { fill: #5c4a1f; stroke: #e0bd5a; }
 .m-sit-comercio rect { fill: #173f3b; stroke: #6fc1b5; }
-.m-sit-sem_dono rect, .m-sit-sem_morador rect { fill: #1b201b; stroke: #77725f; stroke-dasharray: 2.5 1.6; }
-.m-sit-sem_morador rect { stroke: #a08545; }
-.m-sit-sem_dono text, .m-sit-sem_morador text { fill: #a39d86; }
+.m-sit-sem_dono rect { fill: #1b201b; stroke: #77725f; stroke-dasharray: 2.5 1.6; }
+.m-sit-sem_dono text { fill: #a39d86; }
 .m-casa:hover rect, .m-casa.ativa rect { stroke: #ffffff; stroke-width: 2; stroke-dasharray: none; }
 .m-editando .m-casa { cursor: grab; }
 .m-casa.m-arrastada { opacity: 0.85; cursor: grabbing; }
@@ -224,7 +223,7 @@ function desenharMapa() {
     s('text', { class: 'm-legenda', x: 68, y: 251 }, 'Prédios públicos'),
     estrelaCentro(43, 272, 7),
     s('text', { class: 'm-legenda', x: 68, y: 275 }, 'Centro da cidade'),
-    ...[['ocupada', 'Casa com morador', 299], ['comercio', 'Comércio', 323], ['sem_dono', 'Sem dono ou morador', 347]].map(([sit, texto, y]) =>
+    ...[['ocupada', 'Casa com morador', 299], ['comercio', 'Comércio', 323], ['sem_dono', 'Sem dono', 347]].map(([sit, texto, y]) =>
       s('g', {}, s('g', { class: `m-casa m-sit-${sit}`, transform: `translate(43 ${y - 3})`, style: 'cursor:default' },
         s('rect', { x: -7, y: -7, width: 14, height: 14, rx: 2.5 })), s('text', { class: 'm-legenda', x: 68, y }, texto))),
     s('g', { transform: 'translate(101 690)' },
@@ -271,7 +270,7 @@ const ITENS = [
 ];
 const porId = new Map(ITENS.map(i => [i.id, i]));
 
-const SITUACAO = { ocupada: 'Com morador', comercio: 'Comércio', sem_dono: 'Sem dono', sem_morador: 'Sem morador' };
+const SITUACAO = { ocupada: 'Com morador', comercio: 'Comércio', sem_dono: 'Sem dono' };
 
 // Onde fica cada coisa: a via mais perto de um prédio, e os prédios perto de uma via.
 function arredores(item) {
@@ -765,7 +764,7 @@ export async function mapa() {
     const q = normalizar(busca.value.trim());
     const n = sit => casas.filter(c => c.situacao === sit).length;
     resumoCasas.textContent = casas.length
-      ? `${casas.length} casas no mapa: ${n('ocupada')} com morador, ${n('comercio')} comércios, ${n('sem_dono') + n('sem_morador')} sem dono ou morador.`
+      ? `${casas.length} casas no mapa: ${n('ocupada')} com morador, ${n('comercio')} comércios, ${n('sem_dono')} sem dono.`
       : 'Ainda não há casas no mapa.';
     const grupos = [['Avenidas', 'avenida'], ['Ruas', 'rua'], ['Prédios públicos', 'predio']].map(([titulo, tipo]) => [titulo, ITENS.filter(i => i.tipo === tipo)]);
     // As casas só aparecem na lista quando alguém procura (são muitas).

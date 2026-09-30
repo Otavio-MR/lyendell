@@ -16,7 +16,8 @@ r.get('/inicio', async (req, res) => {
   for (const m of Object.keys(MODULOS)) {
     if (pode(req, `${m}.ver`)) tarefas.push(contarModulo(m).then(n => { out.numeros[m] = n; }));
   }
-  if (pode(req, 'congresso.ver')) tarefas.push(novidadesDoCongresso().then(x => { out.congresso = x; }));
+  if (pode(req, 'congresso.ver')) tarefas.push(novidades('congresso').then(x => { out.congresso = x; }));
+  if (pode(req, 'leis.ver')) tarefas.push(novidades('leis').then(x => { out.leis = x; }));
   if (pode(req, 'usuarios.ver')) tarefas.push(db.get('SELECT COUNT(*) AS n FROM usuarios WHERE ativo = 1').then(x => { out.numeros.usuarios = x.n; }));
   if (pode(req, 'galeria.ver')) {
     tarefas.push(db.get('SELECT COUNT(*) AS n FROM fotos').then(x => { out.numeros.fotos = x.n; }));
@@ -37,13 +38,13 @@ r.get('/inicio', async (req, res) => {
   res.json(out);
 });
 
-// As últimas leis e mudanças publicadas no Congresso, para ninguém ficar sem saber.
-async function novidadesDoCongresso() {
+// As últimas publicações do Congresso e das Leis da Capital, para ninguém ficar sem saber.
+async function novidades(modulo) {
   const linhas = await db.all(`
     SELECT r.id, r.livro_id, r.numero, r.dados, COALESCE(r.revisado_em, r.criado_em) AS em, l.nome AS livro, l.campos
     FROM registros r JOIN livros l ON l.id = r.livro_id
-    WHERE l.modulo = 'congresso' AND r.situacao = 'aprovado'
-    ORDER BY COALESCE(r.revisado_em, r.criado_em) DESC, r.id DESC LIMIT 3`);
+    WHERE l.modulo = ? AND r.situacao = 'aprovado'
+    ORDER BY COALESCE(r.revisado_em, r.criado_em) DESC, r.id DESC LIMIT 3`, modulo);
   return linhas.map(x => {
     const campos = JSON.parse(x.campos);
     const dados = JSON.parse(x.dados);

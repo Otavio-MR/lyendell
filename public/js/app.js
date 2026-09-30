@@ -10,7 +10,7 @@ import { perfil } from './telas/perfil.js';
 import { pessoa, comunidade } from './telas/pessoas.js';
 import { mapa } from './telas/mapa.js';
 import { radioDoCanto, carregarTrilha, pararTudo } from './trilha.js';
-import { recreacao, sala, cobrinha, quebraCabeca, assistir } from './telas/recreacao.js';
+import { recreacao, sala, cobrinha, quebraCabeca, assistir, memoria } from './telas/recreacao.js';
 import { pacCoelho } from './telas/pac-coelho.js';
 import { perguntasQuiz } from './telas/quiz.js';
 
@@ -23,6 +23,7 @@ const MENU = [
     { rota: '/mapa', nome: 'Mapa de Lyendell', icone: 'mapa' },
     { rota: '/anuncios', nome: 'Mural de Anúncios', icone: 'megafone', perm: ['anuncios.ver'] },
     { rota: '/congresso', nome: 'Congresso', icone: 'coluna', perm: ['congresso.ver'] },
+    { rota: '/leis', nome: 'Leis da Capital', icone: 'balanca', perm: ['leis.ver'] },
     { rota: '/atividades', nome: 'Mural de Atividades', icone: 'tarefas', perm: ['atividades.ver'] },
     { rota: '/galeria', nome: 'Galeria', icone: 'imagem', perm: ['galeria.ver'] },
     { rota: '/recreacao', nome: 'Recreação', icone: 'jogos', perm: ['recreacao.usar'] },
@@ -45,11 +46,12 @@ const ROTAS = [
   [/^\/atividades$/, () => atividades()],
   [/^\/atividades\/(\d+)$/, id => atividade(id)],
   [/^\/galeria(?:\/(\d+|sem-album))?$/, album => galeria(album)],
-  [/^\/(tabelionato|guarda|hospital|congresso)$/, m => modulo(m)],
-  [/^\/(tabelionato|guarda|hospital|congresso)\/aprovacoes$/, m => aprovacoes(m)],
-  [/^\/(tabelionato|guarda|hospital|congresso)\/envios$/, m => envios(m)],
-  [/^\/(tabelionato|guarda|hospital|congresso)\/(\d+)$/, (m, id) => livro(m, id)],
-  [/^\/(tabelionato|guarda|hospital|congresso)\/(\d+)\/registro\/(\d+)$/, (m, id, reg) => livro(m, id, reg)],
+  [/^\/(tabelionato|guarda|hospital|congresso|leis)$/, m => modulo(m)],
+  [/^\/(tabelionato|guarda|hospital|congresso|leis)\/aprovacoes$/, m => aprovacoes(m)],
+  [/^\/(tabelionato|guarda|hospital|congresso|leis)\/envios$/, m => envios(m)],
+  [/^\/(tabelionato|guarda|hospital|congresso|leis)\/(\d+)$/, (m, id) => livro(m, id)],
+  [/^\/(tabelionato|guarda|hospital|congresso|leis)\/(\d+)\/registro\/(\d+)$/, (m, id, reg) => livro(m, id, reg)],
+  [/^\/recreacao\/memoria$/, () => memoria()],
   [/^\/admin\/usuarios$/, () => usuarios()],
   [/^\/admin\/cargos$/, () => cargos()],
   [/^\/admin\/diario$/, () => diario()],

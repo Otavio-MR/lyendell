@@ -421,6 +421,7 @@ function capaDoModulo(nomeModulo) {
   if (n.includes('guarda')) return { cor: '4', cabecalho: [centralizar('GUARDA DO COELHO'), TABELIONATO[1]] };
   if (n.includes('hospital')) return { cor: '3', cabecalho: [centralizar('HOSPITAL'), TABELIONATO[1]] };
   if (n.includes('congresso')) return { cor: '1', cabecalho: [centralizar('CONGRESSO'), ''] };
+  if (n.includes('leis')) return { cor: '5', cabecalho: [centralizar('LEIS DA'), centralizar('CAPITAL')] };
   return { cor: '2', cabecalho: TABELIONATO };
 }
 

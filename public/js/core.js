@@ -165,6 +165,8 @@ export const ICONES = {
   alvo: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r=".8"/>',
   balanca: '<path d="M12 3v18M7 21h10M5 7h14"/><path d="m5 7-3 6a3 3 0 0 0 6 0z"/><path d="m19 7-3 6a3 3 0 0 0 6 0z"/>',
   cruz: '<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M12 7.5v9M7.5 12h9"/>',
+  cartas: '<rect x="3" y="6" width="11" height="15" rx="2"/><path d="M8 3.5h11a2 2 0 0 1 2 2V17"/><path d="m8.5 11.5 1 2 1-2-1-2z"/>',
+  lig4: '<rect x="3" y="4" width="18" height="15" rx="2"/><circle cx="8" cy="9" r="1.6"/><circle cx="12" cy="9" r="1.6"/><circle cx="16" cy="9" r="1.6"/><circle cx="8" cy="14" r="1.6"/><circle cx="12" cy="14" r="1.6"/><circle cx="16" cy="14" r="1.6"/><path d="M5 19v2M19 19v2"/>',
   coluna: '<path d="M3 21h18M4.5 18h15M3.5 9.5h17L12 4z"/><path d="M6 9.5V18M10 9.5V18M14 9.5V18M18 9.5V18"/>',
   mapa: '<path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/>',
   moeda: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="5.5"/><path d="M12 9.5v5"/>',

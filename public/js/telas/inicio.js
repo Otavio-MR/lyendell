@@ -56,18 +56,18 @@ function painelProgresso(pr) {
     h('p', { class: 'progresso-dica suave' }, 'Ganhe XP conversando no chat, jogando, ajudando nas atividades e deixando recados. Subir de nível libera molduras novas para a foto.'));
 }
 
-// As últimas leis e mudanças votadas no Congresso: todo mundo precisa saber o que mudou.
-function painelCongresso(lista) {
+// As últimas publicações do Congresso e das Leis da Capital: todo mundo precisa saber o que mudou.
+function painelNovidades(lista, { titulo, icone: ic, href }) {
   if (!lista?.length) return null; // sem nada publicado ainda, o painel nem aparece
   const classe = t => ({ aprovada: 'lei-aprovada', rejeitada: 'lei-rejeitada' })[normalizar(t)] || '';
   return h('section', { class: 'painel' },
-    h('header', { class: 'painel-cab' }, h('h2', null, icone('coluna'), 'Novidades do Congresso'), h('a', { href: '#/congresso' }, 'Ver tudo')),
-    h('div', { class: 'lista-simples' }, lista.map(x => h('a', { class: 'anuncio-mini lei-mini', href: `#/congresso/${x.livro_id}` },
+    h('header', { class: 'painel-cab' }, h('h2', null, icone(ic), titulo), h('a', { href }, 'Ver tudo')),
+    h('div', { class: 'lista-simples' }, lista.map(x => h('a', { class: 'anuncio-mini lei-mini', href: `${href}/${x.livro_id}/registro/${x.id}` },
       h('div', { class: 'anuncio-mini-topo' },
         x.etiquetas.map((t, i) => h('span', { class: `etiqueta ${i === 0 ? 'etiqueta-ouro' : classe(t)}`.trim() }, t))),
       h('strong', null, x.titulo),
       x.resumo && h('p', null, x.resumo),
-      h('small', null, x.data ? `Votada em ${dataCurta(x.data)}` : `Publicada ${relativo(x.em)}`, x.numero ? ` · nº ${x.numero}` : '')))));
+      h('small', null, x.data ? `${href === '#/leis' ? 'Feita' : 'Votada'} em ${dataCurta(x.data)}` : `Publicada ${relativo(x.em)}`, x.numero ? ` · nº ${x.numero}` : '')))));
 }
 
 function painelComunidade(pr) {
@@ -99,7 +99,8 @@ export async function inicio() {
     n.tabelionato != null && { rotulo: 'Registros no Tabelionato', valor: n.tabelionato, icone: 'pergaminho', href: '#/tabelionato' },
     n.guarda != null && { rotulo: 'Registros da Guarda', valor: n.guarda, icone: 'escudo', href: '#/guarda' },
     n.hospital != null && { rotulo: 'Registros do Hospital', valor: n.hospital, icone: 'cruz', href: '#/hospital' },
-    n.congresso != null && { rotulo: 'Leis e mudanças', valor: n.congresso, icone: 'coluna', href: '#/congresso' },
+    n.congresso != null && { rotulo: 'Votações no Congresso', valor: n.congresso, icone: 'coluna', href: '#/congresso' },
+    n.leis != null && { rotulo: 'Leis da Capital', valor: n.leis, icone: 'balanca', href: '#/leis' },
     n.atividades != null && { rotulo: 'Atividades abertas', valor: n.atividades, icone: 'tarefas', href: '#/atividades' },
     n.fotos != null && { rotulo: 'Fotos na galeria', valor: n.fotos, icone: 'imagem', href: '#/galeria' },
     n.usuarios != null && { rotulo: 'Usuários ativos', valor: n.usuarios, icone: 'usuarios', href: '#/admin/usuarios' },
@@ -119,7 +120,9 @@ export async function inicio() {
 
     avisosDeAprovacao(d.pendencias),
 
-    painelCongresso(d.congresso),
+    painelNovidades(d.leis, { titulo: 'Novas leis da Capital', icone: 'balanca', href: '#/leis' }),
+
+    painelNovidades(d.congresso, { titulo: 'Novidades do Congresso', icone: 'coluna', href: '#/congresso' }),
 
     pr && painelProgresso(pr),
 

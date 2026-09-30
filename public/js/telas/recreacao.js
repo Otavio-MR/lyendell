@@ -1,4 +1,4 @@
-// Recreação: salão com chat e partidas ao vivo, e os jogos de uma pessoa só (Pac-Coelho, cobrinha e quebra-cabeça).
+// Recreação: salão com chat e partidas ao vivo, e os jogos de uma pessoa só (Pac-Coelho, cobrinha, quebra-cabeça e memória).
 
 import { h, trocar, icone, botao, botaoIcone, cabecalho, vazio, avatar, avatarPessoa, aviso, confirmar, get, post, pode, aoSair, dataHora, estado, num } from '../core.js';
 import { rt, ouvir, enviar, lendoChat, criarPartida, entrarNaPartida, transmitir, enviarQuadro, pararTransmissao } from '../tempo-real.js';
@@ -8,15 +8,18 @@ import { abrirSalaQuiz, telaQuiz, teclaQuiz } from './quiz.js';
 const AO_VIVO = [
   { id: 'quiz', nome: 'Quiz de Lyendell', icone: 'pergunta', texto: 'Perguntas sobre a Casa Luckham, coelhos, Minecraft e regras de RP. Até 10 pessoas.', abrir: abrirSalaQuiz, botao: 'Abrir sala' },
   { id: 'velha', nome: 'Jogo da Velha', icone: 'velha', texto: 'Três em linha, contra outro morador.' },
+  { id: 'cobras', nome: 'Cobrinha ao vivo', icone: 'cobra', texto: 'De 2 a 4 cobras no mesmo tabuleiro. Quem bater sai; vence quem sobrar.', botao: 'Abrir sala' },
   { id: 'ppt', nome: 'Pedra, Papel e Tesoura', icone: 'tesoura', texto: 'Melhor de três. A mão do outro só aparece quando os dois escolhem.' },
+  { id: 'lig4', nome: 'Lig 4', icone: 'lig4', texto: 'Solte as peças e faça quatro em linha antes do outro.' },
 ];
 const SOZINHO = [
   { href: '#/recreacao/pac-coelho', nome: 'Pac-Coelho', icone: 'coelho', texto: 'Coma as moedas, fuja das raposas e pegue a cenoura.' },
   { href: '#/recreacao/cobrinha', nome: 'Cobrinha', icone: 'cobra', texto: 'Coma as cenouras sem bater nas bordas nem em si mesma.' },
   { href: '#/recreacao/quebra-cabeca', nome: 'Quebra-cabeça', icone: 'peca', texto: 'Monte uma foto da galeria no menor tempo.' },
+  { href: '#/recreacao/memoria', nome: 'Jogo da Memória', icone: 'cartas', texto: 'Ache os pares com o menor número de jogadas.' },
 ];
-const ICONE_JOGO = { velha: 'velha', ppt: 'tesoura', quiz: 'pergunta' };
-const ICONE_SOLO = { pacman: 'coelho', cobrinha: 'cobra', quebra: 'peca' };
+const ICONE_JOGO = { velha: 'velha', ppt: 'tesoura', quiz: 'pergunta', lig4: 'lig4', cobras: 'cobra' };
+const ICONE_SOLO = { pacman: 'coelho', cobrinha: 'cobra', quebra: 'peca', memoria: 'cartas' };
 const MAOS = { pedra: 'Pedra', papel: 'Papel', tesoura: 'Tesoura' };
 const VENCE = { pedra: 'tesoura', papel: 'pedra', tesoura: 'papel' };
 const VERBO = { pedra: 'quebra', papel: 'embrulha', tesoura: 'corta' };
@@ -92,7 +95,7 @@ export function recreacao() {
   }
 
   function textoMinhaSala(m) {
-    if (m.grupo) return m.status === 'esperando' ? `Você está na sala do ${m.nomeJogo} (${m.jogadores.length} de ${m.max}), esperando começar.` : `Você está jogando o ${m.nomeJogo}.`;
+    if (m.grupo) return m.status === 'esperando' ? `Você está na sala de ${m.nomeJogo} (${m.jogadores.length} de ${m.max}), esperando começar.` : `Você está jogando ${m.nomeJogo}.`;
     return m.status === 'esperando' ? `Sua partida de ${m.nomeJogo} está esperando um adversário.` : `Você está numa partida de ${m.nomeJogo}.`;
   }
 
@@ -265,7 +268,9 @@ function painelRanking() {
   let dados = null;
   let aba = 'quiz';
   let tamanho = '3x3';
-  const ABAS = [['quiz', 'Quiz'], ['velha', 'Jogo da Velha'], ['ppt', 'Pedra, Papel e Tesoura'], ['pacman', 'Pac-Coelho'], ['cobrinha', 'Cobrinha'], ['quebra', 'Quebra-cabeça']];
+  let tamanhoMem = '4x4';
+  const ABAS = [['quiz', 'Quiz'], ['cobras', 'Cobrinha ao vivo'], ['velha', 'Jogo da Velha'], ['ppt', 'Pedra, Papel e Tesoura'], ['lig4', 'Lig 4'],
+    ['pacman', 'Pac-Coelho'], ['cobrinha', 'Cobrinha'], ['quebra', 'Quebra-cabeça'], ['memoria', 'Memória']];
   const eu = estado.eu.nome;
 
   function tabela(cols, linhas) {
@@ -281,7 +286,7 @@ function painelRanking() {
   function desenhar() {
     if (!dados) return;
     let conteudo;
-    if (aba === 'velha' || aba === 'ppt') {
+    if (aba === 'velha' || aba === 'ppt' || aba === 'lig4') {
       conteudo = tabela([['Vitórias', l => l.vitorias], ['Derrotas', l => l.derrotas], ['Empates', l => l.empates]], dados[aba]);
     } else if (aba === 'quiz') {
       conteudo = [
@@ -292,6 +297,14 @@ function painelRanking() {
       conteudo = tabela([['Pontos', l => num(l.pontos)]], dados.pacman);
     } else if (aba === 'cobrinha') {
       conteudo = tabela([['Cenouras', l => l.pontos]], dados.cobrinha);
+    } else if (aba === 'cobras') {
+      conteudo = tabela([['Vitórias', l => l.vitorias], ['Partidas', l => l.partidas], ['Cenouras', l => l.cenouras]], dados.cobras);
+    } else if (aba === 'memoria') {
+      conteudo = [
+        h('div', { class: 'segmentado ranking-tamanhos' }, Object.keys(MEMORIA).map(t =>
+          h('button', { class: `seg ${t === tamanhoMem ? 'ativo' : ''}`, type: 'button', onclick: () => { tamanhoMem = t; desenhar(); } }, t))),
+        tabela([['Jogadas', l => l.jogadas]], dados.memoria[tamanhoMem]),
+      ];
     } else {
       conteudo = [
         h('div', { class: 'segmentado ranking-tamanhos' }, TAMANHOS.map(t =>
@@ -336,6 +349,11 @@ export function sala(id) {
         : h('div', { class: 'carregando-tela' }, h('span', { class: 'giro' })));
       return;
     }
+    if (s.jogo === 'cobras') {
+      trocar(raiz, telaCobras(s));
+      if (!document.hidden) tituloOriginal();
+      return;
+    }
     if (s.grupo) {
       trocar(raiz, telaQuiz(s, acoesQuiz));
       if (!document.hidden) tituloOriginal();
@@ -367,7 +385,7 @@ export function sala(id) {
               ? 'A partida aparece para todos no salão da Recreação. Assim que alguém entrar, ela começa.'
               : 'Assim que alguém entrar, a partida começa.'),
             !jogador && !rt.minhaSala && botao('Entrar nesta partida', { classe: 'btn-ouro', onclick: () => entrarNaPartida(s.id) }))
-          : s.jogo === 'velha' ? tabuleiroVelha(s) : mesaPpt(s),
+          : s.jogo === 'velha' ? tabuleiroVelha(s) : s.jogo === 'lig4' ? tabuleiroLig4(s) : mesaPpt(s),
         rodape(s, outro),
         s.espectadores > 0 && h('p', { class: 'espectadores' }, icone('olho'), `${s.espectadores} ${s.espectadores === 1 ? 'pessoa assistindo' : 'pessoas assistindo'}`)));
     if (!document.hidden) tituloOriginal();
@@ -379,10 +397,11 @@ export function sala(id) {
   function cartaoJogador(s, i) {
     const p = s.jogadores[i];
     const e = s.estado;
-    const vez = s.status === 'jogando' && s.jogo === 'velha' && e?.vez === i;
+    const vez = s.status === 'jogando' && (s.jogo === 'velha' || s.jogo === 'lig4') && e?.vez === i;
     const venceu = s.status === 'fim' && s.vencedor === i;
     let detalhe = null;
     if (s.jogo === 'velha' && e) detalhe = h('span', { class: `simbolo ${e.simbolos[i].toLowerCase()}` }, desenho(e.simbolos[i]));
+    if (s.jogo === 'lig4') detalhe = h('span', { class: `lig4-disco p${i}`, title: i === 0 ? 'Peças douradas' : 'Peças vermelhas' });
     if (s.jogo === 'ppt' && e && s.status === 'jogando') detalhe = h('span', { class: `escolheu ${e.escolheu[i] ? 'sim' : ''}` }, e.escolheu[i] ? icone('check') : h('span', { class: 'pontinhos' }, '...'));
     let situacao = i === s.eu ? 'Você' : '';
     if (p.saiu) situacao = 'Saiu';
@@ -403,14 +422,14 @@ export function sala(id) {
   function minhaVez(s) {
     if (s.eu < 0 || s.status !== 'jogando') return false;
     if (s.grupo) return s.estado?.fase === 'pergunta' && s.estado.minha == null && !s.jogadores[s.eu].saiu;
-    return s.jogo === 'velha' ? s.estado.vez === s.eu : !s.estado.minha;
+    return s.jogo === 'velha' || s.jogo === 'lig4' ? s.estado.vez === s.eu : !s.estado.minha;
   }
 
   function textoStatus(s) {
     const nome = i => (i === s.eu ? 'Você' : s.jogadores[i]?.nome);
     if (s.status === 'esperando') return s.eu >= 0 ? 'Esperando alguém entrar...' : `${s.jogadores[0].nome} está esperando um adversário.`;
     if (s.status === 'jogando') {
-      if (s.jogo === 'velha') {
+      if (s.jogo === 'velha' || s.jogo === 'lig4') {
         const v = s.estado.vez;
         if (v === s.eu) return 'Sua vez!';
         return `Vez de ${s.jogadores[v].nome}`;
@@ -419,7 +438,7 @@ export function sala(id) {
       if (s.eu < 0) return `Rodada ${n}`;
       return s.estado.minha ? `Rodada ${n} · esperando ${s.jogadores[1 - s.eu].nome} escolher...` : `Rodada ${n} · escolha a sua mão!`;
     }
-    if (s.empate) return s.jogo === 'velha' ? 'Deu velha! Empate.' : 'Empate.';
+    if (s.empate) return s.jogo === 'velha' ? 'Deu velha! Empate.' : s.jogo === 'lig4' ? 'Tabuleiro cheio! Empate.' : 'Empate.';
     const perdedor = 1 - s.vencedor;
     if (s.motivo === 'abandono') return `${nome(perdedor)} ${perdedor === s.eu ? 'desistiu' : 'saiu da partida'}. ${s.vencedor === s.eu ? 'Vitória sua!' : `${nome(s.vencedor)} venceu.`}`;
     if (s.motivo === 'caiu') return `${nome(perdedor)} caiu e não voltou a tempo. ${s.vencedor === s.eu ? 'Vitória sua!' : `${nome(s.vencedor)} venceu.`}`;
@@ -474,6 +493,178 @@ export function sala(id) {
           h('span', { class: 'suave' }, r.vencedor == null ? 'empate' : nomes[r.vencedor])))));
   }
 
+  // Lig 4: sete colunas; clicar numa coluna (ou apertar 1 a 7) solta a peça, que cai até embaixo.
+  function tabuleiroLig4(s) {
+    const e = s.estado;
+    const podeJogar = minhaVez(s);
+    return h('div', { class: `lig4 ${podeJogar ? 'pode' : ''} ${s.status === 'fim' ? 'terminou' : ''}`.replace(/\s+/g, ' ').trim() },
+      Array.from({ length: 7 }, (_, col) => {
+        const cheia = e.tabuleiro[col] != null;
+        return h('button', {
+          class: 'lig4-coluna', type: 'button', disabled: !podeJogar || cheia, 'aria-label': `Coluna ${col + 1}${cheia ? ', cheia' : ''}`,
+          onclick: () => enviar('sala:jogar', { id: s.id, jogada: { coluna: col } }),
+        }, Array.from({ length: 6 }, (_, lin) => {
+          const casa = lin * 7 + col;
+          const v = e.tabuleiro[casa];
+          const nova = v != null && casa === e.ultima && tabuleiroAntes && tabuleiroAntes[casa] == null;
+          return h('span', {
+            class: ['lig4-casa', v != null && `p${v}`, e.linha?.includes(casa) && 'vencedora', nova && 'nova'].filter(Boolean).join(' '),
+            style: nova ? { '--queda': lin + 1 } : null,
+          });
+        }));
+      }));
+  }
+
+  /* Cobrinha ao vivo: o tabuleiro (canvas) é o mesmo durante a partida e só é redesenhado a cada quadro. */
+  let visorCobras = null;
+  let quadroCobras = null;
+  let fimLargada = 0;
+  let placarCobras = null;
+  let ultimaVirada = null;
+
+  function virarCobra(dir) {
+    const s = rt.partidas.get(id);
+    if (!s || s.jogo !== 'cobras' || s.status !== 'jogando' || s.eu < 0 || s.jogadores[s.eu].saiu) return;
+    if (ultimaVirada && ultimaVirada[0] === dir[0] && ultimaVirada[1] === dir[1] && quadroCobras?.fase === 'jogando') return;
+    ultimaVirada = dir;
+    enviar('cobras:virar', { id, dir }, { silencioso: true });
+  }
+
+  function telaDasCobras() {
+    if (visorCobras) return visorCobras;
+    const tela = h('canvas', { class: 'cobras-tela', width: 640, height: 480, 'aria-label': 'Tabuleiro da cobrinha ao vivo' });
+    const aviso_ = h('div', { class: 'cobras-aviso', hidden: true });
+    let inicio = null;
+    tela.addEventListener('pointerdown', e => { inicio = { x: e.clientX, y: e.clientY }; });
+    tela.addEventListener('pointerup', e => {
+      if (!inicio) return;
+      const dx = e.clientX - inicio.x;
+      const dy = e.clientY - inicio.y;
+      inicio = null;
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 20) return;
+      virarCobra(Math.abs(dx) > Math.abs(dy) ? [Math.sign(dx), 0] : [0, Math.sign(dy)]);
+    });
+    visorCobras = { tela, g: tela.getContext('2d'), aviso: aviso_, moldura: h('div', { class: 'cobras-moldura' }, tela, aviso_) };
+    return visorCobras;
+  }
+
+  function desenharQuadroCobras() {
+    const s = rt.partidas.get(id);
+    if (!visorCobras || !quadroCobras || !s) return;
+    desenharArena(visorCobras.g, quadroCobras, s.eu);
+    avisoCobras();
+    desenharPlacarCobras();
+  }
+
+  function avisoCobras() {
+    const s = rt.partidas.get(id);
+    const q = quadroCobras;
+    if (!visorCobras || !q || !s) return;
+    let texto = '';
+    if (q.fase === 'largada') texto = `${Math.max(1, Math.ceil((fimLargada - Date.now()) / 1000))}`;
+    else if (q.fase === 'fim' || s.status === 'fim') {
+      if (s.empate) texto = 'Empate!';
+      else if (s.vencedor === s.eu) texto = 'Você venceu!';
+      else texto = `${s.jogadores[s.vencedor]?.nome || 'Alguém'} venceu!`;
+    } else if (s.eu >= 0 && q.c[s.eu] && !q.c[s.eu].v) texto = 'Você bateu! Assistindo o resto...';
+    visorCobras.aviso.hidden = !texto;
+    visorCobras.aviso.textContent = texto;
+    visorCobras.aviso.classList.toggle('contagem', q.fase === 'largada');
+  }
+
+  function desenharPlacarCobras() {
+    const s = rt.partidas.get(id);
+    const q = quadroCobras;
+    if (!placarCobras || !q || !s) return;
+    const ordem = q.classificacao ? q.classificacao.map(c => c.i) : s.jogadores.map((_, i) => i);
+    trocar(placarCobras,
+      h('div', { class: 'painel-cab' }, h('h2', null, icone('trofeu'), 'Placar')),
+      h('ol', { class: 'cobras-lista' }, ordem.map(i => {
+        const p = s.jogadores[i];
+        const c = q.c[i];
+        if (!p || !c) return null;
+        const venceu = s.status === 'fim' && s.vencedor === i;
+        let situacao = 'jogando';
+        if (!c.v) situacao = p.saiu ? 'saiu' : 'bateu';
+        else if (q.fase === 'fim' || s.status === 'fim') situacao = 'sobrou';
+        return h('li', { class: `${i === s.eu ? 'eu-linha' : ''} ${c.v ? '' : 'fora'}`.trim() },
+          h('span', { class: 'cobras-cor', style: { background: CORES_COBRAS[i] } }),
+          h('span', { class: 'cobras-nome' }, h('strong', null, p.nome), h('small', null, i === s.eu ? `você · ${situacao}` : situacao)),
+          venceu && h('span', { class: 'coroa' }, icone('coroa')),
+          h('span', { class: 'cobras-pontos', title: 'Cenouras comidas' }, c.p));
+      })));
+  }
+
+  function telaCobras(s) {
+    const jogador = s.eu >= 0;
+    const eu = jogador ? s.jogadores[s.eu] : null;
+    const souDono = jogador && s.dono === eu.id;
+    const botoes = [];
+    if (jogador && s.status === 'esperando') botoes.push(botao(souDono ? 'Fechar a sala' : 'Sair da sala', { icone: 'x', onclick: acoesQuiz.sair }));
+    else if (jogador && s.status === 'jogando' && !eu.saiu) botoes.push(botao('Sair da partida', { icone: 'bandeira', classe: 'btn-perigo-texto', onclick: desistirCobras }));
+    else if (!jogador) botoes.push(h('a', { class: 'btn', href: '#/recreacao' }, icone('voltar'), h('span', null, 'Parar de assistir')));
+    const topo = cabecalho({
+      titulo: s.nomeJogo, icone: 'cobra', voltar: { href: '#/recreacao', texto: 'Recreação' }, acoes: botoes,
+      sub: 'De 2 a 4 cobras no mesmo tabuleiro. Quem bater sai e vira cenouras; vence quem sobrar.',
+    });
+    if (s.status === 'esperando') return [topo, esperaCobras(s, { jogador, souDono })];
+    if (s.estado) {
+      quadroCobras = s.estado;
+      if (s.estado.fase === 'largada') fimLargada = Date.now() + s.estado.largada;
+    }
+    if (s.status === 'jogando' && quadroCobras?.fase === 'largada') ultimaVirada = null;
+    const v = telaDasCobras();
+    placarCobras = h('aside', { class: 'painel cobras-placar' });
+    desenharQuadroCobras();
+    const toque = matchMedia('(pointer: coarse)').matches;
+    const seta = (ic, d, rotulo) => h('button', { class: `dpad-${ic}`, type: 'button', 'aria-label': rotulo, onpointerdown: ev => { ev.preventDefault(); virarCobra(d); } }, icone(ic));
+    return [topo,
+      h('div', { class: 'cobras-jogo' },
+        h('div', { class: 'cobras-area' },
+          v.moldura,
+          jogador && s.status === 'jogando' && h('div', { class: 'dpad' },
+            seta('cima', [0, -1], 'Para cima'), seta('voltar', [-1, 0], 'Para a esquerda'),
+            seta('frente', [1, 0], 'Para a direita'), seta('baixo', [0, 1], 'Para baixo')),
+          jogador && s.status === 'jogando' && h('p', { class: 'suave cobras-dica' },
+            toque ? 'Deslize o dedo no tabuleiro ou use as setas abaixo.' : 'Use as setas ou W A S D. Sua cobra tem o contorno branco na cabeça.')),
+        placarCobras),
+      s.status === 'fim' && h('div', { class: 'partida-rodape' },
+        souDono && botao('Jogar de novo', { icone: 'frente', classe: 'btn-ouro', onclick: acoesQuiz.revanche }),
+        jogador && !souDono && h('p', { class: 'suave' }, 'Quem abriu a sala pode começar outra partida.'),
+        h('a', { class: 'btn', href: '#/recreacao' }, 'Voltar ao salão')),
+      s.espectadores > 0 && h('p', { class: 'espectadores' }, icone('olho'), `${s.espectadores} ${s.espectadores === 1 ? 'pessoa assistindo' : 'pessoas assistindo'}`)];
+  }
+
+  function esperaCobras(s, { jogador, souDono }) {
+    const dono = s.jogadores.find(p => p.id === s.dono);
+    const basta = s.jogadores.length >= s.min;
+    return h('div', { class: 'quiz-espera painel' },
+      h('div', { class: 'painel-cab' }, h('h2', null, icone('usuarios'), `Na sala: ${s.jogadores.length} de ${s.max}`)),
+      h('div', { class: 'quiz-na-sala' }, s.jogadores.map((p, i) => h('div', { class: `quiz-pessoa ${p.conectado ? '' : 'ausente'}`.trim() },
+        avatar(p.nome, '', p.foto),
+        h('span', null, h('span', { class: 'cobras-cor', style: { background: CORES_COBRAS[i] } }), ' ', p.nome),
+        p.id === s.dono && h('span', { class: 'quiz-dono', title: 'Abriu a sala' }, icone('coroa'))))),
+      h('div', { class: 'quiz-espera-acao' },
+        souDono
+          ? [
+            botao(basta ? 'Começar a partida' : 'Esperando mais gente...', { classe: 'btn-ouro btn-grande', icone: 'frente', desativado: !basta, onclick: acoesQuiz.comecar }),
+            h('p', { class: 'suave' }, basta
+              ? 'Quem entrar depois de começar só pode assistir. Cabem até 4.'
+              : 'Precisa de pelo menos 2 jogadores (até 4). A sala aparece no salão para todos.'),
+          ]
+          : jogador
+            ? h('p', { class: 'quiz-aguarde' }, h('span', { class: 'giro giro-p' }), ` Esperando ${dono?.nome || 'quem abriu a sala'} começar...`)
+            : [
+              s.jogadores.length < s.max && !rt.minhaSala && botao('Entrar nesta sala', { classe: 'btn-ouro', onclick: () => entrarNaPartida(s.id) }),
+              h('p', { class: 'suave' }, 'Você está assistindo.'),
+            ]));
+  }
+
+  async function desistirCobras() {
+    if (!await confirmar('Se sair agora, sua cobra sai do jogo e vira cenouras.', { titulo: 'Sair da partida?', ok: 'Sair', perigo: true })) return;
+    sair();
+  }
+
   function rodape(s, outro) {
     if (s.status !== 'fim' || s.eu < 0) return null;
     if (!outro || outro.saiu || s.jogadores[s.eu].saiu) {
@@ -522,9 +713,32 @@ export function sala(id) {
   const relogioQuiz = setInterval(() => {
     for (const el of raiz.querySelectorAll('[data-fim]')) el.textContent = Math.max(0, Math.ceil((Number(el.dataset.fim) - Date.now()) / 1000));
   }, 250);
-  const aoTeclar = ev => teclaQuiz(ev, rt.partidas.get(id), acoesQuiz.responder);
+  // Teclas: A-D no quiz, setas na cobrinha ao vivo e 1 a 7 no Lig 4.
+  const aoTeclar = ev => {
+    const s = rt.partidas.get(id);
+    if (ev.target.closest?.('input, textarea, select, [contenteditable]') || document.querySelector('.modal-fundo')) return;
+    if (s?.jogo === 'cobras') {
+      const d = DIRECOES[ev.code];
+      if (d && s.status === 'jogando' && s.eu >= 0) { ev.preventDefault(); virarCobra(d); }
+      return;
+    }
+    if (s?.jogo === 'lig4') {
+      const col = Number(ev.key) - 1;
+      if (col >= 0 && col < 7 && minhaVez(s)) { ev.preventDefault(); enviar('sala:jogar', { id, jogada: { coluna: col } }); }
+      return;
+    }
+    teclaQuiz(ev, s, acoesQuiz.responder);
+  };
   document.addEventListener('keydown', aoTeclar);
-  aoSair(() => { clearInterval(relogioQuiz); document.removeEventListener('keydown', aoTeclar); });
+  // Contagem da largada da cobrinha.
+  const relogioCobras = setInterval(() => { if (quadroCobras?.fase === 'largada') avisoCobras(); }, 200);
+  escutar('cobras:quadro', ({ id: sid, q }) => {
+    if (sid !== id) return;
+    quadroCobras = q;
+    if (q.fase === 'largada') fimLargada = Date.now() + q.largada;
+    desenharQuadroCobras();
+  });
+  aoSair(() => { clearInterval(relogioQuiz); clearInterval(relogioCobras); document.removeEventListener('keydown', aoTeclar); });
 
   // Se a pessoa está em outra aba do navegador, o título avisa que é a vez dela.
   function avisarNaAba(s) {
@@ -571,6 +785,32 @@ const N_COBRA = 20;
 const LADO_COBRA = 600;
 const C_COBRA = LADO_COBRA / N_COBRA;
 
+// Cenoura numa casa do tabuleiro (x, y em casas; C = tamanho da casa).
+function desenharCenoura(g, x, y, C) {
+  const cx = x * C + C / 2;
+  const cy = y * C + C / 2;
+  g.fillStyle = '#5b8c3e';
+  g.beginPath();
+  g.ellipse(cx - C * 0.1, cy - C * 0.3, C * 0.08, C * 0.18, -0.5, 0, Math.PI * 2);
+  g.ellipse(cx + C * 0.1, cy - C * 0.3, C * 0.08, C * 0.18, 0.5, 0, Math.PI * 2);
+  g.fill();
+  g.fillStyle = '#e8812f';
+  g.beginPath();
+  g.moveTo(cx - C * 0.24, cy - C * 0.16);
+  g.quadraticCurveTo(cx, cy - C * 0.28, cx + C * 0.24, cy - C * 0.16);
+  g.lineTo(cx, cy + C * 0.42);
+  g.closePath();
+  g.fill();
+  g.strokeStyle = 'rgba(120, 50, 10, 0.6)';
+  g.lineWidth = 1.5;
+  g.beginPath();
+  g.moveTo(cx - C * 0.12, cy);
+  g.lineTo(cx - C * 0.02, cy);
+  g.moveTo(cx + C * 0.04, cy + C * 0.14);
+  g.lineTo(cx + C * 0.12, cy + C * 0.14);
+  g.stroke();
+}
+
 // Desenha o tabuleiro da cobrinha: e = { cobra: [{x, y}], comida: {x, y} | null, direcao: [dx, dy], bateu }.
 function desenharCobrinha(g, { cobra, comida, direcao, bateu }) {
   const C = C_COBRA;
@@ -580,30 +820,7 @@ function desenharCobrinha(g, { cobra, comida, direcao, bateu }) {
       g.fillRect(x * C, y * C, C, C);
     }
   }
-  if (comida) {
-    const cx = comida.x * C + C / 2;
-    const cy = comida.y * C + C / 2;
-    g.fillStyle = '#5b8c3e';
-    g.beginPath();
-    g.ellipse(cx - C * 0.1, cy - C * 0.3, C * 0.08, C * 0.18, -0.5, 0, Math.PI * 2);
-    g.ellipse(cx + C * 0.1, cy - C * 0.3, C * 0.08, C * 0.18, 0.5, 0, Math.PI * 2);
-    g.fill();
-    g.fillStyle = '#e8812f';
-    g.beginPath();
-    g.moveTo(cx - C * 0.24, cy - C * 0.16);
-    g.quadraticCurveTo(cx, cy - C * 0.28, cx + C * 0.24, cy - C * 0.16);
-    g.lineTo(cx, cy + C * 0.42);
-    g.closePath();
-    g.fill();
-    g.strokeStyle = 'rgba(120, 50, 10, 0.6)';
-    g.lineWidth = 1.5;
-    g.beginPath();
-    g.moveTo(cx - C * 0.12, cy);
-    g.lineTo(cx - C * 0.02, cy);
-    g.moveTo(cx + C * 0.04, cy + C * 0.14);
-    g.lineTo(cx + C * 0.12, cy + C * 0.14);
-    g.stroke();
-  }
+  if (comida) desenharCenoura(g, comida.x, comida.y, C);
   cobra.forEach((p, i) => {
     const t = i / Math.max(1, cobra.length - 1);
     g.fillStyle = i === 0 ? (bateu ? '#d8674a' : '#d8b13a') : `rgb(${Math.round(127 - 50 * t)}, ${Math.round(176 - 60 * t)}, ${Math.round(105 - 40 * t)})`;
@@ -625,6 +842,59 @@ function desenharCobrinha(g, { cobra, comida, direcao, bateu }) {
     g.arc(ex, ey, C * 0.09, 0, Math.PI * 2);
     g.fill();
   }
+}
+
+/* ─── Cobrinha ao vivo: o desenho ─────────────────── */
+
+// Cor de cada cobra (a ordem de quem entrou na sala): dourada, vermelha, azul e roxa.
+const CORES_COBRAS = ['#d8b13a', '#d8674a', '#5aa0d8', '#b77be6'];
+const escurecer = (hex, t) => {
+  const n = parseInt(hex.slice(1), 16);
+  const c = [n >> 16, (n >> 8) & 255, n & 255].map(v => Math.round(v * (1 - t)));
+  return `rgb(${c.join(', ')})`;
+};
+
+// q = { l, a, c: [{ v, p, d, b: [x, y, x, y...] }], f: [x, y...] }; eu = índice de quem está vendo (ou -1).
+function desenharArena(g, q, eu) {
+  const C = g.canvas.width / q.l;
+  for (let y = 0; y < q.a; y++) {
+    for (let x = 0; x < q.l; x++) {
+      g.fillStyle = (x + y) % 2 ? '#0c170f' : '#0f1c12';
+      g.fillRect(x * C, y * C, C, C);
+    }
+  }
+  for (let k = 0; k + 1 < q.f.length; k += 2) desenharCenoura(g, q.f[k], q.f[k + 1], C);
+  q.c.forEach((c, i) => {
+    if (!c.v || !c.b.length) return;
+    const n = c.b.length / 2;
+    for (let k = n - 1; k >= 0; k--) {
+      const x = c.b[k * 2];
+      const y = c.b[k * 2 + 1];
+      g.fillStyle = k === 0 ? CORES_COBRAS[i] : escurecer(CORES_COBRAS[i], 0.2 + 0.35 * (k / Math.max(1, n - 1)));
+      const m = k === 0 ? 1 : 2.5;
+      g.beginPath();
+      if (g.roundRect) g.roundRect(x * C + m, y * C + m, C - m * 2, C - m * 2, k === 0 ? 7 : 5);
+      else g.rect(x * C + m, y * C + m, C - m * 2, C - m * 2);
+      g.fill();
+    }
+    const [hx, hy] = [c.b[0], c.b[1]];
+    if (i === eu) {
+      // A cabeça da sua cobra tem contorno branco.
+      g.strokeStyle = '#ffffff';
+      g.lineWidth = 2;
+      g.beginPath();
+      if (g.roundRect) g.roundRect(hx * C + 1, hy * C + 1, C - 2, C - 2, 7);
+      else g.rect(hx * C + 1, hy * C + 1, C - 2, C - 2);
+      g.stroke();
+    }
+    const [dx, dy] = c.d;
+    g.fillStyle = '#1b1403';
+    for (const lado of [-1, 1]) {
+      g.beginPath();
+      g.arc(hx * C + C / 2 + dx * C * 0.18 + dy * lado * C * 0.2, hy * C + C / 2 + dy * C * 0.18 + dx * lado * C * 0.2, C * 0.1, 0, Math.PI * 2);
+      g.fill();
+    }
+  });
 }
 
 // Mostra quantas pessoas estão assistindo quem joga.
@@ -1063,7 +1333,249 @@ function estiloPeca(url, n, p) {
   };
 }
 
+/* ─── Jogo da Memória ─────────────────────────────── */
+
+// Tamanhos (linhas x colunas) e as figuras das cartas (ícones do site).
+const MEMORIA = { '4x4': [4, 4], '4x6': [4, 6], '6x6': [6, 6] };
+const FIGURAS = ['coelho', 'coroa', 'escudo', 'espada', 'moeda', 'pergaminho', 'balanca', 'cruz', 'coluna', 'alvo',
+  'bandeira', 'bau', 'chave', 'alianca', 'pena', 'mapa', 'estrela', 'musica', 'trofeu', 'cobra'];
+let tamanhoMemoria = '4x4';
+
+const embaralharLista = lista => {
+  const a = [...lista];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+
+// Uma carta: o verso (o coelho da Casa) e a frente (a figura). Vira com animação.
+function cartaMemoria(fig, onclick) {
+  return h(onclick ? 'button' : 'div', { class: 'mem-carta', type: onclick ? 'button' : null, onclick, 'aria-label': 'Carta' },
+    h('span', { class: 'mem-verso' }, icone('coelho')),
+    h('span', { class: 'mem-frente' }, fig && icone(fig)));
+}
+
+export function memoria() {
+  exigirAcesso();
+  const grade = h('div', { class: 'mem-grade' });
+  const moldura = h('div', { class: 'mem-moldura' });
+  const jogadasEl = h('strong', null, '0');
+  const paresEl = h('strong', null, '0');
+  const tempoEl = h('strong', null, '0:00');
+  const recordeEl = h('strong', null, '...');
+  const sobre = h('div', { class: 'cobra-sobre mem-sobre', hidden: true });
+  const ranking = h('div');
+  const seletor = h('div', { class: 'segmentado' });
+  const tituloRanking = h('span');
+  let cartas = [];
+  let botoes = [];
+  let abertas = [];
+  let jogadas = 0;
+  let achados = 0;
+  let inicio = 0;
+  let seg = 0;
+  let situacao = 'pronto';
+  let relogioId = null;
+  let fecharTimer = null;
+  let recorde = null;
+
+  function novoJogo() {
+    clearInterval(relogioId);
+    clearTimeout(fecharTimer);
+    const [lin, col] = MEMORIA[tamanhoMemoria];
+    const figs = embaralharLista(FIGURAS).slice(0, (lin * col) / 2);
+    cartas = embaralharLista([...figs, ...figs]).map(fig => ({ fig, achada: false }));
+    abertas = [];
+    jogadas = 0;
+    achados = 0;
+    seg = 0;
+    situacao = 'pronto';
+    moldura.style.setProperty('--colunas', col);
+    moldura.style.setProperty('--linhas', lin);
+    botoes = cartas.map((c, i) => cartaMemoria(c.fig, () => clicar(i)));
+    trocar(grade, botoes);
+    sobre.hidden = true;
+    desenharSeletor();
+    atualizar();
+    carregarRanking();
+    if (rt.conectado) transmitir('memoria', { n: tamanhoMemoria });
+    transmitirQuadro(true);
+  }
+
+  // Duas cartas diferentes ficam abertas um instante; clicar noutra já fecha as duas.
+  function fecharAbertas() {
+    clearTimeout(fecharTimer);
+    fecharTimer = null;
+    abertas = [];
+  }
+
+  function clicar(i) {
+    if (situacao === 'fim' || cartas[i].achada || abertas.includes(i)) return;
+    if (fecharTimer) fecharAbertas();
+    if (situacao === 'pronto') {
+      situacao = 'jogando';
+      inicio = Date.now();
+      relogioId = setInterval(tique, 500);
+    }
+    abertas.push(i);
+    if (abertas.length === 2) {
+      jogadas++;
+      const [a, b] = abertas;
+      if (cartas[a].fig === cartas[b].fig) {
+        cartas[a].achada = true;
+        cartas[b].achada = true;
+        achados++;
+        abertas = [];
+        if (achados === cartas.length / 2) fimDeJogo();
+      } else {
+        fecharTimer = setTimeout(() => { fecharAbertas(); atualizar(); transmitirQuadro(true); }, 900);
+      }
+    }
+    atualizar();
+    transmitirQuadro(true);
+  }
+
+  function tique() {
+    seg = Math.floor((Date.now() - inicio) / 1000);
+    tempoEl.textContent = relogio(seg);
+    transmitirQuadro();
+  }
+
+  function atualizar() {
+    botoes.forEach((b, i) => {
+      b.classList.toggle('virada', abertas.includes(i));
+      b.classList.toggle('achada', cartas[i].achada);
+      b.disabled = situacao === 'fim' || cartas[i].achada;
+    });
+    jogadasEl.textContent = jogadas;
+    paresEl.textContent = `${achados} de ${cartas.length / 2}`;
+    tempoEl.textContent = relogio(seg);
+  }
+
+  async function fimDeJogo() {
+    situacao = 'fim';
+    clearInterval(relogioId);
+    seg = Math.floor((Date.now() - inicio) / 1000);
+    const caixa = h('div', { class: 'cobra-caixa' },
+      h('h2', null, 'Todos os pares!'),
+      h('p', { class: 'cobra-placar' }, `${jogadas} jogadas em ${relogio(seg)}`),
+      botao('Jogar de novo', { classe: 'btn-ouro', icone: 'frente', onclick: novoJogo }));
+    trocar(sobre, caixa);
+    sobre.hidden = false;
+    atualizar();
+    transmitirQuadro(true);
+    try {
+      const r = await post('/api/recreacao/recordes', { jogo: 'memoria', variante: tamanhoMemoria, pontos: jogadas, detalhe: relogio(seg) });
+      if (r.recorde) {
+        caixa.insertBefore(h('p', { class: 'cobra-recorde' }, icone('trofeu'), r.anterior == null ? 'Primeiro recorde registrado!' : 'Novo recorde pessoal!'), caixa.lastChild);
+        carregarRanking();
+      }
+    } catch (e) {
+      aviso(e.message, 'erro');
+    }
+  }
+
+  function desenharSeletor() {
+    trocar(seletor, Object.keys(MEMORIA).map(t => h('button', {
+      class: `seg ${t === tamanhoMemoria ? 'ativo' : ''}`.trim(), type: 'button',
+      onclick: () => { if (t !== tamanhoMemoria) { tamanhoMemoria = t; novoJogo(); } },
+    }, `${t} (${(MEMORIA[t][0] * MEMORIA[t][1]) / 2} pares)`)));
+  }
+
+  // Quem assiste recebe as cartas abertas e achadas (as fechadas vão como -1, sem entregar a figura).
+  function transmitirQuadro(urgente = false) {
+    enviarQuadro({
+      t: tamanhoMemoria, j: jogadas, seg, s: situacao,
+      v: cartas.map((c, i) => (c.achada || abertas.includes(i) ? FIGURAS.indexOf(c.fig) : -1)),
+      ac: cartas.map(c => (c.achada ? 1 : 0)),
+    }, urgente);
+  }
+  escutar('estado', () => { if (rt.conectado) { transmitir('memoria', { n: tamanhoMemoria }); transmitirQuadro(true); } });
+
+  function carregarRanking() {
+    tituloRanking.textContent = `Melhores (${tamanhoMemoria})`;
+    get('/api/recreacao/ranking').then(r => {
+      const lista = r.memoria?.[tamanhoMemoria] || [];
+      const meu = lista.find(l => l.nome === estado.eu.nome);
+      recorde = meu ? meu.jogadas : null;
+      recordeEl.textContent = recorde ?? '-';
+      trocar(ranking, lista.length
+        ? h('ol', { class: 'mini-ranking' }, lista.map(l => h('li', { class: l.nome === estado.eu.nome ? 'eu-linha' : '' }, h('span', null, l.nome), h('strong', null, `${l.jogadas} jogadas`))))
+        : h('p', { class: 'painel-vazio' }, 'Ninguém jogou ainda neste tamanho. Seja o primeiro!'));
+    }).catch(() => {});
+  }
+
+  aoSair(() => {
+    clearInterval(relogioId);
+    clearTimeout(fecharTimer);
+    situacao = 'fim';
+    pararTransmissao();
+  });
+  novoJogo();
+
+  return h('div', { class: 'pagina' },
+    cabecalho({
+      titulo: 'Jogo da Memória', icone: 'cartas', voltar: { href: '#/recreacao', texto: 'Recreação' },
+      sub: 'Vire duas cartas por vez e ache os pares. Quanto menos jogadas, melhor.',
+      acoes: [botao('Embaralhar de novo', { icone: 'aleatorio', onclick: novoJogo })],
+    }),
+    h('div', { class: 'jogo-solo' },
+      h('div', { class: 'jogo-area' },
+        seletor,
+        h('div', { class: 'cobra-placar-linha' },
+          h('span', null, 'Jogadas: ', jogadasEl),
+          h('span', null, 'Pares: ', paresEl),
+          h('span', null, icone('relogio'), ' ', tempoEl),
+          contadorPlateia(),
+          h('span', null, icone('trofeu'), ' Seu recorde: ', recordeEl)),
+        (moldura.append(grade, sobre), moldura)),
+      h('aside', { class: 'painel jogo-lateral' },
+        h('div', { class: 'painel-cab' }, h('h2', null, icone('trofeu'), tituloRanking)),
+        ranking)));
+}
+
 /* ─── Assistir quem joga sozinho ──────────────────── */
+
+function assistirMemoria() {
+  const grade = h('div', { class: 'mem-grade espectador' });
+  const moldura = h('div', { class: 'mem-moldura' });
+  const jogadasEl = h('strong', null, '0');
+  const tempoEl = h('strong', null, '0:00');
+  const tamanhoEl = h('span', { class: 'suave' });
+  const aviso_ = h('div', { class: 'assistir-aviso', hidden: true });
+  let chave = '';
+  let cartas = [];
+  return {
+    el: h('div', { class: 'jogo-area' },
+      h('div', { class: 'cobra-placar-linha' }, h('span', null, 'Jogadas: ', jogadasEl), h('span', null, icone('relogio'), ' ', tempoEl), tamanhoEl),
+      (moldura.append(grade, aviso_), moldura)),
+    quadro(q) {
+      const [lin, col] = MEMORIA[q.t] || MEMORIA['4x4'];
+      if (chave !== `${q.t}:${q.v.length}`) {
+        chave = `${q.t}:${q.v.length}`;
+        moldura.style.setProperty('--colunas', col);
+        moldura.style.setProperty('--linhas', lin);
+        cartas = q.v.map(() => cartaMemoria(null));
+        trocar(grade, cartas);
+      }
+      q.v.forEach((f, i) => {
+        const c = cartas[i];
+        if (!c) return;
+        if (f >= 0) trocar(c.lastChild, icone(FIGURAS[f]));
+        c.classList.toggle('virada', f >= 0 && !q.ac[i]);
+        c.classList.toggle('achada', !!q.ac[i]);
+      });
+      jogadasEl.textContent = q.j ?? 0;
+      tempoEl.textContent = relogio(q.seg || 0);
+      tamanhoEl.textContent = q.t || '';
+      aviso_.hidden = q.s !== 'fim';
+      if (q.s === 'fim') aviso_.textContent = `Achou todos os pares em ${q.j} jogadas!`;
+    },
+    parar() {},
+  };
+}
 
 function assistirCobrinha() {
   const tela = h('canvas', { class: 'cobra-tela', width: LADO_COBRA, height: LADO_COBRA, 'aria-label': 'Tabuleiro da cobrinha' });
@@ -1125,7 +1637,7 @@ function assistirQuebra(t) {
   };
 }
 
-const TELA_DO_JOGO = { pacman: '#/recreacao/pac-coelho', cobrinha: '#/recreacao/cobrinha', quebra: '#/recreacao/quebra-cabeca' };
+const TELA_DO_JOGO = { pacman: '#/recreacao/pac-coelho', cobrinha: '#/recreacao/cobrinha', quebra: '#/recreacao/quebra-cabeca', memoria: '#/recreacao/memoria' };
 
 export function assistir(id) {
   exigirAcesso();
@@ -1165,7 +1677,7 @@ export function assistir(id) {
     if (nova !== chave || !visor) {
       visor?.parar();
       chave = nova;
-      visor = t.jogo === 'pacman' ? assistirPac() : t.jogo === 'cobrinha' ? assistirCobrinha() : assistirQuebra(t);
+      visor = t.jogo === 'pacman' ? assistirPac() : t.jogo === 'cobrinha' ? assistirCobrinha() : t.jogo === 'memoria' ? assistirMemoria() : assistirQuebra(t);
       trocar(area, visor.el);
     }
     if (t.quadro) visor.quadro(t.quadro);

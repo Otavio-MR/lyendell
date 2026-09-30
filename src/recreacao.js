@@ -1,4 +1,4 @@
-// Recreação ao vivo: quem está online, chat e partidas (jogo da velha, pedra papel e tesoura, quiz).
+// Recreação ao vivo: quem está online, chat e partidas (jogo da velha, pedra papel e tesoura, Lig 4, quiz e cobrinha ao vivo).
 // Tudo passa por uma conexão WebSocket em /ws, aberta com a mesma sessão (cookie) do site.
 // As partidas ficam na memória do servidor; o chat e os resultados vão para o banco.
 
@@ -10,10 +10,13 @@ const { texto: limparTexto } = require('./util');
 const quiz = require('./quiz');
 const progresso = require('./progresso');
 const antispam = require('./antispam');
+const cobras = require('./cobras');
 
 const ESPERA_MS = Number(process.env.RECREACAO_ESPERA_MS) || 30_000;       // tempo para voltar depois de cair
 const REVALIDAR_MS = Number(process.env.RECREACAO_REVALIDAR_MS) || 120_000; // confere se a sessão ainda vale
 const HISTORICO = 80;
+const COBRAS_PASSO_MS = Number(process.env.COBRAS_PASSO_MS) || 125;     // velocidade da cobrinha ao vivo
+const COBRAS_LARGADA_MS = Number(process.env.COBRAS_LARGADA_MS) || 3000; // contagem antes de largar
 
 class ErroJogo extends Error {}
 
@@ -41,6 +44,24 @@ const online = () => [...conexoes.keys()].map(id => pessoas.get(id)).filter(Bool
 const LINHAS = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
 const MAOS = ['pedra', 'papel', 'tesoura'];
 const VENCE = { pedra: 'tesoura', papel: 'pedra', tesoura: 'papel' };
+
+// Lig 4: tabuleiro de 7 colunas e 6 linhas (casa = linha * 7 + coluna; a linha 0 é a de cima).
+function quatroEmLinha(t, lin, col, i) {
+  for (const [dl, dc] of [[0, 1], [1, 0], [1, 1], [1, -1]]) {
+    const casas = [[lin, col]];
+    for (const lado of [1, -1]) {
+      let l = lin + dl * lado;
+      let c = col + dc * lado;
+      while (l >= 0 && l < 6 && c >= 0 && c < 7 && t[l * 7 + c] === i) {
+        casas.push([l, c]);
+        l += dl * lado;
+        c += dc * lado;
+      }
+    }
+    if (casas.length >= 4) return casas.map(([l, c]) => l * 7 + c);
+  }
+  return null;
+}
 
 // Cada jogo: novo(quem começa), jogar(estado, índice do jogador, jogada) e visao(estado, índice de quem vê).
 // jogar devolve null (continua), { vencedor: 0|1 } ou { empate: true }.
@@ -82,10 +103,36 @@ const JOGOS = {
     // A escolha do outro só aparece depois que os dois escolheram.
     visao: (e, i) => ({ placar: e.placar, rodadas: e.rodadas, minha: i >= 0 ? e.escolhas[i] : null, escolheu: e.escolhas.map(Boolean) }),
   },
+  lig4: {
+    nome: 'Lig 4',
+    max: 2,
+    novo: inicia => ({ tabuleiro: Array(42).fill(null), vez: inicia, ultima: null, linha: null }),
+    jogar(e, i, { coluna }) {
+      if (e.vez !== i) throw new ErroJogo('Não é a sua vez.');
+      if (!Number.isInteger(coluna) || coluna < 0 || coluna > 6) throw new ErroJogo('Escolha uma coluna.');
+      let lin = 5;
+      while (lin >= 0 && e.tabuleiro[lin * 7 + coluna] != null) lin--;
+      if (lin < 0) throw new ErroJogo('Essa coluna está cheia.');
+      e.tabuleiro[lin * 7 + coluna] = i;
+      e.ultima = lin * 7 + coluna;
+      const linha = quatroEmLinha(e.tabuleiro, lin, coluna, i);
+      if (linha) { e.linha = linha; return { vencedor: i }; }
+      if (e.tabuleiro.every(v => v != null)) return { empate: true };
+      e.vez = 1 - i;
+      return null;
+    },
+    visao: e => ({ tabuleiro: e.tabuleiro, vez: e.vez, ultima: e.ultima, linha: e.linha }),
+  },
   quiz: {
     nome: 'Quiz de Lyendell',
     max: quiz.MAX_JOGADORES,
     grupo: true, // várias pessoas; quem abriu a sala decide quando começa
+  },
+  cobras: {
+    nome: 'Cobrinha ao vivo',
+    max: 4,
+    min: 2,
+    grupo: true,
   },
 };
 
@@ -94,6 +141,7 @@ const JOGOS = {
 const indiceNa = (s, id) => s.jogadores.findIndex(p => p.id === id);
 const salaAtivaDe = id => [...salas.values()].find(s => s.status !== 'fim' && s.jogadores.some(p => p.id === id && !p.saiu));
 const ehGrupo = s => !!JOGOS[s.jogo].grupo;
+const ehQuiz = s => s.jogo === 'quiz';
 const ativos = s => s.jogadores.filter(p => !p.saiu);
 const dono = s => ativos(s)[0] || null; // quem abriu a sala (ou o próximo, se ele saiu)
 
@@ -101,13 +149,14 @@ function visaoSala(s, id) {
   const eu = indiceNa(s, id);
   const jogo = JOGOS[s.jogo];
   let estado = null;
-  if (s.estado) estado = jogo.grupo ? visaoQuiz(s, id) : jogo.visao(s.estado, eu);
+  if (s.estado) estado = ehQuiz(s) ? visaoQuiz(s, id) : s.jogo === 'cobras' ? visaoCobras(s) : jogo.visao(s.estado, eu);
   return {
     id: s.id,
     jogo: s.jogo,
     nomeJogo: jogo.nome,
     grupo: !!jogo.grupo,
     max: jogo.max,
+    min: jogo.min || 1,
     opcoes: s.opcoes || null,
     status: s.status,
     eu,
@@ -163,7 +212,7 @@ function sairDaSala(id, s, motivo = 'abandono') {
   if (s.espectadores.delete(id)) { enviarSala(s); return; }
   const i = indiceNa(s, id);
   if (i < 0 || s.jogadores[i].saiu) return;
-  if (ehGrupo(s)) { sairDoQuiz(id, s, i); return; }
+  if (ehGrupo(s)) { sairDoGrupo(id, s, i); return; }
   if (s.status === 'esperando') {
     fecharSala(s);
     paraUsuario(id, 'sala:fechada', { id: s.id });
@@ -286,7 +335,8 @@ function terminarQuiz(s) {
   avisarLobby();
 }
 
-function sairDoQuiz(id, s, i) {
+// Sair de uma sala de várias pessoas (quiz ou cobrinha ao vivo).
+function sairDoGrupo(id, s, i) {
   paraUsuario(id, 'sala:fechada', { id: s.id });
   if (s.status === 'esperando') {
     if (i === 0) {
@@ -303,7 +353,8 @@ function sairDoQuiz(id, s, i) {
   }
   s.jogadores[i].saiu = true;
   if (!ativos(s).length) { fecharSala(s); avisarLobby(); return; }
-  if (s.status === 'jogando') conferirRespostas(s);
+  if (s.status === 'jogando' && ehQuiz(s)) conferirRespostas(s);
+  if (s.status === 'jogando' && s.jogo === 'cobras') cobras.eliminar(s.estado, i); // a cobra de quem saiu vira cenouras
   enviarSala(s);
   avisarLobby();
 }
@@ -331,11 +382,75 @@ function visaoQuiz(s, id) {
   };
 }
 
+/* ─── Cobrinha ao vivo ────────────────────────────── */
+
+// O servidor roda a partida: a cada passo todas as cobras andam, e quem joga e quem assiste
+// recebe o tabuleiro numa mensagem leve ("cobras:quadro"), sem mandar a sala inteira de novo.
+
+function visaoCobras(s) {
+  const e = s.estado;
+  return {
+    ...cobras.visao(e),
+    fase: e.fase,
+    largada: e.fase === 'largada' ? Math.max(0, e.largada - Date.now()) : 0,
+    classificacao: e.fase === 'fim' ? cobras.classificacao(e).map(c => ({ i: c.i, pontos: c.pontos, viva: c.viva })) : null,
+  };
+}
+
+function enviarQuadroCobras(s) {
+  const q = visaoCobras(s);
+  for (const id of new Set([...s.jogadores.map(p => p.id), ...s.espectadores])) paraUsuario(id, 'cobras:quadro', { id: s.id, q });
+}
+
+function comecarCobras(s) {
+  const jogadores = ativos(s);
+  if (jogadores.length < JOGOS.cobras.min) throw new ErroJogo('A cobrinha ao vivo precisa de pelo menos 2 jogadores (até 4).');
+  s.jogadores = jogadores;
+  s.estado = Object.assign(cobras.novo(jogadores.map(p => p.id)), { fase: 'largada', largada: Date.now() + COBRAS_LARGADA_MS });
+  Object.assign(s, { status: 'jogando', vencedor: null, empate: false, motivo: null });
+  s.revanche.clear();
+  clearTimeout(s.timer);
+  // Contagem de 3 segundos antes de largar (dá para já escolher a direção).
+  s.timer = setTimeout(() => {
+    if (!salas.has(s.id) || s.status !== 'jogando') return;
+    s.estado.fase = 'jogando';
+    s.timer = setInterval(() => passoCobras(s), COBRAS_PASSO_MS);
+  }, COBRAS_LARGADA_MS);
+  enviarSala(s);
+  avisarLobby();
+}
+
+function passoCobras(s) {
+  if (!salas.has(s.id) || s.status !== 'jogando') { clearInterval(s.timer); return; }
+  cobras.passo(s.estado);
+  if (cobras.acabou(s.estado)) terminarCobras(s);
+  else enviarQuadroCobras(s);
+}
+
+function terminarCobras(s) {
+  clearInterval(s.timer);
+  const e = s.estado;
+  e.fase = 'fim';
+  const v = cobras.vencedor(e);
+  Object.assign(s, { status: 'fim', vencedor: v, empate: v == null, motivo: v == null ? 'empate' : 'vitoria', terminou: Date.now() });
+  const lista = cobras.classificacao(e);
+  db.lote(lista.map((c, posicao) => [
+    'INSERT INTO resultados (jogo, usuario_id, usuario_nome, posicao, jogadores, pontos, venceu) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    'cobras', c.id, s.jogadores[c.i].nome, posicao + 1, lista.length, c.pontos, c.i === v ? 1 : 0,
+  ])).then(async () => {
+    for (const c of lista) await progresso.registrar(c.id, 'partida');
+    if (v != null) await progresso.registrar(e.cobras[v].id, 'vitoria');
+  }).catch(err => console.error('Erro ao guardar a cobrinha:', err.message));
+  enviarQuadroCobras(s);
+  enviarSala(s);
+  avisarLobby();
+}
+
 /* ─── Jogos de uma pessoa só, transmitidos ao vivo ─── */
 
 // Quem joga Pac-Coelho, Cobrinha ou Quebra-cabeça manda o estado do jogo algumas vezes por segundo,
 // e o servidor repassa para quem está assistindo. Nada disso vai para o banco.
-const SOLO = { pacman: 'Pac-Coelho', cobrinha: 'Cobrinha', quebra: 'Quebra-cabeça' };
+const SOLO = { pacman: 'Pac-Coelho', cobrinha: 'Cobrinha', quebra: 'Quebra-cabeça', memoria: 'Jogo da Memória' };
 const transmissoes = new Map(); // id de quem joga -> transmissão
 
 const resumoTransmissoes = () => [...transmissoes.values()].map(t => ({
@@ -388,7 +503,7 @@ const acoes = {
     if (!JOGOS[jogo]) throw new ErroJogo('Jogo desconhecido.');
     if (salaAtivaDe(u.id)) throw new ErroJogo('Você já está numa partida. Termine ou saia dela antes de abrir outra.');
     let escolhidas = null;
-    if (JOGOS[jogo].grupo) {
+    if (jogo === 'quiz') {
       escolhidas = quiz.validarOpcoes(opcoes);
       if (!await quiz.contarPerguntas(escolhidas.categorias)) throw new ErroJogo('Ainda não há perguntas nessas categorias.');
       if (salaAtivaDe(u.id)) throw new ErroJogo('Você já está numa partida.'); // abriu outra enquanto contava
@@ -434,6 +549,7 @@ const acoes = {
     if (!s || !ehGrupo(s)) throw new ErroJogo('Essa sala não existe mais.');
     if (dono(s)?.id !== u.id) throw new ErroJogo('Só quem abriu a sala pode começar.');
     if (s.status !== 'esperando' || s.comecando) return;
+    if (s.jogo === 'cobras') { comecarCobras(s); return; }
     s.comecando = true;
     try {
       await comecarQuiz(s);
@@ -449,11 +565,21 @@ const acoes = {
     const i = s ? indiceNa(s, u.id) : -1;
     if (!s || i < 0 || s.jogadores[i].saiu) throw new ErroJogo('Você não está nessa partida.');
     if (s.status !== 'jogando') throw new ErroJogo('A partida não está em andamento.');
-    if (ehGrupo(s)) { responder(s, i, jogada || {}); return; }
+    if (ehQuiz(s)) { responder(s, i, jogada || {}); return; }
+    if (ehGrupo(s)) throw new ErroJogo('Use as setas para jogar.');
     const resultado = JOGOS[s.jogo].jogar(s.estado, i, jogada || {});
     if (resultado) finalizar(s, resultado, resultado.empate ? 'empate' : 'vitoria');
     enviarSala(s);
     if (resultado) avisarLobby();
+  },
+
+  // Cobrinha ao vivo: para onde a cobra vira (as setas de quem joga).
+  'cobras:virar'(u, { id, dir }) {
+    const s = salas.get(id);
+    if (!s || s.jogo !== 'cobras' || s.status !== 'jogando') return;
+    const i = indiceNa(s, u.id);
+    if (i < 0 || s.jogadores[i].saiu) return;
+    cobras.virar(s.estado, i, dir);
   },
 
   'sala:revanche'(u, { id }) {
@@ -461,7 +587,8 @@ const acoes = {
     const i = s ? indiceNa(s, u.id) : -1;
     if (!s || i < 0 || s.status !== 'fim') throw new ErroJogo('Não dá para pedir revanche agora.');
     if (ehGrupo(s)) {
-      // Quiz: a sala volta a esperar gente, com quem ficou até o fim.
+      // Quiz e cobrinha: a sala volta a esperar gente, com quem ficou até o fim.
+      clearTimeout(s.timer);
       if (dono(s)?.id !== u.id) throw new ErroJogo('Só quem abriu a sala pode começar outra rodada.');
       s.jogadores = ativos(s);
       Object.assign(s, { status: 'esperando', estado: null, vencedor: null, empate: false, motivo: null, criada: Date.now() });
@@ -600,7 +727,7 @@ function desconectar(ws) {
   }
   const s = salaAtivaDe(id);
   if (!s) return;
-  if (ehGrupo(s)) conferirRespostas(s); // o quiz não fica esperando quem caiu
+  if (ehQuiz(s)) conferirRespostas(s); // o quiz não fica esperando quem caiu
   enviarSala(s); // mostra para os outros que a pessoa caiu
   // Se não voltar a tempo, perde a partida (ou a sala de espera fecha).
   quedas.set(id, setTimeout(() => {

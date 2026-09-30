@@ -61,6 +61,7 @@ const comandosRenomear = (id, nome) => [
   ['UPDATE partidas SET jogador1_nome = ? WHERE jogador1_id = ?', nome, id],
   ['UPDATE partidas SET jogador2_nome = ? WHERE jogador2_id = ?', nome, id],
   ['UPDATE quiz_resultados SET usuario_nome = ? WHERE usuario_id = ?', nome, id],
+  ['UPDATE resultados SET usuario_nome = ? WHERE usuario_id = ?', nome, id],
   ['UPDATE recados SET autor_nome = ? WHERE autor_id = ?', nome, id],
 ];
 
@@ -185,6 +186,7 @@ r.delete('/:id', exigir('usuarios.remover'), async (req, res) => {
     ['UPDATE partidas SET jogador1_id = NULL WHERE jogador1_id = ?', id],
     ['UPDATE partidas SET jogador2_id = NULL WHERE jogador2_id = ?', id],
     ['UPDATE quiz_resultados SET usuario_id = NULL WHERE usuario_id = ?', id],
+    ['UPDATE resultados SET usuario_id = NULL WHERE usuario_id = ?', id],
     ['UPDATE recados SET autor_id = NULL WHERE autor_id = ?', id],
     ['DELETE FROM recados WHERE perfil_id = ?', id],
     ['DELETE FROM conquistas_usuario WHERE usuario_id = ?', id],

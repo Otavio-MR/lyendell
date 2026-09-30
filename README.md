@@ -33,6 +33,7 @@ Todo usuário é morador. Os cargos somam poderes em cima disso, e uma pessoa po
 | Diretor do Hospital | Tudo no Hospital, inclusive aprovar os registros dos médicos |
 | Médico | Ver o Hospital e registrar pacientes, que vão para a aprovação do Diretor do Hospital |
 | Senadora | Tudo no Congresso: publica as PECs, leis e regras votadas e aprova o que outros enviarem |
+| Lorde Comandante | Faz as Leis da Capital junto com a Família Nobre: escreve, publica, edita e revoga |
 | Morador | Ver tudo (menos o Hospital), ajudar nas atividades e usar a Recreação |
 
 O Hospital não é aberto a todos os moradores, porque guarda o prontuário dos pacientes: só o
@@ -45,7 +46,7 @@ O administrador pode mudar o que cada cargo faz, ou criar cargos novos, na tela 
 Ninguém consegue conceder a outra pessoa um poder que não tem: por isso a Família Nobre
 não consegue, por exemplo, dar a si mesma o poder de criar usuários.
 
-## Livros (Tabelionato, Guarda, Hospital e Congresso)
+## Livros (Tabelionato, Guarda, Hospital, Congresso e Leis da Capital)
 
 Cada módulo tem livros de registro, e cada livro tem o próprio formulário. Quem comanda
 o módulo pode, pelo próprio site:
@@ -64,6 +65,10 @@ Livros que já vêm prontos:
 - **Congresso**: Leis e Mudanças (título, tipo: PEC, lei, regra, emenda, decreto..., data da
   votação, resultado, o que muda, texto completo, votos e situação). As últimas publicações
   aparecem para todo mundo na tela de início, em **Novidades do Congresso**.
+- **Leis da Capital**: as leis de Lyendell (título, tipo: lei, decreto, edital, proibição, imposto...,
+  data, quem fez, o que diz, a pena para quem descumprir e a situação). Só o Lorde Comandante e a
+  Família Nobre escrevem, e publicam direto, sem aprovação; todo morador lê. As novas aparecem na
+  tela de início, em **Novas leis da Capital**.
 
 ## Aprovação de registros
 
@@ -134,7 +139,11 @@ Um salão com **chat ao vivo**, a lista de quem está online e os jogos:
   sala escolhe as categorias e o tamanho (5, 10 ou 15 perguntas) e começa quando quiser.
   Cada pergunta tem 20 segundos; acertar vale de 500 a 1000 pontos (quanto mais rápido, mais).
   Sozinho vale como treino. No fim aparece o pódio, e quem abriu pode começar outra rodada.
-- **Jogo da Velha** e **Pedra, Papel e Tesoura** (melhor de três), ao vivo contra outro morador.
+- **Cobrinha ao vivo**, de 2 a 4 pessoas (1v1, 1v1v1 ou 1v1v1v1) no mesmo tabuleiro: quem abre a sala
+  começa quando tiver gente, e há uma contagem de 3 segundos. Quem bate na borda, noutra cobra ou em
+  si mesma sai e o corpo vira cenouras; vence quem sobrar. Cabeça com cabeça tira as duas.
+- **Jogo da Velha**, **Pedra, Papel e Tesoura** (melhor de três) e **Lig 4** (quatro em linha, 7
+  colunas; dá para jogar com as teclas 1 a 7), ao vivo contra outro morador.
   Quem abre a partida espera alguém clicar em **Entrar**; os outros podem **Assistir**.
   No fim dá para pedir revanche (quem não começou, começa).
 - **Pac-Coelho**: o coelho da Casa come os Lírios do labirinto e foge de quatro raposas
@@ -142,13 +151,15 @@ Um salão com **chat ao vivo**, a lista de quem está online e os jogos:
   com medo; a cenoura é o bônus. Vida extra aos 10.000 pontos.
 - **Cobrinha**, comendo cenouras (setas, W A S D, ou deslizando o dedo no celular).
 - **Quebra-cabeça** com as fotos da Galeria, em 3x3, 4x4 ou 5x5.
+- **Jogo da Memória**, em 4x4, 4x6 ou 6x6: ache os pares com o menor número de jogadas.
 
 As perguntas do quiz ficam no banco: quem tem o poder "Criar e editar as perguntas do quiz"
 (a Família Nobre, e o administrador) corrige, apaga e cria perguntas no botão **Perguntas**
 do cartão do quiz. O sistema já vem com umas 115 perguntas.
 
-Cada jogo tem ranking: vitórias e acertos no quiz, vitórias nos jogos de dois, pontos no
-Pac-Coelho, cenouras na cobrinha e o menor tempo no quebra-cabeça. Quem sai de uma partida no
+Cada jogo tem ranking: vitórias e acertos no quiz, vitórias e cenouras na cobrinha ao vivo, vitórias
+nos jogos de dois, pontos no Pac-Coelho, cenouras na cobrinha, o menor tempo no quebra-cabeça e o
+menor número de jogadas na memória. Quem sai de uma partida no
 meio perde (no quiz, fica fora do resultado); quem cai da internet tem 30 segundos para voltar. A Família Nobre (e quem tiver o poder "Apagar mensagens de outros no chat") pode
 apagar mensagens impróprias; cada um pode apagar as suas.
 
@@ -183,7 +194,7 @@ Luckham), Tabelionato (com a estrela roxa do Centro da cidade), Banco e Quartel 
 - **Baixar imagem** gera um PNG do mapa inteiro, bom para mandar no Discord.
 
 **Casas.** Cada casa é um quadradinho numerado ao lado da rua (dourado: com morador; verde: comércio;
-tracejado: sem dono ou sem morador). Passando o mouse, ou clicando, aparece a ficha: o endereço e
+tracejado: sem dono, que é o mesmo que sem morador). Passando o mouse, ou clicando, aparece a ficha: o endereço e
 quem mora, com a foto e os dados do registro no Tabelionato (Moradores, Nobres e Outros) e um link
 que abre o registro. Quem mora é escolhido à mão ao editar a casa. Sem ninguém escolhido, o mapa
 tenta achar pelo nome da casa ("Rudeus" acha "Rudeus Greyrat", se for o único), menos em casa de
@@ -228,7 +239,7 @@ Para incentivar a visita de todo dia:
   (bronze no 5, prata no 10, ouro no 15, esmeralda no 20 e coroa no 25).
 - **Sequência de dias**: entrar todo dia aumenta a sequência e o XP da visita.
 - **Missões do dia**: três por dia, as mesmas para todo mundo, que renovam à meia-noite.
-- **Conquistas**: 24 no total (Tagarela, Sábio da Toca, Terror das Raposas, Braço forte...).
+- **Conquistas**: 26 no total (Tagarela, Sábio da Toca, Terror das Raposas, Braço forte...).
 
 Conquistas, missões cumpridas, nível novo e recado novo aparecem na hora, em qualquer tela.
 A tela de início mostra o progresso, as missões, as conquistas recentes e os mais ativos da semana.

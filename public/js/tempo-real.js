@@ -193,7 +193,7 @@ function avisarMudanca(antes, s) {
     if (s.eu === 0 && comecou) chamar(`${s.jogadores[1].nome} entrou na sua partida de ${s.nomeJogo}!`, 'Jogar agora', rotaDaSala(s.id), 20_000);
     return;
   }
-  if (comecou) chamar(`O ${s.nomeJogo} começou!`, 'Ir para o quiz', rotaDaSala(s.id), 20_000);
+  if (comecou) chamar(s.jogo === 'quiz' ? `O ${s.nomeJogo} começou!` : `A partida de ${s.nomeJogo} começou!`, s.jogo === 'quiz' ? 'Ir para o quiz' : 'Ir para a partida', rotaDaSala(s.id), 20_000);
   else if (s.status === 'esperando' && s.dono === rt.eu?.id && s.jogadores.length > antes.jogadores.length) {
     chamar(`${s.jogadores[s.jogadores.length - 1].nome} entrou na sua sala do ${s.nomeJogo} (${s.jogadores.length} de ${s.max}).`, 'Ver a sala', rotaDaSala(s.id), 12_000);
   }
@@ -252,13 +252,13 @@ export function atualizarBarra() {
   let minhaVez;
   let texto;
   if (s.grupo) {
-    minhaVez = s.status === 'jogando' && s.estado?.fase === 'pergunta' && s.estado.minha == null;
-    texto = s.status === 'esperando'
-      ? `Sala do ${s.nomeJogo} (${s.jogadores.length} de ${s.max}) esperando começar`
-      : `${s.nomeJogo}: pergunta ${s.estado?.numero} de ${s.estado?.total}${minhaVez ? ' · responda!' : ''}`;
+    minhaVez = s.jogo === 'quiz' && s.status === 'jogando' && s.estado?.fase === 'pergunta' && s.estado.minha == null;
+    if (s.status === 'esperando') texto = `Sala de ${s.nomeJogo} (${s.jogadores.length} de ${s.max}) esperando começar`;
+    else if (s.jogo === 'quiz') texto = `${s.nomeJogo}: pergunta ${s.estado?.numero} de ${s.estado?.total}${minhaVez ? ' · responda!' : ''}`;
+    else texto = `${s.nomeJogo}: sua partida está rolando!`;
   } else {
     const outro = s.jogadores[1 - s.eu];
-    minhaVez = s.jogo === 'velha' ? s.estado?.vez === s.eu : !s.estado?.minha;
+    minhaVez = s.jogo === 'velha' || s.jogo === 'lig4' ? s.estado?.vez === s.eu : !s.estado?.minha;
     texto = `Partida de ${s.nomeJogo} contra ${outro?.nome || '...'}${minhaVez ? ' · sua vez!' : ''}`;
   }
   if (!barra) {

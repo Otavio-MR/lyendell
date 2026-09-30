@@ -276,6 +276,19 @@ CREATE TABLE IF NOT EXISTS recados (
 );
 CREATE INDEX IF NOT EXISTS idx_recados_perfil ON recados(perfil_id, id);
 
+CREATE TABLE IF NOT EXISTS resultados (
+  id INTEGER PRIMARY KEY,
+  jogo TEXT NOT NULL,
+  usuario_id INTEGER,
+  usuario_nome TEXT NOT NULL,
+  posicao INTEGER NOT NULL,
+  jogadores INTEGER NOT NULL,
+  pontos INTEGER NOT NULL DEFAULT 0,
+  venceu INTEGER NOT NULL DEFAULT 0,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_resultados_jogo ON resultados(jogo);
+
 CREATE TABLE IF NOT EXISTS casas (
   id INTEGER PRIMARY KEY,
   numero TEXT NOT NULL DEFAULT '',
@@ -326,7 +339,7 @@ CREATE TABLE IF NOT EXISTS diario (
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 14;
+const VERSAO = 15;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -395,6 +408,7 @@ async function migrar() {
   if (versao < 13) await migrarHospitalECongresso();
   // v14: casas no mapa. A Família Nobre e a Tabeliã colocam e editam as casas.
   if (versao < 14) await darPermissoes({ 'Família Nobre': ['mapa.editar'], 'Tabeliã': ['mapa.editar'] });
+  if (versao < 15) await migrarLeisDaCapital();
 
   await db.run("INSERT INTO meta (chave, valor) VALUES ('versao', ?) ON CONFLICT (chave) DO UPDATE SET valor = excluded.valor", String(VERSAO));
 }
@@ -462,6 +476,26 @@ async function migrarHospitalECongresso() {
     l.modulo, l.nome, l.descricao, l.icone, l.aberto, JSON.stringify(l.campos), null, ordemLivro + i + 1,
   ]));
   await resolverReferencias();
+}
+
+// v15: Leis da Capital (o Lorde Comandante e a Família Nobre publicam), e "sem morador" virou "sem dono" no mapa.
+async function migrarLeisDaCapital() {
+  await db.run("UPDATE casas SET situacao = 'sem_dono' WHERE situacao = 'sem_morador'");
+  if (!(await db.get('SELECT COUNT(*) AS n FROM cargos')).n) return; // banco novo: o semear cria tudo
+  const lorde = CARGOS_PADRAO.find(c => c.nome === 'Lorde Comandante');
+  if (!await db.get('SELECT id FROM cargos WHERE nome = ?', lorde.nome)) {
+    const { ordem } = await db.get('SELECT COALESCE(MAX(ordem), 0) AS ordem FROM cargos');
+    await db.run('INSERT INTO cargos (nome, descricao, cor, permissoes, base, ordem) VALUES (?, ?, ?, ?, 0, ?)', lorde.nome, lorde.descricao, lorde.cor, '[]', ordem + 1);
+  }
+  const nobre = CARGOS_PADRAO.find(c => c.nome === 'Família Nobre').permissoes.filter(p => p.startsWith('leis.'));
+  await darPermissoes({ base: ['leis.ver'], 'Família Nobre': nobre, [lorde.nome]: lorde.permissoes });
+  await atualizarDescricoes();
+  if (!await db.get("SELECT id FROM livros WHERE modulo = 'leis' LIMIT 1")) {
+    const l = LIVROS_PADRAO.find(x => x.modulo === 'leis');
+    const { ordem } = await db.get('SELECT COALESCE(MAX(ordem), 0) AS ordem FROM livros');
+    await db.run('INSERT INTO livros (modulo, nome, descricao, icone, aberto, campos, cobranca, ordem) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      l.modulo, l.nome, l.descricao, l.icone, l.aberto, JSON.stringify(l.campos), null, ordem + 1);
+  }
 }
 
 // Descrições de cargo que ainda estão no texto antigo passam para o texto novo (as editadas à mão ficam).

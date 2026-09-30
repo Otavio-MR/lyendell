@@ -51,10 +51,10 @@ function infoNivel(xp = 0) {
 
 const MISSOES = [
   { chave: 'chat5', tipo: 'chat', meta: 5, xp: 30, texto: 'Converse no chat da cidade: 5 mensagens (spam, repetidas e "kkkk" não contam)' },
-  { chave: 'partida3', tipo: 'partida', meta: 3, xp: 40, texto: 'Termine 3 partidas ao vivo (quiz, velha ou pedra, papel e tesoura)' },
+  { chave: 'partida3', tipo: 'partida', meta: 3, xp: 40, texto: 'Termine 3 partidas ao vivo (quiz, velha, pedra-papel-tesoura, Lig 4 ou cobrinha ao vivo)' },
   { chave: 'vitoria1', tipo: 'vitoria', meta: 1, xp: 50, texto: 'Vença uma partida ao vivo' },
   { chave: 'quiz5', tipo: 'quiz_acerto', meta: 5, xp: 40, texto: 'Acerte 5 perguntas no Quiz de Lyendell' },
-  { chave: 'solo2', tipo: 'solo', meta: 2, xp: 25, texto: 'Jogue 2 vezes Pac-Coelho, Cobrinha ou Quebra-cabeça' },
+  { chave: 'solo2', tipo: 'solo', meta: 2, xp: 25, texto: 'Jogue 2 vezes Pac-Coelho, Cobrinha, Quebra-cabeça ou Memória' },
   { chave: 'recado1', tipo: 'recado', meta: 1, xp: 25, texto: 'Deixe um recado no perfil de alguém' },
   { chave: 'entrega1', tipo: 'entrega', meta: 1, xp: 50, texto: 'Tenha uma entrega conferida numa atividade' },
 ];
@@ -101,6 +101,8 @@ const CONQUISTAS = [
   { chave: 'pac30k', nome: 'Terror das Raposas', desc: 'Fez 30.000 pontos no Pac-Coelho.', icone: 'coelho', stat: 'pacman', meta: 30000, tipos: ['solo'] },
   { chave: 'cobra30', nome: 'Cobra criada', desc: 'Comeu 30 cenouras numa partida de Cobrinha.', icone: 'cobra', stat: 'cobrinha', meta: 30, tipos: ['solo'] },
   { chave: 'quebra5', nome: 'Mestre montador', desc: 'Montou um quebra-cabeça 5x5.', icone: 'peca', stat: 'quebra5', meta: 1, tipos: ['solo'] },
+  { chave: 'memoria6', nome: 'Memória de elefante', desc: 'Terminou o Jogo da Memória 6x6.', icone: 'cartas', stat: 'memoria6', meta: 1, tipos: ['solo'] },
+  { chave: 'cobras1', nome: 'Rei da arena', desc: 'Venceu uma partida de cobrinha ao vivo.', icone: 'cobra', stat: 'cobrasVitorias', meta: 1, tipos: ['vitoria'] },
   { chave: 'entrega1', nome: 'Mão na massa', desc: 'Teve a primeira entrega conferida numa atividade.', icone: 'tarefas', stat: 'entregas', meta: 1, tipos: ['entrega'] },
   { chave: 'entrega10', nome: 'Braço forte', desc: 'Teve 10 entregas conferidas.', icone: 'bau', stat: 'entregas', meta: 10, tipos: ['entrega'] },
   { chave: 'anuncio1', nome: 'Arauto', desc: 'Publicou o primeiro anúncio no mural.', icone: 'megafone', stat: 'anuncios', meta: 1, tipos: ['anuncio'] },
@@ -119,14 +121,18 @@ const STATS = {
   sequencia: id => n('SELECT sequencia_max AS n FROM usuarios WHERE id = ?', id),
   chat: id => n("SELECT SUM(qtd) AS n FROM eventos_dia WHERE usuario_id = ? AND tipo = 'chat'", id),
   partidas: id => n(`SELECT (SELECT COUNT(*) FROM partidas WHERE jogador1_id = ? OR jogador2_id = ?)
-    + (SELECT COUNT(*) FROM quiz_resultados WHERE usuario_id = ? AND jogadores > 1) AS n`, id, id, id),
+    + (SELECT COUNT(*) FROM quiz_resultados WHERE usuario_id = ? AND jogadores > 1)
+    + (SELECT COUNT(*) FROM resultados WHERE usuario_id = ? AND jogadores > 1) AS n`, id, id, id, id),
   vitorias: id => n(`SELECT (SELECT COUNT(*) FROM partidas WHERE (jogador1_id = ? AND vencedor = 1) OR (jogador2_id = ? AND vencedor = 2))
-    + (SELECT COUNT(*) FROM quiz_resultados WHERE usuario_id = ? AND posicao = 1 AND jogadores > 1) AS n`, id, id, id),
+    + (SELECT COUNT(*) FROM quiz_resultados WHERE usuario_id = ? AND posicao = 1 AND jogadores > 1)
+    + (SELECT COUNT(*) FROM resultados WHERE usuario_id = ? AND venceu = 1 AND jogadores > 1) AS n`, id, id, id, id),
   quizVitorias: id => n('SELECT COUNT(*) AS n FROM quiz_resultados WHERE usuario_id = ? AND posicao = 1 AND jogadores > 1', id),
   quizAcertos: id => n('SELECT SUM(acertos) AS n FROM quiz_resultados WHERE usuario_id = ?', id),
   pacman: id => n("SELECT MAX(pontos) AS n FROM recordes WHERE jogo = 'pacman' AND usuario_id = ?", id),
   cobrinha: id => n("SELECT MAX(pontos) AS n FROM recordes WHERE jogo = 'cobrinha' AND usuario_id = ?", id),
   quebra5: id => n("SELECT COUNT(*) AS n FROM recordes WHERE jogo = 'quebra' AND variante = '5x5' AND usuario_id = ?", id),
+  memoria6: id => n("SELECT COUNT(*) AS n FROM recordes WHERE jogo = 'memoria' AND variante = '6x6' AND usuario_id = ?", id),
+  cobrasVitorias: id => n("SELECT COUNT(*) AS n FROM resultados WHERE jogo = 'cobras' AND venceu = 1 AND usuario_id = ?", id),
   entregas: id => n('SELECT COUNT(*) AS n FROM contribuicoes WHERE usuario_id = ? AND conferida = 1', id),
   anuncios: id => n('SELECT COUNT(*) AS n FROM anuncios WHERE autor_id = ?', id),
   fotos: id => n('SELECT COUNT(*) AS n FROM fotos WHERE enviado_por = ?', id),

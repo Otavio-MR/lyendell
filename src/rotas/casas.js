@@ -12,7 +12,7 @@ const r = express.Router();
 r.use(exigirLogin);
 const editar = exigir('mapa.editar');
 
-const SITUACOES = ['ocupada', 'comercio', 'sem_dono', 'sem_morador'];
+const SITUACOES = ['ocupada', 'comercio', 'sem_dono']; // sem dono = sem morador (é a mesma coisa)
 const LADOS = ['esquerda', 'direita'];
 const [LARGURA, ALTURA] = [1154, 773]; // o tamanho do mapa
 
@@ -120,7 +120,7 @@ function lerCasa(b = {}, atual = {}) {
   return {
     numero: linha(b.numero ?? atual.numero ?? '', 10),
     via, lado, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10,
-    situacao: SITUACOES.includes(b.situacao) ? b.situacao : atual.situacao || 'ocupada',
+    situacao: b.situacao === 'sem_morador' ? 'sem_dono' : SITUACOES.includes(b.situacao) ? b.situacao : atual.situacao || 'ocupada',
     texto: linha(b.texto ?? atual.texto ?? '', 80),
     pessoas,
   };
