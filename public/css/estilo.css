@@ -1411,6 +1411,12 @@ body.com-radio.radio-mini #toasts { bottom: 86px; }
 .chip-x { display: inline-grid; place-items: center; width: 16px; height: 16px; margin-left: 2px; padding: 0; border: 0; border-radius: 50%; background: none; color: inherit; cursor: pointer; }
 .chip-x:hover { background: rgba(255, 255, 255, 0.12); }
 .chip-x .ico { width: 11px; height: 11px; }
+.mapa-sugestoes { display: grid; gap: 6px; }
+.mapa-sugestoes:empty { display: none; }
+.mapa-sugestao { cursor: pointer; font: inherit; border-style: dashed; }
+.mapa-sugestao:hover { border-style: solid; border-color: var(--ouro-d); }
+.mapa-sugestao small { color: var(--suave); font-size: 0.78rem; margin-left: 4px; }
+.mapa-sugestao.mora-fora { opacity: 0.7; }
 .mapa-check { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .mapa-resumo-lista { font-size: 0.9rem; margin: 0; }
 .mapa-busca { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }

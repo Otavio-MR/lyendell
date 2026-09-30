@@ -315,6 +315,7 @@ function fichaDaCasa(c, { fixa, podeEditar, aoFechar, aoEditar }) {
         fixa && h('a', { href: `#/tabelionato/${p.livro_id}/registro/${p.registro_id}` }, `Ver no ${p.livro}`))))),
     !fixa && moradores.length > 4 && h('small', { class: 'suave' }, `e mais ${moradores.length - 4}. Clique para ver todos.`),
     c.situacao === 'ocupada' && !moradores.length && h('small', { class: 'suave' }, 'Ninguém do Tabelionato ligado a esta casa ainda.'),
+    fixa && podeEditar && c.palpite && moradores.length > 0 && h('small', { class: 'suave' }, 'Achado pelo nome da casa. Se não for essa pessoa, escolha em "Editar casa".'),
     fixa && podeEditar && h('div', { class: 'mapa-ficha-acoes' }, botao('Editar casa', { icone: 'editar', classe: 'btn-pequeno', onclick: aoEditar })),
     fixa && h('button', { class: 'btn-icone mapa-ficha-fechar', type: 'button', title: 'Fechar', 'aria-label': 'Fechar', onclick: aoFechar }, icone('x')));
 }
@@ -484,12 +485,41 @@ export async function mapa() {
     // Quem mora: nomes escolhidos dos registros do Tabelionato.
     const escolhidos = [...(dados.pessoas || [])];
     const chips = h('div', { class: 'mapa-chips' });
-    const lista = h('datalist', { id: 'mapa-nomes' }, nomes.map(n => h('option', { value: n.nome }, n.livro)));
+    // Onde cada pessoa já mora (em outra casa), para não ligar a mesma pessoa em dois lugares sem querer.
+    const ondeMora = nome => {
+      const outra = casas.find(x => x.id !== c?.id && (x.moradores || []).some(p => p.nome === nome));
+      return outra ? `mora na Casa ${outra.numero || 's/n'}${viaPorId(outra.via) ? ` (${viaPorId(outra.via).nome})` : ''}` : '';
+    };
+    const lista = h('datalist', { id: 'mapa-nomes' }, nomes.map(n => h('option', { value: n.nome }, [n.livro, ondeMora(n.nome)].filter(Boolean).join(' · '))));
     const busca = h('input', { class: 'input', list: 'mapa-nomes', placeholder: 'Digite para procurar no Tabelionato...' });
-    const desenharChips = () => trocar(chips, escolhidos.length
-      ? escolhidos.map((n, i) => h('span', { class: 'chip' }, n,
-        h('button', { type: 'button', class: 'chip-x', title: `Tirar ${n}`, 'aria-label': `Tirar ${n}`, onclick: () => { escolhidos.splice(i, 1); desenharChips(); } }, icone('x'))))
-      : h('small', { class: 'suave' }, 'Ninguém escolhido: o mapa procura pelo nome da casa.'));
+    // Casa de família: sugere quem tem o sobrenome, mas só entra quem for clicado (nem todo mundo mora ali).
+    const sugestoes = h('div', { class: 'mapa-sugestoes' });
+    const desenharSugestoes = () => {
+      const familia = normalizar(texto.value).match(/\bfamilia\s+(.+)$/);
+      const sobrenome = familia ? familia[1].split(' ').filter(Boolean) : [];
+      const achadas = sobrenome.length
+        ? nomes.filter(n => !escolhidos.includes(n.nome) && sobrenome.every(w => normalizar(n.nome).split(' ').includes(w)))
+        : [];
+      trocar(sugestoes, achadas.length > 0 && [
+        h('small', { class: 'suave' }, `Com o sobrenome ${familia[1].replace(/\b\w/g, l => l.toUpperCase())} no Tabelionato (clique em quem mora aqui):`),
+        h('div', { class: 'mapa-chips' }, achadas.map(n => {
+          const onde = ondeMora(n.nome);
+          return h('button', {
+            type: 'button', class: `chip mapa-sugestao ${onde ? 'mora-fora' : ''}`.trim(), title: onde || 'Adicionar',
+            onclick: () => { escolhidos.push(n.nome); desenharChips(); },
+          }, icone('mais'), n.nome, onde && h('small', null, onde));
+        })),
+      ]);
+    };
+    const desenharChips = () => {
+      trocar(chips, escolhidos.length
+        ? escolhidos.map((n, i) => h('span', { class: 'chip' }, n,
+          h('button', { type: 'button', class: 'chip-x', title: `Tirar ${n}`, 'aria-label': `Tirar ${n}`, onclick: () => { escolhidos.splice(i, 1); desenharChips(); } }, icone('x'))))
+        : h('small', { class: 'suave' }, /\bfamilia\b/.test(normalizar(texto.value))
+          ? 'Ninguém escolhido. Casa de família não liga ninguém sozinha: escolha quem mora aqui.'
+          : 'Ninguém escolhido: o mapa procura pelo nome da casa.'));
+      desenharSugestoes();
+    };
     const adicionar = () => {
       const v = busca.value.trim();
       if (!v || escolhidos.includes(v)) return;
@@ -499,6 +529,7 @@ export async function mapa() {
     };
     busca.addEventListener('change', adicionar);
     busca.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); adicionar(); } });
+    texto.addEventListener('input', desenharChips);
     desenharChips();
     let janela = null;
     const apagar = c && h('button', {
@@ -517,7 +548,7 @@ export async function mapa() {
         h('div', { class: 'form-grade' }, campo('Número', numero), campo('Situação', situacao)),
         h('div', { class: 'form-grade' }, campo('Rua ou avenida', via), campo('Lado', ladoSel)),
         campo('Nome da casa', texto, { ajuda: 'O que aparece no mapa. Pode ser o morador, a família ou o comércio.' }),
-        campo('Quem mora (do Tabelionato)', h('div', { class: 'mapa-escolher' }, busca, lista, chips),
+        campo('Quem mora (do Tabelionato)', h('div', { class: 'mapa-escolher' }, busca, lista, chips, sugestoes),
           { ajuda: 'Escolha um ou mais registros de Moradores, Nobres ou Outros. A foto e os dados vêm de lá.' }),
       ],
       extraRodape: apagar,

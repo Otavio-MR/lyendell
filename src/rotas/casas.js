@@ -1,6 +1,7 @@
 // Casas do mapa de Lyendell. Cada casa guarda onde fica (x, y no mapa, rua e lado), o número,
 // a situação e quem mora. Quem mora é ligado pelo nome aos registros do Tabelionato
 // (Moradores, Nobres e Outros), de onde vêm a foto e os dados mostrados no mapa.
+// Sem ninguém escolhido à mão, o mapa tenta achar pelo nome da casa (menos casas de família).
 const express = require('express');
 const { db } = require('../db');
 const { exigirLogin, exigir, pode } = require('../auth');
@@ -58,27 +59,32 @@ async function pessoasRegistradas() {
 }
 
 // Liga um nome às pessoas registradas: o nome exato, ou o único registro que tem todas as palavras
-// ("Rudeus" acha "Rudeus Greyrat"). "Casa da Família Lombardi" traz todo mundo com Lombardi no nome.
-function acharPessoas(nome, pessoas) {
+// ("Rudeus" acha "Rudeus Greyrat").
+// Quando é só um palpite pelo nome da casa (ninguém foi escolhido à mão):
+//  - nome de família ("Casa da Família Lombardi") não liga ninguém: nem todo Lombardi mora ali;
+//  - quem já foi escolhido à mão para alguma casa fica de fora (mora lá, não aqui).
+function acharPessoas(nome, pessoas, { palpite = false, escolhidos = new Set() } = {}) {
   const k = chaveNome(nome);
-  const familia = k.match(/familia\s+(.+)$/);
-  if (familia) {
-    const sobrenome = familia[1].split(' ');
-    return pessoas.filter(p => sobrenome.every(w => p.chave.split(' ').includes(w)));
-  }
+  if (palpite && /\bfamilia\b/.test(k)) return [];
+  const livre = p => !(palpite && escolhidos.has(p.registro_id));
   const exata = pessoas.find(p => p.chave === k);
-  if (exata) return [exata];
+  if (exata) return livre(exata) ? [exata] : [];
   const palavras = k.split(' ');
-  const parecidas = pessoas.filter(p => palavras.every(w => p.chave.split(' ').includes(w)));
+  const parecidas = pessoas.filter(p => palavras.every(w => p.chave.split(' ').includes(w)) && livre(p));
   return parecidas.length === 1 ? parecidas : [];
 }
 
-function moradoresDa(casa, pessoas) {
-  const nomes = casa.pessoas.length ? casa.pessoas : casa.situacao === 'ocupada' && casa.texto ? [casa.texto] : [];
+function moradoresDa(casa, pessoas, escolhidos) {
+  const aMao = casa.pessoas.length > 0;
+  const nomes = aMao ? casa.pessoas : casa.situacao === 'ocupada' && casa.texto ? [casa.texto] : [];
   const vistos = new Set();
-  return nomes.flatMap(n => acharPessoas(n, pessoas)).filter(p => !vistos.has(p.registro_id) && vistos.add(p.registro_id))
+  return nomes.flatMap(n => acharPessoas(n, pessoas, { palpite: !aMao, escolhidos }))
+    .filter(p => !vistos.has(p.registro_id) && vistos.add(p.registro_id))
     .slice(0, 12).map(({ chave, ...p }) => p);
 }
+
+// Registros de quem foi escolhido à mão em alguma casa.
+const escolhidosAMao = (casas, pessoas) => new Set(casas.flatMap(c => c.pessoas.flatMap(n => acharPessoas(n, pessoas))).map(p => p.registro_id));
 
 /* ─── Rotas ───────────────────────────────────────── */
 
@@ -89,8 +95,13 @@ r.get('/', async (req, res) => {
   const verTabelionato = pode(req, 'tabelionato.ver');
   const podeEditar = pode(req, 'mapa.editar');
   const pessoas = verTabelionato || podeEditar ? await pessoasRegistradas() : [];
+  const escolhidos = escolhidosAMao(casas, pessoas);
   res.json({
-    casas: casas.map(c => ({ ...c, moradores: verTabelionato ? moradoresDa(c, pessoas) : [] })),
+    casas: casas.map(c => ({
+      ...c,
+      moradores: verTabelionato ? moradoresDa(c, pessoas, escolhidos) : [],
+      palpite: !c.pessoas.length, // quem mora foi achado pelo nome da casa, e não escolhido à mão
+    })),
     podeEditar,
     // Para escolher quem mora, na hora de editar.
     nomes: podeEditar ? pessoas.map(p => ({ nome: p.nome, livro: p.livro })) : undefined,

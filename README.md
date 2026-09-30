@@ -185,8 +185,11 @@ Luckham), Tabelionato (com a estrela roxa do Centro da cidade), Banco e Quartel 
 **Casas.** Cada casa é um quadradinho numerado ao lado da rua (dourado: com morador; verde: comércio;
 tracejado: sem dono ou sem morador). Passando o mouse, ou clicando, aparece a ficha: o endereço e
 quem mora, com a foto e os dados do registro no Tabelionato (Moradores, Nobres e Outros) e um link
-que abre o registro. Quem mora é achado pelo nome da casa ("Rudeus" acha "Rudeus Greyrat"; "Casa da
-Família Lombardi" traz todos com Lombardi no nome) ou escolhido à mão. Só entram registros aprovados.
+que abre o registro. Quem mora é escolhido à mão ao editar a casa. Sem ninguém escolhido, o mapa
+tenta achar pelo nome da casa ("Rudeus" acha "Rudeus Greyrat", se for o único), menos em casa de
+família: nem todo mundo com o sobrenome mora nela, então o formulário só sugere quem tem o sobrenome
+e mostra onde cada um já mora. Quem foi escolhido para uma casa não aparece em outra pelo nome
+parecido. Só entram registros aprovados.
 
 Quem tem o poder "Colocar, mover e editar as casas do mapa" (a Família Nobre e a Tabeliã) usa
 **Editar casas**:
