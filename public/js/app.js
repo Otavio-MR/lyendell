@@ -49,6 +49,7 @@ const ROTAS = [
   [/^\/(tabelionato|guarda|hospital|congresso)\/aprovacoes$/, m => aprovacoes(m)],
   [/^\/(tabelionato|guarda|hospital|congresso)\/envios$/, m => envios(m)],
   [/^\/(tabelionato|guarda|hospital|congresso)\/(\d+)$/, (m, id) => livro(m, id)],
+  [/^\/(tabelionato|guarda|hospital|congresso)\/(\d+)\/registro\/(\d+)$/, (m, id, reg) => livro(m, id, reg)],
   [/^\/admin\/usuarios$/, () => usuarios()],
   [/^\/admin\/cargos$/, () => cargos()],
   [/^\/admin\/diario$/, () => diario()],

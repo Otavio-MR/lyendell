@@ -4,6 +4,7 @@ const { createClient } = require('@libsql/client');
 const { hashSenha } = require('./senhas');
 const { CARGOS_PADRAO, DESCRICOES, EXCLUSIVAS } = require('./permissoes');
 const { LIVROS_PADRAO, AJUDA_ABERTURA, CAMPOS_PENA, CAMPO_GUARDAS, CAMPOS_FICHA, FICHAS } = require('./livros-padrao');
+const { CASAS_PADRAO } = require('./casas-padrao');
 const { PERGUNTAS_PADRAO } = require('./perguntas-padrao');
 const { linha, chaveNome } = require('./util');
 
@@ -275,6 +276,20 @@ CREATE TABLE IF NOT EXISTS recados (
 );
 CREATE INDEX IF NOT EXISTS idx_recados_perfil ON recados(perfil_id, id);
 
+CREATE TABLE IF NOT EXISTS casas (
+  id INTEGER PRIMARY KEY,
+  numero TEXT NOT NULL DEFAULT '',
+  via TEXT,
+  lado TEXT,
+  x REAL NOT NULL,
+  y REAL NOT NULL,
+  situacao TEXT NOT NULL DEFAULT 'ocupada',
+  texto TEXT NOT NULL DEFAULT '',
+  pessoas TEXT NOT NULL DEFAULT '[]',
+  atualizado_por_nome TEXT NOT NULL DEFAULT '',
+  atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS musicas (
   id INTEGER PRIMARY KEY,
   tipo TEXT NOT NULL,
@@ -311,7 +326,7 @@ CREATE TABLE IF NOT EXISTS diario (
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 13;
+const VERSAO = 14;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -378,6 +393,8 @@ async function migrar() {
   // v12: a trilha fica só com músicas em arquivo (sem Spotify, YouTube ou links de fora).
   if (versao < 12) await db.run("DELETE FROM musicas WHERE tipo <> 'arquivo'");
   if (versao < 13) await migrarHospitalECongresso();
+  // v14: casas no mapa. A Família Nobre e a Tabeliã colocam e editam as casas.
+  if (versao < 14) await darPermissoes({ 'Família Nobre': ['mapa.editar'], 'Tabeliã': ['mapa.editar'] });
 
   await db.run("INSERT INTO meta (chave, valor) VALUES ('versao', ?) ON CONFLICT (chave) DO UPDATE SET valor = excluded.valor", String(VERSAO));
 }
@@ -588,6 +605,18 @@ async function semear() {
       l.modulo, l.nome, l.descricao, l.icone, l.aberto, JSON.stringify(l.campos), l.cobranca ? JSON.stringify(l.cobranca) : null, i,
     ]));
     await resolverReferencias();
+  }
+
+  // As primeiras casas do mapa (Avenida Santa Menefreda) também entram uma vez só.
+  if (!await db.get("SELECT valor FROM meta WHERE chave = 'casas_semeadas'")) {
+    const vazio = !(await db.get('SELECT COUNT(*) AS n FROM casas')).n;
+    await db.lote([
+      ...(vazio ? CASAS_PADRAO.map(c => [
+        'INSERT INTO casas (numero, via, lado, x, y, situacao, texto, pessoas, atualizado_por_nome) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        c.numero, c.via, c.lado, c.x, c.y, c.situacao, c.texto, '[]', 'Sistema',
+      ]) : []),
+      ["INSERT INTO meta (chave, valor) VALUES ('casas_semeadas', '1')"],
+    ]);
   }
 
   // As perguntas padrão do quiz entram uma vez só: se alguém apagar todas depois, não voltam.

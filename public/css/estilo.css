@@ -1361,7 +1361,6 @@ body.com-radio.radio-mini #toasts { bottom: 86px; }
 .mapa-info p:empty { display: none; }
 .mapa-info .btn-icone { position: absolute; top: 6px; right: 6px; width: 28px; height: 28px; }
 .mapa-lado { margin-top: 18px; display: grid; gap: 16px; }
-.mapa-lado > .input { max-width: 360px; }
 .mapa-listas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; align-items: start; }
 .mapa-sub { font-family: var(--f-titulo); font-size: 0.76rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ouro); margin: 0 0 8px; padding-bottom: 6px; border-bottom: 1px solid var(--borda); }
 .mapa-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
@@ -1376,6 +1375,51 @@ body.com-radio.radio-mini #toasts { bottom: 86px; }
 .mapa-num.rua { background: #2a281f; color: #eee2bb; border: 1px solid #857d66; }
 .mapa-num.predio { background: #0b110d; color: var(--ouro-l); border: 1px solid var(--ouro); }
 .mapa-num .ico { width: 14px; height: 14px; }
+
+/* Casas do mapa: ficha, edição e lista */
+.mapa-ficha {
+  position: absolute; z-index: 3; width: 290px; max-width: calc(100% - 16px); display: grid; gap: 4px; padding: 12px 14px;
+  border-radius: var(--raio-p); background: rgba(8, 12, 9, 0.96); border: 1px solid var(--ouro-d); box-shadow: var(--sombra); pointer-events: none;
+}
+.mapa-ficha.fixa { pointer-events: auto; padding-right: 36px; max-height: calc(100% - 16px); overflow-y: auto; }
+.mapa-ficha-end { color: var(--suave); font-size: 0.8rem; }
+.mapa-ficha-nome { font-family: var(--f-titulo); color: var(--ouro-l); font-size: 1rem; line-height: 1.25; }
+.mapa-ficha-sit { justify-self: start; font-family: var(--f-titulo); font-size: 0.64rem; letter-spacing: 0.08em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; border: 1px solid; }
+.sit-ocupada { color: #e0bd5a; border-color: rgba(224, 189, 90, 0.5); }
+.sit-comercio { color: #6fc1b5; border-color: rgba(111, 193, 181, 0.5); }
+.sit-sem_dono, .sit-sem_morador { color: #a39d86; border-color: rgba(163, 157, 134, 0.45); }
+.mapa-moradores { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 10px; }
+.mapa-moradores li { display: flex; gap: 10px; align-items: flex-start; }
+.avatar-m { width: 46px; height: 46px; font-size: 0.9rem; flex: none; }
+.mapa-moradores strong { display: block; color: var(--texto); }
+.mapa-moradores dl { margin: 2px 0 0; display: grid; gap: 1px; font-size: 0.84rem; }
+.mapa-moradores dl > div { display: flex; gap: 5px; }
+.mapa-moradores dt { color: var(--suave); }
+.mapa-moradores dt::after { content: ':'; }
+.mapa-moradores dd { margin: 0; color: var(--texto-2); }
+.mapa-moradores a { font-size: 0.84rem; }
+.mapa-ficha-acoes { margin-top: 6px; }
+.mapa-ficha-fechar { position: absolute; top: 6px; right: 6px; width: 28px; height: 28px; }
+.mapa-edicao {
+  position: absolute; left: 12px; top: 12px; z-index: 2; max-width: min(560px, calc(100% - 80px)); display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 14px; border-radius: var(--raio-p); background: rgba(8, 12, 9, 0.94); border: 1px solid var(--ouro); font-size: 0.92rem; color: var(--texto-2);
+}
+.mapa-edicao > .ico { color: var(--ouro); }
+.mapa-edicao > span { flex: 1 1 260px; }
+.mapa-escolher { display: grid; gap: 8px; }
+.mapa-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip-x { display: inline-grid; place-items: center; width: 16px; height: 16px; margin-left: 2px; padding: 0; border: 0; border-radius: 50%; background: none; color: inherit; cursor: pointer; }
+.chip-x:hover { background: rgba(255, 255, 255, 0.12); }
+.chip-x .ico { width: 11px; height: 11px; }
+.mapa-check { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.mapa-resumo-lista { font-size: 0.9rem; margin: 0; }
+.mapa-busca { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.mapa-busca > .input { max-width: 360px; }
+.mapa-resumo { margin: 0; font-size: 0.92rem; }
+.mapa-num.casa { width: 26px; font-size: 0.7rem; border-radius: 4px; }
+.mapa-num.casa.sit-ocupada { background: #5c4a1f; border: 1px solid #e0bd5a; color: #fff3d0; }
+.mapa-num.casa.sit-comercio { background: #173f3b; border: 1px solid #6fc1b5; color: #e8fbf7; }
+.mapa-num.casa.sit-sem_dono, .mapa-num.casa.sit-sem_morador { background: #1b201b; border: 1px dashed #77725f; color: #a39d86; }
 
 /* ─── Celular e tablet ──────────────────────────── */
 @media (max-width: 960px) {

@@ -74,6 +74,7 @@ app.use('/api/atividades', require('./src/rotas/atividades'));
 app.use('/api/recreacao', require('./src/rotas/recreacao'));
 app.use('/api/pessoas', require('./src/rotas/pessoas'));
 app.use('/api/trilha', require('./src/rotas/trilha'));
+app.use('/api/casas', require('./src/rotas/casas'));
 app.use('/api', require('./src/rotas/livros'));
 app.use('/api', require('./src/rotas/geral'));
 app.use('/api', (req, res, next) => next(erro(404, 'Rota não encontrada.')));

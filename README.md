@@ -182,6 +182,24 @@ Luckham), Tabelionato (com a estrela roxa do Centro da cidade), Banco e Quartel 
 - Clique numa rua ou prédio (no mapa ou na lista ao lado) para destacar e ver onde fica.
 - **Baixar imagem** gera um PNG do mapa inteiro, bom para mandar no Discord.
 
+**Casas.** Cada casa é um quadradinho numerado ao lado da rua (dourado: com morador; verde: comércio;
+tracejado: sem dono ou sem morador). Passando o mouse, ou clicando, aparece a ficha: o endereço e
+quem mora, com a foto e os dados do registro no Tabelionato (Moradores, Nobres e Outros) e um link
+que abre o registro. Quem mora é achado pelo nome da casa ("Rudeus" acha "Rudeus Greyrat"; "Casa da
+Família Lombardi" traz todos com Lombardi no nome) ou escolhido à mão. Só entram registros aprovados.
+
+Quem tem o poder "Colocar, mover e editar as casas do mapa" (a Família Nobre e a Tabeliã) usa
+**Editar casas**:
+
+- **Colar lista de uma rua**: uma linha "Esquerda" ou "Direita" e depois "Casa 02 - Nome" em cada
+  linha. O site põe as casas enfileiradas dos dois lados, na mesma altura, desviando das esquinas.
+  "Sem dono" e "Sem morador" viram casas vazias; bar, peixaria, pousada e afins viram comércio.
+- clicar num lugar vazio põe uma casa (ela encosta alinhada na rua mais perto);
+- arrastar uma casa muda o lugar; clicar nela abre para editar número, situação, nome e quem mora.
+
+Numa rua em pé, esquerda é o lado oeste; numa rua deitada, é o lado de cima. Os números crescem de
+cima para baixo, ou da esquerda para a direita. As casas da Avenida Santa Menefreda já vêm no mapa.
+
 Os dados ficam em `public/js/mapa-lyendell.js`, com as coordenadas tiradas da vista de cima do
 jogo (imagem de 1154 x 773, norte para cima). Para acrescentar algo (ex.: as casas), é só marcar o
 ponto nessa mesma imagem e anotar o x e o y.

@@ -62,6 +62,9 @@ const CATALOGO = [
     { chave: 'recreacao.moderar', nome: 'Apagar mensagens de outros no chat' },
     { chave: 'recreacao.perguntas', nome: 'Criar e editar as perguntas do quiz' },
   ] },
+  { grupo: 'Mapa', itens: [
+    { chave: 'mapa.editar', nome: 'Colocar, mover e editar as casas do mapa (e quem mora em cada uma)' },
+  ] },
   { grupo: 'Trilha sonora', itens: [
     { chave: 'trilha.gerenciar', nome: 'Adicionar e tirar músicas da trilha sonora' },
   ] },
@@ -110,7 +113,7 @@ const CARGOS_PADRAO = [
     permissoes: TODAS.filter(p => p !== 'usuarios.criar' && p !== 'cargos.gerenciar' && !EXCLUSIVAS[p]) },
   { nome: 'Tabeliã', cor: '#c98b4a',
     descricao: DESCRICOES['Tabeliã'][1],
-    permissoes: [...MEMBRO, ...acoes('tabelionato', 'registrar', 'editar', 'apagar', 'configurar', 'pagamentos', 'aprovar')] },
+    permissoes: [...MEMBRO, ...acoes('tabelionato', 'registrar', 'editar', 'apagar', 'configurar', 'pagamentos', 'aprovar'), 'mapa.editar'] },
   { nome: 'Escriba', cor: '#b9a27a',
     descricao: DESCRICOES.Escriba[1],
     permissoes: [...MEMBRO, 'tabelionato.registrar'] },

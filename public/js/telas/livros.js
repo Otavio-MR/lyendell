@@ -196,7 +196,8 @@ function cartaoPendente(m, r, l, permissoes, recarregar, modo) {
 
 /* ─── Um livro: registros ─────────────────────────── */
 
-export async function livro(m, id) {
+// abrir: id de um registro para já abrir o documento dele (ex.: vindo do mapa).
+export async function livro(m, id, abrir = null) {
   const info = MODULOS[m];
   const raiz = h('div', { class: 'pagina' });
   const filtros = {};
@@ -320,6 +321,10 @@ export async function livro(m, id) {
   }
 
   await carregar();
+  if (abrir) {
+    const reg = d.registros.find(x => x.id === Number(abrir));
+    if (reg) setTimeout(() => verRegistro(m, d, reg, carregar, abrirDepois), 0);
+  }
   return raiz;
 }
 
