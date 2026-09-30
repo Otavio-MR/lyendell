@@ -1,7 +1,7 @@
 import { estado, get, post, h, trocar, icone, pode, podeAlgum, aviso, avatar, cargoPrincipal, vazio, limparTela } from './core.js';
 import { ligar, desligar, ouvir, rt } from './tempo-real.js';
 import { inicio } from './telas/inicio.js';
-import { modulo, livro, aprovacoes, envios } from './telas/livros.js';
+import { modulo, livro, aprovacoes, envios, MODULOS } from './telas/livros.js';
 import { galeria } from './telas/galeria.js';
 import { anuncios } from './telas/anuncios.js';
 import { atividades, atividade } from './telas/atividades.js';
@@ -20,6 +20,7 @@ const MENU = [
     { rota: '/', nome: 'Início', icone: 'casa' },
     { rota: '/comunidade', nome: 'Comunidade', icone: 'usuarios' },
     { rota: '/anuncios', nome: 'Mural de Anúncios', icone: 'megafone', perm: ['anuncios.ver'] },
+    { rota: '/congresso', nome: 'Congresso', icone: 'coluna', perm: ['congresso.ver'] },
     { rota: '/atividades', nome: 'Mural de Atividades', icone: 'tarefas', perm: ['atividades.ver'] },
     { rota: '/galeria', nome: 'Galeria', icone: 'imagem', perm: ['galeria.ver'] },
     { rota: '/recreacao', nome: 'Recreação', icone: 'jogos', perm: ['recreacao.usar'] },
@@ -27,6 +28,7 @@ const MENU = [
   { secao: 'Registros', itens: [
     { rota: '/tabelionato', nome: 'Tabelionato', icone: 'pergaminho', perm: ['tabelionato.ver'] },
     { rota: '/guarda', nome: 'Guarda do Coelho', icone: 'escudo', perm: ['guarda.ver'] },
+    { rota: '/hospital', nome: 'Hospital', icone: 'cruz', perm: ['hospital.ver'] },
   ] },
   { secao: 'Administração', itens: [
     { rota: '/admin/usuarios', nome: 'Usuários', icone: 'usuarios', perm: ['usuarios.ver'] },
@@ -41,10 +43,10 @@ const ROTAS = [
   [/^\/atividades$/, () => atividades()],
   [/^\/atividades\/(\d+)$/, id => atividade(id)],
   [/^\/galeria(?:\/(\d+|sem-album))?$/, album => galeria(album)],
-  [/^\/(tabelionato|guarda)$/, m => modulo(m)],
-  [/^\/(tabelionato|guarda)\/aprovacoes$/, m => aprovacoes(m)],
-  [/^\/(tabelionato|guarda)\/envios$/, m => envios(m)],
-  [/^\/(tabelionato|guarda)\/(\d+)$/, (m, id) => livro(m, id)],
+  [/^\/(tabelionato|guarda|hospital|congresso)$/, m => modulo(m)],
+  [/^\/(tabelionato|guarda|hospital|congresso)\/aprovacoes$/, m => aprovacoes(m)],
+  [/^\/(tabelionato|guarda|hospital|congresso)\/envios$/, m => envios(m)],
+  [/^\/(tabelionato|guarda|hospital|congresso)\/(\d+)$/, (m, id) => livro(m, id)],
   [/^\/admin\/usuarios$/, () => usuarios()],
   [/^\/admin\/cargos$/, () => cargos()],
   [/^\/admin\/diario$/, () => diario()],
@@ -242,7 +244,7 @@ async function atualizarAvisos() {
   if (!estado.eu) return;
   let p;
   try { p = await get('/api/pendencias'); } catch { return; }
-  for (const m of ['tabelionato', 'guarda']) {
+  for (const m of Object.keys(MODULOS)) {
     const item = document.querySelector(`.menu-item[data-rota="/${m}"]`);
     if (!item) continue;
     item.querySelector('.menu-aviso')?.remove();

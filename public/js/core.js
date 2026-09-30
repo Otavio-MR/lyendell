@@ -164,6 +164,8 @@ const ICONES = {
   grades: '<rect x="3" y="3" width="18" height="18" rx="1.5"/><path d="M7.5 3v18M12 3v18M16.5 3v18M3 12h18"/>',
   alvo: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r=".8"/>',
   balanca: '<path d="M12 3v18M7 21h10M5 7h14"/><path d="m5 7-3 6a3 3 0 0 0 6 0z"/><path d="m19 7-3 6a3 3 0 0 0 6 0z"/>',
+  cruz: '<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M12 7.5v9M7.5 12h9"/>',
+  coluna: '<path d="M3 21h18M4.5 18h15M3.5 9.5h17L12 4z"/><path d="M6 9.5V18M10 9.5V18M14 9.5V18M18 9.5V18"/>',
   mapa: '<path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/>',
   moeda: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="5.5"/><path d="M12 9.5v5"/>',
   espada: '<path d="M14.5 3H21v6.5L10 20.5 3.5 14z"/><path d="m6 11.5 6.5 6.5"/><path d="m3 21 3.5-3.5"/>',

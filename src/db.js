@@ -311,7 +311,7 @@ CREATE TABLE IF NOT EXISTS diario (
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 12;
+const VERSAO = 13;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -377,6 +377,7 @@ async function migrar() {
   }
   // v12: a trilha fica só com músicas em arquivo (sem Spotify, YouTube ou links de fora).
   if (versao < 12) await db.run("DELETE FROM musicas WHERE tipo <> 'arquivo'");
+  if (versao < 13) await migrarHospitalECongresso();
 
   await db.run("INSERT INTO meta (chave, valor) VALUES ('versao', ?) ON CONFLICT (chave) DO UPDATE SET valor = excluded.valor", String(VERSAO));
 }
@@ -413,6 +414,44 @@ async function alinharFichas() {
     const { m } = await db.get('SELECT COALESCE(MAX(ordem), 0) AS m FROM livros');
     await db.run('INSERT INTO livros (modulo, nome, descricao, icone, aberto, campos, cobranca, ordem) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       o.modulo, o.nome, o.descricao, o.icone, o.aberto, JSON.stringify(o.campos), null, m + 1);
+  }
+}
+
+// v13: Hospital (Diretor e Médicos, aprovação do Diretor), Congresso (a Senadora publica as leis e PECs)
+// e os Guardas registram em todos os livros da Guarda (sempre com a aprovação do Comandante).
+async function migrarHospitalECongresso() {
+  if (!(await db.get('SELECT COUNT(*) AS n FROM cargos')).n) return; // banco novo: o semear cria tudo
+  const novos = ['Diretor do Hospital', 'Médico', 'Senadora'].map(nome => CARGOS_PADRAO.find(c => c.nome === nome));
+  let { ordem } = await db.get('SELECT COALESCE(MAX(ordem), 0) AS ordem FROM cargos');
+  for (const c of novos) {
+    if (await db.get('SELECT id FROM cargos WHERE nome = ?', c.nome)) continue;
+    await db.run('INSERT INTO cargos (nome, descricao, cor, permissoes, base, ordem) VALUES (?, ?, ?, ?, 0, ?)',
+      c.nome, c.descricao, c.cor, '[]', ++ordem);
+  }
+  // Cargo com o mesmo nome criado antes à mão também recebe os poderes.
+  const nobre = CARGOS_PADRAO.find(c => c.nome === 'Família Nobre').permissoes.filter(p => /^(hospital|congresso)\./.test(p));
+  await darPermissoes({ base: ['congresso.ver'], 'Família Nobre': nobre, ...Object.fromEntries(novos.map(c => [c.nome, c.permissoes])) });
+  await atualizarDescricoes();
+  await db.run("UPDATE livros SET aberto = 1 WHERE modulo = 'guarda'");
+  const { ordemLivro } = await db.get('SELECT COALESCE(MAX(ordem), 0) AS ordemLivro FROM livros');
+  const livros = LIVROS_PADRAO.filter(l => l.modulo === 'hospital' || l.modulo === 'congresso');
+  const faltam = [];
+  for (const l of livros) {
+    if (!await db.get('SELECT id FROM livros WHERE modulo = ? LIMIT 1', l.modulo) || faltam.some(x => x.modulo === l.modulo)) faltam.push(l);
+  }
+  if (!faltam.length) return;
+  await db.lote(faltam.map((l, i) => [
+    'INSERT INTO livros (modulo, nome, descricao, icone, aberto, campos, cobranca, ordem) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    l.modulo, l.nome, l.descricao, l.icone, l.aberto, JSON.stringify(l.campos), null, ordemLivro + i + 1,
+  ]));
+  await resolverReferencias();
+}
+
+// Descrições de cargo que ainda estão no texto antigo passam para o texto novo (as editadas à mão ficam).
+async function atualizarDescricoes() {
+  for (const c of await db.all('SELECT id, nome, descricao FROM cargos')) {
+    const [antigas = [], atual] = DESCRICOES[c.nome] || [];
+    if (antigas.includes(c.descricao)) await db.run('UPDATE cargos SET descricao = ? WHERE id = ?', atual, c.id);
   }
 }
 

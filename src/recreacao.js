@@ -9,6 +9,7 @@ const { usuarioDaRequisicao, sessaoAindaValida } = require('./auth');
 const { texto: limparTexto } = require('./util');
 const quiz = require('./quiz');
 const progresso = require('./progresso');
+const antispam = require('./antispam');
 
 const ESPERA_MS = Number(process.env.RECREACAO_ESPERA_MS) || 30_000;       // tempo para voltar depois de cair
 const REVALIDAR_MS = Number(process.env.RECREACAO_REVALIDAR_MS) || 120_000; // confere se a sessão ainda vale
@@ -20,7 +21,6 @@ const conexoes = new Map(); // id do usuário -> Set de conexões (a pessoa pode
 const pessoas = new Map();  // id do usuário -> { id, nome, foto }
 const salas = new Map();
 const quedas = new Map();   // id do usuário -> timer de "voltar a tempo"
-const envios = new Map();   // id do usuário -> horários das últimas mensagens (anti-flood)
 
 /* ─── Envio ───────────────────────────────────────── */
 
@@ -360,18 +360,20 @@ function encerrarTransmissao(id) {
 /* ─── O que cada mensagem do navegador faz ────────── */
 
 const acoes = {
-  async 'chat:enviar'(u, { texto }) {
-    const t = limparTexto(texto, 500);
-    if (!t) return;
-    const agora = Date.now();
-    const recentes = (envios.get(u.id) || []).filter(x => agora - x < 10_000);
-    if (recentes.length >= 8) throw new ErroJogo('Calma! Muitas mensagens seguidas. Espere alguns segundos.');
-    recentes.push(agora);
-    envios.set(u.id, recentes);
-    const { id } = await db.run('INSERT INTO chat_mensagens (usuario_id, usuario_nome, texto) VALUES (?, ?, ?)', u.id, u.nome, t);
+  async 'chat:enviar'(u, { texto }, ws) {
+    const bruto = limparTexto(texto, 500);
+    if (!bruto) return;
+    // Barrada pelo anti-spam: volta só para quem mandou, com o texto (para não perder o que escreveu).
+    const r = antispam.avaliar(u.id, bruto);
+    if (!r.ok) {
+      enviar(ws, 'chat:recusada', { motivo: r.motivo, texto: bruto, ate: r.ate || 0 });
+      return;
+    }
+    const { id } = await db.run('INSERT INTO chat_mensagens (usuario_id, usuario_nome, texto) VALUES (?, ?, ?)', u.id, u.nome, r.texto);
     const msg = await db.get('SELECT * FROM chat_mensagens WHERE id = ?', id);
     paraTodos('chat:msg', { msg: { ...msg, ...(await visualDe(u.id)) } });
-    progresso.registrar(u.id, 'chat');
+    // Só mensagem de verdade conta para XP, missões e conquistas (veja antispam.js).
+    if (r.conta) progresso.registrar(u.id, 'chat');
   },
 
   async 'chat:apagar'(u, { id }) {
@@ -571,7 +573,7 @@ function conectar(ws, usuario, token) {
     .then(historico => {
       const minha = salaAtivaDe(id);
       enviar(ws, 'ola', {
-        eu: { id, nome: usuario.nome, moderar: usuario.permissoes.has('recreacao.moderar') },
+        eu: { id, nome: usuario.nome, moderar: usuario.permissoes.has('recreacao.moderar'), silenciadoAte: antispam.silenciadoAte(id) },
         online: online(), historico, salas: resumoSalas(), minhaSala: minha ? minha.id : null, transmissoes: resumoTransmissoes(),
       });
       if (minha) enviarSala(minha); // voltou a tempo: a partida continua

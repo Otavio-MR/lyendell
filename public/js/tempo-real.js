@@ -16,6 +16,7 @@ export const rt = {
   lendoChat: false,
   transmissoes: [], // quem está jogando Pac-Coelho, Cobrinha ou Quebra-cabeça agora (dá para assistir)
   plateia: 0,       // quantas pessoas me assistem jogar
+  silenciadoAte: 0, // anti-spam: até quando não posso falar no chat (horário em ms)
 };
 
 const ouvintes = new Map();
@@ -120,7 +121,7 @@ function tratar(m) {
   switch (m.tipo) {
     case 'ola':
       tentativas = 0;
-      Object.assign(rt, { conectado: true, eu: m.eu, online: m.online, historico: m.historico, salas: m.salas, minhaSala: m.minhaSala, transmissoes: m.transmissoes || [] });
+      Object.assign(rt, { conectado: true, eu: m.eu, online: m.online, historico: m.historico, salas: m.salas, minhaSala: m.minhaSala, transmissoes: m.transmissoes || [], silenciadoAte: m.eu?.silenciadoAte || 0 });
       emitir('estado');
       break;
     case 'online':
@@ -139,6 +140,9 @@ function tratar(m) {
       break;
     case 'chat:apagada':
       rt.historico = rt.historico.filter(x => x.id !== m.id);
+      break;
+    case 'chat:recusada':
+      if (m.ate) rt.silenciadoAte = m.ate;
       break;
     case 'sala': {
       const s = m.sala;

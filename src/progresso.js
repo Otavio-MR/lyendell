@@ -50,7 +50,7 @@ function infoNivel(xp = 0) {
 /* ─── Missões do dia ──────────────────────────────── */
 
 const MISSOES = [
-  { chave: 'chat5', tipo: 'chat', meta: 5, xp: 30, texto: 'Mande 5 mensagens no chat da cidade' },
+  { chave: 'chat5', tipo: 'chat', meta: 5, xp: 30, texto: 'Converse no chat da cidade: 5 mensagens (spam, repetidas e "kkkk" não contam)' },
   { chave: 'partida3', tipo: 'partida', meta: 3, xp: 40, texto: 'Termine 3 partidas ao vivo (quiz, velha ou pedra, papel e tesoura)' },
   { chave: 'vitoria1', tipo: 'vitoria', meta: 1, xp: 50, texto: 'Vença uma partida ao vivo' },
   { chave: 'quiz5', tipo: 'quiz_acerto', meta: 5, xp: 40, texto: 'Acerte 5 perguntas no Quiz de Lyendell' },
@@ -105,7 +105,7 @@ const CONQUISTAS = [
   { chave: 'entrega10', nome: 'Braço forte', desc: 'Teve 10 entregas conferidas.', icone: 'bau', stat: 'entregas', meta: 10, tipos: ['entrega'] },
   { chave: 'anuncio1', nome: 'Arauto', desc: 'Publicou o primeiro anúncio no mural.', icone: 'megafone', stat: 'anuncios', meta: 1, tipos: ['anuncio'] },
   { chave: 'foto5', nome: 'Pintor da corte', desc: 'Enviou 5 fotos para a galeria.', icone: 'imagem', stat: 'fotos', meta: 5, tipos: ['foto'] },
-  { chave: 'registro10', nome: 'Pena afiada', desc: 'Fez 10 registros no Tabelionato ou na Guarda.', icone: 'pena', stat: 'registros', meta: 10, tipos: ['registro'] },
+  { chave: 'registro10', nome: 'Pena afiada', desc: 'Fez 10 registros nos livros (Tabelionato, Guarda, Hospital ou Congresso).', icone: 'pena', stat: 'registros', meta: 10, tipos: ['registro'] },
   { chave: 'recado5', nome: 'Amigo de todos', desc: 'Deixou recado no perfil de 5 pessoas diferentes.', icone: 'usuarios', stat: 'recadosPessoas', meta: 5, tipos: ['recado'] },
   { chave: 'nivel10', nome: 'Coelho Veloz', desc: 'Chegou ao nível 10.', icone: 'estrela', stat: 'nivel', meta: 10, tipos: ['nivel'] },
   { chave: 'nivel20', nome: 'Coelho Dourado', desc: 'Chegou ao nível 20.', icone: 'coroa', stat: 'nivel', meta: 20, tipos: ['nivel'] },

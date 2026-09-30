@@ -279,6 +279,8 @@ a.nota-link:hover { color: var(--texto); border-color: var(--ouro-d); background
 .anuncio-mini-topo:empty { display: none; }
 .anuncio-mini p { color: var(--texto-2); font-size: 0.95rem; white-space: pre-line; }
 .anuncio-mini small, .ativ-mini small { color: var(--suave); font-size: 0.85rem; }
+.lei-mini .etiqueta.lei-aprovada { color: var(--verde); border-color: rgba(127, 176, 105, 0.45); }
+.lei-mini .etiqueta.lei-rejeitada { color: #f08466; border-color: rgba(216, 103, 74, 0.45); }
 .ativ-mini-topo { display: flex; justify-content: space-between; gap: 10px; }
 .fotos-faixa { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
 .foto-mini { aspect-ratio: 1; border-radius: var(--raio-p); overflow: hidden; background: var(--sup-2); }
@@ -758,6 +760,8 @@ input[type='date'].input::-webkit-calendar-picker-indicator { filter: invert(0.7
 .chat-form { display: flex; gap: 8px; }
 .chat-form .input { flex: 1; }
 .chat-form .btn { padding-inline: 14px; }
+.chat-nota { margin: -4px 0 10px; padding: 8px 12px; border-radius: var(--raio-p); background: var(--vermelho-fundo); border: 1px solid rgba(216, 103, 74, 0.45); color: #f3a58f; font-size: 0.9rem; }
+.chat-nota-tempo { white-space: nowrap; color: #f8c2b2; }
 
 .rec-jogos { display: grid; gap: 10px; }
 .rec-jogos .nota { margin-bottom: 0; }

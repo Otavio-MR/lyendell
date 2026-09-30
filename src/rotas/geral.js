@@ -3,6 +3,7 @@ const { db } = require('../db');
 const { exigir, exigirLogin, pode } = require('../auth');
 const { upload, salvarArquivo } = require('../uploads');
 const { erro, linha, inteiro } = require('../util');
+const { MODULOS } = require('../permissoes');
 
 const r = express.Router();
 r.use(exigirLogin);
@@ -12,8 +13,10 @@ r.get('/inicio', async (req, res) => {
   const out = { numeros: {} };
   const contarModulo = async m => (await db.get("SELECT COUNT(*) AS n FROM registros r JOIN livros l ON l.id = r.livro_id WHERE l.modulo = ? AND r.situacao = 'aprovado'", m)).n;
   const tarefas = [pendencias(req).then(p => { out.pendencias = p; })];
-  if (pode(req, 'tabelionato.ver')) tarefas.push(contarModulo('tabelionato').then(n => { out.numeros.tabelionato = n; }));
-  if (pode(req, 'guarda.ver')) tarefas.push(contarModulo('guarda').then(n => { out.numeros.guarda = n; }));
+  for (const m of Object.keys(MODULOS)) {
+    if (pode(req, `${m}.ver`)) tarefas.push(contarModulo(m).then(n => { out.numeros[m] = n; }));
+  }
+  if (pode(req, 'congresso.ver')) tarefas.push(novidadesDoCongresso().then(x => { out.congresso = x; }));
   if (pode(req, 'usuarios.ver')) tarefas.push(db.get('SELECT COUNT(*) AS n FROM usuarios WHERE ativo = 1').then(x => { out.numeros.usuarios = x.n; }));
   if (pode(req, 'galeria.ver')) {
     tarefas.push(db.get('SELECT COUNT(*) AS n FROM fotos').then(x => { out.numeros.fotos = x.n; }));
@@ -34,13 +37,36 @@ r.get('/inicio', async (req, res) => {
   res.json(out);
 });
 
+// As últimas leis e mudanças publicadas no Congresso, para ninguém ficar sem saber.
+async function novidadesDoCongresso() {
+  const linhas = await db.all(`
+    SELECT r.id, r.livro_id, r.numero, r.dados, COALESCE(r.revisado_em, r.criado_em) AS em, l.nome AS livro, l.campos
+    FROM registros r JOIN livros l ON l.id = r.livro_id
+    WHERE l.modulo = 'congresso' AND r.situacao = 'aprovado'
+    ORDER BY COALESCE(r.revisado_em, r.criado_em) DESC, r.id DESC LIMIT 3`);
+  return linhas.map(x => {
+    const campos = JSON.parse(x.campos);
+    const dados = JSON.parse(x.dados);
+    const preenchidos = campos.filter(c => dados[c.id] != null && dados[c.id] !== '');
+    const titulo = preenchidos.find(c => c.tipo === 'texto' || c.tipo === 'selecao');
+    const resumo = String(dados[preenchidos.find(c => c.tipo === 'texto_longo')?.id] ?? '');
+    return {
+      id: x.id, livro_id: x.livro_id, livro: x.livro, numero: x.numero, em: x.em,
+      titulo: titulo ? String(dados[titulo.id]) : 'sem título',
+      etiquetas: preenchidos.filter(c => c.tipo === 'selecao' && c !== titulo).slice(0, 2).map(c => String(dados[c.id])),
+      data: dados[preenchidos.find(c => c.tipo === 'data')?.id] || null,
+      resumo: resumo.length > 220 ? `${resumo.slice(0, 220)}…` : resumo,
+    };
+  });
+}
+
 // Avisos do menu: registros esperando a minha aprovação e envios meus que foram recusados, por módulo.
 async function pendencias(req) {
   const linhas = await db.all(`
     SELECT l.modulo, SUM(r.situacao = 'pendente') AS pendentes, SUM(r.situacao = 'recusado' AND r.criado_por = ?) AS recusados
     FROM registros r JOIN livros l ON l.id = r.livro_id WHERE r.situacao <> 'aprovado' GROUP BY l.modulo`, req.usuario.id);
   const out = {};
-  for (const m of ['tabelionato', 'guarda']) {
+  for (const m of Object.keys(MODULOS)) {
     const l = linhas.find(x => x.modulo === m) || {};
     out[m] = { aprovar: pode(req, `${m}.aprovar`) ? l.pendentes || 0 : 0, recusados: l.recusados || 0 };
   }
@@ -50,7 +76,7 @@ async function pendencias(req) {
 r.get('/pendencias', async (req, res) => res.json(await pendencias(req)));
 
 // Envio avulso de imagem (retratos nos registros, imagens de anúncios).
-const PODE_ENVIAR = ['galeria.enviar', 'anuncios.publicar', 'tabelionato.registrar', 'tabelionato.editar', 'guarda.registrar', 'guarda.editar'];
+const PODE_ENVIAR = ['galeria.enviar', 'anuncios.publicar', ...Object.keys(MODULOS).flatMap(m => [`${m}.registrar`, `${m}.editar`])];
 r.post('/upload', (req, res, next) => {
   if (!PODE_ENVIAR.some(p => pode(req, p))) return next(erro(403, 'Você não tem permissão para enviar imagens.'));
   next();

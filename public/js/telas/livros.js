@@ -6,24 +6,37 @@ import {
 import { livroDeRegistro, livroDeRegistros } from '../livro-mc.js';
 import { verPagamentos, resumoCobranca } from './pagamentos.js';
 
-// Tabelionato e Guarda do Coelho usam a mesma tela: livros com formulários configuráveis.
-const MODULOS = {
+// Tabelionato, Guarda do Coelho, Hospital e Congresso usam a mesma tela: livros com formulários configuráveis.
+// "no" é como o nome entra numa frase ("aguarda a sua aprovação no Hospital"); "enviam" dá o exemplo de quem envia.
+export const MODULOS = {
   tabelionato: {
-    titulo: 'Tabelionato', icone: 'pergaminho',
+    titulo: 'Tabelionato', icone: 'pergaminho', no: 'no Tabelionato', enviam: 'Escribas',
     sub: 'Os livros oficiais de Lyendell: moradores, nobreza, comércio, documentos, casamentos e propriedades.',
     quemComanda: 'a Tabeliã',
     aprovador: 'da Tabeliã',
   },
   guarda: {
-    titulo: 'Guarda do Coelho', icone: 'escudo',
+    titulo: 'Guarda do Coelho', icone: 'escudo', no: 'na Guarda do Coelho', enviam: 'Guardas',
     sub: 'Prisioneiros, efetivo da guarda e procurados da capital.',
     quemComanda: 'o Comandante da Guarda',
     aprovador: 'do Comandante da Guarda',
   },
+  hospital: {
+    titulo: 'Hospital', icone: 'cruz', no: 'no Hospital', enviam: 'Médicos',
+    sub: 'Os pacientes atendidos no hospital da capital e a equipe que cuida deles.',
+    quemComanda: 'o Diretor do Hospital',
+    aprovador: 'do Diretor do Hospital',
+  },
+  congresso: {
+    titulo: 'Congresso', icone: 'coluna', no: 'no Congresso', enviam: 'a Família Nobre',
+    sub: 'PECs, leis e regras votadas no Congresso, publicadas pela nossa Senadora.',
+    quemComanda: 'a Senadora',
+    aprovador: 'da Senadora',
+  },
 };
 
 const ICONES_LIVRO = ['livro', 'casa', 'coroa', 'loja', 'documento', 'alianca', 'chave', 'escudo', 'grades', 'alvo',
-  'pergaminho', 'balanca', 'mapa', 'moeda', 'espada', 'pena', 'bandeira', 'bau'];
+  'pergaminho', 'balanca', 'mapa', 'moeda', 'espada', 'pena', 'bandeira', 'bau', 'usuarios', 'cruz', 'coluna'];
 
 const TIPOS = [
   ['texto', 'Texto curto'], ['texto_longo', 'Texto longo'], ['numero', 'Número'], ['data', 'Data'],
@@ -134,7 +147,7 @@ async function filaModulo(m, modo) {
       cabecalho({ titulo: info.titulo, sub: info.sub, icone: info.icone }),
       abasModulo(m, modo, contagem),
       h('p', { class: 'fila-intro' }, modo === 'aprovacoes'
-        ? `Registros enviados por quem não aprova (ex.: ${m === 'tabelionato' ? 'Escribas' : 'Guardas'}). Eles só entram no livro oficial depois de aprovados.`
+        ? `Registros enviados por quem não aprova (ex.: ${info.enviam}). Eles só entram no livro oficial depois de aprovados.`
         : `Seus registros que ainda não entraram no livro oficial. Eles aguardam a aprovação ${info.aprovador}; os recusados podem ser corrigidos e reenviados.`),
       lista.length
         ? h('div', { class: 'fila' }, lista.map(r => cartaoPendente(m, r, livros[r.livro_id], permissoes, desenhar, modo)))

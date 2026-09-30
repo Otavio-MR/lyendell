@@ -1,7 +1,7 @@
 # Casa Luckham · Sistema de Lyendell
 
-Sistema de administração da cidade de Lyendell: Tabelionato, Guarda do Coelho, Galeria,
-Mural de Anúncios, Mural de Atividades e Recreação, com login por nome de personagem e níveis de acesso.
+Sistema de administração da cidade de Lyendell: Tabelionato, Guarda do Coelho, Hospital, Congresso,
+Galeria, Mural de Anúncios, Mural de Atividades e Recreação, com login por nome de personagem e níveis de acesso.
 
 ## Como rodar
 
@@ -29,8 +29,15 @@ Todo usuário é morador. Os cargos somam poderes em cima disso, e uma pessoa po
 | Tabeliã | Tudo no Tabelionato: aprovar registros, editar, apagar, criar livros, seções, campos e opções, e marcar pagamentos |
 | Escriba | Fazer registros no Tabelionato, que vão para a aprovação da Tabeliã |
 | Comandante da Guarda | Tudo na Guarda do Coelho, inclusive aprovar os registros dos guardas |
-| Guarda | Ver a Guarda e registrar prisioneiros, que vão para a aprovação do Comandante |
-| Morador | Ver tudo, ajudar nas atividades e usar a Recreação |
+| Guarda | Ver todos os livros da Guarda e registrar em qualquer um deles; os registros vão para a aprovação do Comandante |
+| Diretor do Hospital | Tudo no Hospital, inclusive aprovar os registros dos médicos |
+| Médico | Ver o Hospital e registrar pacientes, que vão para a aprovação do Diretor do Hospital |
+| Senadora | Tudo no Congresso: publica as PECs, leis e regras votadas e aprova o que outros enviarem |
+| Morador | Ver tudo (menos o Hospital), ajudar nas atividades e usar a Recreação |
+
+O Hospital não é aberto a todos os moradores, porque guarda o prontuário dos pacientes: só o
+Diretor, os Médicos, a Família Nobre e o administrador veem. Para abrir a todos, marque
+"Ver os livros e registros" do Hospital no cargo Morador, na tela **Cargos**.
 
 Quem está acima de morador também publica anúncios, cria atividades e envia fotos.
 
@@ -38,7 +45,7 @@ O administrador pode mudar o que cada cargo faz, ou criar cargos novos, na tela 
 Ninguém consegue conceder a outra pessoa um poder que não tem: por isso a Família Nobre
 não consegue, por exemplo, dar a si mesma o poder de criar usuários.
 
-## Livros (Tabelionato e Guarda)
+## Livros (Tabelionato, Guarda, Hospital e Congresso)
 
 Cada módulo tem livros de registro, e cada livro tem o próprio formulário. Quem comanda
 o módulo pode, pelo próprio site:
@@ -47,18 +54,28 @@ o módulo pode, pelo próprio site:
 - adicionar, renomear, reordenar e remover campos (texto, data, número, lista de opções, sim ou não, imagem);
 - dividir o formulário em seções;
 - editar as opções das listas;
-- deixar um livro **restrito**: só quem comanda o módulo registra nele (ex.: Guardas da Capital);
+- deixar um livro **restrito**: só quem comanda o módulo registra nele (os livros padrão vêm todos abertos);
 - ligar **pagamentos periódicos** num livro do Tabelionato (veja abaixo).
+
+Livros que já vêm prontos:
+
+- **Hospital**: Registro de Pacientes (motivo, gravidade, diagnóstico, tratamento, situação, alta
+  e os médicos responsáveis, escolhidos da Equipe) e Equipe do Hospital.
+- **Congresso**: Leis e Mudanças (título, tipo: PEC, lei, regra, emenda, decreto..., data da
+  votação, resultado, o que muda, texto completo, votos e situação). As últimas publicações
+  aparecem para todo mundo na tela de início, em **Novidades do Congresso**.
 
 ## Aprovação de registros
 
 O que o Escriba registra no Tabelionato fica **aguardando a Tabeliã**; o que o Guarda registra na
-Guarda do Coelho fica **aguardando o Comandante**. As duas filas são separadas. Enquanto não é
-aprovado, o registro não aparece no livro oficial.
+Guarda do Coelho fica **aguardando o Comandante**; o que o Médico registra no Hospital fica
+**aguardando o Diretor do Hospital**; o que outros enviam ao Congresso fica **aguardando a Senadora**.
+Cada fila é separada. Enquanto não é aprovado, o registro não aparece no livro oficial.
 
 - Quem aprova vê a aba **Aguardando aprovação** (e um número no menu) e pode aprovar, editar ou recusar com um motivo.
 - Quem enviou vê a aba **Meus envios**: pode corrigir ou cancelar enquanto não foi aprovado, e os recusados mostram o motivo e podem ser corrigidos e reenviados.
-- Registros de quem já tem a permissão de aprovar (Tabeliã, Comandante, Família Nobre, administrador) entram aprovados direto.
+- Registros de quem já tem a permissão de aprovar (Tabeliã, Comandante, Diretor do Hospital, Senadora, administrador) entram aprovados direto.
+- Aprovar é exclusivo de um cargo por módulo: nem a Família Nobre aprova.
 
 ## Pagamentos dos comerciantes
 
@@ -73,7 +90,8 @@ O Registro de Comerciantes já vem com pagamento **a cada 14 dias**, contado a p
 
 ## Livros do Minecraft (.book)
 
-Tudo que é registrado tem um botão **Baixar .book**: cada registro do Tabelionato e da Guarda,
+Tudo que é registrado tem um botão **Baixar .book**: cada registro do Tabelionato, da Guarda, do
+Hospital e do Congresso (cada módulo com a sua capa),
 o livro inteiro (com os filtros aplicados), cada anúncio, cada atividade (com quem ajudou e
 quanto cada um recebe) e a tabela de pagamentos de um comerciante.
 
@@ -138,6 +156,15 @@ Dá para **assistir qualquer jogo**: as partidas ao vivo (quiz, velha, pedra, pa
 também quem está jogando sozinho. Quem abre o Pac-Coelho, a Cobrinha ou o Quebra-cabeça aparece
 em **Jogando agora**, no salão; clicando em Assistir, dá para ver o jogo ao vivo, com o chat do
 lado. Quem joga vê quantas pessoas estão assistindo.
+
+**Anti-spam do chat:**
+
+- mensagem colada na outra (menos de 0,7 s) ou repetida dentro de 1 minuto é barrada, e o texto
+  volta para a caixa;
+- mais de 6 mensagens em 10 segundos silencia a pessoa: 20 segundos na primeira vez, depois 1, 3
+  e 10 minutos se continuar (zera após 15 minutos sem spam). A caixa do chat fica travada com a contagem;
+- **missões e XP**: só conta mensagem de verdade (3 letras ou mais, não só "kkkk"), no máximo uma a
+  cada 15 segundos, e quem foi silenciado fica mais 5 minutos sem o chat contar para XP e missões.
 
 O chat guarda as últimas 2000 mensagens. As partidas em andamento ficam só na memória do
 servidor: se o site reiniciar (por exemplo, depois de um `git push`), elas se perdem, mas o

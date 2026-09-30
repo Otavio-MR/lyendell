@@ -25,6 +25,22 @@ const CATALOGO = [
     { chave: 'guarda.configurar', nome: 'Criar livros, seções, campos e opções' },
     { chave: 'guarda.aprovar', nome: 'Aprovar ou recusar registros (exclusiva: só um cargo pode ter, o Comandante)' },
   ] },
+  { grupo: 'Hospital', itens: [
+    { chave: 'hospital.ver', nome: 'Ver os livros e registros (pacientes e equipe)' },
+    { chave: 'hospital.registrar', nome: 'Fazer novos registros, ex.: pacientes (vão para aprovação, se a pessoa não aprova)' },
+    { chave: 'hospital.editar', nome: 'Editar registros' },
+    { chave: 'hospital.apagar', nome: 'Apagar registros' },
+    { chave: 'hospital.configurar', nome: 'Criar livros, seções, campos e opções' },
+    { chave: 'hospital.aprovar', nome: 'Aprovar ou recusar registros (exclusiva: só um cargo pode ter, o Diretor do Hospital)' },
+  ] },
+  { grupo: 'Congresso', itens: [
+    { chave: 'congresso.ver', nome: 'Ler as leis, PECs e mudanças votadas' },
+    { chave: 'congresso.registrar', nome: 'Enviar leis e mudanças votadas (vão para aprovação, se a pessoa não aprova)' },
+    { chave: 'congresso.editar', nome: 'Editar o que foi publicado' },
+    { chave: 'congresso.apagar', nome: 'Apagar o que foi publicado' },
+    { chave: 'congresso.configurar', nome: 'Criar livros, seções, campos e opções' },
+    { chave: 'congresso.aprovar', nome: 'Publicar direto e aprovar o que outros enviam (exclusiva: só um cargo pode ter, a Senadora)' },
+  ] },
   { grupo: 'Galeria', itens: [
     { chave: 'galeria.ver', nome: 'Ver as fotos' },
     { chave: 'galeria.enviar', nome: 'Enviar fotos' },
@@ -55,14 +71,21 @@ const TODAS = CATALOGO.flatMap(g => g.itens.map(i => i.chave));
 const VALIDAS = new Set(TODAS);
 
 // Todo usuário é morador: estas permissões valem para qualquer um.
-const MORADOR = ['tabelionato.ver', 'guarda.ver', 'galeria.ver', 'anuncios.ver', 'atividades.ver', 'atividades.participar', 'recreacao.usar'];
+const MORADOR = ['tabelionato.ver', 'guarda.ver', 'congresso.ver', 'galeria.ver', 'anuncios.ver', 'atividades.ver', 'atividades.participar', 'recreacao.usar'];
 // Quem está acima de morador publica anúncios, cria atividades e envia fotos.
 const MEMBRO = ['anuncios.publicar', 'atividades.criar', 'galeria.enviar'];
 const acoes = (modulo, ...lista) => lista.map(a => `${modulo}.${a}`);
 
+// Módulos de livros: todos usam a mesma tela (livros com formulário, registros numerados e aprovação).
+// O Hospital não é aberto a todos os moradores (prontuário de paciente); o resto é.
+const MODULOS = { tabelionato: 'Tabelionato', guarda: 'Guarda do Coelho', hospital: 'Hospital', congresso: 'Congresso' };
+
 // Aprovar registros é exclusivo de um único cargo em cada módulo (além do administrador principal).
-// Nem a Família Nobre aprova: tudo passa pela Tabeliã ou pelo Comandante.
-const EXCLUSIVAS = { 'tabelionato.aprovar': 'Tabeliã', 'guarda.aprovar': 'Comandante da Guarda' };
+// Nem a Família Nobre aprova: tudo passa pela Tabeliã, pelo Comandante, pelo Diretor do Hospital ou pela Senadora.
+const EXCLUSIVAS = {
+  'tabelionato.aprovar': 'Tabeliã', 'guarda.aprovar': 'Comandante da Guarda',
+  'hospital.aprovar': 'Diretor do Hospital', 'congresso.aprovar': 'Senadora',
+};
 
 // [descrições antigas, descrição atual]: as antigas são trocadas nos bancos que ainda não as mudaram.
 const DESCRICOES = {
@@ -72,10 +95,10 @@ const DESCRICOES = {
     'Faz registros no Tabelionato, que vão para a aprovação da Tabeliã.'],
   'Comandante da Guarda': [['Comanda a Guarda do Coelho: registra, edita, apaga e configura os livros.'],
     'Comanda a Guarda do Coelho: aprova os registros, edita, apaga e configura os livros.'],
-  Guarda: [['Vê os registros da Guarda e registra prisioneiros.'],
-    'Vê os registros da Guarda e registra prisioneiros, que vão para a aprovação do Comandante.'],
-  'Família Nobre': [['Pode tudo, menos adicionar novos usuários.'],
-    'Pode tudo, menos adicionar usuários e aprovar registros (isso é da Tabeliã e do Comandante).'],
+  Guarda: [['Vê os registros da Guarda e registra prisioneiros.', 'Vê os registros da Guarda e registra prisioneiros, que vão para a aprovação do Comandante.'],
+    'Vê todos os livros e registros da Guarda e registra em qualquer um deles; os registros vão para a aprovação do Comandante.'],
+  'Família Nobre': [['Pode tudo, menos adicionar novos usuários.', 'Pode tudo, menos adicionar usuários e aprovar registros (isso é da Tabeliã e do Comandante).'],
+    'Pode tudo, menos adicionar usuários e aprovar registros (isso é da Tabeliã, do Comandante, do Diretor do Hospital e da Senadora).'],
 };
 
 const CARGOS_PADRAO = [
@@ -97,6 +120,15 @@ const CARGOS_PADRAO = [
   { nome: 'Guarda', cor: '#6f9a58',
     descricao: DESCRICOES.Guarda[1],
     permissoes: [...MEMBRO, 'guarda.registrar'] },
+  { nome: 'Diretor do Hospital', cor: '#4fa39b',
+    descricao: 'Comanda o Hospital: aprova os registros de pacientes, edita, apaga e configura os livros.',
+    permissoes: [...MEMBRO, ...acoes('hospital', 'ver', 'registrar', 'editar', 'apagar', 'configurar', 'aprovar')] },
+  { nome: 'Médico', cor: '#8cc5b6',
+    descricao: 'Vê o Hospital e registra pacientes, que vão para a aprovação do Diretor do Hospital.',
+    permissoes: [...MEMBRO, 'hospital.ver', 'hospital.registrar'] },
+  { nome: 'Senadora', cor: '#7f93d8',
+    descricao: 'Publica no Congresso as PECs, leis e regras votadas; aprova o que outros enviarem para lá.',
+    permissoes: [...MEMBRO, ...acoes('congresso', 'registrar', 'editar', 'apagar', 'configurar', 'aprovar')] },
 ];
 
-module.exports = { CATALOGO, TODAS, VALIDAS, CARGOS_PADRAO, DESCRICOES, EXCLUSIVAS };
+module.exports = { CATALOGO, TODAS, VALIDAS, CARGOS_PADRAO, DESCRICOES, EXCLUSIVAS, MODULOS };

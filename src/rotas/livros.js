@@ -7,14 +7,14 @@ const { urlValida, comandoApagarArquivo } = require('../uploads');
 const progresso = require('../progresso');
 const { hoje, cronograma, resumo } = require('../cobranca');
 const { erro, texto, linha, inteiro, idDaRota, dataValida } = require('../util');
+const { MODULOS } = require('../permissoes');
 
-// Tabelionato e Guarda funcionam igual: cada módulo tem "livros", cada livro tem
+// Tabelionato, Guarda, Hospital e Congresso funcionam igual: cada módulo tem "livros", cada livro tem
 // um formulário próprio (campos) e uma pilha de registros.
-const MODULOS = { tabelionato: 'Tabelionato', guarda: 'Guarda do Coelho' };
 // referencia: escolhe registros de outro livro (ex.: guardas). duracao: tempo calculado entre duas datas (ex.: pena).
 const TIPOS = ['texto', 'texto_longo', 'numero', 'data', 'selecao', 'sim_nao', 'imagem', 'referencia', 'duracao', 'secao'];
 const ICONES = ['livro', 'casa', 'coroa', 'loja', 'documento', 'alianca', 'chave', 'escudo', 'grades', 'alvo',
-  'pergaminho', 'balanca', 'mapa', 'moeda', 'espada', 'pena', 'bandeira', 'bau'];
+  'pergaminho', 'balanca', 'mapa', 'moeda', 'espada', 'pena', 'bandeira', 'bau', 'usuarios', 'cruz', 'coluna'];
 
 const r = express.Router();
 r.use(exigirLogin);
@@ -393,7 +393,7 @@ r.delete('/registros/:id', async (req, res) => {
   res.json({ ok: true });
 });
 
-/* ─── Aprovação (Tabeliã no Tabelionato, Comandante na Guarda) ─ */
+/* ─── Aprovação (Tabeliã, Comandante, Diretor do Hospital, Senadora) ─ */
 
 // Quem enviou pode corrigir ou cancelar o próprio registro enquanto ele não foi aprovado.
 const doAutorSemAprovacao = (req, reg) => reg.criado_por === req.usuario.id && reg.situacao !== 'aprovado';

@@ -1,5 +1,6 @@
-import { estado, get, h, icone, chipCargo, barra, num, pacotes, relativo, dataCurta, seloNivel, avatarPessoa } from '../core.js';
+import { estado, get, h, icone, chipCargo, barra, num, pacotes, relativo, dataCurta, seloNivel, avatarPessoa, normalizar } from '../core.js';
 import { barraNivel } from './pessoas.js';
+import { MODULOS } from './livros.js';
 
 function saudacao() {
   const hora = new Date().getHours();
@@ -11,18 +12,17 @@ function saudacao() {
 
 // Registros esperando a aprovação de quem entrou, e envios dele que foram recusados.
 function avisosDeAprovacao(p = {}) {
-  const nomes = { tabelionato: 'Tabelionato', guarda: 'Guarda do Coelho' };
   const itens = [];
-  for (const m of Object.keys(nomes)) {
+  for (const [m, info] of Object.entries(MODULOS)) {
     const { aprovar = 0, recusados = 0 } = p[m] || {};
     if (aprovar) {
       itens.push(h('a', { class: 'nota nota-link nota-ouro', href: `#/${m}/aprovacoes` }, icone('relogio'),
-        h('span', null, `${aprovar} ${aprovar === 1 ? 'registro aguarda' : 'registros aguardam'} a sua aprovação no ${nomes[m]}.`),
+        h('span', null, `${aprovar} ${aprovar === 1 ? 'registro aguarda' : 'registros aguardam'} a sua aprovação ${info.no}.`),
         h('strong', null, 'Revisar')));
     }
     if (recusados) {
       itens.push(h('a', { class: 'nota nota-link nota-vermelha', href: `#/${m}/envios` }, icone('alerta'),
-        h('span', null, `${recusados} ${recusados === 1 ? 'envio seu foi recusado' : 'envios seus foram recusados'} no ${nomes[m]}.`),
+        h('span', null, `${recusados} ${recusados === 1 ? 'envio seu foi recusado' : 'envios seus foram recusados'} ${info.no}.`),
         h('strong', null, 'Ver e corrigir')));
     }
   }
@@ -56,6 +56,20 @@ function painelProgresso(pr) {
     h('p', { class: 'progresso-dica suave' }, 'Ganhe XP conversando no chat, jogando, ajudando nas atividades e deixando recados. Subir de nível libera molduras novas para a foto.'));
 }
 
+// As últimas leis e mudanças votadas no Congresso: todo mundo precisa saber o que mudou.
+function painelCongresso(lista) {
+  if (!lista?.length) return null; // sem nada publicado ainda, o painel nem aparece
+  const classe = t => ({ aprovada: 'lei-aprovada', rejeitada: 'lei-rejeitada' })[normalizar(t)] || '';
+  return h('section', { class: 'painel' },
+    h('header', { class: 'painel-cab' }, h('h2', null, icone('coluna'), 'Novidades do Congresso'), h('a', { href: '#/congresso' }, 'Ver tudo')),
+    h('div', { class: 'lista-simples' }, lista.map(x => h('a', { class: 'anuncio-mini lei-mini', href: `#/congresso/${x.livro_id}` },
+      h('div', { class: 'anuncio-mini-topo' },
+        x.etiquetas.map((t, i) => h('span', { class: `etiqueta ${i === 0 ? 'etiqueta-ouro' : classe(t)}`.trim() }, t))),
+      h('strong', null, x.titulo),
+      x.resumo && h('p', null, x.resumo),
+      h('small', null, x.data ? `Votada em ${dataCurta(x.data)}` : `Publicada ${relativo(x.em)}`, x.numero ? ` · nº ${x.numero}` : '')))));
+}
+
 function painelComunidade(pr) {
   if (!pr.novidades.length && !pr.semana.length) return null;
   return h('div', { class: 'inicio-grade' },
@@ -84,6 +98,8 @@ export async function inicio() {
   const numeros = [
     n.tabelionato != null && { rotulo: 'Registros no Tabelionato', valor: n.tabelionato, icone: 'pergaminho', href: '#/tabelionato' },
     n.guarda != null && { rotulo: 'Registros da Guarda', valor: n.guarda, icone: 'escudo', href: '#/guarda' },
+    n.hospital != null && { rotulo: 'Registros do Hospital', valor: n.hospital, icone: 'cruz', href: '#/hospital' },
+    n.congresso != null && { rotulo: 'Leis e mudanças', valor: n.congresso, icone: 'coluna', href: '#/congresso' },
     n.atividades != null && { rotulo: 'Atividades abertas', valor: n.atividades, icone: 'tarefas', href: '#/atividades' },
     n.fotos != null && { rotulo: 'Fotos na galeria', valor: n.fotos, icone: 'imagem', href: '#/galeria' },
     n.usuarios != null && { rotulo: 'Usuários ativos', valor: n.usuarios, icone: 'usuarios', href: '#/admin/usuarios' },
@@ -102,6 +118,8 @@ export async function inicio() {
         h('div', { class: 'chips' }, cargos))),
 
     avisosDeAprovacao(d.pendencias),
+
+    painelCongresso(d.congresso),
 
     pr && painelProgresso(pr),
 

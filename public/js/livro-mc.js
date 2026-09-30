@@ -415,12 +415,19 @@ function tipoDoLivro(nome) {
 // Linhas que uma linha do livro ocupa na tela (a página quebra o texto comprido).
 const linhasNaTela = linha => quebrar(semCodigos(linha)).length;
 
+// Cabeçalho e cor da moldura da capa de cada módulo (o Tabelionato segue o modelo da Casa).
+function capaDoModulo(nomeModulo) {
+  const n = normalizar(nomeModulo);
+  if (n.includes('guarda')) return { cor: '4', cabecalho: [centralizar('GUARDA DO COELHO'), TABELIONATO[1]] };
+  if (n.includes('hospital')) return { cor: '3', cabecalho: [centralizar('HOSPITAL'), TABELIONATO[1]] };
+  if (n.includes('congresso')) return { cor: '1', cabecalho: [centralizar('CONGRESSO'), ''] };
+  return { cor: '2', cabecalho: TABELIONATO };
+}
+
 // Qualquer livro sem modelo próprio: mesma capa e mesmo desenho, com os campos do formulário.
 function fichaGenerica(nomeModulo, livro, reg) {
-  const guarda = normalizar(nomeModulo).includes('guarda');
   const capa = capaDaFicha({
-    cor: guarda ? '4' : '2',
-    cabecalho: guarda ? [centralizar('GUARDA DO COELHO'), TABELIONATO[1]] : TABELIONATO,
+    ...capaDoModulo(nomeModulo),
     tipo: tipoDoLivro(livro.nome), numero: numeroDoRegistro(reg), titulo: tituloDoRegistro(livro, reg.dados || {}, ''),
   });
   const blocos = [];

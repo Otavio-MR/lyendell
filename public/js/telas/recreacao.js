@@ -167,6 +167,15 @@ function painelChat() {
   const entrada = h('input', { class: 'input', maxlength: '500', placeholder: 'Escreva uma mensagem...', autocomplete: 'off', 'aria-label': 'Mensagem' });
   const botaoEnviar = h('button', { class: 'btn btn-ouro', type: 'submit', title: 'Enviar', 'aria-label': 'Enviar' }, icone('aviao'));
   const situacao = h('span', { class: 'chat-situacao' });
+  const notaTexto = h('span');
+  const notaTempo = h('strong', { class: 'chat-nota-tempo' });
+  const nota = h('p', { class: 'chat-nota', role: 'status', hidden: true }, notaTexto, notaTempo);
+  const mostrarNota = (texto, silencio, ate = 0) => {
+    notaTexto.textContent = texto;
+    nota.classList.toggle('silencio', silencio);
+    nota.dataset.ate = String(ate);
+    nota.hidden = false;
+  };
   const form = h('form', { class: 'chat-form' }, entrada, botaoEnviar);
   form.addEventListener('submit', e => {
     e.preventDefault();
@@ -175,6 +184,27 @@ function painelChat() {
     if (enviar('chat:enviar', { texto })) entrada.value = '';
     entrada.focus();
   });
+
+  // Anti-spam: enquanto a pessoa está silenciada, a caixa fica travada e o aviso mostra quanto falta.
+  let relogio = null;
+  function travar() {
+    clearInterval(relogio);
+    relogio = null;
+    const passo = () => {
+      const falta = rt.silenciadoAte - Date.now();
+      entrada.disabled = botaoEnviar.disabled = !rt.conectado || falta > 0;
+      entrada.placeholder = falta > 0 ? 'Sem falar no chat por spam...' : 'Escreva uma mensagem...';
+      if (falta > 0 && nota.hidden) mostrarNota('Você está sem falar no chat por spam.', true, rt.silenciadoAte); // abriu a tela já silenciado
+      notaTempo.textContent = falta > 0 ? ` Faltam ${Math.ceil(falta / 1000)} s.` : '';
+      if (falta <= 0 || !form.isConnected) {
+        clearInterval(relogio);
+        relogio = null;
+        if (falta <= 0 && !nota.hidden && nota.classList.contains('silencio')) nota.hidden = true;
+      }
+    };
+    passo();
+    if (rt.silenciadoAte > Date.now()) relogio = setInterval(passo, 1000);
+  }
 
   const pertoDoFim = () => lista.scrollHeight - lista.scrollTop - lista.clientHeight < 90;
   const descer = () => { lista.scrollTop = lista.scrollHeight; };
@@ -199,7 +229,7 @@ function painelChat() {
     trocar(lista, rt.historico.length
       ? rt.historico.map((m, i) => linha(m, rt.historico[i - 1]))
       : h('p', { class: 'chat-vazio' }, rt.conectado ? 'Ninguém falou nada ainda. Diga olá!' : 'Conectando ao chat...'));
-    entrada.disabled = botaoEnviar.disabled = !rt.conectado;
+    travar();
     situacao.className = `chat-situacao ${rt.conectado ? 'on' : ''}`;
     situacao.textContent = rt.conectado ? 'ao vivo' : 'conectando...';
     setTimeout(descer, 0);
@@ -207,18 +237,27 @@ function painelChat() {
 
   escutar('estado', tudo);
   escutar('chat:apagada', tudo);
+  // Mensagem barrada: o motivo aparece aqui mesmo e o texto volta para a caixa.
+  // As que chegam depois, no mesmo silêncio, não apagam a explicação do castigo.
+  escutar('chat:recusada', m => {
+    const mesmoSilencio = m.ate && !nota.hidden && nota.dataset.ate === String(m.ate);
+    if (!mesmoSilencio) mostrarNota(m.motivo, !!m.ate, m.ate);
+    if (!entrada.value.trim()) entrada.value = m.texto;
+    travar();
+  });
   escutar('chat:msg', ({ msg }) => {
     const n = rt.historico.length;
     if (n === 1) { tudo(); return; }
     const acompanhava = pertoDoFim();
     lista.append(linha(msg, rt.historico[n - 2]));
+    if (msg.usuario_id === rt.eu?.id && !nota.classList.contains('silencio')) nota.hidden = true;
     if (acompanhava || msg.usuario_id === rt.eu?.id) descer();
   });
   tudo();
 
   return h('section', { class: 'painel rec-chat' },
     h('div', { class: 'painel-cab' }, h('h2', null, icone('chat'), 'Chat da cidade'), situacao),
-    lista, form);
+    lista, nota, form);
 }
 
 function painelRanking() {
