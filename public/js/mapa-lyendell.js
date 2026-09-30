@@ -1,66 +1,62 @@
 // Dados do mapa de Lyendell, tirados da vista de cima do jogo (imagem de 1154 x 773).
 // Todas as coordenadas estão nesse espaço: x para a direita, y para baixo, norte para cima.
+// As vias foram alinhadas (só retas, cantos de 90° e diagonais de 45°), como numa planta da cidade.
 // Para acrescentar algo (ex.: as casas), é só marcar o ponto na mesma imagem e anotar o x e o y.
 
 export const VISTA = [0, 0, 1154, 773];
 
-// Área construída da cidade (dentro das muralhas).
+// Contorno das muralhas (a área da cidade).
 export const CIDADE = [
-  [212, 108], [262, 72], [360, 52], [500, 48], [640, 50], [700, 52], [760, 92], [900, 96], [972, 90],
-  [1004, 150], [1024, 262], [1046, 352], [1084, 440], [1106, 540], [1122, 650], [1094, 712], [1040, 728],
-  [960, 736], [900, 780], [440, 780], [424, 716], [398, 702], [236, 702], [214, 606], [202, 500], [200, 300],
+  [205, 100], [250, 55], [980, 55], [1005, 80], [1022, 300], [1050, 360], [1085, 440], [1100, 560], [1100, 705],
+  [1077, 728], [228, 728], [205, 705],
 ];
 
-// O rio: entra pelo alto, à esquerda, passa ao norte da cidade e desce pelo leste até o sul.
+// O rio: passa ao norte da cidade e desce pelo leste até o sul.
 export const RIO = [
-  [30, -20], [110, 20], [250, 30], [420, 14], [590, 26], [700, 36], [800, 58], [880, 80], [952, 72],
-  [990, 112], [1006, 192], [1024, 272], [1050, 350], [1090, 420], [1132, 490], [1162, 580], [1172, 660],
-  [1146, 728], [1070, 756], [970, 768], [880, 800],
+  [30, -20], [110, 16], [250, 22], [420, 10], [590, 18], [700, 24], [800, 30], [880, 32], [952, 30], [1000, 46],
+  [1038, 90], [1050, 180], [1062, 280], [1080, 360], [1115, 425], [1145, 490], [1168, 580], [1176, 660],
+  [1150, 735], [1070, 762], [970, 772], [880, 800],
 ];
 
-// Muralhas: o contorno da cidade, com torres nos cantos e o portão ao norte (com a ponte sobre o rio).
-export const TORRES = [[228, 96], [654, 52], [728, 54], [972, 88], [1100, 560], [1100, 700], [228, 690]];
-export const PONTE = { x: 691, y: 50, largura: 26, ate: -4 };
+export const TORRES = [[227, 77], [662, 55], [698, 55], [992, 67], [1088, 716], [216, 716]];
+export const PORTAO = { x: 680, y: 55 };
+// Caminho do portão norte até a Avenida Nadir (sem nome).
+export const CAMINHOS = [[[680, 55], [680, 120]]];
 
-// n = número da legenda que você mandou. Os pontos seguem o traço desenhado na imagem.
+// n = número da legenda. pontos = o traçado; rotulo = o trecho reto onde o nome é escrito.
 export const AVENIDAS = [
-  { id: 'av1', n: 1, nome: 'Avenida Bandeirinhas', rotulo: 0.36, pontos: [
-    [452, 663], [500, 668], [550, 678], [600, 683], [654, 685], [704, 679], [754, 673], [804, 670], [854, 668],
-    [904, 665], [954, 662], [989, 652], [1006, 632], [1011, 600], [1008, 562], [998, 522], [984, 478],
-    [968, 430], [955, 400], [946, 386]] },
-  { id: 'av2', n: 2, nome: 'Avenida Nadir', rotulo: 0.36, pontos: [
-    [646, 135], [643, 175], [648, 210], [659, 245], [672, 285], [683, 330], [690, 365], [697, 410], [702, 455],
-    [705, 503], [700, 553], [693, 603], [690, 640], [691, 675]] },
-  { id: 'av3', n: 3, nome: 'Avenida Sarará', rotulo: 0.42, pontos: [
-    [333, 538], [355, 551], [400, 557], [450, 560], [500, 562], [550, 558], [578, 548], [598, 525], [610, 500], [615, 478]] },
-  { id: 'av4', n: 4, nome: 'Avenida Santa Menefreda', rotulo: 0.55, pontos: [
-    [495, 74], [450, 71], [410, 69], [385, 70], [368, 80], [355, 100], [345, 125], [337, 160], [331, 200],
-    [328, 250], [324, 300], [321, 350], [321, 400], [321, 450], [319, 485], [314, 500]] },
+  { id: 'av1', n: 1, nome: 'Avenida Bandeirinhas',
+    pontos: [[455, 672], [975, 672], [1005, 642], [1005, 410], [965, 370]], rotulo: [[777, 672], [923, 672]] },
+  { id: 'av2', n: 2, nome: 'Avenida Nadir',
+    pontos: [[680, 120], [680, 672]], rotulo: [[680, 215], [680, 316]] },
+  { id: 'av3', n: 3, nome: 'Avenida Sarará',
+    pontos: [[325, 558], [575, 558], [605, 528], [605, 478]], rotulo: [[330, 558], [452, 558]] },
+  { id: 'av4', n: 4, nome: 'Avenida Santa Menefreda',
+    pontos: [[495, 72], [350, 72], [325, 97], [325, 558]], rotulo: [[325, 280], [325, 500]] },
 ];
 
 export const RUAS = [
-  { id: 'r1', n: 1, nome: 'Rua Corvos', pontos: [[740, 514], [750, 545], [764, 595], [780, 655]] },
-  { id: 'r2', n: 2, nome: 'Rua Coelho', pontos: [[550, 573], [553, 598], [567, 628], [585, 646], [602, 657]] },
-  { id: 'r3', n: 3, nome: 'Rua Toca', pontos: [[452, 577], [455, 615], [457, 655]] },
-  { id: 'r4', n: 4, nome: 'Rua Floral', pontos: [[355, 229], [400, 220], [440, 211], [480, 205], [550, 201], [630, 199]] },
-  { id: 'r5', n: 5, nome: 'Rua Café com Leite', pontos: [[491, 130], [555, 133], [617, 137]] },
-  { id: 'r6', n: 6, nome: 'Rua Alecrim', pontos: [[469, 90], [474, 125], [473, 160], [469, 200]] },
-  { id: 'r7', n: 7, nome: 'Rua Resenha', pontos: [[704, 316], [760, 316], [812, 317], [824, 326]] },
-  { id: 'r8', n: 8, nome: 'Rua Bank', pontos: [[966, 493], [950, 495], [939, 505], [938, 555], [941, 613]] },
-  { id: 'r9', n: 9, nome: 'Rua Raposo', pontos: [[395, 89], [387, 115], [382, 150], [385, 182], [392, 210]] },
-  { id: 'r10', n: 10, nome: 'Rua Gatuno', pontos: [[731, 413], [754, 397], [779, 383], [814, 374], [849, 372], [874, 365], [936, 360]],
-    ramos: [[[851, 374], [854, 400], [856, 428]]] },
+  { id: 'r1', n: 1, nome: 'Rua Corvos', pontos: [[760, 515], [760, 672]], rotulo: [[760, 540], [760, 650]] },
+  { id: 'r2', n: 2, nome: 'Rua Coelho', pontos: [[552, 558], [552, 620], [604, 672]], rotulo: [[552, 560], [552, 620]] },
+  { id: 'r3', n: 3, nome: 'Rua Toca', pontos: [[455, 558], [455, 672]], rotulo: [[455, 570], [455, 660]] },
+  { id: 'r4', n: 4, nome: 'Rua Floral', pontos: [[325, 212], [680, 212]], rotulo: [[480, 212], [670, 212]] },
+  { id: 'r5', n: 5, nome: 'Rua Café com Leite', pontos: [[470, 135], [680, 135]], rotulo: [[480, 135], [670, 135]] },
+  { id: 'r6', n: 6, nome: 'Rua Alecrim', pontos: [[470, 72], [470, 212]], rotulo: [[470, 138], [470, 210]] },
+  { id: 'r7', n: 7, nome: 'Rua Resenha', pontos: [[680, 318], [830, 318]], rotulo: [[690, 318], [830, 318]] },
+  { id: 'r8', n: 8, nome: 'Rua Bank', pontos: [[1005, 495], [940, 495], [940, 672]], rotulo: [[940, 500], [940, 665]] },
+  { id: 'r9', n: 9, nome: 'Rua Raposo', pontos: [[390, 72], [390, 212]], rotulo: [[390, 76], [390, 208]] },
+  { id: 'r10', n: 10, nome: 'Rua Gatuno', pontos: [[680, 410], [735, 410], [775, 370], [965, 370]], ramos: [[[852, 370], [852, 430]]],
+    rotulo: [[855, 370], [962, 370]] },
 ];
 
-// Prédios públicos. x e y: onde fica o ícone; rotulo: onde vai o nome (linhas separadas por |).
+// Prédios públicos: o selo fica em x, y (grande = prédio maior); linhas = o nome; sub = a linha pequena embaixo.
 export const PREDIOS = [
-  { id: 'septo', nome: 'Septo', tipo: 'Templo', icone: 'septo', x: 506, y: 358, rotulo: [506, 396] },
-  { id: 'coliseu', nome: 'Coliseu', tipo: 'Arena', icone: 'espada', x: 781, y: 186, rotulo: [781, 224] },
-  { id: 'toca', nome: 'Toca do Coelho', tipo: 'Prédio público', icone: 'coelho', x: 934, y: 176, rotulo: [934, 212], linhas: ['Toca do', 'Coelho'] },
-  { id: 'tabelionato', nome: 'Tabelionato', tipo: 'Prédio público, no Centro da cidade', icone: 'pergaminho', x: 746, y: 466, rotulo: [688, 470], ancora: 'end' },
-  { id: 'banco', nome: 'Banco', tipo: 'Prédio público', icone: 'moeda', x: 315, y: 624, rotulo: [315, 662] },
-  { id: 'quartel', nome: 'Quartel General', tipo: 'Prédio público', icone: 'escudo', x: 1079, y: 626, rotulo: [1079, 662], linhas: ['Quartel', 'General'] },
+  { id: 'septo', nome: 'Septo', tipo: 'Templo', icone: 'septo', x: 500, y: 372, grande: true },
+  { id: 'coliseu', nome: 'Coliseu', tipo: 'Arena', icone: 'espada', x: 776, y: 200, grande: true },
+  { id: 'toca', nome: 'Toca do Coelho', tipo: 'Castelo da Família Nobre Luckham', icone: 'castelo', x: 928, y: 200, grande: true,
+    linhas: ['Toca do Coelho'], sub: 'Castelo Luckham' },
+  { id: 'tabelionato', nome: 'Tabelionato', tipo: 'Prédio público, no Centro da cidade', icone: 'pergaminho', x: 736, y: 452,
+    sub: 'Centro da cidade', centro: true },
+  { id: 'banco', nome: 'Banco', tipo: 'Prédio público', icone: 'moeda', x: 330, y: 622 },
+  { id: 'quartel', nome: 'Quartel General', tipo: 'Prédio público', icone: 'escudo', x: 1053, y: 610, linhas: ['Quartel', 'General'] },
 ];
-
-// O Centro da cidade (a cruz roxa da sua imagem), no Tabelionato.
-export const CENTRO = { x: 718, y: 468 };

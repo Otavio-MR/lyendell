@@ -172,10 +172,11 @@ chat, os resultados e os recordes ficam salvos.
 
 ## Mapa de Lyendell
 
-A tela **Mapa de Lyendell** mostra a capital vista de cima, num desenho escuro no estilo do site:
-o rio, as muralhas, as torres e o portão com a ponte, as casinhas, as 4 avenidas (douradas) e as
-10 ruas com o nome escrito ao longo delas, os prédios públicos (Septo, Coliseu, Toca do Coelho,
-Tabelionato, Banco e Quartel General) e o Centro da cidade (a estrela roxa, no Tabelionato).
+A tela **Mapa de Lyendell** mostra a capital vista de cima, como uma planta escura no estilo do
+site: o rio, as muralhas, as torres e o portão com a ponte, as casas em grade, as 4 avenidas
+(douradas) e as 10 ruas alinhadas (só retas e cantos), com o nome escrito em cada uma, e os prédios
+públicos, todos com o mesmo selo: Septo, Coliseu, Toca do Coelho (o Castelo da Família Nobre
+Luckham), Tabelionato (com a estrela roxa do Centro da cidade), Banco e Quartel General.
 
 - Arraste para andar pelo mapa; use a rodinha, a pinça no celular ou os botões + e − para o zoom.
 - Clique numa rua ou prédio (no mapa ou na lista ao lado) para destacar e ver onde fica.
