@@ -155,8 +155,10 @@ registro com 4 dígitos e o nome entre os coelhos; depois os campos do modelo (N
 Idade, Cargo, Residência, Estado Civil e Profissão; no Outros: Nickname, Idade, Gênero, Estado
 civil, Endereço, família e cargo na família), cada valor na linha logo abaixo do rótulo, e no fim
 quem registrou e quando. Uma ficha em branco sai igual, byte por byte, ao arquivo modelo.
-Os campos são achados pelo nome no formulário, então o Tabelionato pode ter outros campos além
-desses (eles só não entram no livro).
+Os campos são achados pelo nome no formulário (o nome mais exato ganha) e, se a Tabeliã renomear um
+campo que veio pronto, pelo campo original. Em Lyendell o "Endereço" é o nick do jogador (vai na linha
+Nickname) e a "Residência" é a rua e o número. O Tabelionato pode ter outros campos além desses (eles só
+não entram no livro).
 
 Os outros livros (Comerciantes, Casamentos, Prisioneiros...) seguem o mesmo desenho, com os
 próprios campos. O livro inteiro junta as fichas uma atrás da outra, até 100 páginas. Se um valor

@@ -306,20 +306,30 @@ const SEP = '🐇 ────────── 🐇';
 const FIM = '§4   §6  Casa Luckham';
 const TABELIONATO = ['      TABELIONATO', '      DE LYENDELL'];
 
-// Nomes que cada campo do modelo pode ter no formulário do site (sem acento e sem maiúscula).
+// Nomes que cada linha do modelo pode ter no formulário do site (sem acento e sem maiúscula), do mais
+// certo ao mais solto. Em Lyendell, o "Endereço" é o nick do jogador (o endereço dele no Minecraft) e a
+// "Residência" é a rua e o número; por isso "endereco" é o último recurso da residência.
 const CAMPOS_FICHA = {
-  nickname: ['nickname', 'nick', 'nick do minecraft'],
+  nickname: ['nickname', 'nick', 'nick do minecraft', 'endereco'],
   nome: ['nome', 'nome do personagem', 'nome completo'],
   idade: ['idade'],
   cargo: ['cargo'],
-  residencia: ['residencia', 'endereco', 'moradia'],
+  residencia: ['residencia', 'moradia', 'onde mora', 'endereco'],
   estadoCivil: ['estado civil'],
   profissao: ['profissao', 'oficio'],
   genero: ['genero', 'sexo'],
-  endereco: ['endereco', 'residencia', 'moradia'],
+  endereco: ['residencia', 'moradia', 'onde mora', 'endereco'], // a linha "Endereço" do modelo de Outros: onde a pessoa mora
   familia: ['a qual familia pertence', 'familia'],
   cargoFamilia: ['cargo na familia'],
 };
+// O id que o site deu ao campo quando criou o livro: continua o mesmo se a Tabeliã trocar o nome do campo.
+const IDS_FICHA = {
+  nickname: 'nickname', nome: 'nome', idade: 'idade', cargo: 'cargo', residencia: 'residencia', estadoCivil: 'estado_civil',
+  profissao: 'profissao', genero: 'genero', endereco: 'endereco', familia: 'familia', cargoFamilia: 'cargo_familia',
+};
+// As linhas de cada modelo (o nome entra no de Outros só para o título da capa, se não houver nick).
+const LINHAS_PESSOA = ['nickname', 'nome', 'idade', 'cargo', 'residencia', 'estadoCivil', 'profissao'];
+const LINHAS_OUTROS = ['nickname', 'nome', 'idade', 'genero', 'estadoCivil', 'endereco', 'familia', 'cargoFamilia'];
 
 const semCodigos = s => s.replace(/§./g, '');
 // Valor numa linha só, sem § (que o Minecraft leria como código de cor).
@@ -339,10 +349,34 @@ function valorFormatado(c, reg) {
   return valorDoCampo(c, v, reg.dados);
 }
 
-function valorDaFicha(livro, reg, chave) {
-  const nomes = CAMPOS_FICHA[chave];
-  const c = livro.campos.find(x => x.tipo !== 'imagem' && x.tipo !== 'secao' && nomes.includes(nomeDoCampo(x)));
-  return c ? umaLinha(valorFormatado(c, reg)) : '';
+// Qual campo do formulário vai em cada linha do modelo. Cada campo serve a uma linha só.
+// 1) Pelo nome do campo: os nomes mais certos de todas as linhas escolhem primeiro (assim "Residência"
+//    ganha a linha da residência, e "Endereço" fica para o nick).
+// 2) O que sobrar, pelo id que o site deu ao campo (ex.: o campo "Nickname" renomeado para "Endereço").
+function camposDaFicha(livro, linhas) {
+  const campos = livro.campos.filter(c => c.tipo !== 'imagem' && c.tipo !== 'secao');
+  const usados = new Set();
+  const achados = {};
+  const voltas = Math.max(...linhas.map(k => CAMPOS_FICHA[k].length));
+  for (let i = 0; i < voltas; i++) {
+    for (const k of linhas) {
+      const nome = CAMPOS_FICHA[k][i];
+      if (achados[k] || !nome) continue;
+      const c = campos.find(x => !usados.has(x) && nomeDoCampo(x) === nome);
+      if (c) { achados[k] = c; usados.add(c); }
+    }
+  }
+  for (const k of linhas) {
+    if (achados[k]) continue;
+    const c = campos.find(x => !usados.has(x) && x.id === IDS_FICHA[k]);
+    if (c) { achados[k] = c; usados.add(c); }
+  }
+  return achados;
+}
+
+function leitorDaFicha(livro, reg, linhas) {
+  const achados = camposDaFicha(livro, linhas);
+  return chave => (achados[chave] ? umaLinha(valorFormatado(achados[chave], reg)) : '');
 }
 
 const numeroDoRegistro = reg => (reg.numero ? String(reg.numero).padStart(4, '0') : '----');
@@ -371,7 +405,7 @@ const rodapePadrao = reg => `§8${SEP}\n§0Registrado por: ${quemRegistrou(reg)}
 const vaga = v => (v ? `§0${v}§4` : '');
 
 function fichaMoradoresOuNobres(livro, reg, nobres) {
-  const v = chave => valorDaFicha(livro, reg, chave);
+  const v = leitorDaFicha(livro, reg, LINHAS_PESSOA);
   const cargo = v('cargo');
   return [
     capaDaFicha({
@@ -385,7 +419,7 @@ function fichaMoradoresOuNobres(livro, reg, nobres) {
 }
 
 function fichaOutros(livro, reg) {
-  const v = chave => valorDaFicha(livro, reg, chave);
+  const v = leitorDaFicha(livro, reg, LINHAS_OUTROS);
   return [
     capaDaFicha({
       cor: '3', fecho: '§2', tipo: ['       Registro de', '         Outros'],
