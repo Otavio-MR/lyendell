@@ -904,7 +904,8 @@ a.jogo-cartao:hover { border-color: var(--ouro-d); color: var(--texto); }
 .mini-ranking li { counter-increment: pos; display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 6px; }
 .mini-ranking li::before { content: counter(pos); width: 22px; text-align: center; font-family: var(--f-titulo); font-size: 0.78rem; color: var(--suave); }
 .mini-ranking li:nth-child(1)::before { color: var(--ouro); }
-.mini-ranking li span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Só o nome (filho direto) estica; a foto dentro do link de "Mais ativos" fica do tamanho dela. */
+.mini-ranking li > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mini-ranking li strong { font-family: var(--f-titulo); font-size: 0.9rem; color: var(--ouro-l); }
 
 .qc-cab { flex-wrap: wrap; }
@@ -1258,7 +1259,7 @@ button.emblema.ativo { background: var(--ouro-fundo); border-color: var(--ouro);
 .novidade-conquista .ico { width: 15px; height: 15px; }
 .novidade small { color: var(--suave); font-size: 0.8rem; white-space: nowrap; }
 .semana-pessoa { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; color: var(--texto); }
-.semana-pessoa span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.semana-pessoa > span:not(.avatar) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Avisos de conquista e missão */
 .toast.chamada-ouro { border-color: var(--ouro); background: linear-gradient(160deg, rgba(216, 177, 58, 0.18), var(--sup-2) 60%); }
