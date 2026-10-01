@@ -2217,3 +2217,31 @@ body.modo-crianca .tabela th { color: var(--rosa); }
   .cr-portas { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .cr-porta { padding: 16px 10px 14px; }
 }
+
+/* ─── Modos dos jogos (co-op e versus) ─────────────── */
+.modos-escolha { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; margin: 4px 0 10px; }
+.modo-opcao {
+  display: grid; gap: 3px; padding: 10px 12px; text-align: left; cursor: pointer; border-radius: var(--raio-p);
+  background: var(--sup-2); border: 1px solid var(--borda-2); color: var(--texto);
+}
+.modo-opcao strong { font-family: var(--f-titulo); font-size: 0.85rem; color: var(--pergaminho); }
+.modo-opcao small { color: var(--texto-2); font-size: 0.85rem; line-height: 1.3; }
+.modo-opcao:hover:not(:disabled) { border-color: var(--ouro-d); }
+.modo-opcao.ativo { border-color: var(--ouro); background: var(--ouro-fundo); box-shadow: 0 0 0 1px var(--ouro) inset; }
+.modo-opcao.ativo strong { color: var(--ouro-l); }
+.modo-opcao:disabled { cursor: default; }
+.modo-opcao:disabled:not(.ativo) { opacity: 0.55; }
+.modo-da-sala { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0 0 12px; color: var(--texto-2); }
+.modo-da-sala strong { color: var(--ouro-l); font-family: var(--f-titulo); font-size: 0.85rem; }
+.quiz-equipe { display: grid; gap: 6px; margin-bottom: 12px; }
+.quiz-equipe p { margin: 0; }
+.quiz-equipe strong { color: var(--pergaminho); }
+.quiz-times { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.quiz-time { display: grid; justify-items: center; padding: 8px; border-radius: var(--raio-p); border: 1px solid; }
+.quiz-time small { font: 600 0.66rem var(--f-titulo); letter-spacing: 0.08em; text-transform: uppercase; }
+.quiz-time strong { font: 700 1.2rem var(--f-titulo); }
+.quiz-time.t0 { color: #f0d27a; border-color: rgba(216, 177, 58, 0.5); background: rgba(216, 177, 58, 0.08); }
+.quiz-time.t1 { color: #9fcaf0; border-color: rgba(90, 160, 216, 0.5); background: rgba(90, 160, 216, 0.08); }
+.quiz-time.na-frente { box-shadow: 0 0 0 2px currentColor inset; }
+.quiz-lista li.time-t0 { box-shadow: inset 3px 0 0 #d8b13a; }
+.quiz-lista li.time-t1 { box-shadow: inset 3px 0 0 #5aa0d8; }

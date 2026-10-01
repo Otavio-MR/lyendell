@@ -5,6 +5,13 @@ import { rt, criarPartida, entrarNaPartida } from '../tempo-real.js';
 
 const LETRAS = ['A', 'B', 'C', 'D'];
 const QUANTIDADES = [5, 10, 15];
+// Os modos do quiz: cada um por si, a sala inteira junta (co-op) ou dois times (versus).
+export const MODOS_QUIZ = {
+  todos: { nome: 'Todos contra todos', curto: 'todos contra todos', texto: 'Cada um por si: vence quem fizer mais pontos.' },
+  equipe: { nome: 'Em equipe (co-op)', curto: 'em equipe', texto: 'A sala inteira é um time: juntos, vocês precisam acertar 60% de todas as respostas.' },
+  times: { nome: 'Dois times (versus)', curto: 'dois times', texto: 'O jogo sorteia dois times no começo; vence o time que somar mais pontos.' },
+};
+const NOMES_TIMES = ['Time Dourado', 'Time Azul'];
 
 /* ─── Abrir uma sala ──────────────────────────────── */
 
@@ -24,6 +31,14 @@ export async function abrirSalaQuiz() {
     h('span', null, h('strong', null, c.nome), h('small', null, c.total ? `${c.total} perguntas` : 'nenhuma pergunta ainda')))));
   desenharCats();
 
+  let modo = 'todos';
+  const modos = h('div', { class: 'modos-escolha' });
+  const desenharModos = () => trocar(modos, Object.entries(MODOS_QUIZ).map(([k, m]) => h('button', {
+    type: 'button', class: `modo-opcao ${k === modo ? 'ativo' : ''}`.trim(), 'aria-pressed': String(k === modo),
+    onclick: () => { modo = k; desenharModos(); },
+  }, h('strong', null, m.nome), h('small', null, m.texto))));
+  desenharModos();
+
   const qtd = h('div', { class: 'segmentado' });
   const desenharQtd = () => trocar(qtd, QUANTIDADES.map(n =>
     h('button', { class: `seg ${n === quantidade ? 'ativo' : ''}`, type: 'button', onclick: () => { quantidade = n; desenharQtd(); } }, `${n} perguntas`)));
@@ -34,12 +49,13 @@ export async function abrirSalaQuiz() {
     textoOk: 'Abrir sala',
     conteudo: [
       h('p', { class: 'form-intro' }, 'A sala aparece para todos no salão. Quando quiser, você começa: cada pergunta vale até 1000 pontos, e quem responde mais rápido ganha mais.'),
+      h('div', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Modo'), modos),
       campo('Categorias', categorias),
       campo('Tamanho da partida', qtd),
     ],
     aoEnviar() {
       if (!escolhidas.size) throw new Error('Escolha pelo menos uma categoria.');
-      criarPartida('quiz', { categorias: [...escolhidas], quantidade });
+      criarPartida('quiz', { categorias: [...escolhidas], quantidade, modo });
     },
   });
 }
@@ -62,7 +78,7 @@ export function telaQuiz(s, acoes) {
   const cats = (s.opcoes?.categorias || []).map(c => ({ luckham: 'Família Luckham', coelhos: 'Coelhos', minecraft: 'Minecraft', rp: 'Regras de RP' }[c]));
   const topo = cabecalho({
     titulo: s.nomeJogo, icone: 'pergunta', voltar: { href: '#/recreacao', texto: 'Recreação' }, acoes: botoes,
-    sub: `${cats.join(', ')} · ${s.opcoes?.quantidade || ''} perguntas`,
+    sub: `${MODOS_QUIZ[s.opcoes?.modo || 'todos'].nome} · ${cats.join(', ')} · ${s.opcoes?.quantidade || ''} perguntas`,
   });
 
   if (s.status === 'esperando') return [topo, salaDeEspera(s, { jogador, souDono, acoes })];
@@ -141,6 +157,7 @@ function salaDeEspera(s, { jogador, souDono, acoes }) {
   return h('div', { class: 'quiz-espera painel' },
     h('div', { class: 'painel-cab' },
       h('h2', null, icone('usuarios'), `Na sala: ${s.jogadores.length} de ${s.max}`)),
+    h('p', { class: 'modo-da-sala' }, icone(s.opcoes?.modo === 'equipe' ? 'usuarios' : 'espada'), h('strong', null, MODOS_QUIZ[s.opcoes?.modo || 'todos'].nome), ' ', MODOS_QUIZ[s.opcoes?.modo || 'todos'].texto),
     h('div', { class: 'quiz-na-sala' }, s.jogadores.map(p => h('div', { class: `quiz-pessoa ${p.conectado ? '' : 'ausente'}`.trim() },
       avatar(p.nome, '', p.foto),
       h('span', null, p.nome),
@@ -148,7 +165,9 @@ function salaDeEspera(s, { jogador, souDono, acoes }) {
     h('div', { class: 'quiz-espera-acao' },
       souDono
         ? [
-          botao(s.jogadores.length > 1 ? 'Começar o quiz' : 'Começar sozinho (treino)', { classe: 'btn-ouro btn-grande', icone: 'frente', onclick: acoes.comecar }),
+          botao(s.jogadores.length > 1 ? 'Começar o quiz' : s.opcoes?.modo === 'times' ? 'Esperando mais gente...' : 'Começar sozinho (treino)', {
+            classe: 'btn-ouro btn-grande', icone: 'frente', onclick: acoes.comecar, desativado: s.opcoes?.modo === 'times' && s.jogadores.length < 2,
+          }),
           h('p', { class: 'suave' }, s.jogadores.length > 1
             ? 'Quem entrar depois de começar só pode assistir.'
             : 'A sala aparece no salão para todos. Com uma pessoa só vale como treino e não conta vitória.'),
@@ -161,12 +180,27 @@ function salaDeEspera(s, { jogador, souDono, acoes }) {
           ]));
 }
 
+// O que a equipe (co-op) ou cada time (versus) já fez.
+function resumoModo(e) {
+  const r = e.resumo;
+  if (!r || r.modo === 'todos') return null;
+  if (r.modo === 'equipe') {
+    const pct = Math.min(100, (r.acertos / r.meta) * 100);
+    return h('div', { class: 'quiz-equipe' },
+      h('p', null, h('strong', null, `Equipe: ${r.acertos} de ${r.meta} acertos`), h('small', null, r.acertos >= r.meta ? ' Meta batida!' : ' para bater a meta')),
+      h('div', { class: `barra ${pct >= 100 ? 'completa' : ''}`.trim() }, h('div', { class: 'barra-cheia', style: { width: `${pct}%` } })));
+  }
+  return h('div', { class: 'quiz-times' }, [0, 1].map(t => h('div', { class: `quiz-time t${t} ${r.pontos[t] > r.pontos[1 - t] ? 'na-frente' : ''}`.trim() },
+    h('small', null, NOMES_TIMES[t]), h('strong', null, num(r.pontos[t])))));
+}
+
 function placar(s, { euId, revelada }) {
   const e = s.estado;
   const ganhos = Object.fromEntries((e.respostas || []).map(r => [r.id, r.pontos]));
   const responderam = new Set(e.responderam || []);
   return h('aside', { class: 'painel quiz-placar' },
     h('div', { class: 'painel-cab' }, h('h2', null, icone('trofeu'), 'Placar')),
+    resumoModo(e),
     h('ol', { class: 'quiz-lista' }, e.placar.map((pl, n) => {
       const p = s.jogadores.find(x => x.id === pl.id);
       if (!p) return null;
@@ -175,7 +209,7 @@ function placar(s, { euId, revelada }) {
       else if (revelada && ganhos[p.id] > 0) marca = h('small', { class: 'quiz-ganho' }, `+${num(ganhos[p.id])}`);
       else if (!revelada && responderam.has(p.id)) marca = h('span', { class: 'quiz-respondeu', title: 'Já respondeu' }, icone('check'));
       else if (!p.conectado) marca = h('small', { class: 'quiz-caiu' }, 'caiu');
-      return h('li', { class: `${p.id === euId ? 'eu-linha' : ''} ${p.saiu ? 'saiu' : ''}`.trim() },
+      return h('li', { class: `${p.id === euId ? 'eu-linha' : ''} ${p.saiu ? 'saiu' : ''} ${pl.time != null ? `time-t${pl.time}` : ''}`.replace(/\s+/g, ' ').trim() },
         h('span', { class: 'quiz-pos' }, n + 1),
         avatar(p.nome, 'avatar-p', p.foto),
         h('span', { class: 'quiz-nome' }, p.nome),
@@ -190,12 +224,23 @@ function resultado(s, { jogador, euId, souDono, acoes }) {
   const minhaPos = lista.findIndex(x => x.id === euId);
   const podio = lista.slice(0, 3);
   let titulo = 'Fim do quiz!';
-  if (jogador && minhaPos === 0) titulo = lista.length > 1 ? 'Você venceu o quiz!' : 'Treino concluído!';
+  let venci = jogador && minhaPos === 0;
+  const r = e.resumo;
+  if (r?.modo === 'equipe') {
+    venci = r.vencedores.length > 0;
+    titulo = venci ? `A equipe venceu! ${r.acertos} acertos (a meta era ${r.meta})` : `Faltou pouco: ${r.acertos} de ${r.meta} acertos`;
+  } else if (r?.modo === 'times') {
+    const meuTime = e.placar.find(pl => pl.id === euId)?.time;
+    venci = r.time != null && meuTime === r.time;
+    titulo = r.time == null ? `Empate: ${num(r.pontos[0])} a ${num(r.pontos[1])}`
+      : `${NOMES_TIMES[r.time]} venceu: ${num(r.pontos[r.time])} a ${num(r.pontos[1 - r.time])}${jogador && meuTime != null ? (venci ? '. Vitória sua!' : '.') : ''}`;
+  } else if (jogador && minhaPos === 0) titulo = lista.length > 1 ? 'Você venceu o quiz!' : 'Treino concluído!';
   else if (jogador && minhaPos > 0) titulo = `Você ficou em ${minhaPos + 1}º lugar`;
   else if (lista[0]) titulo = `${lista[0].p.nome} venceu o quiz!`;
 
   return h('div', { class: 'quiz-fim' },
-    h('p', { class: `partida-status ${jogador && minhaPos === 0 ? 'vitoria' : 'destaque'}` }, titulo),
+    h('p', { class: `partida-status ${venci ? 'vitoria' : 'destaque'}` }, titulo),
+    resumoModo(e),
     h('div', { class: 'quiz-podio' }, [1, 0, 2].map(i => podio[i] && h('div', { class: `degrau d${i + 1}` },
       i === 0 && h('span', { class: 'coroa' }, icone('coroa')),
       avatar(podio[i].p.nome, 'avatar-g', podio[i].p.foto),

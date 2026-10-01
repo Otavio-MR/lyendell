@@ -30,8 +30,14 @@ function validarOpcoes(bruto = {}) {
   const categorias = [...new Set((Array.isArray(bruto.categorias) ? bruto.categorias : []).filter(c => CATEGORIAS[c]))];
   if (!categorias.length) throw new ErroQuiz('Escolha pelo menos uma categoria.');
   const quantidade = QUANTIDADES.includes(Number(bruto.quantidade)) ? Number(bruto.quantidade) : 10;
-  return { categorias, quantidade };
+  // todos: cada um por si. equipe (co-op): a sala inteira junta acertos para bater a meta.
+  // times (versus): duas equipes sorteadas no começo; vence a que somar mais pontos.
+  const modo = MODOS.includes(bruto.modo) ? bruto.modo : 'todos';
+  return { categorias, quantidade, modo };
 }
+
+const MODOS = ['todos', 'equipe', 'times'];
+const META_EQUIPE = 0.6; // no modo equipe: acertar 60% de todas as respostas possíveis
 
 const marcas = lista => lista.map(() => '?').join(', ');
 
@@ -61,4 +67,4 @@ function pontosDaResposta(certa, restanteMs) {
   return 500 + Math.round(500 * Math.max(0, Math.min(1, restanteMs / TEMPO_MS)));
 }
 
-module.exports = { CATEGORIAS, QUANTIDADES, MAX_JOGADORES, TEMPO_MS, REVELAR_MS, ErroQuiz, validarOpcoes, contarPerguntas, sortear, pontosDaResposta };
+module.exports = { CATEGORIAS, QUANTIDADES, MODOS, META_EQUIPE, MAX_JOGADORES, TEMPO_MS, REVELAR_MS, ErroQuiz, validarOpcoes, contarPerguntas, sortear, pontosDaResposta };

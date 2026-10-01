@@ -616,10 +616,15 @@ export function sala(id) {
     let texto = '';
     if (q.fase === 'largada') texto = `${Math.max(1, Math.ceil((fimLargada - Date.now()) / 1000))}`;
     else if (q.fase === 'fim' || s.status === 'fim') {
-      if (s.empate) texto = 'Empate!';
+      const r = q.resultado;
+      if (q.m === 'colheita') texto = r?.equipe ? 'A equipe venceu a colheita!' : 'O tempo acabou! Faltaram cenouras.';
+      else if (q.m === 'duplas') texto = r?.time == null ? 'Empate!' : r.venceram.includes(s.eu) ? 'A sua dupla venceu!' : `A ${NOMES_DUPLAS[r.time].toLowerCase()} venceu!`;
+      else if (s.empate) texto = 'Empate!';
       else if (s.vencedor === s.eu) texto = 'Você venceu!';
       else texto = `${s.jogadores[s.vencedor]?.nome || 'Alguém'} venceu!`;
-    } else if (s.eu >= 0 && q.c[s.eu] && !q.c[s.eu].v) texto = 'Você bateu! Assistindo o resto...';
+    } else if (s.eu >= 0 && q.c[s.eu] && !q.c[s.eu].v) {
+      texto = q.m === 'colheita' && q.c[s.eu].r != null && !s.jogadores[s.eu].saiu ? `Bateu! Volta em ${Math.max(1, Math.ceil((q.c[s.eu].r * (q.ms || 125)) / 1000))}...` : 'Você bateu! Assistindo o resto...';
+    }
     visorCobras.aviso.hidden = !texto;
     visorCobras.aviso.textContent = texto;
     visorCobras.aviso.classList.toggle('contagem', q.fase === 'largada');
@@ -631,21 +636,29 @@ export function sala(id) {
     if (!placarCobras || !q || !s) return;
     const ordem = q.classificacao ? q.classificacao.map(c => c.i) : s.jogadores.map((_, i) => i);
     // O placar só é refeito quando muda alguma coisa (os quadros chegam várias vezes por segundo).
-    const chave = JSON.stringify([ordem, q.c.map(c => [c.v, c.p]), s.status, s.vencedor, s.jogadores.map(p => p.saiu)]);
+    const segundos = q.resta != null ? Math.ceil((q.resta * (q.ms || 125)) / 1000) : null;
+    const chave = JSON.stringify([ordem, q.c.map(c => [c.v, c.p]), s.status, s.vencedor, s.jogadores.map(p => p.saiu), q.total, segundos]);
     if (chave === chavePlacar && placarCobras.childElementCount) return;
     chavePlacar = chave;
+    const pct = q.meta ? Math.min(100, (q.total / q.meta) * 100) : 0;
+    const somaDupla = t => q.c.reduce((n, c, i) => n + (q.times?.[i] === t ? c.p : 0), 0);
     trocar(placarCobras,
       h('div', { class: 'painel-cab' }, h('h2', null, icone('trofeu'), 'Placar')),
+      q.m === 'colheita' && h('div', { class: 'quiz-equipe' },
+        h('p', null, h('strong', null, `Equipe: ${q.total} de ${q.meta} cenouras`), h('small', null, ` · ${Math.floor(segundos / 60)}:${String(segundos % 60).padStart(2, '0')}`)),
+        h('div', { class: `barra ${pct >= 100 ? 'completa' : ''}`.trim() }, h('div', { class: 'barra-cheia', style: { width: `${pct}%` } }))),
+      q.m === 'duplas' && h('div', { class: 'quiz-times' }, [0, 1].map(t => h('div', { class: `quiz-time t${t}` },
+        h('small', null, NOMES_DUPLAS[t]), h('strong', null, `${somaDupla(t)} cenouras`)))),
       h('ol', { class: 'cobras-lista' }, ordem.map(i => {
         const p = s.jogadores[i];
         const c = q.c[i];
         if (!p || !c) return null;
-        const venceu = s.status === 'fim' && s.vencedor === i;
+        const venceu = s.status === 'fim' && (q.resultado?.venceram || [s.vencedor]).includes(i);
         let situacao = 'jogando';
-        if (!c.v) situacao = p.saiu ? 'saiu' : 'bateu';
+        if (!c.v) situacao = p.saiu ? 'saiu' : q.m === 'colheita' && c.r != null ? 'vai renascer' : 'bateu';
         else if (q.fase === 'fim' || s.status === 'fim') situacao = 'sobrou';
         return h('li', { class: `${i === s.eu ? 'eu-linha' : ''} ${c.v ? '' : 'fora'}`.trim() },
-          h('span', { class: 'cobras-cor', style: { background: CORES_COBRAS[i] } }),
+          h('span', { class: 'cobras-cor', style: { background: corDaCobra(q, i) } }),
           h('span', { class: 'cobras-nome' }, h('strong', null, p.nome), h('small', null, i === s.eu ? `você · ${situacao}` : situacao)),
           venceu && h('span', { class: 'coroa' }, icone('coroa')),
           h('span', { class: 'cobras-pontos', title: 'Cenouras comidas' }, c.p));
@@ -662,7 +675,7 @@ export function sala(id) {
     else if (!jogador) botoes.push(h('a', { class: 'btn', href: '#/recreacao' }, icone('voltar'), h('span', null, 'Parar de assistir')));
     const topo = cabecalho({
       titulo: s.nomeJogo, icone: 'cobra', voltar: { href: '#/recreacao', texto: 'Recreação' }, acoes: botoes,
-      sub: 'De 2 a 4 cobras no mesmo tabuleiro. Quem bater sai e vira cenouras; vence quem sobrar.',
+      sub: `${MODOS_COBRAS[s.opcoes?.modo || 'todos'].nome}: ${MODOS_COBRAS[s.opcoes?.modo || 'todos'].texto}`,
     });
     if (s.status === 'esperando') return [topo, esperaCobras(s, { jogador, souDono })];
     const v = telaDasCobras();
@@ -690,20 +703,27 @@ export function sala(id) {
 
   function esperaCobras(s, { jogador, souDono }) {
     const dono = s.jogadores.find(p => p.id === s.dono);
-    const basta = s.jogadores.length >= s.min;
+    const modo = s.opcoes?.modo || 'todos';
+    const basta = modo === 'duplas' ? s.jogadores.length === 4 : s.jogadores.length >= s.min;
+    const previa = modo === 'duplas' ? { times: [0, 1, 1, 0] } : null;
     return h('div', { class: 'quiz-espera painel' },
       h('div', { class: 'painel-cab' }, h('h2', null, icone('usuarios'), `Na sala: ${s.jogadores.length} de ${s.max}`)),
+      h('div', { class: 'modos-escolha' }, Object.entries(MODOS_COBRAS).map(([k, m]) => h('button', {
+        type: 'button', class: `modo-opcao ${k === modo ? 'ativo' : ''}`.trim(), 'aria-pressed': String(k === modo), disabled: !souDono,
+        onclick: () => enviar('sala:opcoes', { id: s.id, opcoes: { modo: k } }),
+      }, h('strong', null, m.nome), h('small', null, m.texto)))),
+      !souDono && h('p', { class: 'suave' }, 'Quem abriu a sala escolhe o modo.'),
       h('div', { class: 'quiz-na-sala' }, s.jogadores.map((p, i) => h('div', { class: `quiz-pessoa ${p.conectado ? '' : 'ausente'}`.trim() },
         avatar(p.nome, '', p.foto),
-        h('span', null, h('span', { class: 'cobras-cor', style: { background: CORES_COBRAS[i] } }), ' ', p.nome),
+        h('span', null, h('span', { class: 'cobras-cor', style: { background: corDaCobra(previa, i) } }), ' ', p.nome, previa && h('small', { class: 'suave' }, ` · ${NOMES_DUPLAS[previa.times[i]]}`)),
         p.id === s.dono && h('span', { class: 'quiz-dono', title: 'Abriu a sala' }, icone('coroa'))))),
       h('div', { class: 'quiz-espera-acao' },
         souDono
           ? [
-            botao(basta ? 'Começar a partida' : 'Esperando mais gente...', { classe: 'btn-ouro btn-grande', icone: 'frente', desativado: !basta, onclick: acoesQuiz.comecar }),
+            botao(basta ? 'Começar a partida' : modo === 'duplas' && s.jogadores.length > 4 ? 'O 2 contra 2 é com 4' : 'Esperando mais gente...', { classe: 'btn-ouro btn-grande', icone: 'frente', desativado: !basta, onclick: acoesQuiz.comecar }),
             h('p', { class: 'suave' }, basta
               ? 'Quem entrar depois de começar só pode assistir. Cabem até 4.'
-              : 'Precisa de pelo menos 2 jogadores (até 4). A sala aparece no salão para todos.'),
+              : modo === 'duplas' ? 'O 2 contra 2 precisa de exatamente 4 jogadores.' : 'Precisa de pelo menos 2 jogadores (até 4). A sala aparece no salão para todos.'),
           ]
           : jogador
             ? h('p', { class: 'quiz-aguarde' }, h('span', { class: 'giro giro-p' }), ` Esperando ${dono?.nome || 'quem abriu a sala'} começar...`)
@@ -914,6 +934,20 @@ function desenharCobrinha(g, { cobra, comida, direcao, bateu }) {
 
 // Cor de cada cobra (a ordem de quem entrou na sala): dourada, vermelha, azul e roxa.
 const CORES_COBRAS = ['#d8b13a', '#d8674a', '#5aa0d8', '#b77be6'];
+// No 2 contra 2, cada dupla tem a sua cor (dourada contra azul), em dois tons.
+const CORES_DUPLAS = [['#d8b13a', '#f0d27a'], ['#5aa0d8', '#9fcaf0']];
+const NOMES_DUPLAS = ['Dupla dourada', 'Dupla azul'];
+function corDaCobra(q, i) {
+  if (!q?.times) return CORES_COBRAS[i];
+  const t = q.times[i];
+  return CORES_DUPLAS[t][q.times.slice(0, i).filter(x => x === t).length % 2];
+}
+// Os modos da cobrinha ao vivo.
+const MODOS_COBRAS = {
+  todos: { nome: 'Todos contra todos', texto: 'Quem bate sai e vira cenouras; vence quem sobrar.' },
+  colheita: { nome: 'Colheita (co-op)', texto: 'As cobras passam umas pelas outras e quem bate renasce. Juntem 15 cenouras por cobra em 1 min e meio!' },
+  duplas: { nome: '2 contra 2 (versus)', texto: 'A dupla dourada (cantos da esquerda) contra a azul (cantos da direita). Vence a dupla que sobrar. Precisa de 4.' },
+};
 const escurecer = (hex, t) => {
   const n = parseInt(hex.slice(1), 16);
   const c = [n >> 16, (n >> 8) & 255, n & 255].map(v => Math.round(v * (1 - t)));
@@ -954,7 +988,7 @@ function desenharArena(visor, q, cobras, eu) {
   g.lineJoin = 'round';
   for (const c of cobras) {
     if (!c || !c.pontos.length) continue;
-    const cor = CORES_COBRAS[c.i];
+    const cor = corDaCobra(q, c.i);
     const pts = c.pontos.map(([x, y]) => [x * C + C / 2, y * C + C / 2]);
     const linha = () => {
       g.beginPath();

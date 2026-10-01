@@ -1,6 +1,10 @@
-// Cobrinha ao vivo: de 2 a 4 cobras no mesmo tabuleiro. Quem bate (na borda, noutra cobra ou em si
-// mesma) sai do jogo e vira cenouras; vence quem sobrar por último. O servidor roda o jogo e os
-// navegadores só dizem para onde querem virar.
+// Cobrinha ao vivo: de 2 a 4 cobras no mesmo tabuleiro. O servidor roda o jogo e os navegadores só
+// dizem para onde querem virar. Três modos:
+//  - todos: todos contra todos. Quem bate (na borda, noutra cobra ou em si mesma) sai e vira cenouras;
+//    vence quem sobrar por último.
+//  - colheita (co-op): as cobras passam umas pelas outras; quem bate renasce no seu canto depois de um
+//    tempinho. A equipe vence se juntar a meta de cenouras antes do tempo acabar.
+//  - duplas (2 contra 2): a dupla da esquerda contra a da direita; vence a dupla que tiver cobra viva no fim.
 
 const LARGURA = 32;
 const ALTURA = 24;
@@ -12,6 +16,9 @@ const INICIOS = [
   { corpo: [[5, 18], [5, 19], [5, 20]], dir: [0, -1] },
 ];
 const MAX_COMIDA = 30;
+const MODOS = ['todos', 'colheita', 'duplas'];
+const TIMES_DUPLAS = [0, 1, 1, 0]; // os cantos da esquerda (0 e 3) contra os da direita (1 e 2)
+const RENASCER_PASSOS = 24;       // na colheita, quem bate volta depois de uns 3 segundos
 
 const chave = (x, y) => `${x},${y}`;
 const noTabuleiro = ([x, y]) => x >= 0 && y >= 0 && x < LARGURA && y < ALTURA;
@@ -24,12 +31,17 @@ function novaComida(e, sorte) {
 }
 const minimoDeComida = e => e.cobras.length + 1;
 
-function novo(ids, sorte = Math.random) {
+// opcoes: { modo, limite (passos que a colheita dura), meta (cenouras da equipe) }.
+function novo(ids, sorte = Math.random, { modo = 'todos', limite = 0, meta = 0 } = {}) {
   if (ids.length < 2 || ids.length > INICIOS.length) throw new Error('A cobrinha ao vivo é de 2 a 4 jogadores.');
+  if (modo === 'duplas' && ids.length !== 4) throw new Error('O 2 contra 2 precisa de 4 jogadores.');
   const e = {
-    cobras: ids.map((id, i) => ({ id, corpo: INICIOS[i].corpo.map(p => [...p]), dir: [...INICIOS[i].dir], fila: [], viva: true, pontos: 0, morreu: null })),
+    cobras: ids.map((id, i) => ({ id, corpo: INICIOS[i].corpo.map(p => [...p]), dir: [...INICIOS[i].dir], fila: [], viva: true, pontos: 0, morreu: null, renasce: null })),
     comida: [],
     tick: 0,
+    modo: MODOS.includes(modo) ? modo : 'todos',
+    limite, meta,
+    times: modo === 'duplas' ? TIMES_DUPLAS.slice(0, ids.length) : null,
   };
   while (e.comida.length < minimoDeComida(e)) novaComida(e, sorte);
   return e;
@@ -57,6 +69,19 @@ function eliminar(e, i) {
   for (const [n, p] of c.corpo.entries()) if (n % 3 === 1 && noTabuleiro(p) && e.comida.length < MAX_COMIDA) e.comida.push([...p]);
   c.corpo = [];
   c.fila = [];
+  if (e.modo === 'colheita') c.renasce = e.tick + RENASCER_PASSOS;
+}
+
+// Colheita: a cobra volta no canto dela (com 3 de tamanho) quando o canto está livre.
+function renascer(e) {
+  const ocupado = new Set(e.cobras.flatMap(c => c.corpo).map(p => chave(...p)));
+  for (const [i, c] of e.cobras.entries()) {
+    if (c.viva || c.renasce == null || e.tick < c.renasce || c.saiu) continue;
+    const corpo = INICIOS[i].corpo.map(p => [...p]);
+    if (corpo.some(p => ocupado.has(chave(...p)))) continue;
+    Object.assign(c, { corpo, dir: [...INICIOS[i].dir], fila: [], viva: true, renasce: null });
+    e.comida = e.comida.filter(([x, y]) => !corpo.some(p => p[0] === x && p[1] === y));
+  }
 }
 
 // Um passo do jogo: todas as cobras andam ao mesmo tempo.
@@ -69,10 +94,14 @@ function passo(e, sorte = Math.random) {
     c.come = e.comida.some(([x, y]) => x === c.nova[0] && y === c.nova[1]);
   }
   // Onde os corpos vão estar (quem não come solta a ponta do rabo neste passo).
+  // Na colheita cada cobra só bate na borda e em si mesma (as outras passam por cima).
+  const separado = e.modo === 'colheita';
+  const corpoDepois = c => (c.come ? c.corpo : c.corpo.slice(0, -1));
   const ocupado = new Set();
-  for (const c of vivas) for (const p of c.come ? c.corpo : c.corpo.slice(0, -1)) ocupado.add(chave(...p));
-  const batem = vivas.filter(c => !noTabuleiro(c.nova) || ocupado.has(chave(...c.nova))
-    || vivas.some(o => o !== c && o.nova[0] === c.nova[0] && o.nova[1] === c.nova[1])); // cabeça com cabeça: as duas saem
+  if (!separado) for (const c of vivas) for (const p of corpoDepois(c)) ocupado.add(chave(...p));
+  const batem = vivas.filter(c => !noTabuleiro(c.nova)
+    || (separado ? corpoDepois(c).some(p => p[0] === c.nova[0] && p[1] === c.nova[1]) : ocupado.has(chave(...c.nova)))
+    || (!separado && vivas.some(o => o !== c && o.nova[0] === c.nova[0] && o.nova[1] === c.nova[1]))); // cabeça com cabeça: as duas saem
   const comidas = new Set();
   for (const c of vivas) {
     if (batem.includes(c)) continue;
@@ -81,12 +110,41 @@ function passo(e, sorte = Math.random) {
   }
   e.comida = e.comida.filter(([x, y]) => !comidas.has(chave(x, y)));
   for (const c of batem) eliminar(e, e.cobras.indexOf(c));
+  if (e.modo === 'colheita') renascer(e);
   while (e.comida.length < minimoDeComida(e)) novaComida(e, sorte);
   for (const c of e.cobras) { delete c.nova; delete c.come; }
   return batem.map(c => e.cobras.indexOf(c));
 }
 
-const acabou = e => e.cobras.filter(c => c.viva).length <= 1;
+const totalDaEquipe = e => e.cobras.reduce((t, c) => t + c.pontos, 0);
+const timesVivos = e => new Set(e.cobras.filter(c => c.viva).map(c => e.times[e.cobras.indexOf(c)]));
+
+function acabou(e) {
+  if (e.modo === 'colheita') return totalDaEquipe(e) >= e.meta || e.tick >= e.limite || e.cobras.every(c => c.saiu);
+  if (e.modo === 'duplas') return timesVivos(e).size <= 1;
+  return e.cobras.filter(c => c.viva).length <= 1;
+}
+
+// O resultado conforme o modo: quem venceu (índices das cobras) e se foi empate.
+function resultado(e) {
+  const todas = e.cobras.map((c, i) => i);
+  if (e.modo === 'colheita') {
+    const venceu = totalDaEquipe(e) >= e.meta;
+    return { venceram: venceu ? todas : [], empate: false, equipe: venceu, vencedor: null };
+  }
+  if (e.modo === 'duplas') {
+    const vivos = [...timesVivos(e)];
+    let time = vivos.length === 1 ? vivos[0] : null;
+    if (time == null) {
+      // As duas duplas saíram juntas: desempata nas cenouras.
+      const soma = t => e.cobras.reduce((n, c, i) => n + (e.times[i] === t ? c.pontos : 0), 0);
+      if (soma(0) !== soma(1)) time = soma(0) > soma(1) ? 0 : 1;
+    }
+    return { venceram: time == null ? [] : todas.filter(i => e.times[i] === time), empate: time == null, time, vencedor: null };
+  }
+  const v = vencedor(e);
+  return { venceram: v == null ? [] : [v], empate: v == null, vencedor: v };
+}
 
 // Classificação: quem está viva primeiro, depois quem saiu mais tarde; empate desempata nas cenouras.
 function classificacao(e) {
@@ -104,9 +162,11 @@ function vencedor(e) {
 
 // O que vai para a tela (compacto: é mandado várias vezes por segundo).
 const visao = e => ({
-  l: LARGURA, a: ALTURA, t: e.tick,
-  c: e.cobras.map(c => ({ v: c.viva ? 1 : 0, p: c.pontos, d: c.dir, b: c.corpo.flat() })),
+  l: LARGURA, a: ALTURA, t: e.tick, m: e.modo,
+  c: e.cobras.map(c => ({ v: c.viva ? 1 : 0, p: c.pontos, d: c.dir, b: c.corpo.flat(), ...(c.renasce != null && !c.viva ? { r: c.renasce - e.tick } : {}) })),
   f: e.comida.flat(),
+  ...(e.modo === 'colheita' ? { meta: e.meta, total: totalDaEquipe(e), resta: Math.max(0, e.limite - e.tick) } : {}),
+  ...(e.times ? { times: e.times } : {}),
 });
 
-module.exports = { LARGURA, ALTURA, novo, virar, eliminar, passo, acabou, classificacao, vencedor, visao };
+module.exports = { LARGURA, ALTURA, MODOS, novo, virar, eliminar, passo, acabou, classificacao, vencedor, resultado, visao };

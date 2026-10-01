@@ -20,6 +20,7 @@ const REVALIDAR_MS = Number(process.env.RECREACAO_REVALIDAR_MS) || 120_000; // c
 const HISTORICO = 80;
 const COBRAS_PASSO_MS = Number(process.env.COBRAS_PASSO_MS) || 125;     // velocidade da cobrinha ao vivo
 const COBRAS_LARGADA_MS = Number(process.env.COBRAS_LARGADA_MS) || 3000; // contagem antes de largar
+const COLHEITA_MS = Number(process.env.COLHEITA_MS) || 90_000;             // quanto dura a colheita (co-op)
 
 class ErroJogo extends Error {}
 
@@ -165,6 +166,18 @@ const JOGOS = {
 
 /* ─── Salas ───────────────────────────────────────── */
 
+// As opções de cada jogo (o modo e o resto), conferidas antes de valer.
+function validarOpcoesDaSala(jogo, opcoes = {}) {
+  try {
+    if (jogo === 'cidade') return cidade.validarOpcoes(opcoes);
+    if (jogo === 'quiz') return quiz.validarOpcoes(opcoes);
+  } catch (x) {
+    throw x instanceof quiz.ErroQuiz ? new ErroJogo(x.message) : x;
+  }
+  if (jogo === 'cobras') return { modo: cobras.MODOS.includes(opcoes?.modo) ? opcoes.modo : 'todos' };
+  return null;
+}
+
 const indiceNa = (s, id) => s.jogadores.findIndex(p => p.id === id);
 const salaAtivaDe = id => [...salas.values()].find(s => s.status !== 'fim' && s.jogadores.some(p => p.id === id && !p.saiu));
 const ehGrupo = s => !!JOGOS[s.jogo].grupo;
@@ -278,10 +291,16 @@ function pessoaDe(u) {
 // ("pergunta": valendo; "resposta": mostrando a certa), as respostas dela e o placar de cada um.
 
 async function comecarQuiz(s) {
+  if (s.opcoes?.modo === 'times' && ativos(s).length < 2) throw new ErroJogo('O modo de dois times precisa de pelo menos 2 pessoas.');
   const perguntas = await quiz.sortear(s.opcoes);
   if (!salas.has(s.id) || s.status !== 'esperando') return; // a sala fechou enquanto sorteava
-  s.estado = { perguntas, atual: -1, fase: 'pergunta', prazo: 0, proxima: 0, respostas: {}, placar: {} };
+  s.estado = { perguntas, atual: -1, fase: 'pergunta', prazo: 0, proxima: 0, respostas: {}, placar: {}, modo: s.opcoes?.modo || 'todos', times: null };
   for (const p of s.jogadores) s.estado.placar[p.id] = { pontos: 0, acertos: 0 };
+  // Dois times: sorteados e equilibrados (um para cada lado, alternando).
+  if (s.estado.modo === 'times') {
+    const ordem = [...ativos(s)].sort(() => Math.random() - 0.5);
+    s.estado.times = Object.fromEntries(ordem.map((p, i) => [p.id, i % 2]));
+  }
   Object.assign(s, { status: 'jogando', vencedor: null, empate: false, motivo: null });
   s.revanche.clear();
   abrirPergunta(s, 0);
@@ -351,15 +370,19 @@ function terminarQuiz(s) {
   s.status = 'fim';
   s.terminou = Date.now();
   s.vencedor = lista[0]?.i ?? null;
+  // Quem venceu, conforme o modo: o primeiro; a equipe toda (se bateu a meta); o time que somou mais.
+  const resumo = resumoDoQuiz(s, lista);
+  e.resultado = resumo;
+  const venceu = c => (resumo.modo === 'todos' ? c === lista[0] : resumo.vencedores.includes(c.id));
   if (lista.length) {
     db.lote(lista.map((c, posicao) => [
       'INSERT INTO quiz_resultados (usuario_id, usuario_nome, pontos, acertos, total, posicao, jogadores) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      c.id, c.nome, c.pontos, c.acertos, e.perguntas.length, posicao + 1, lista.length,
+      c.id, c.nome, c.pontos, c.acertos, e.perguntas.length, resumo.modo === 'todos' ? posicao + 1 : venceu(c) ? 1 : 2, lista.length,
     ])).then(async () => {
-      for (const [posicao, c] of lista.entries()) {
+      for (const c of lista) {
         if (c.acertos) await progresso.registrar(c.id, 'quiz_acerto', c.acertos);
         if (lista.length > 1) await progresso.registrar(c.id, 'partida');
-        if (lista.length > 1 && posicao === 0) await progresso.registrar(c.id, 'vitoria');
+        if (lista.length > 1 && venceu(c)) await progresso.registrar(c.id, 'vitoria');
       }
     }).catch(err => console.error('Erro ao guardar o quiz:', err.message));
   }
@@ -386,7 +409,7 @@ function sairDoGrupo(id, s, i) {
   s.jogadores[i].saiu = true;
   if (!ativos(s).length) { fecharSala(s); avisarLobby(); return; }
   if (s.status === 'jogando' && ehQuiz(s)) conferirRespostas(s);
-  if (s.status === 'jogando' && s.jogo === 'cobras') cobras.eliminar(s.estado, i); // a cobra de quem saiu vira cenouras
+  if (s.status === 'jogando' && s.jogo === 'cobras') { s.estado.cobras[i].saiu = true; cobras.eliminar(s.estado, i); } // a cobra de quem saiu vira cenouras (e não renasce)
   if (s.status === 'jogando' && s.jogo === 'cidade') {
     cidade.sair(s.estado, i); // quem sai morre na cidade
     if (s.estado.fase === 'fim') { terminarCidade(s); return; }
@@ -396,10 +419,28 @@ function sairDoGrupo(id, s, i) {
   avisarLobby();
 }
 
+// Modo equipe: a meta de acertos da sala inteira. Modo times: os pontos de cada time.
+function resumoDoQuiz(s, lista = classificacao(s).filter(c => !c.saiu)) {
+  const e = s.estado;
+  const modo = e.modo || 'todos';
+  if (modo === 'equipe') {
+    const acertos = lista.reduce((t, c) => t + c.acertos, 0);
+    const meta = Math.max(1, Math.ceil(quiz.META_EQUIPE * e.perguntas.length * lista.length));
+    return { modo, acertos, meta, vencedores: e.fase === 'fim' && acertos >= meta ? lista.map(c => c.id) : [] };
+  }
+  if (modo === 'times') {
+    const pontos = [0, 0];
+    for (const c of lista) pontos[e.times?.[c.id] ?? 0] += c.pontos;
+    const time = pontos[0] === pontos[1] ? null : pontos[0] > pontos[1] ? 0 : 1;
+    return { modo, pontos, time, vencedores: e.fase === 'fim' && time != null ? lista.filter(c => e.times[c.id] === time).map(c => c.id) : [] };
+  }
+  return { modo, vencedores: [] };
+}
+
 function visaoQuiz(s, id) {
   const e = s.estado;
-  const placar = classificacao(s).map(c => ({ id: c.id, pontos: c.pontos, acertos: c.acertos, saiu: c.saiu }));
-  const base = { numero: e.atual + 1, total: e.perguntas.length, fase: e.fase, placar, tempoTotal: quiz.TEMPO_MS };
+  const placar = classificacao(s).map(c => ({ id: c.id, pontos: c.pontos, acertos: c.acertos, saiu: c.saiu, time: e.times?.[c.id] ?? null }));
+  const base = { numero: e.atual + 1, total: e.perguntas.length, fase: e.fase, placar, tempoTotal: quiz.TEMPO_MS, modo: e.modo || 'todos', resumo: resumoDoQuiz(s) };
   if (e.fase === 'fim') return base;
   const p = e.perguntas[e.atual];
   const revelada = e.fase === 'resposta';
@@ -432,6 +473,7 @@ function visaoCobras(s) {
     fase: e.fase,
     largada: e.fase === 'largada' ? Math.max(0, e.largada - Date.now()) : 0,
     classificacao: e.fase === 'fim' ? cobras.classificacao(e).map(c => ({ i: c.i, pontos: c.pontos, viva: c.viva })) : null,
+    resultado: e.fase === 'fim' ? e.resultado : null,
   };
 }
 
@@ -443,8 +485,13 @@ function enviarQuadroCobras(s) {
 function comecarCobras(s) {
   const jogadores = ativos(s);
   if (jogadores.length < JOGOS.cobras.min) throw new ErroJogo('A cobrinha ao vivo precisa de pelo menos 2 jogadores (até 4).');
+  const modo = s.opcoes?.modo || 'todos';
+  if (modo === 'duplas' && jogadores.length !== 4) throw new ErroJogo('O 2 contra 2 precisa de exatamente 4 jogadores.');
   s.jogadores = jogadores;
-  s.estado = Object.assign(cobras.novo(jogadores.map(p => p.id)), { fase: 'largada', largada: Date.now() + COBRAS_LARGADA_MS });
+  // Colheita (co-op): 90 segundos para a equipe juntar 15 cenouras por cobra.
+  const limite = Math.ceil(COLHEITA_MS / COBRAS_PASSO_MS);
+  s.estado = Object.assign(cobras.novo(jogadores.map(p => p.id), Math.random, { modo, limite, meta: 15 * jogadores.length }),
+    { fase: 'largada', largada: Date.now() + COBRAS_LARGADA_MS });
   Object.assign(s, { status: 'jogando', vencedor: null, empate: false, motivo: null });
   s.revanche.clear();
   clearTimeout(s.timer);
@@ -479,15 +526,17 @@ function terminarCobras(s) {
   clearTimeout(s.timer);
   const e = s.estado;
   e.fase = 'fim';
-  const v = cobras.vencedor(e);
-  Object.assign(s, { status: 'fim', vencedor: v, empate: v == null, motivo: v == null ? 'empate' : 'vitoria', terminou: Date.now() });
+  const r = cobras.resultado(e);
+  e.resultado = r;
+  const v = r.vencedor;
+  Object.assign(s, { status: 'fim', vencedor: v, empate: r.empate, motivo: r.empate ? 'empate' : 'vitoria', terminou: Date.now() });
   const lista = cobras.classificacao(e);
   db.lote(lista.map((c, posicao) => [
     'INSERT INTO resultados (jogo, usuario_id, usuario_nome, posicao, jogadores, pontos, venceu) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    'cobras', c.id, s.jogadores[c.i].nome, posicao + 1, lista.length, c.pontos, c.i === v ? 1 : 0,
+    'cobras', c.id, s.jogadores[c.i].nome, posicao + 1, lista.length, c.pontos, r.venceram.includes(c.i) ? 1 : 0,
   ])).then(async () => {
     for (const c of lista) await progresso.registrar(c.id, 'partida');
-    if (v != null) await progresso.registrar(e.cobras[v].id, 'vitoria');
+    for (const i of r.venceram) await progresso.registrar(e.cobras[i].id, 'vitoria');
   }).catch(err => console.error('Erro ao guardar a cobrinha:', err.message));
   enviarQuadroCobras(s);
   enviarSala(s);
@@ -614,10 +663,8 @@ const acoes = {
   async 'sala:criar'(u, { jogo, opcoes }) {
     if (!JOGOS[jogo]) throw new ErroJogo('Jogo desconhecido.');
     if (salaAtivaDe(u.id)) throw new ErroJogo('Você já está numa partida. Termine ou saia dela antes de abrir outra.');
-    let escolhidas = null;
-    if (jogo === 'cidade') escolhidas = cidade.validarOpcoes(opcoes);
+    let escolhidas = validarOpcoesDaSala(jogo, opcoes);
     if (jogo === 'quiz') {
-      escolhidas = quiz.validarOpcoes(opcoes);
       if (!await quiz.contarPerguntas(escolhidas.categorias)) throw new ErroJogo('Ainda não há perguntas nessas categorias.');
       if (salaAtivaDe(u.id)) throw new ErroJogo('Você já está numa partida.'); // abriu outra enquanto contava
     }
@@ -689,12 +736,16 @@ const acoes = {
   },
 
   // Lyendell Dorme: quem abriu a sala muda as opções (tempo do dia, classes) antes de começar.
-  'cidade:opcoes'(u, { id, opcoes }) {
+  'cidade:opcoes'(u, dados) { return acoes['sala:opcoes'](u, dados); },
+
+  // Quem abriu a sala muda as opções (modo, tempo, classes...) antes de começar.
+  'sala:opcoes'(u, { id, opcoes }) {
     const s = salas.get(id);
-    if (!s || s.jogo !== 'cidade' || s.status !== 'esperando') throw new ErroJogo('Essa sala não está esperando.');
+    if (!s || s.status !== 'esperando') throw new ErroJogo('Essa sala não está esperando.');
     if (dono(s)?.id !== u.id) throw new ErroJogo('Só quem abriu a sala muda as opções.');
-    s.opcoes = cidade.validarOpcoes(opcoes);
+    s.opcoes = validarOpcoesDaSala(s.jogo, { ...(s.opcoes || {}), ...(opcoes || {}) });
     enviarSala(s);
+    avisarLobby();
   },
 
   // Chat do jogo: cada mensagem vai só para quem pode ler aquele canal.
