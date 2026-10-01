@@ -394,34 +394,83 @@ export function sala(id) {
     const outro = jogador ? s.jogadores[1 - eu] : null;
     const e = s.estado;
 
+    const contraRaposa = !!s.raposa;
     const acoes = [];
-    if (jogador && s.status === 'esperando') acoes.push(botao('Cancelar partida', { icone: 'x', onclick: sair }));
+    if (jogador && s.status === 'esperando') acoes.push(botao(contraRaposa && s.eu > 0 ? 'Sair da sala' : 'Cancelar partida', { icone: 'x', onclick: sair }));
     else if (jogador && s.status === 'jogando') acoes.push(botao('Desistir', { icone: 'bandeira', classe: 'btn-perigo-texto', onclick: desistir }));
     else if (!jogador) acoes.push(h('a', { class: 'btn', href: '#/recreacao' }, icone('voltar'), h('span', null, 'Parar de assistir')));
 
     trocar(raiz,
       cabecalho({ titulo: s.nomeJogo, icone: ICONE_JOGO[s.jogo], voltar: { href: '#/recreacao', texto: 'Recreação' }, acoes }),
       h('div', { class: 'partida-caixa' },
-        h('div', { class: 'duelo' },
-          cartaoJogador(s, 0),
-          h('span', { class: 'duelo-vs' }, s.jogo === 'ppt' && e ? `${e.placar[0]} × ${e.placar[1]}` : 'vs'),
-          b ? cartaoJogador(s, 1) : h('div', { class: 'jogador vazio-jogador' }, h('span', { class: 'giro giro-p' }), h('span', null, 'Esperando adversário'))),
+        contraRaposa
+          ? h('div', { class: 'duelo' }, cartaoDaDupla(s), h('span', { class: 'duelo-vs' }, 'vs'), cartaoDaRaposa(s))
+          : h('div', { class: 'duelo' },
+            cartaoJogador(s, 0),
+            h('span', { class: 'duelo-vs' }, s.jogo === 'ppt' && e ? `${e.placar[0]} × ${e.placar[1]}` : 'vs'),
+            b ? cartaoJogador(s, 1) : h('div', { class: 'jogador vazio-jogador' }, h('span', { class: 'giro giro-p' }), h('span', null, 'Esperando adversário'))),
         h('p', { class: `partida-status ${statusClasse(s)}` }, textoStatus(s)),
-        s.status === 'esperando'
+        s.status === 'esperando' && contraRaposa ? esperaRaposa(s)
+          : s.status === 'esperando'
           ? h('div', { class: 'esperando' },
             h('p', null, jogador
               ? 'A partida aparece para todos no salão da Recreação. Assim que alguém entrar, ela começa.'
               : 'Assim que alguém entrar, a partida começa.'),
             !jogador && !rt.minhaSala && botao('Entrar nesta partida', { classe: 'btn-ouro', onclick: () => entrarNaPartida(s.id) }))
           : s.jogo === 'velha' ? tabuleiroVelha(s) : s.jogo === 'lig4' ? tabuleiroLig4(s)
-            : s.jogo === 'damas' ? tabuleiroDamas(s, { podeJogar: minhaVez(s), jogar: jogada => enviar('sala:jogar', { id: s.id, jogada }) })
+            : s.jogo === 'damas' ? tabuleiroDamas(contraRaposa ? { ...s, eu: 0 } : s, { podeJogar: minhaVez(s), jogar: jogada => enviar('sala:jogar', { id: s.id, jogada }) })
               : mesaPpt(s),
-        rodape(s, outro),
+        contraRaposa ? rodapeRaposa(s) : rodape(s, outro),
         s.espectadores > 0 && h('p', { class: 'espectadores' }, icone('olho'), `${s.espectadores} ${s.espectadores === 1 ? 'pessoa assistindo' : 'pessoas assistindo'}`)));
     if (!document.hidden) tituloOriginal();
     tabuleiroAntes = e?.tabuleiro ? [...e.tabuleiro] : null;
     rodadasAntes = e?.rodadas ? e.rodadas.length : null;
     avisarNaAba(s);
+  }
+
+  /* Contra a Raposa: a pessoa (ou a dupla) de um lado, o computador do outro. */
+  function detalheDoLado(s, lado) {
+    const e = s.estado;
+    if (!e) return null;
+    if (s.jogo === 'velha') return h('span', { class: `simbolo ${e.simbolos[lado].toLowerCase()}` }, desenho(e.simbolos[lado]));
+    if (s.jogo === 'lig4') return h('span', { class: `lig4-disco p${lado}` });
+    if (s.jogo === 'damas') return h('span', { class: `damas-mini ${nomeCor(e, lado)}` }, e.pecas[lado]);
+    return null;
+  }
+  function cartaoDaDupla(s) {
+    const humanos = s.jogadores.filter(p => !p.saiu);
+    const vez = s.status === 'jogando' && s.raposa?.vezDe != null;
+    return h('div', { class: `jogador dupla ${vez ? 'na-vez' : ''} ${s.status === 'fim' && s.vencedor === 0 ? 'venceu' : ''}`.replace(/\s+/g, ' ').trim() },
+      h('span', { class: 'dupla-avatares' }, humanos.map(p => h('span', { class: p.id === s.raposa?.vezDe ? 'joga-agora' : '', title: p.nome }, avatar(p.nome, '', p.foto)))),
+      h('div', { class: 'jogador-texto' },
+        h('strong', null, humanos.length > 1 ? humanos.map(p => p.nome.split(' ')[0]).join(' e ') : humanos[0]?.nome || 'Ninguém'),
+        h('small', null, humanos.length > 1 ? 'em dupla, um lance cada' : s.eu >= 0 ? 'Você' : '')),
+      s.status === 'fim' && s.vencedor === 0 && h('span', { class: 'coroa' }, icone('coroa')),
+      detalheDoLado(s, 0));
+  }
+  function cartaoDaRaposa(s) {
+    return h('div', { class: `jogador raposa-pc ${s.raposa?.pensando ? 'na-vez' : ''} ${s.status === 'fim' && s.vencedor === 1 ? 'venceu' : ''}`.replace(/\s+/g, ' ').trim() },
+      h('span', { class: 'avatar raposa-avatar' }, icone('raposa')),
+      h('div', { class: 'jogador-texto' }, h('strong', null, 'A Raposa'), h('small', null, s.raposa?.pensando ? 'pensando...' : 'o computador')),
+      s.status === 'fim' && s.vencedor === 1 && h('span', { class: 'coroa' }, icone('coroa')),
+      detalheDoLado(s, 1));
+  }
+  function esperaRaposa(s) {
+    const souDono = s.eu === 0;
+    const dupla = s.jogadores.length > 1;
+    return h('div', { class: 'esperando' },
+      h('p', null, dupla
+        ? 'Vocês jogam juntos contra a Raposa, um lance cada.'
+        : 'Você contra a Raposa, o computador. Se alguém entrar, vocês jogam em dupla, um lance cada.'),
+      souDono && botao(dupla ? 'Começar em dupla' : 'Começar sozinho', { classe: 'btn-ouro', icone: 'frente', onclick: () => enviar('sala:comecar', { id: s.id }) }),
+      s.eu > 0 && h('p', { class: 'suave' }, `Esperando ${s.jogadores[0].nome} começar...`),
+      s.eu < 0 && !rt.minhaSala && s.jogadores.length < 2 && botao('Entrar em dupla', { classe: 'btn-ouro', onclick: () => entrarNaPartida(s.id) }));
+  }
+  function rodapeRaposa(s) {
+    if (s.status !== 'fim' || s.eu < 0) return null;
+    return h('div', { class: 'partida-rodape' },
+      !s.jogadores[s.eu]?.saiu && botao('Jogar de novo', { icone: 'frente', classe: 'btn-ouro', onclick: () => enviar('sala:revanche', { id: s.id }) }),
+      h('a', { class: 'btn', href: '#/recreacao' }, 'Voltar ao salão'));
   }
 
   function cartaoJogador(s, i) {
@@ -450,17 +499,30 @@ export function sala(id) {
   function statusClasse(s) {
     if (s.status !== 'fim') return s.status === 'jogando' && minhaVez(s) ? 'destaque' : '';
     if (s.empate) return '';
+    if (s.raposa) return s.eu >= 0 ? (s.vencedor === 0 ? 'vitoria' : 'derrota') : 'destaque';
     return s.eu >= 0 ? (s.vencedor === s.eu ? 'vitoria' : 'derrota') : 'destaque';
   }
 
   function minhaVez(s) {
     if (s.eu < 0 || s.status !== 'jogando') return false;
+    if (s.raposa) return s.raposa.vezDe === s.jogadores[s.eu]?.id;
     if (s.grupo) return s.estado?.fase === 'pergunta' && s.estado.minha == null && !s.jogadores[s.eu].saiu;
     return POR_VEZ.has(s.jogo) ? s.estado.vez === s.eu : !s.estado.minha;
   }
 
   function textoStatus(s) {
     const nome = i => (i === s.eu ? 'Você' : s.jogadores[i]?.nome);
+    if (s.raposa) {
+      const dupla = s.jogadores.filter(p => !p.saiu).length > 1;
+      if (s.status === 'esperando') return dupla ? 'Dupla formada!' : 'Contra a Raposa';
+      if (s.status === 'jogando') {
+        if (s.raposa.pensando) return 'A Raposa está pensando...';
+        const quem = s.jogadores.find(p => p.id === s.raposa.vezDe);
+        return quem && s.eu >= 0 && quem.id === s.jogadores[s.eu].id ? 'Sua vez!' : `Vez de ${quem?.nome || '...'}`;
+      }
+      if (s.empate) return { velha: 'Deu velha! Ninguém ganhou.', lig4: 'Tabuleiro cheio! Empate.', damas: 'Empate com a Raposa.' }[s.jogo] || 'Empate.';
+      return s.vencedor === 0 ? (dupla ? 'Vocês venceram a Raposa!' : 'Você venceu a Raposa!') : 'A Raposa venceu desta vez!';
+    }
     if (s.status === 'esperando') return s.eu >= 0 ? 'Esperando alguém entrar...' : `${s.jogadores[0].nome} está esperando um adversário.`;
     if (s.status === 'jogando') {
       if (POR_VEZ.has(s.jogo)) {

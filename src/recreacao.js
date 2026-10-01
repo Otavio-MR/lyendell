@@ -12,6 +12,7 @@ const progresso = require('./progresso');
 const antispam = require('./antispam');
 const cobras = require('./cobras');
 const damas = require('./damas');
+const raposa = require('./raposa');
 const cidade = require('./cidade');
 const { paraCriancas } = require('./censura');
 
@@ -21,6 +22,7 @@ const HISTORICO = 80;
 const COBRAS_PASSO_MS = Number(process.env.COBRAS_PASSO_MS) || 125;     // velocidade da cobrinha ao vivo
 const COBRAS_LARGADA_MS = Number(process.env.COBRAS_LARGADA_MS) || 3000; // contagem antes de largar
 const COLHEITA_MS = Number(process.env.COLHEITA_MS) || 90_000;             // quanto dura a colheita (co-op)
+const RAPOSA_MS = Number(process.env.RAPOSA_MS) || 800;                  // a Raposa "pensa" antes de jogar
 
 class ErroJogo extends Error {}
 
@@ -175,6 +177,8 @@ function validarOpcoesDaSala(jogo, opcoes = {}) {
     throw x instanceof quiz.ErroQuiz ? new ErroJogo(x.message) : x;
   }
   if (jogo === 'cobras') return { modo: cobras.MODOS.includes(opcoes?.modo) ? opcoes.modo : 'todos' };
+  // Velha, Lig 4 e Damas: um contra o outro (versus) ou contra a Raposa, o computador (co-op).
+  if (raposa.COM_RAPOSA.includes(jogo)) return { modo: opcoes?.modo === 'raposa' ? 'raposa' : 'versus' };
   return null;
 }
 
@@ -182,6 +186,7 @@ const indiceNa = (s, id) => s.jogadores.findIndex(p => p.id === id);
 const salaAtivaDe = id => [...salas.values()].find(s => s.status !== 'fim' && s.jogadores.some(p => p.id === id && !p.saiu));
 const ehGrupo = s => !!JOGOS[s.jogo].grupo;
 const ehQuiz = s => s.jogo === 'quiz';
+const ehRaposa = s => s.opcoes?.modo === 'raposa';
 const ativos = s => s.jogadores.filter(p => !p.saiu);
 const dono = s => ativos(s)[0] || null; // quem abriu a sala (ou o próximo, se ele saiu)
 
@@ -213,7 +218,64 @@ function visaoSala(s, id) {
     motivo: s.motivo,
     revanche: [...s.revanche],
     espectadores: s.espectadores.size,
+    raposa: ehRaposa(s) ? { vezDe: s.status === 'jogando' && s.estado?.vez === 0 ? vezDoTime(s) : null, pensando: s.status === 'jogando' && s.estado?.vez === 1 } : null,
   };
+}
+
+/* ─── Contra a Raposa (co-op) ─────────────────────── */
+
+// A pessoa (ou a dupla, um lance cada) joga com o lado 0; a Raposa, com o lado 1.
+function vezDoTime(s) {
+  const humanos = ativos(s);
+  return humanos.length ? humanos[s.raposa.turno % humanos.length].id : null;
+}
+
+function comecarRaposa(s) {
+  s.jogadores = ativos(s);
+  s.estado = JOGOS[s.jogo].novo(s.inicia);
+  s.raposa = { turno: 0 };
+  Object.assign(s, { status: 'jogando', vencedor: null, empate: false, motivo: null });
+  s.revanche.clear();
+  if (s.estado.vez === 1) agendarRaposa(s);
+  enviarSala(s);
+  avisarLobby();
+}
+
+function agendarRaposa(s) {
+  clearTimeout(s.timer);
+  s.timer = setTimeout(() => {
+    if (!salas.has(s.id) || s.status !== 'jogando' || s.estado.vez !== 1) return;
+    const r = JOGOS[s.jogo].jogar(s.estado, 1, raposa.jogadaDaRaposa(s.jogo, s.estado));
+    if (r) finalizarRaposa(s, r, r.empate ? 'empate' : 'vitoria');
+    enviarSala(s);
+  }, RAPOSA_MS);
+}
+
+function jogarContraRaposa(s, u, jogada) {
+  if (s.estado.vez !== 0) throw new ErroJogo('Espere: é a vez da Raposa.');
+  if (vezDoTime(s) !== u.id) throw new ErroJogo('Agora é a vez do seu parceiro.');
+  const r = JOGOS[s.jogo].jogar(s.estado, 0, jogada || {});
+  s.raposa.turno++;
+  if (r) finalizarRaposa(s, r, r.empate ? 'empate' : 'vitoria');
+  else if (s.estado.vez === 1) agendarRaposa(s);
+  enviarSala(s);
+}
+
+function finalizarRaposa(s, resultado, motivo) {
+  clearTimeout(s.timer);
+  Object.assign(s, { status: 'fim', vencedor: resultado.empate ? null : resultado.vencedor, empate: !!resultado.empate, motivo, terminou: Date.now() });
+  const humanos = s.jogadores.filter(p => !p.saiu);
+  const venceram = s.vencedor === 0;
+  db.lote(humanos.map(p => [
+    'INSERT INTO resultados (jogo, usuario_id, usuario_nome, posicao, jogadores, pontos, venceu) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    `${s.jogo}_raposa`, p.id, p.nome, venceram ? 1 : 2, humanos.length, 0, venceram ? 1 : 0,
+  ])).then(async () => {
+    for (const p of humanos) {
+      await progresso.registrar(p.id, 'partida');
+      if (venceram) await progresso.registrar(p.id, 'vitoria');
+    }
+  }).catch(err => console.error('Erro ao guardar a partida contra a Raposa:', err.message));
+  avisarLobby();
 }
 
 function enviarSala(s) {
@@ -258,6 +320,20 @@ function sairDaSala(id, s, motivo = 'abandono') {
   const i = indiceNa(s, id);
   if (i < 0 || s.jogadores[i].saiu) return;
   if (ehGrupo(s)) { sairDoGrupo(id, s, i); return; }
+  if (ehRaposa(s) && !(s.status === 'esperando' && i === 0)) {
+    // Contra a Raposa: quem sobra continua sozinho; sem ninguém, a Raposa vence (ou a sala fecha).
+    paraUsuario(id, 'sala:fechada', { id: s.id });
+    if (s.status === 'esperando') s.jogadores.splice(i, 1);
+    else s.jogadores[i].saiu = true;
+    if (!ativos(s).length) {
+      if (s.status === 'jogando') finalizarRaposa(s, { vencedor: 1 }, motivo);
+      fecharSala(s);
+    } else {
+      enviarSala(s);
+    }
+    avisarLobby();
+    return;
+  }
   if (s.status === 'esperando') {
     fecharSala(s);
     paraUsuario(id, 'sala:fechada', { id: s.id });
@@ -688,7 +764,7 @@ const acoes = {
     if (s.jogadores.length >= JOGOS[s.jogo].max) throw new ErroJogo('A sala está cheia.');
     s.jogadores.push(pessoaDe(u));
     s.espectadores.delete(u.id);
-    if (!ehGrupo(s)) {
+    if (!ehGrupo(s) && !ehRaposa(s)) {
       s.status = 'jogando';
       s.estado = JOGOS[s.jogo].novo(s.inicia);
     }
@@ -706,9 +782,10 @@ const acoes = {
   // Quiz: quem abriu a sala começa quando quiser (sozinho vale como treino).
   async 'sala:comecar'(u, { id }) {
     const s = salas.get(id);
-    if (!s || !ehGrupo(s)) throw new ErroJogo('Essa sala não existe mais.');
+    if (!s || (!ehGrupo(s) && !ehRaposa(s))) throw new ErroJogo('Essa sala não existe mais.');
     if (dono(s)?.id !== u.id) throw new ErroJogo('Só quem abriu a sala pode começar.');
     if (s.status !== 'esperando' || s.comecando) return;
+    if (ehRaposa(s)) { comecarRaposa(s); return; }
     if (s.jogo === 'cobras') { comecarCobras(s); return; }
     if (s.jogo === 'cidade') { comecarCidade(s); return; }
     s.comecando = true;
@@ -728,6 +805,7 @@ const acoes = {
     if (s.status !== 'jogando') throw new ErroJogo('A partida não está em andamento.');
     if (ehQuiz(s)) { responder(s, i, jogada || {}); return; }
     if (s.jogo === 'cidade') { jogarCidade(s, i, jogada || {}); return; }
+    if (ehRaposa(s)) { jogarContraRaposa(s, u, jogada); return; }
     if (ehGrupo(s)) throw new ErroJogo('Use as setas para jogar.');
     const resultado = JOGOS[s.jogo].jogar(s.estado, i, jogada || {});
     if (resultado) finalizar(s, resultado, resultado.empate ? 'empate' : 'vitoria');
@@ -788,6 +866,13 @@ const acoes = {
     const s = salas.get(id);
     const i = s ? indiceNa(s, u.id) : -1;
     if (!s || i < 0 || s.status !== 'fim') throw new ErroJogo('Não dá para pedir revanche agora.');
+    if (ehRaposa(s)) {
+      // Contra a Raposa: qualquer um da dupla começa outra (e quem começou da última vez, agora não começa).
+      if (s.jogadores[i].saiu) throw new ErroJogo('Você já saiu desta partida.');
+      s.inicia = 1 - s.inicia;
+      comecarRaposa(s);
+      return;
+    }
     if (ehGrupo(s)) {
       // Quiz e cobrinha: a sala volta a esperar gente, com quem ficou até o fim.
       clearTimeout(s.timer);

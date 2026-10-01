@@ -2245,3 +2245,11 @@ body.modo-crianca .tabela th { color: var(--rosa); }
 .quiz-time.na-frente { box-shadow: 0 0 0 2px currentColor inset; }
 .quiz-lista li.time-t0 { box-shadow: inset 3px 0 0 #d8b13a; }
 .quiz-lista li.time-t1 { box-shadow: inset 3px 0 0 #5aa0d8; }
+/* Contra a Raposa: a dupla de um lado, o computador do outro. */
+.jogador.dupla .dupla-avatares { display: flex; }
+.jogador.dupla .dupla-avatares > span + span { margin-left: -12px; }
+.jogador.dupla .dupla-avatares .avatar { box-shadow: 0 0 0 2px var(--sup); }
+.jogador.dupla .dupla-avatares .joga-agora .avatar { box-shadow: 0 0 0 2px var(--ouro); }
+.raposa-avatar { display: grid; place-items: center; background: linear-gradient(135deg, #e08a52, #9c4a22); color: #fff3e0; }
+.raposa-avatar .ico { width: 24px; height: 24px; }
+.jogador.raposa-pc.na-vez .raposa-avatar { animation: piscar 1s ease-in-out infinite; }

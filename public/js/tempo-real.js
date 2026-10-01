@@ -266,8 +266,13 @@ export function atualizarBarra() {
     else texto = `${s.nomeJogo}: sua partida está rolando!`;
   } else {
     const outro = s.jogadores[1 - s.eu];
-    minhaVez = ['velha', 'lig4', 'damas'].includes(s.jogo) ? s.estado?.vez === s.eu : !s.estado?.minha;
-    texto = `Partida de ${s.nomeJogo} contra ${outro?.nome || '...'}${minhaVez ? ' · sua vez!' : ''}`;
+    if (s.raposa) {
+      minhaVez = s.raposa.vezDe === rt.eu?.id;
+      texto = `${s.nomeJogo} contra a Raposa${minhaVez ? ' · sua vez!' : ''}`;
+    } else {
+      minhaVez = ['velha', 'lig4', 'damas'].includes(s.jogo) ? s.estado?.vez === s.eu : !s.estado?.minha;
+      texto = `Partida de ${s.nomeJogo} contra ${outro?.nome || '...'}${minhaVez ? ' · sua vez!' : ''}`;
+    }
   }
   if (!barra) {
     barra = h('a', { id: 'partida-ativa', class: 'partida-ativa' });
