@@ -257,6 +257,12 @@ export function atualizarBarra() {
     minhaVez = s.jogo === 'quiz' && s.status === 'jogando' && s.estado?.fase === 'pergunta' && s.estado.minha == null;
     if (s.status === 'esperando') texto = `Sala de ${s.nomeJogo} (${s.jogadores.length} de ${s.max}) esperando começar`;
     else if (s.jogo === 'quiz') texto = `${s.nomeJogo}: pergunta ${s.estado?.numero} de ${s.estado?.total}${minhaVez ? ' · responda!' : ''}`;
+    else if (s.jogo === 'cidade') {
+      // Lyendell Dorme: avisa quando tem algo a fazer (votar de dia, usar o poder à noite, o tiro do Caçador).
+      const e = s.estado;
+      minhaVez = !!e?.eu?.acoes?.length && (e.fase === 'noite' ? e.eu.pronto === false : e.fase === 'dia' ? e.eu.acoes[0]?.escolhido == null : e.fase === 'cacador');
+      texto = `${s.nomeJogo}: ${e?.fase === 'noite' ? `noite ${e.dia}` : e?.fase === 'dia' ? `dia ${e.dia}, hora de votar` : 'a partida está rolando'}${minhaVez ? ' · é a sua vez!' : ''}`;
+    }
     else texto = `${s.nomeJogo}: sua partida está rolando!`;
   } else {
     const outro = s.jogadores[1 - s.eu];

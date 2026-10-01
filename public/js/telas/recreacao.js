@@ -6,9 +6,11 @@ import { assistirPac } from './pac-coelho.js';
 import { abrirSalaQuiz, telaQuiz, teclaQuiz } from './quiz.js';
 import { SuavizadorCobras } from '../cobras-suave.js';
 import { tabuleiroDamas, nomeCor } from './damas.js';
+import { criarTelaCidade } from './cidade.js';
 import { assistirMinado, assistir2048 } from './jogos-sozinho.js';
 
 const AO_VIVO = [
+  { id: 'cidade', nome: 'Lyendell Dorme', icone: 'lua', texto: 'De 4 a 15 pessoas: à noite os Raposos atacam, de dia a cidade vota em quem executar. 20 classes.', botao: 'Abrir sala' },
   { id: 'quiz', nome: 'Quiz de Lyendell', icone: 'pergunta', texto: 'Perguntas sobre a Casa Luckham, coelhos, Minecraft e regras de RP. Até 10 pessoas.', abrir: abrirSalaQuiz, botao: 'Abrir sala' },
   { id: 'velha', nome: 'Jogo da Velha', icone: 'velha', texto: 'Três em linha, contra outro morador.' },
   { id: 'cobras', nome: 'Cobrinha ao vivo', icone: 'cobra', texto: 'De 2 a 4 cobras no mesmo tabuleiro. Quem bater sai; vence quem sobrar.', botao: 'Abrir sala' },
@@ -24,7 +26,7 @@ const SOZINHO = [
   { href: '#/recreacao/campo-minado', nome: 'Campo Minado', icone: 'minado', texto: 'Abra o campo sem pisar nas armadilhas. Vale o menor tempo.' },
   { href: '#/recreacao/2048', nome: '2048', icone: 'blocos', texto: 'Deslize e junte os blocos iguais até chegar no 2048.' },
 ];
-const ICONE_JOGO = { velha: 'velha', ppt: 'tesoura', quiz: 'pergunta', lig4: 'lig4', cobras: 'cobra', damas: 'damas' };
+const ICONE_JOGO = { velha: 'velha', ppt: 'tesoura', quiz: 'pergunta', lig4: 'lig4', cobras: 'cobra', damas: 'damas', cidade: 'lua' };
 const ICONE_SOLO = { pacman: 'coelho', cobrinha: 'cobra', quebra: 'peca', memoria: 'cartas', minado: 'minado', 2048: 'blocos' };
 // Jogos de dois em que cada um joga na sua vez (no pedra, papel e tesoura, os dois escolhem ao mesmo tempo).
 const POR_VEZ = new Set(['velha', 'lig4', 'damas']);
@@ -278,7 +280,7 @@ function painelRanking() {
   let tamanho = '3x3';
   let tamanhoMem = '4x4';
   let dificuldade = 'facil';
-  const ABAS = [['quiz', 'Quiz'], ['cobras', 'Cobrinha ao vivo'], ['velha', 'Jogo da Velha'], ['ppt', 'Pedra, Papel e Tesoura'], ['lig4', 'Lig 4'],
+  const ABAS = [['quiz', 'Quiz'], ['cidade', 'Lyendell Dorme'], ['cobras', 'Cobrinha ao vivo'], ['velha', 'Jogo da Velha'], ['ppt', 'Pedra, Papel e Tesoura'], ['lig4', 'Lig 4'],
     ['damas', 'Damas'], ['pacman', 'Pac-Coelho'], ['cobrinha', 'Cobrinha'], ['quebra', 'Quebra-cabeça'], ['memoria', 'Memória'],
     ['minado', 'Campo Minado'], ['2048', '2048']];
   const eu = estado.eu.nome;
@@ -313,6 +315,8 @@ function painelRanking() {
       ];
     } else if (aba === 'cobrinha') {
       conteudo = tabela([['Cenouras', l => l.pontos]], dados.cobrinha);
+    } else if (aba === 'cidade') {
+      conteudo = tabela([['Vitórias', l => l.vitorias], ['Partidas', l => l.partidas], ['Chegou vivo', l => l.sobreviveu]], dados.cidade || []);
     } else if (aba === 'cobras') {
       conteudo = tabela([['Vitórias', l => l.vitorias], ['Partidas', l => l.partidas], ['Cenouras', l => l.cenouras]], dados.cobras);
     } else if (aba === 'memoria') {
@@ -363,6 +367,14 @@ export function sala(id) {
       trocar(raiz, pedido && rt.conectado && naoExiste
         ? vazio('Partida não encontrada', 'Ela já terminou ou foi cancelada.', h('a', { class: 'btn', href: '#/recreacao' }, 'Voltar à Recreação'))
         : h('div', { class: 'carregando-tela' }, h('span', { class: 'giro' })));
+      return;
+    }
+    if (s.jogo === 'cidade') {
+      // A tela da cidade é criada uma vez e só atualiza (o chat e o que está sendo digitado não somem).
+      if (!telaCidade) telaCidade = criarTelaCidade(id, { sair: acoesQuiz.sair, sairJa: sair });
+      telaCidade.atualizar(s);
+      if (raiz.firstChild !== telaCidade.el) trocar(raiz, telaCidade.el);
+      if (!document.hidden) tituloOriginal();
       return;
     }
     if (s.jogo === 'cobras') {
@@ -541,6 +553,7 @@ export function sala(id) {
 
   /* Cobrinha ao vivo: o tabuleiro (canvas) é o mesmo durante a partida e só é redesenhado a cada quadro. */
   // A tela desenha 60 vezes por segundo, deslizando as cobras entre os quadros do servidor (veja cobras-suave.js).
+  let telaCidade = null;
   let visorCobras = null;
   let quadroCobras = null;
   let fimLargada = 0;
@@ -773,6 +786,7 @@ export function sala(id) {
   // Contagem da largada da cobrinha.
   const relogioCobras = setInterval(() => { if (quadroCobras?.fase === 'largada') avisoCobras(); }, 200);
   escutar('cobras:quadro', ({ id: sid, q }) => { if (sid === id) receberQuadroCobras(q); });
+  escutar('cidade:msg', ({ id: sid, msg }) => { if (sid === id) telaCidade?.mensagem(msg); });
   // Mede o atraso da conexão de tempos em tempos (a sua cobra vira na tela na hora certa).
   let pingou = false;
   const pingar = () => { if (rt.partidas.get(id)?.jogo === 'cobras') enviar('ping', { t: performance.now() }, { silencioso: true }); };
@@ -788,6 +802,7 @@ export function sala(id) {
     clearInterval(relogioCobras);
     clearInterval(relogioPing);
     cancelAnimationFrame(laco);
+    telaCidade?.parar();
     document.removeEventListener('keydown', aoTeclar);
   });
 

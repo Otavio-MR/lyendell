@@ -151,6 +151,7 @@ Um salão com **chat ao vivo**, a lista de quem está online e os jogos:
   sala escolhe as categorias e o tamanho (5, 10 ou 15 perguntas) e começa quando quiser.
   Cada pergunta tem 20 segundos; acertar vale de 500 a 1000 pontos (quanto mais rápido, mais).
   Sozinho vale como treino. No fim aparece o pódio, e quem abriu pode começar outra rodada.
+- **Lyendell Dorme** (o "Cidade Dorme" ou "Lobisomem" da Casa), de 4 a 15 pessoas: veja abaixo.
 - **Cobrinha ao vivo**, de 2 a 4 pessoas (1v1, 1v1v1 ou 1v1v1v1) no mesmo tabuleiro: quem abre a sala
   começa quando tiver gente, e há uma contagem de 3 segundos. Quem bate na borda, noutra cobra ou em
   si mesma sai e o corpo vira cenouras; vence quem sobrar. Cabeça com cabeça tira as duas.
@@ -180,19 +181,66 @@ Um salão com **chat ao vivo**, a lista de quem está online e os jogos:
 Os jogos novos (Damas, Campo Minado e 2048) são por vez ou rodam inteiros no navegador: nada fica
 indo e vindo pela internet o tempo todo, então não travam mesmo com a conexão ruim.
 
+### Lyendell Dorme
+
+O jogo do "Cidade Dorme" (ou "Lobisomem") da Casa: de 4 a 15 pessoas, cada uma com uma carta
+secreta. Quem abre a sala escolhe o tempo do dia (1, 2 ou 3 minutos), se a classe de quem morre
+aparece e quais classes podem sair; começa quando quiser, com pelo menos 4 pessoas.
+
+- **Noite**: a praça fecha. Os **Raposos** (os assassinos) escolhem juntos quem pegar, com um chat
+  só deles; quem tem poder usa (cada um vê na tela o que pode fazer). A noite acaba quando todo mundo
+  fez a sua parte ou o tempo acaba.
+- **Amanhecer**: todos veem quem morreu, como morreu e (se ligado) a classe. Cada um recebe em
+  segredo o que descobriu ("Só você sabe").
+- **Dia**: a cidade conversa na praça e vota em quem executar (os votos aparecem para todos). Empate
+  ou "pular" não executa ninguém.
+- Quem morre vê todas as cartas e conversa no chat dos mortos; quem assiste não vê nenhuma carta.
+
+Quantos Raposos: 1 com 4 a 6 pessoas, 2 com 7 a 10 e 3 com 11 a 15. A partir de 7 pessoas entra um
+neutro (dois a partir de 12) e, a partir de 9, pode entrar o Traidor. O resto são coelhos, quase
+todos com poder. A lista das classes da partida aparece para todos (sem dizer de quem é cada uma).
+
+As 20 classes:
+
+| Time | Classe | O que faz |
+|---|---|---|
+| Coelhos | Coelho | Sem poder; vota de dia |
+| Coelhos | Vidente | Toda noite descobre se alguém é Raposo |
+| Coelhos | Aprendiz de Vidente | Vira a Vidente quando ela morre |
+| Coelhos | Curandeira | Protege alguém por noite (não a mesma pessoa duas noites seguidas) |
+| Coelhos | Guarda-Costas | Fica de guarda na casa de alguém e morre no lugar dela |
+| Coelhos | Caçador | Quando morre, atira em alguém e leva junto |
+| Coelhos | Boticária | Vê quem os Raposos atacam; uma poção de vida e uma de veneno |
+| Coelhos | Nobre | O voto vale por dois |
+| Coelhos | Cupido | Na primeira noite flecha dois apaixonados, que morrem juntos |
+| Coelhos | Vigia | Vigia uma casa e sabe quem foi lá |
+| Coelhos | Médium | Lê o chat dos mortos e, à noite, escreve lá sem mostrar o nome |
+| Coelhos | Sacerdote do Septo | Uma vez: água benta mata um Raposo; se errar, morre ele |
+| Coelhos | Ancião | Aguenta o primeiro ataque |
+| Raposos | Raposo | Ataca à noite com os outros Raposos |
+| Raposos | Raposo Alfa | Desempata o ataque; a Vidente vê como coelho |
+| Raposos | Raposa Farejadora | Ataca e descobre a classe exata de alguém por noite |
+| Raposos | Traidor | Coelho que sabe quem são os Raposos e ajuda de dia; parece coelho |
+| Neutro | Bobo da Corte | Vence se for executado |
+| Neutro | Gatuno | Mata alguém por noite; vence se sobrar sozinho ou com mais um |
+| Neutro | Andarilho | 2 coletes; vence se estiver vivo no fim |
+
+Os coelhos vencem quando não sobra Raposo nem Gatuno; os Raposos, quando são tantos quanto o resto;
+os apaixonados, se forem os dois últimos. Quem sai da partida no meio morre na cidade.
+
 As perguntas do quiz ficam no banco: quem tem o poder "Criar e editar as perguntas do quiz"
 (a Família Nobre, e o administrador) corrige, apaga e cria perguntas no botão **Perguntas**
 do cartão do quiz. O sistema já vem com umas 115 perguntas.
 
-Cada jogo tem ranking: vitórias e acertos no quiz, vitórias e cenouras na cobrinha ao vivo, vitórias
+Cada jogo tem ranking: vitórias e acertos no quiz, vitórias e partidas em Lyendell Dorme, vitórias e cenouras na cobrinha ao vivo, vitórias
 nos jogos de dois (velha, pedra, papel e tesoura, Lig 4 e Damas), pontos no Pac-Coelho e no 2048,
 cenouras na cobrinha, o menor tempo no quebra-cabeça e no Campo Minado (por dificuldade) e o
 menor número de jogadas na memória. Quem sai de uma partida no
 meio perde (no quiz, fica fora do resultado); quem cai da internet tem 30 segundos para voltar. A Família Nobre (e quem tiver o poder "Apagar mensagens de outros no chat") pode
 apagar mensagens impróprias; cada um pode apagar as suas.
 
-Dá para **assistir qualquer jogo**: as partidas ao vivo (quiz, velha, pedra, papel e tesoura, Lig 4,
-Damas, cobrinha ao vivo) e também quem está jogando sozinho. Quem abre o Pac-Coelho, a Cobrinha, o
+Dá para **assistir qualquer jogo**: as partidas ao vivo (quiz, Lyendell Dorme, velha, pedra, papel e
+tesoura, Lig 4, Damas, cobrinha ao vivo) e também quem está jogando sozinho. Quem abre o Pac-Coelho, a Cobrinha, o
 Quebra-cabeça, a Memória, o Campo Minado ou o 2048 aparece
 em **Jogando agora**, no salão; clicando em Assistir, dá para ver o jogo ao vivo, com o chat do
 lado. Quem joga vê quantas pessoas estão assistindo.
@@ -287,7 +335,7 @@ Para incentivar a visita de todo dia:
   (bronze no 5, prata no 10, ouro no 15, esmeralda no 20 e coroa no 25).
 - **Sequência de dias**: entrar todo dia aumenta a sequência e o XP da visita.
 - **Missões do dia**: três por dia, as mesmas para todo mundo, que renovam à meia-noite.
-- **Conquistas**: 29 no total (Tagarela, Sábio da Toca, Terror das Raposas, Dama de ferro, Pisa leve...).
+- **Conquistas**: 30 no total (Tagarela, Sábio da Toca, Terror das Raposas, Faro afiado, Dama de ferro...).
 
 Conquistas, missões cumpridas, nível novo e recado novo aparecem na hora, em qualquer tela.
 A tela de início mostra o progresso, as missões, as conquistas recentes e os mais ativos da semana.

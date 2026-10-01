@@ -12,6 +12,7 @@ const progresso = require('./progresso');
 const antispam = require('./antispam');
 const cobras = require('./cobras');
 const damas = require('./damas');
+const cidade = require('./cidade');
 
 const ESPERA_MS = Number(process.env.RECREACAO_ESPERA_MS) || 30_000;       // tempo para voltar depois de cair
 const REVALIDAR_MS = Number(process.env.RECREACAO_REVALIDAR_MS) || 120_000; // confere se a sessão ainda vale
@@ -148,6 +149,12 @@ const JOGOS = {
     min: 2,
     grupo: true,
   },
+  cidade: {
+    nome: 'Lyendell Dorme',
+    max: cidade.MAX,
+    min: cidade.MIN,
+    grupo: true,
+  },
 };
 
 /* ─── Salas ───────────────────────────────────────── */
@@ -163,7 +170,9 @@ function visaoSala(s, id) {
   const eu = indiceNa(s, id);
   const jogo = JOGOS[s.jogo];
   let estado = null;
-  if (s.estado) estado = ehQuiz(s) ? visaoQuiz(s, id) : s.jogo === 'cobras' ? visaoCobras(s) : jogo.visao(s.estado, eu);
+  if (s.estado) {
+    estado = ehQuiz(s) ? visaoQuiz(s, id) : s.jogo === 'cobras' ? visaoCobras(s) : s.jogo === 'cidade' ? cidade.visao(s.estado, eu) : jogo.visao(s.estado, eu);
+  }
   return {
     id: s.id,
     jogo: s.jogo,
@@ -369,6 +378,11 @@ function sairDoGrupo(id, s, i) {
   if (!ativos(s).length) { fecharSala(s); avisarLobby(); return; }
   if (s.status === 'jogando' && ehQuiz(s)) conferirRespostas(s);
   if (s.status === 'jogando' && s.jogo === 'cobras') cobras.eliminar(s.estado, i); // a cobra de quem saiu vira cenouras
+  if (s.status === 'jogando' && s.jogo === 'cidade') {
+    cidade.sair(s.estado, i); // quem sai morre na cidade
+    if (s.estado.fase === 'fim') { terminarCidade(s); return; }
+    if (s.estado.fase === 'cacador' && cidade.todosProntos(s.estado)) agendarCidade(s, true);
+  }
   enviarSala(s);
   avisarLobby();
 }
@@ -471,6 +485,69 @@ function terminarCobras(s) {
   avisarLobby();
 }
 
+/* ─── Lyendell Dorme ──────────────────────────────── */
+
+// As regras ficam em src/cidade.js. Aqui: começar, o relógio das fases (noite, dia...), as jogadas,
+// o chat de cada canal (praça, raposos, mortos) e o resultado no fim.
+
+function comecarCidade(s) {
+  const jogadores = ativos(s);
+  if (jogadores.length < cidade.MIN) throw new ErroJogo(`Lyendell Dorme precisa de pelo menos ${cidade.MIN} pessoas (cabem até ${cidade.MAX}).`);
+  s.jogadores = jogadores;
+  s.estado = cidade.novo(jogadores, s.opcoes || cidade.validarOpcoes());
+  Object.assign(s, { status: 'jogando', vencedor: null, empate: false, motivo: null });
+  s.revanche.clear();
+  agendarCidade(s);
+  enviarSala(s);
+  avisarLobby();
+}
+
+// Marca a próxima virada de fase (encurtar: todo mundo já fez a sua parte, não precisa esperar o tempo todo).
+function agendarCidade(s, encurtar = false) {
+  const e = s.estado;
+  if (encurtar) cidade.encurtar(e);
+  clearTimeout(s.timer);
+  s.timer = setTimeout(() => passoCidade(s), Math.max(0, e.prazo - Date.now()));
+}
+
+function passoCidade(s) {
+  if (!salas.has(s.id) || s.status !== 'jogando' || s.jogo !== 'cidade') return;
+  cidade.avancar(s.estado);
+  if (s.estado.fase === 'fim') { terminarCidade(s); return; }
+  agendarCidade(s, cidade.todosProntos(s.estado)); // ex.: o Caçador que já saiu da sala não atira
+  enviarSala(s);
+}
+
+function jogarCidade(s, i, jogada) {
+  try {
+    cidade.agir(s.estado, i, jogada);
+  } catch (x) {
+    throw x instanceof cidade.ErroCidade ? new ErroJogo(x.message) : x;
+  }
+  if (cidade.todosProntos(s.estado)) agendarCidade(s, true);
+  enviarSala(s);
+}
+
+function terminarCidade(s) {
+  clearTimeout(s.timer);
+  const e = s.estado;
+  const venceram = new Set(e.vencedores?.indices || []);
+  Object.assign(s, { status: 'fim', vencedor: null, empate: !venceram.size, motivo: e.vencedores?.time || 'fim', terminou: Date.now() });
+  const lista = e.j.map((p, i) => ({ ...p, i, venceu: venceram.has(i) }));
+  db.lote(lista.map(p => [
+    'INSERT INTO resultados (jogo, usuario_id, usuario_nome, posicao, jogadores, pontos, venceu) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    'cidade', p.id, p.nome, p.venceu ? 1 : 2, lista.length, p.vivo ? 1 : 0, p.venceu ? 1 : 0,
+  ])).then(async () => {
+    for (const p of lista) {
+      if (s.jogadores[p.i]?.saiu) continue;
+      await progresso.registrar(p.id, 'partida');
+      if (p.venceu) await progresso.registrar(p.id, 'vitoria');
+    }
+  }).catch(err => console.error('Erro ao guardar Lyendell Dorme:', err.message));
+  enviarSala(s);
+  avisarLobby();
+}
+
 /* ─── Jogos de uma pessoa só, transmitidos ao vivo ─── */
 
 // Quem joga Pac-Coelho, Cobrinha ou Quebra-cabeça manda o estado do jogo algumas vezes por segundo,
@@ -528,6 +605,7 @@ const acoes = {
     if (!JOGOS[jogo]) throw new ErroJogo('Jogo desconhecido.');
     if (salaAtivaDe(u.id)) throw new ErroJogo('Você já está numa partida. Termine ou saia dela antes de abrir outra.');
     let escolhidas = null;
+    if (jogo === 'cidade') escolhidas = cidade.validarOpcoes(opcoes);
     if (jogo === 'quiz') {
       escolhidas = quiz.validarOpcoes(opcoes);
       if (!await quiz.contarPerguntas(escolhidas.categorias)) throw new ErroJogo('Ainda não há perguntas nessas categorias.');
@@ -575,6 +653,7 @@ const acoes = {
     if (dono(s)?.id !== u.id) throw new ErroJogo('Só quem abriu a sala pode começar.');
     if (s.status !== 'esperando' || s.comecando) return;
     if (s.jogo === 'cobras') { comecarCobras(s); return; }
+    if (s.jogo === 'cidade') { comecarCidade(s); return; }
     s.comecando = true;
     try {
       await comecarQuiz(s);
@@ -591,11 +670,44 @@ const acoes = {
     if (!s || i < 0 || s.jogadores[i].saiu) throw new ErroJogo('Você não está nessa partida.');
     if (s.status !== 'jogando') throw new ErroJogo('A partida não está em andamento.');
     if (ehQuiz(s)) { responder(s, i, jogada || {}); return; }
+    if (s.jogo === 'cidade') { jogarCidade(s, i, jogada || {}); return; }
     if (ehGrupo(s)) throw new ErroJogo('Use as setas para jogar.');
     const resultado = JOGOS[s.jogo].jogar(s.estado, i, jogada || {});
     if (resultado) finalizar(s, resultado, resultado.empate ? 'empate' : 'vitoria');
     enviarSala(s);
     if (resultado) avisarLobby();
+  },
+
+  // Lyendell Dorme: quem abriu a sala muda as opções (tempo do dia, classes) antes de começar.
+  'cidade:opcoes'(u, { id, opcoes }) {
+    const s = salas.get(id);
+    if (!s || s.jogo !== 'cidade' || s.status !== 'esperando') throw new ErroJogo('Essa sala não está esperando.');
+    if (dono(s)?.id !== u.id) throw new ErroJogo('Só quem abriu a sala muda as opções.');
+    s.opcoes = cidade.validarOpcoes(opcoes);
+    enviarSala(s);
+  },
+
+  // Chat do jogo: cada mensagem vai só para quem pode ler aquele canal.
+  'cidade:falar'(u, { id, canal, texto }) {
+    const s = salas.get(id);
+    const i = s ? indiceNa(s, u.id) : -1;
+    if (!s || s.jogo !== 'cidade' || !s.estado || i < 0) throw new ErroJogo('Você não está nessa partida.');
+    const t = limparTexto(texto, 300).replace(/\s+/g, ' ');
+    if (!t) return;
+    s.falas ??= new Map();
+    const agora = Date.now();
+    if (agora - (s.falas.get(u.id) || 0) < 700) throw new ErroJogo('Calma: uma mensagem de cada vez.');
+    s.falas.set(u.id, agora);
+    let msg;
+    try {
+      msg = cidade.falar(s.estado, i, canal, t);
+    } catch (x) {
+      throw x instanceof cidade.ErroCidade ? new ErroJogo(x.message) : x;
+    }
+    for (const k of cidade.leitores(s.estado, canal)) {
+      if (k >= 0) paraUsuario(s.jogadores[k].id, 'cidade:msg', { id: s.id, msg });
+      else for (const x of s.espectadores) paraUsuario(x, 'cidade:msg', { id: s.id, msg });
+    }
   },
 
   // Mede o atraso da conexão (a cobrinha ao vivo usa para virar na hora certa na tela).

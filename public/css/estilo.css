@@ -1824,6 +1824,179 @@ body.com-radio.radio-mini #toasts { bottom: 86px; }
 .b2048-bloco[data-v="grande"] { background: #b77be6; color: #160b20; font-size: clamp(0.7rem, 3.4vw, 1.15rem); box-shadow: 0 0 26px rgba(183, 123, 230, 0.6); }
 .b2048-faixa { width: min(100%, 460px); padding: 8px 12px; border-radius: var(--raio-p); text-align: center; color: #1b1403; background: var(--ouro); font-weight: 600; }
 
+/* ─── Lyendell Dorme ──────────────────────────────── */
+.cidade { --cid-noite: #7e9fd8; --cid-raposa: #e08a52; display: grid; gap: 14px; }
+.cid-papel {
+  display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px 2px 7px; border-radius: 999px; white-space: nowrap;
+  font: 600 0.7rem var(--f-titulo); letter-spacing: 0.03em; border: 1px solid; background: var(--sup-2);
+}
+.cid-papel .ico { width: 13px; height: 13px; }
+.cid-papel.time-coelhos { color: #e9d9a6; border-color: rgba(216, 177, 58, 0.45); }
+.cid-papel.time-raposos { color: #f2a679; border-color: rgba(224, 138, 82, 0.55); background: rgba(224, 138, 82, 0.1); }
+.cid-papel.time-neutro { color: #c9b2ef; border-color: rgba(183, 123, 230, 0.5); background: rgba(183, 123, 230, 0.08); }
+.cid-papel.oculto { color: var(--suave); border-color: var(--borda-2); border-style: dashed; }
+button.cid-papel { cursor: pointer; }
+button.cid-papel:disabled { cursor: default; }
+.cid-papel.desligada { opacity: 0.4; text-decoration: line-through; }
+.cid-classes { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* Espera */
+.cid-espera { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.cid-espera .cid-regras { grid-column: 1 / -1; }
+.cid-conta { margin: 10px 0 0; font-size: 0.92rem; }
+.cid-opcoes { display: grid; gap: 12px; }
+.cid-opcao { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.cid-opcao-titulo { margin: 4px 0 0; font: 600 0.74rem var(--f-titulo); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ouro); }
+.cid-regras > summary { cursor: pointer; display: flex; align-items: center; gap: 8px; font-family: var(--f-titulo); color: var(--ouro); }
+.cid-regras[open] > summary { margin-bottom: 10px; }
+.cid-regras p { margin: 0 0 8px; color: var(--texto-2); }
+.cid-regras .cid-classes { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
+.cid-regra-papel { display: grid; gap: 4px; justify-items: start; padding: 8px 10px; border-radius: var(--raio-p); background: var(--sup-2); border: 1px solid var(--borda); }
+.cid-regra-papel small { color: var(--texto-2); font-size: 0.86rem; line-height: 1.35; }
+
+/* Faixa da fase */
+.cid-faixa {
+  position: relative; display: flex; align-items: center; gap: 14px; padding: 12px 18px 16px; overflow: hidden; border-radius: var(--raio);
+  background: linear-gradient(120deg, rgba(216, 177, 58, 0.16), transparent 60%), var(--sup); border: 1px solid var(--borda-2);
+}
+.cid-faixa.f-noite, .cid-faixa.f-papeis { background: linear-gradient(120deg, rgba(64, 92, 160, 0.38), transparent 65%), #0b1220; border-color: #26365a; }
+.cid-faixa.f-cacador { background: linear-gradient(120deg, rgba(216, 103, 74, 0.25), transparent 65%), var(--sup); }
+.cid-faixa-icone { display: grid; place-items: center; width: 44px; height: 44px; flex: none; border-radius: 50%; background: rgba(0, 0, 0, 0.25); color: var(--ouro-l); }
+.cid-faixa.f-noite .cid-faixa-icone, .cid-faixa.f-papeis .cid-faixa-icone { color: #cfe0ff; }
+.cid-faixa-icone .ico { width: 24px; height: 24px; }
+.cid-faixa > div { display: grid; min-width: 0; flex: 1; }
+.cid-faixa strong { font-family: var(--f-titulo); font-size: 1.25rem; letter-spacing: 0.05em; color: var(--pergaminho); }
+.cid-faixa small { color: var(--texto-2); font-size: 0.95rem; }
+.cid-tempo { font: 700 1.5rem var(--f-titulo); color: var(--ouro-l); font-variant-numeric: tabular-nums; }
+.cid-barra { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: rgba(0, 0, 0, 0.3); }
+.cid-barra > span { display: block; height: 100%; width: 100%; background: var(--ouro); transition: width 0.25s linear; }
+.cid-faixa.f-noite .cid-barra > span { background: var(--cid-noite); }
+
+/* Grade da partida */
+.cid-grade { display: grid; grid-template-columns: 270px minmax(0, 1fr) 330px; grid-template-areas: "esq centro dir"; gap: 14px; align-items: start; }
+.cid-esquerda { grid-area: esq; }
+.cid-centro { grid-area: centro; }
+.cid-direita { grid-area: dir; }
+.cid-esquerda, .cid-centro, .cid-direita { display: grid; gap: 14px; min-width: 0; }
+
+/* Minha carta */
+.cid-carta { display: grid; gap: 6px; justify-items: center; text-align: center; padding-top: 16px; }
+.cid-carta.time-raposos { border-color: rgba(224, 138, 82, 0.6); background: linear-gradient(180deg, rgba(224, 138, 82, 0.12), transparent 50%), var(--sup); }
+.cid-carta.time-neutro { border-color: rgba(183, 123, 230, 0.5); background: linear-gradient(180deg, rgba(183, 123, 230, 0.1), transparent 50%), var(--sup); }
+.cid-carta.time-coelhos { border-color: rgba(216, 177, 58, 0.45); background: linear-gradient(180deg, rgba(216, 177, 58, 0.1), transparent 50%), var(--sup); }
+.cid-carta.morta { filter: grayscale(0.6); }
+.cid-carta-sobre { font: 600 0.64rem var(--f-titulo); letter-spacing: 0.16em; text-transform: uppercase; color: var(--suave); }
+.cid-carta-icone { display: grid; place-items: center; width: 70px; height: 70px; border-radius: 50%; background: rgba(0, 0, 0, 0.3); border: 1.5px solid currentColor; color: var(--ouro-l); }
+.cid-carta.time-raposos .cid-carta-icone { color: #f2a679; }
+.cid-carta.time-neutro .cid-carta-icone { color: #c9b2ef; }
+.cid-carta-icone .ico { width: 38px; height: 38px; }
+.cid-carta h2 { font-family: var(--f-titulo); font-size: 1.3rem; color: var(--pergaminho); }
+.cid-carta-time { font: 600 0.7rem var(--f-titulo); letter-spacing: 0.08em; text-transform: uppercase; color: var(--suave); }
+.cid-carta-desc { color: var(--texto); line-height: 1.45; }
+.cid-carta-objetivo { font-size: 0.92rem; color: var(--texto-2); }
+.cid-carta-extra { display: flex; align-items: center; gap: 4px; font-size: 0.92rem; color: var(--ouro-l); }
+.cid-carta-extra .ico { width: 15px; height: 15px; }
+.cid-notas { width: 100%; text-align: left; margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--borda); }
+.cid-notas-titulo { margin: 0 0 8px; font: 600 0.7rem var(--f-titulo); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ouro); }
+.cid-notas ol, .cid-diario ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.cid-notas li { font-size: 0.92rem; line-height: 1.35; color: var(--texto); }
+.cid-notas li small { display: block; font: 600 0.6rem var(--f-titulo); letter-spacing: 0.08em; text-transform: uppercase; color: var(--suave); }
+
+/* Praça: as pessoas */
+.cid-praca { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
+.cid-pessoa {
+  position: relative; display: grid; justify-items: center; align-content: start; gap: 4px; padding: 12px 8px 10px; text-align: center;
+  border-radius: var(--raio); background: var(--sup); border: 1px solid var(--borda); color: var(--texto); font: inherit;
+}
+.cid-pessoa.clicavel { cursor: pointer; }
+.cid-pessoa.clicavel:hover { border-color: var(--ouro-d); background: var(--sup-2); }
+.cid-pessoa.escolhida { border-color: var(--ouro); box-shadow: 0 0 0 2px rgba(216, 177, 58, 0.45); background: var(--ouro-fundo); }
+.cidade.noite .cid-pessoa.escolhida { border-color: var(--cid-noite); box-shadow: 0 0 0 2px rgba(126, 159, 216, 0.45); background: rgba(126, 159, 216, 0.12); }
+.cid-pessoa.eu { border-style: dashed; }
+.cid-pessoa.aliado { border-color: rgba(224, 138, 82, 0.6); }
+.cid-pessoa.morta { opacity: 0.55; }
+.cid-pessoa.morta .avatar { filter: grayscale(1); }
+.cid-pessoa.cacador { border-color: var(--vermelho); box-shadow: 0 0 0 2px rgba(216, 103, 74, 0.4); opacity: 1; }
+.cid-pessoa.executada { animation: cid-tremer 0.5s ease 2; }
+@keyframes cid-tremer { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+.cid-pessoa strong { font-size: 0.95rem; line-height: 1.2; overflow-wrap: anywhere; }
+.cid-pessoa .cid-papel { white-space: normal; text-align: left; max-width: 100%; line-height: 1.15; }
+.cid-pessoa strong small { color: var(--suave); font-weight: 400; }
+.cid-av { position: relative; }
+.cid-av .avatar { width: 46px; height: 46px; }
+.cid-caveira { position: absolute; right: -6px; bottom: -4px; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #1b201b; color: #ece0bf; border: 1px solid var(--borda-2); }
+.cid-caveira .ico { width: 14px; height: 14px; }
+.cid-causa { font-size: 0.78rem; color: var(--suave); line-height: 1.2; }
+.cid-marca { position: absolute; top: 6px; left: 6px; color: #f08466; }
+.cid-marca.raposa { left: auto; right: 6px; color: #f2a679; }
+.cid-marca .ico { width: 16px; height: 16px; }
+.cid-votos {
+  position: absolute; top: -8px; right: -6px; display: inline-flex; align-items: center; gap: 2px; min-width: 26px; height: 26px; padding: 0 7px;
+  justify-content: center; border-radius: 999px; font: 700 0.8rem var(--f-titulo); color: #1b1403; background: var(--ouro); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+.cid-votos.patas { background: #e08a52; top: auto; bottom: -8px; }
+.cid-votos .ico { width: 13px; height: 13px; }
+.cid-votou { font-size: 0.76rem; color: var(--suave); }
+
+/* Ações */
+.cid-acoes { display: grid; gap: 12px; }
+.cid-acoes.pendente { border-color: var(--ouro-d); box-shadow: 0 0 0 1px rgba(216, 177, 58, 0.25); }
+.cidade.noite .cid-acoes.pendente { border-color: #3a5288; box-shadow: 0 0 0 1px rgba(126, 159, 216, 0.3); }
+.cid-acao { display: grid; gap: 8px; justify-items: start; }
+.cid-acao + .cid-acao { padding-top: 12px; border-top: 1px dashed var(--borda); }
+.cid-acao-titulo { display: flex; align-items: center; gap: 8px; margin: 0; font-family: var(--f-titulo); font-size: 0.95rem; color: var(--pergaminho); }
+.cid-acao-titulo .ico { color: var(--ouro); }
+.cid-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.cid-vitima { margin: 0; color: #f3a186; font-weight: 600; }
+.cid-pronto { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--verde); font-size: 0.92rem; }
+
+/* Chat e diário */
+.cid-chat { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; height: 420px; padding: 0; overflow: hidden; }
+.cid-chat-abas { display: flex; gap: 2px; padding: 6px 6px 0; border-bottom: 1px solid var(--borda); }
+.cid-chat-aba { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--texto-2); cursor: pointer; font: 600 0.78rem var(--f-titulo); letter-spacing: 0.04em; }
+.cid-chat-aba.ativa { color: var(--ouro-l); border-bottom-color: var(--ouro); }
+.cid-chat-aba.c-raposos.ativa { color: #f2a679; border-bottom-color: #e08a52; }
+.cid-chat-aba.c-mortos.ativa { color: #c9b2ef; border-bottom-color: #b77be6; }
+.cid-chat-lista { overflow-y: auto; padding: 10px 14px; display: grid; align-content: start; gap: 6px; scrollbar-width: thin; }
+.cid-msg { margin: 0; line-height: 1.4; overflow-wrap: anywhere; }
+.cid-msg strong { color: var(--ouro); font-weight: 600; }
+.cid-msg.minha strong { color: var(--ouro-l); }
+.cid-chat-vazio { color: var(--suave); font-size: 0.92rem; text-align: center; padding: 20px 0; }
+.cid-chat-form { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--borda); }
+.cid-chat-form .input { flex: 1; min-width: 0; }
+.cid-diario { max-height: 340px; overflow-y: auto; scrollbar-width: thin; }
+.cid-diario li { display: flex; gap: 8px; align-items: flex-start; font-size: 0.92rem; line-height: 1.35; color: var(--texto-2); }
+.cid-diario li .ico { flex: none; width: 15px; height: 15px; margin-top: 2px; color: var(--suave); }
+.cid-diario li.d-morte { color: var(--texto); }
+.cid-diario li.d-morte .ico { color: #f08466; }
+.cid-diario li.d-lua .ico { color: var(--cid-noite); }
+.cid-diario li.d-sol .ico, .cid-diario li.d-fim .ico { color: var(--ouro); }
+.cid-diario li.d-bom .ico { color: var(--verde); }
+.cid-diario li.d-fim { color: var(--ouro-l); font-weight: 600; }
+
+/* Fim */
+.cid-fim { display: grid; justify-items: center; gap: 8px; text-align: center; padding: 22px; }
+.cid-fim.venci { border-color: var(--ouro); background: radial-gradient(500px 200px at 50% 0%, rgba(216, 177, 58, 0.18), transparent), var(--sup); }
+.cid-fim-icone { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; background: rgba(0, 0, 0, 0.3); border: 1.5px solid var(--ouro); color: var(--ouro-l); }
+.cid-fim-icone .ico { width: 34px; height: 34px; }
+.cid-fim h2 { font-family: var(--f-titulo); color: var(--pergaminho); font-size: 1.35rem; }
+.cid-fim-voce { font: 700 1.05rem var(--f-titulo); color: var(--ouro-l); margin: 0; }
+
+/* Telas médias: a praça ocupa a esquerda inteira; a carta e o chat ficam numa coluna à direita. */
+@media (max-width: 1500px) {
+  .cid-grade { grid-template-columns: minmax(0, 1fr) 320px; grid-template-areas: "centro esq" "centro dir"; }
+}
+@media (max-width: 760px) {
+  .cid-espera { grid-template-columns: minmax(0, 1fr); }
+  .cid-grade { grid-template-columns: minmax(0, 1fr); grid-template-areas: "centro" "dir" "esq"; }
+  .cid-praca { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+  .cid-av .avatar { width: 38px; height: 38px; }
+  .cid-faixa { padding: 10px 12px 14px; }
+  .cid-faixa strong { font-size: 1.05rem; }
+  .cid-tempo { font-size: 1.2rem; }
+  .cid-chat { height: 360px; }
+}
+
 @media (max-width: 960px) {
   .lateral { transform: translateX(-100%); transition: transform 0.25s ease; box-shadow: none; }
   body.menu-aberto .lateral { transform: none; box-shadow: var(--sombra); }

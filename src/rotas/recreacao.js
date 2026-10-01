@@ -27,7 +27,7 @@ const melhoresPontos = jogo => db.all(
   'SELECT usuario_nome AS nome, MAX(pontos) AS pontos FROM recordes WHERE jogo = ? GROUP BY usuario_nome ORDER BY pontos DESC LIMIT 10', jogo);
 
 r.get('/ranking', async (req, res) => {
-  const [velha, ppt, lig4, damas, cobras, cobrinha, pacman, jogo2048, quiz, ...outros] = await Promise.all([
+  const [velha, ppt, lig4, damas, cobras, cidade, cobrinha, pacman, jogo2048, quiz, ...outros] = await Promise.all([
     rankingAoVivo('velha'),
     rankingAoVivo('ppt'),
     rankingAoVivo('lig4'),
@@ -36,6 +36,10 @@ r.get('/ranking', async (req, res) => {
     db.all(`
       SELECT usuario_nome AS nome, SUM(venceu) AS vitorias, COUNT(*) AS partidas, SUM(pontos) AS cenouras
       FROM resultados WHERE jogo = 'cobras' GROUP BY usuario_nome ORDER BY vitorias DESC, cenouras DESC, nome LIMIT 10`),
+    // Lyendell Dorme: vitórias, partidas e em quantas chegou vivo ao fim.
+    db.all(`
+      SELECT usuario_nome AS nome, SUM(venceu) AS vitorias, COUNT(*) AS partidas, SUM(pontos) AS sobreviveu
+      FROM resultados WHERE jogo = 'cidade' GROUP BY usuario_nome ORDER BY vitorias DESC, sobreviveu DESC, nome LIMIT 10`),
     melhoresPontos('cobrinha'),
     melhoresPontos('pacman'),
     melhoresPontos('2048'),
@@ -58,7 +62,7 @@ r.get('/ranking', async (req, res) => {
   const memoria = outros.slice(TAMANHOS.length, TAMANHOS.length + Object.keys(MEMORIA).length);
   const minado = outros.slice(TAMANHOS.length + Object.keys(MEMORIA).length);
   res.json({
-    velha, ppt, lig4, damas, cobras, cobrinha, pacman, quiz, 2048: jogo2048,
+    velha, ppt, lig4, damas, cobras, cidade, cobrinha, pacman, quiz, 2048: jogo2048,
     quebra: Object.fromEntries(TAMANHOS.map((t, i) => [t, quebra[i]])),
     memoria: Object.fromEntries(Object.keys(MEMORIA).map((t, i) => [t, memoria[i]])),
     minado: Object.fromEntries(Object.keys(MINADO).map((t, i) => [t, minado[i]])),
