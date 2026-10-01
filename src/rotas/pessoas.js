@@ -5,6 +5,8 @@ const { exigirLogin, pode } = require('../auth');
 const progresso = require('../progresso');
 const { erro, texto, idDaRota } = require('../util');
 
+const { paraCriancas } = require('../censura');
+
 const r = express.Router();
 r.use(exigirLogin);
 
@@ -106,7 +108,8 @@ r.get('/:id/recados', async (req, res) => {
   const u = await buscarPessoa(req);
   const recados = await db.all(`SELECT r.*, a.foto AS autor_foto, a.cor AS autor_cor, a.moldura AS autor_moldura
     FROM recados r LEFT JOIN usuarios a ON a.id = r.autor_id WHERE r.perfil_id = ? ORDER BY r.id DESC LIMIT 60`, u.id);
-  res.json({ recados });
+  // Criança lê os recados sem palavrão.
+  res.json({ recados: req.usuario.crianca ? recados.map(x => ({ ...x, texto: paraCriancas(x.texto) })) : recados });
 });
 
 const ultimoRecado = new Map(); // anti-flood: um recado a cada 10 segundos por pessoa
@@ -121,7 +124,7 @@ r.post('/:id/recados', async (req, res) => {
   if (u.id !== req.usuario.id) {
     progresso.registrar(req.usuario.id, 'recado');
     // Avisa a dona ou o dono do perfil na hora, se estiver no site.
-    progresso.avisar(u.id, [{ tipo: 'recado', de: req.usuario.nome, deId: req.usuario.id, texto: t }]);
+    progresso.avisar(u.id, [{ tipo: 'recado', de: req.usuario.nome, deId: req.usuario.id, texto: u.crianca ? paraCriancas(t) : t }]);
   }
   res.status(201).json({ id });
 });

@@ -13,6 +13,7 @@ const antispam = require('./antispam');
 const cobras = require('./cobras');
 const damas = require('./damas');
 const cidade = require('./cidade');
+const { paraCriancas } = require('./censura');
 
 const ESPERA_MS = Number(process.env.RECREACAO_ESPERA_MS) || 30_000;       // tempo para voltar depois de cair
 const REVALIDAR_MS = Number(process.env.RECREACAO_REVALIDAR_MS) || 120_000; // confere se a sessão ainda vale
@@ -38,6 +39,11 @@ function paraUsuario(id, tipo, dados) {
 function paraTodos(tipo, dados) {
   for (const lista of conexoes.values()) for (const ws of lista) enviar(ws, tipo, dados);
 }
+
+// Personagem criança: as mensagens chegam para ela sem palavrão (veja censura.js).
+const ehCrianca = id => !!pessoas.get(id)?.crianca;
+const limparMsg = msg => ({ ...msg, texto: paraCriancas(msg.texto) });
+const msgPara = (id, msg) => (ehCrianca(id) ? limparMsg(msg) : msg);
 const online = () => [...conexoes.keys()].map(id => pessoas.get(id)).filter(Boolean)
   .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 
@@ -172,6 +178,9 @@ function visaoSala(s, id) {
   let estado = null;
   if (s.estado) {
     estado = ehQuiz(s) ? visaoQuiz(s, id) : s.jogo === 'cobras' ? visaoCobras(s) : s.jogo === 'cidade' ? cidade.visao(s.estado, eu) : jogo.visao(s.estado, eu);
+    if (s.jogo === 'cidade' && ehCrianca(id)) {
+      estado.chat = Object.fromEntries(Object.entries(estado.chat).map(([c, l]) => [c, l.map(limparMsg)]));
+    }
   }
   return {
     id: s.id,
@@ -588,7 +597,8 @@ const acoes = {
     }
     const { id } = await db.run('INSERT INTO chat_mensagens (usuario_id, usuario_nome, texto) VALUES (?, ?, ?)', u.id, u.nome, r.texto);
     const msg = await db.get('SELECT * FROM chat_mensagens WHERE id = ?', id);
-    paraTodos('chat:msg', { msg: { ...msg, ...(await visualDe(u.id)) } });
+    const completa = { ...msg, ...(await visualDe(u.id)) };
+    for (const [id, lista] of conexoes) for (const w of lista) enviar(w, 'chat:msg', { msg: msgPara(id, completa) });
     // Só mensagem de verdade conta para XP, missões e conquistas (veja antispam.js).
     if (r.conta) progresso.registrar(u.id, 'chat');
   },
@@ -705,8 +715,7 @@ const acoes = {
       throw x instanceof cidade.ErroCidade ? new ErroJogo(x.message) : x;
     }
     for (const k of cidade.leitores(s.estado, canal)) {
-      if (k >= 0) paraUsuario(s.jogadores[k].id, 'cidade:msg', { id: s.id, msg });
-      else for (const x of s.espectadores) paraUsuario(x, 'cidade:msg', { id: s.id, msg });
+      for (const quem of k >= 0 ? [s.jogadores[k].id] : s.espectadores) paraUsuario(quem, 'cidade:msg', { id: s.id, msg: msgPara(quem, msg) });
     }
   },
 
@@ -813,7 +822,7 @@ function conectar(ws, usuario, token) {
   ws.usuario = usuario;
   ws.token = token;
   ws.vivo = true;
-  pessoas.set(id, { id, nome: usuario.nome, foto: usuario.foto || null });
+  pessoas.set(id, { id, nome: usuario.nome, foto: usuario.foto || null, crianca: !!usuario.crianca });
   const chegou = !conexoes.has(id);
   if (chegou) conexoes.set(id, new Set());
   conexoes.get(id).add(ws);
@@ -843,7 +852,7 @@ function conectar(ws, usuario, token) {
       const minha = salaAtivaDe(id);
       enviar(ws, 'ola', {
         eu: { id, nome: usuario.nome, moderar: usuario.permissoes.has('recreacao.moderar'), silenciadoAte: antispam.silenciadoAte(id) },
-        online: online(), historico, salas: resumoSalas(), minhaSala: minha ? minha.id : null, transmissoes: resumoTransmissoes(),
+        online: online(), historico: usuario.crianca ? historico.map(limparMsg) : historico, salas: resumoSalas(), minhaSala: minha ? minha.id : null, transmissoes: resumoTransmissoes(),
       });
       if (minha) enviarSala(minha); // voltou a tempo: a partida continua
     })

@@ -111,6 +111,14 @@ E o site aparece para ela **do jeito de uma criança**:
 - no mapa, cada prédio tem "o que eu acho" do lugar ("Onde guardam as moedinhas. Será que dá para
   pegar uma?").
 
+**Palavrão some para a criança.** No chat da Recreação, no chat do Lyendell Dorme e nos recados do perfil,
+cada palavrão ou xingamento chega para a criança trocado por uma palavra de criança ("Que porra é essa?"
+vira algo como "Que batatinha é essa?"), e o mesmo palavrão vira sempre a mesma palavra. Os adultos
+continuam vendo a mensagem como foi escrita. O filtro acha a palavra mesmo disfarçada (p0rr4,
+caraaaalho, maiúscula, sem acento) e deixa em paz as palavras inocentes do RP (burro e veado, os bichos;
+lixo; trouxa...). A troca é feita no servidor: a palavra feia nem chega ao navegador da criança. A lista
+fica em `src/censura.js`.
+
 Para os outros, o perfil e a comunidade mostram a etiqueta "Criança". Os textos de criança ficam em
 `public/js/crianca.js`.
 
