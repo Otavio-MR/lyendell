@@ -12,6 +12,8 @@ import { mapa } from './telas/mapa.js';
 import { radioDoCanto, carregarTrilha, pararTudo } from './trilha.js';
 import { recreacao, sala, cobrinha, quebraCabeca, assistir, memoria } from './telas/recreacao.js';
 import { pacCoelho } from './telas/pac-coelho.js';
+import { leis, gerenciaLeis } from './telas/leis.js';
+import { campoMinado, jogo2048 } from './telas/jogos-sozinho.js';
 import { perguntasQuiz } from './telas/quiz.js';
 
 const app = document.getElementById('app');
@@ -23,7 +25,7 @@ const MENU = [
     { rota: '/mapa', nome: 'Mapa de Lyendell', icone: 'mapa' },
     { rota: '/anuncios', nome: 'Mural de Anúncios', icone: 'megafone', perm: ['anuncios.ver'] },
     { rota: '/congresso', nome: 'Congresso', icone: 'coluna', perm: ['congresso.ver'] },
-    { rota: '/leis', nome: 'Leis da Capital', icone: 'balanca', perm: ['leis.ver'] },
+    { rota: '/leis', nome: 'Leis de Lyendell', icone: 'balanca', perm: ['leis.ver'] },
     { rota: '/atividades', nome: 'Mural de Atividades', icone: 'tarefas', perm: ['atividades.ver'] },
     { rota: '/galeria', nome: 'Galeria', icone: 'imagem', perm: ['galeria.ver'] },
     { rota: '/recreacao', nome: 'Recreação', icone: 'jogos', perm: ['recreacao.usar'] },
@@ -46,12 +48,19 @@ const ROTAS = [
   [/^\/atividades$/, () => atividades()],
   [/^\/atividades\/(\d+)$/, id => atividade(id)],
   [/^\/galeria(?:\/(\d+|sem-album))?$/, album => galeria(album)],
-  [/^\/(tabelionato|guarda|hospital|congresso|leis)$/, m => modulo(m)],
+  // Leis de Lyendell: todo mundo lê arrumado; quem escreve as leis gerencia os livros em /leis/livros.
+  [/^\/leis$/, () => leis()],
+  [/^\/leis\/livros$/, () => gerenciaLeis(() => modulo('leis'))],
+  [/^\/leis\/(\d+)$/, id => gerenciaLeis(() => livro('leis', id), () => leis(id))],
+  [/^\/leis\/(\d+)\/registro\/(\d+)$/, (id, reg) => gerenciaLeis(() => livro('leis', id, reg), () => leis(id, reg))],
+  [/^\/(tabelionato|guarda|hospital|congresso)$/, m => modulo(m)],
   [/^\/(tabelionato|guarda|hospital|congresso|leis)\/aprovacoes$/, m => aprovacoes(m)],
   [/^\/(tabelionato|guarda|hospital|congresso|leis)\/envios$/, m => envios(m)],
-  [/^\/(tabelionato|guarda|hospital|congresso|leis)\/(\d+)$/, (m, id) => livro(m, id)],
-  [/^\/(tabelionato|guarda|hospital|congresso|leis)\/(\d+)\/registro\/(\d+)$/, (m, id, reg) => livro(m, id, reg)],
+  [/^\/(tabelionato|guarda|hospital|congresso)\/(\d+)$/, (m, id) => livro(m, id)],
+  [/^\/(tabelionato|guarda|hospital|congresso)\/(\d+)\/registro\/(\d+)$/, (m, id, reg) => livro(m, id, reg)],
   [/^\/recreacao\/memoria$/, () => memoria()],
+  [/^\/recreacao\/campo-minado$/, () => campoMinado()],
+  [/^\/recreacao\/2048$/, () => jogo2048()],
   [/^\/admin\/usuarios$/, () => usuarios()],
   [/^\/admin\/cargos$/, () => cargos()],
   [/^\/admin\/diario$/, () => diario()],

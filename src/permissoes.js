@@ -62,16 +62,16 @@ const CATALOGO = [
     { chave: 'recreacao.moderar', nome: 'Apagar mensagens de outros no chat' },
     { chave: 'recreacao.perguntas', nome: 'Criar e editar as perguntas do quiz' },
   ] },
-  { grupo: 'Leis da Capital', itens: [
-    { chave: 'leis.ver', nome: 'Ler as Leis da Capital' },
-    { chave: 'leis.registrar', nome: 'Escrever leis da Capital (vão para aprovação, se a pessoa não publica direto)' },
+  { grupo: 'Leis de Lyendell', itens: [
+    { chave: 'leis.ver', nome: 'Ler as Leis de Lyendell' },
+    { chave: 'leis.registrar', nome: 'Escrever leis (vão para aprovação, se a pessoa não publica direto)' },
     { chave: 'leis.editar', nome: 'Editar leis' },
     { chave: 'leis.apagar', nome: 'Apagar leis' },
-    { chave: 'leis.configurar', nome: 'Criar livros, seções, campos e opções' },
+    { chave: 'leis.configurar', nome: 'Criar livros de leis e regras, seções, campos e opções' },
     { chave: 'leis.aprovar', nome: 'Publicar leis direto e aprovar as enviadas (Lorde Comandante e Família Nobre)' },
   ] },
   { grupo: 'Mapa', itens: [
-    { chave: 'mapa.editar', nome: 'Colocar, mover e editar as casas do mapa (e quem mora em cada uma)' },
+    { chave: 'mapa.editar', nome: 'Colocar, mover e editar as casas e os prédios do mapa (quem mora, fotos e informações)' },
   ] },
   { grupo: 'Trilha sonora', itens: [
     { chave: 'trilha.gerenciar', nome: 'Adicionar e tirar músicas da trilha sonora' },
@@ -89,7 +89,7 @@ const acoes = (modulo, ...lista) => lista.map(a => `${modulo}.${a}`);
 
 // Módulos de livros: todos usam a mesma tela (livros com formulário, registros numerados e aprovação).
 // O Hospital não é aberto a todos os moradores (prontuário de paciente); o resto é.
-const MODULOS = { tabelionato: 'Tabelionato', guarda: 'Guarda do Coelho', hospital: 'Hospital', congresso: 'Congresso', leis: 'Leis da Capital' };
+const MODULOS = { tabelionato: 'Tabelionato', guarda: 'Guarda do Coelho', hospital: 'Hospital', congresso: 'Congresso', leis: 'Leis de Lyendell' };
 
 // Aprovar registros é exclusivo de um único cargo em cada módulo (além do administrador principal).
 // Nem a Família Nobre aprova: tudo passa pela Tabeliã, pelo Comandante, pelo Diretor do Hospital ou pela Senadora.
@@ -109,8 +109,11 @@ const DESCRICOES = {
   Guarda: [['Vê os registros da Guarda e registra prisioneiros.', 'Vê os registros da Guarda e registra prisioneiros, que vão para a aprovação do Comandante.'],
     'Vê todos os livros e registros da Guarda e registra em qualquer um deles; os registros vão para a aprovação do Comandante.'],
   'Família Nobre': [['Pode tudo, menos adicionar novos usuários.', 'Pode tudo, menos adicionar usuários e aprovar registros (isso é da Tabeliã e do Comandante).',
-    'Pode tudo, menos adicionar usuários e aprovar registros (isso é da Tabeliã, do Comandante, do Diretor do Hospital e da Senadora).'],
-  'Faz as Leis da Capital com o Lorde Comandante. Pode tudo, menos adicionar usuários e aprovar registros do Tabelionato, da Guarda, do Hospital e do Congresso (isso é da Tabeliã, do Comandante, do Diretor do Hospital e da Senadora).'],
+    'Pode tudo, menos adicionar usuários e aprovar registros (isso é da Tabeliã, do Comandante, do Diretor do Hospital e da Senadora).',
+    'Faz as Leis da Capital com o Lorde Comandante. Pode tudo, menos adicionar usuários e aprovar registros do Tabelionato, da Guarda, do Hospital e do Congresso (isso é da Tabeliã, do Comandante, do Diretor do Hospital e da Senadora).'],
+  'Faz as Leis de Lyendell com o Lorde Comandante. Pode tudo, menos adicionar usuários e aprovar registros do Tabelionato, da Guarda, do Hospital e do Congresso (isso é da Tabeliã, do Comandante, do Diretor do Hospital e da Senadora).'],
+  'Lorde Comandante': [['Faz as Leis da Capital junto com a Família Nobre: escreve, publica, edita e revoga.'],
+    'Faz as Leis de Lyendell junto com a Família Nobre: escreve, publica, edita e revoga.'],
 };
 
 const CARGOS_PADRAO = [
@@ -139,7 +142,7 @@ const CARGOS_PADRAO = [
     descricao: 'Vê o Hospital e registra pacientes, que vão para a aprovação do Diretor do Hospital.',
     permissoes: [...MEMBRO, 'hospital.ver', 'hospital.registrar'] },
   { nome: 'Lorde Comandante', cor: '#b5563f',
-    descricao: 'Faz as Leis da Capital junto com a Família Nobre: escreve, publica, edita e revoga.',
+    descricao: DESCRICOES['Lorde Comandante'][1],
     permissoes: [...MEMBRO, ...acoes('leis', 'registrar', 'editar', 'apagar', 'configurar', 'aprovar')] },
   { nome: 'Senadora', cor: '#7f93d8',
     descricao: 'Publica no Congresso as PECs, leis e regras votadas; aprova o que outros enviarem para lá.',

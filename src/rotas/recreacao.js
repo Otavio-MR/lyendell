@@ -12,6 +12,8 @@ r.use(exigir('recreacao.usar'));
 const TAMANHOS = ['3x3', '4x4', '5x5'];
 // Jogo da Memória: tamanho e quantos pares tem (o resultado é o número de jogadas; menos é melhor).
 const MEMORIA = { '4x4': 8, '4x6': 12, '6x6': 18 };
+// Campo Minado: as três dificuldades (o resultado é o tempo em segundos; menos é melhor).
+const MINADO = { facil: 'Fácil', medio: 'Médio', dificil: 'Difícil' };
 
 // Vitórias, derrotas e empates de cada pessoa num jogo ao vivo de duas pessoas.
 const rankingAoVivo = jogo => db.all(`
@@ -25,16 +27,18 @@ const melhoresPontos = jogo => db.all(
   'SELECT usuario_nome AS nome, MAX(pontos) AS pontos FROM recordes WHERE jogo = ? GROUP BY usuario_nome ORDER BY pontos DESC LIMIT 10', jogo);
 
 r.get('/ranking', async (req, res) => {
-  const [velha, ppt, lig4, cobras, cobrinha, pacman, quiz, ...outros] = await Promise.all([
+  const [velha, ppt, lig4, damas, cobras, cobrinha, pacman, jogo2048, quiz, ...outros] = await Promise.all([
     rankingAoVivo('velha'),
     rankingAoVivo('ppt'),
     rankingAoVivo('lig4'),
+    rankingAoVivo('damas'),
     // Cobrinha ao vivo: vitórias (em partida de 2 a 4) e cenouras comidas.
     db.all(`
       SELECT usuario_nome AS nome, SUM(venceu) AS vitorias, COUNT(*) AS partidas, SUM(pontos) AS cenouras
       FROM resultados WHERE jogo = 'cobras' GROUP BY usuario_nome ORDER BY vitorias DESC, cenouras DESC, nome LIMIT 10`),
     melhoresPontos('cobrinha'),
     melhoresPontos('pacman'),
+    melhoresPontos('2048'),
     // Vitória no quiz só conta em partida com pelo menos duas pessoas.
     db.all(`
       SELECT usuario_nome AS nome, SUM(posicao = 1 AND jogadores > 1) AS vitorias, SUM(acertos) AS acertos,
@@ -46,19 +50,25 @@ r.get('/ranking', async (req, res) => {
     ...Object.keys(MEMORIA).map(t => db.all(`
       SELECT usuario_nome AS nome, MIN(pontos) AS jogadas FROM recordes WHERE jogo = 'memoria' AND variante = ?
       GROUP BY usuario_nome ORDER BY jogadas LIMIT 10`, t)),
+    ...Object.keys(MINADO).map(t => db.all(`
+      SELECT usuario_nome AS nome, MIN(pontos) AS segundos FROM recordes WHERE jogo = 'minado' AND variante = ?
+      GROUP BY usuario_nome ORDER BY segundos LIMIT 10`, t)),
   ]);
   const quebra = outros.slice(0, TAMANHOS.length);
-  const memoria = outros.slice(TAMANHOS.length);
+  const memoria = outros.slice(TAMANHOS.length, TAMANHOS.length + Object.keys(MEMORIA).length);
+  const minado = outros.slice(TAMANHOS.length + Object.keys(MEMORIA).length);
   res.json({
-    velha, ppt, lig4, cobras, cobrinha, pacman, quiz,
+    velha, ppt, lig4, damas, cobras, cobrinha, pacman, quiz, 2048: jogo2048,
     quebra: Object.fromEntries(TAMANHOS.map((t, i) => [t, quebra[i]])),
     memoria: Object.fromEntries(Object.keys(MEMORIA).map((t, i) => [t, memoria[i]])),
+    minado: Object.fromEntries(Object.keys(MINADO).map((t, i) => [t, minado[i]])),
   });
 });
 
 // Resultado de um jogo que roda no navegador.
-// Cobrinha: cenouras comidas. Pac-Coelho: pontos. Quebra-cabeça: segundos e Memória: jogadas (menor é melhor).
-const LIMITES = { cobrinha: 400, pacman: 5_000_000 };
+// Cobrinha: cenouras comidas. Pac-Coelho e 2048: pontos. Quebra-cabeça e Campo Minado: segundos;
+// Memória: jogadas (nesses três, menor é melhor).
+const LIMITES = { cobrinha: 400, pacman: 5_000_000, 2048: 10_000_000 };
 
 r.post('/recordes', async (req, res) => {
   const jogo = req.body?.jogo;
@@ -70,6 +80,10 @@ r.post('/recordes', async (req, res) => {
     variante = MEMORIA[req.body?.variante] ? req.body.variante : null;
     if (!variante) throw erro(400, 'Tamanho do Jogo da Memória inválido.');
     pontos = inteiro(req.body?.pontos, { min: MEMORIA[variante], max: 5000 }); // não dá para terminar com menos jogadas que pares
+  } else if (jogo === 'minado') {
+    variante = MINADO[req.body?.variante] ? req.body.variante : null;
+    if (!variante) throw erro(400, 'Dificuldade do Campo Minado inválida.');
+    pontos = inteiro(req.body?.pontos, { min: 1, max: 24 * 3600 });
   } else if (jogo === 'quebra') {
     variante = TAMANHOS.includes(req.body?.variante) ? req.body.variante : null;
     pontos = inteiro(req.body?.pontos, { min: 1, max: 24 * 3600 });
@@ -78,7 +92,7 @@ r.post('/recordes', async (req, res) => {
     throw erro(400, 'Jogo desconhecido.');
   }
   if (pontos == null) throw erro(400, 'Resultado inválido.');
-  const menorMelhor = jogo === 'quebra' || jogo === 'memoria';
+  const menorMelhor = jogo === 'quebra' || jogo === 'memoria' || jogo === 'minado';
   const antes = (await db.get(
     `SELECT ${menorMelhor ? 'MIN' : 'MAX'}(pontos) AS m FROM recordes WHERE jogo = ? AND variante = ? AND usuario_id = ?`,
     jogo, variante, req.usuario.id)).m;

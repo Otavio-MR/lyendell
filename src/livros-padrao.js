@@ -227,8 +227,8 @@ const LIVROS_PADRAO = [
     ],
   },
   {
-    modulo: 'leis', nome: 'Leis da Capital', icone: 'balanca', aberto: 1,
-    descricao: 'As leis de Lyendell, feitas pelo Lorde Comandante e pela Família Nobre.',
+    modulo: 'leis', nome: 'Leis de Lyendell', icone: 'balanca', aberto: 1,
+    descricao: 'As leis da capital, feitas pelo Lorde Comandante e pela Família Nobre.',
     campos: [
       { id: 'titulo', nome: 'Título', tipo: 'texto', obrigatorio: true, destaque: true, ajuda: 'Ex.: Lei do Toque de Recolher' },
       { id: 'tipo', nome: 'Tipo', tipo: 'selecao', obrigatorio: true, destaque: true, opcoes: ['Lei', 'Decreto', 'Edital', 'Proibição', 'Imposto', 'Regra', 'Outro'] },

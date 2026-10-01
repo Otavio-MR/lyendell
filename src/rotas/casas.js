@@ -1,12 +1,15 @@
 // Casas do mapa de Lyendell. Cada casa guarda onde fica (x, y no mapa, rua e lado), o número,
-// a situação e quem mora. Quem mora é ligado pelo nome aos registros do Tabelionato
+// a situação, o ícone (opcional) e quem mora. Quem mora é ligado pelo nome aos registros do Tabelionato
 // (Moradores, Nobres e Outros), de onde vêm a foto e os dados mostrados no mapa.
 // Sem ninguém escolhido à mão, o mapa tenta achar pelo nome da casa (menos casas de família).
+// O GET também manda os prédios (veja rotas/predios.js), para o mapa carregar tudo de uma vez.
 const express = require('express');
 const { db } = require('../db');
 const { exigirLogin, exigir, pode } = require('../auth');
 const { anotar } = require('../diario');
-const { erro, linha, chaveNome, idDaRota } = require('../util');
+const { erro, linha, idDaRota } = require('../util');
+const { pessoasRegistradas, acharPessoas, semChave } = require('../moradores');
+const { formatarPredio, comPessoas } = require('./predios');
 
 const r = express.Router();
 r.use(exigirLogin);
@@ -16,75 +19,20 @@ const SITUACOES = ['ocupada', 'comercio', 'sem_dono']; // sem dono = sem morador
 const LADOS = ['esquerda', 'direita'];
 const [LARGURA, ALTURA] = [1154, 773]; // o tamanho do mapa
 
-/* ─── Quem mora: os registros de pessoas do Tabelionato ─── */
-
-const LIVRO_DE_PESSOAS = /morador|nobre|outro/;
-// Dados mostrados no mapa, nesta ordem, quando o registro tiver (pelo nome do campo, sem acento).
-const DADOS_MOSTRADOS = [
-  ['idade'], ['profissao', 'oficio'], ['cargo'], ['titulo'], ['estado civil'], ['a qual familia pertence', 'familia'],
-  ['cargo na familia'], ['casa'], ['genero'], ['nickname', 'nick', 'nick do minecraft'],
-];
-const nomeDoCampo = c => chaveNome(c.nome).replace(/:$/, '').trim();
-
-async function pessoasRegistradas() {
-  const livros = (await db.all("SELECT id, nome, campos FROM livros WHERE modulo = 'tabelionato' ORDER BY ordem, id"))
-    .filter(l => LIVRO_DE_PESSOAS.test(chaveNome(l.nome)));
-  const pessoas = [];
-  for (const l of livros) {
-    const campos = JSON.parse(l.campos);
-    const campoNome = campos.find(c => c.tipo === 'texto' && /^nome\b/.test(nomeDoCampo(c)));
-    const campoNick = campos.find(c => c.tipo === 'texto' && /^nick/.test(nomeDoCampo(c)));
-    const primeiro = campos.find(c => c.tipo === 'texto' || c.tipo === 'selecao');
-    const fotos = campos.filter(c => c.tipo === 'imagem');
-    const registros = await db.all("SELECT id, numero, dados FROM registros WHERE livro_id = ? AND situacao = 'aprovado' ORDER BY numero", l.id);
-    for (const reg of registros) {
-      const d = JSON.parse(reg.dados);
-      const nome = String(d[campoNome?.id] || d[campoNick?.id] || d[primeiro?.id] || '').trim();
-      if (!nome) continue;
-      const detalhes = [];
-      for (const nomes of DADOS_MOSTRADOS) {
-        const c = campos.find(x => x !== campoNome && nomes.includes(nomeDoCampo(x)) && d[x.id] !== undefined && d[x.id] !== '' && d[x.id] !== false);
-        if (c && !detalhes.some(x => x.id === c.id)) {
-          detalhes.push({ id: c.id, rotulo: c.nome.replace(/:$/, '').trim(), valor: Array.isArray(d[c.id]) ? d[c.id].join(', ') : String(d[c.id]) });
-        }
-      }
-      pessoas.push({
-        nome, chave: chaveNome(nome), livro: l.nome, livro_id: l.id, registro_id: reg.id, numero: reg.numero,
-        foto: fotos.map(c => d[c.id]).find(Boolean) || null,
-        detalhes: detalhes.slice(0, 6).map(({ rotulo, valor }) => ({ rotulo, valor })),
-      });
-    }
-  }
-  return pessoas;
-}
-
-// Liga um nome às pessoas registradas: o nome exato, ou o único registro que tem todas as palavras
-// ("Rudeus" acha "Rudeus Greyrat").
-// Quando é só um palpite pelo nome da casa (ninguém foi escolhido à mão):
-//  - nome de família ("Casa da Família Lombardi") não liga ninguém: nem todo Lombardi mora ali;
-//  - quem já foi escolhido à mão para alguma casa fica de fora (mora lá, não aqui).
-function acharPessoas(nome, pessoas, { palpite = false, escolhidos = new Set() } = {}) {
-  const k = chaveNome(nome);
-  if (palpite && /\bfamilia\b/.test(k)) return [];
-  const livre = p => !(palpite && escolhidos.has(p.registro_id));
-  const exata = pessoas.find(p => p.chave === k);
-  if (exata) return livre(exata) ? [exata] : [];
-  const palavras = k.split(' ');
-  const parecidas = pessoas.filter(p => palavras.every(w => p.chave.split(' ').includes(w)) && livre(p));
-  return parecidas.length === 1 ? parecidas : [];
-}
-
 function moradoresDa(casa, pessoas, escolhidos) {
   const aMao = casa.pessoas.length > 0;
   const nomes = aMao ? casa.pessoas : casa.situacao === 'ocupada' && casa.texto ? [casa.texto] : [];
   const vistos = new Set();
   return nomes.flatMap(n => acharPessoas(n, pessoas, { palpite: !aMao, escolhidos }))
     .filter(p => !vistos.has(p.registro_id) && vistos.add(p.registro_id))
-    .slice(0, 12).map(({ chave, ...p }) => p);
+    .slice(0, 12).map(semChave);
 }
 
-// Registros de quem foi escolhido à mão em alguma casa.
-const escolhidosAMao = (casas, pessoas) => new Set(casas.flatMap(c => c.pessoas.flatMap(n => acharPessoas(n, pessoas))).map(p => p.registro_id));
+// Registros de quem foi escolhido à mão para morar em alguma casa ou prédio.
+const escolhidosAMao = (casas, predios, pessoas) => new Set([
+  ...casas.flatMap(c => c.pessoas),
+  ...predios.flatMap(p => p.pessoas.filter(x => x.papel === 'mora').map(x => x.nome)),
+].flatMap(n => acharPessoas(n, pessoas)).map(p => p.registro_id));
 
 /* ─── Rotas ───────────────────────────────────────── */
 
@@ -92,16 +40,18 @@ const formatar = c => ({ ...c, pessoas: JSON.parse(c.pessoas || '[]') });
 
 r.get('/', async (req, res) => {
   const casas = (await db.all('SELECT * FROM casas ORDER BY via, id')).map(formatar);
+  const predios = (await db.all('SELECT * FROM predios ORDER BY id')).map(formatarPredio);
   const verTabelionato = pode(req, 'tabelionato.ver');
   const podeEditar = pode(req, 'mapa.editar');
   const pessoas = verTabelionato || podeEditar ? await pessoasRegistradas() : [];
-  const escolhidos = escolhidosAMao(casas, pessoas);
+  const escolhidos = escolhidosAMao(casas, predios, pessoas);
   res.json({
     casas: casas.map(c => ({
       ...c,
       moradores: verTabelionato ? moradoresDa(c, pessoas, escolhidos) : [],
       palpite: !c.pessoas.length, // quem mora foi achado pelo nome da casa, e não escolhido à mão
     })),
+    predios: predios.map(p => comPessoas(p, verTabelionato ? pessoas : [])),
     podeEditar,
     // Para escolher quem mora, na hora de editar.
     nomes: podeEditar ? pessoas.map(p => ({ nome: p.nome, livro: p.livro })) : undefined,
@@ -122,11 +72,12 @@ function lerCasa(b = {}, atual = {}) {
     via, lado, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10,
     situacao: b.situacao === 'sem_morador' ? 'sem_dono' : SITUACOES.includes(b.situacao) ? b.situacao : atual.situacao || 'ocupada',
     texto: linha(b.texto ?? atual.texto ?? '', 80),
+    icone: b.icone === undefined ? atual.icone || '' : typeof b.icone === 'string' && /^[a-z]{2,16}$/.test(b.icone) ? b.icone : '',
     pessoas,
   };
 }
-const valores = c => [c.numero, c.via, c.lado, c.x, c.y, c.situacao, c.texto, JSON.stringify(c.pessoas)];
-const INSERIR = 'INSERT INTO casas (numero, via, lado, x, y, situacao, texto, pessoas, atualizado_por_nome) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
+const valores = c => [c.numero, c.via, c.lado, c.x, c.y, c.situacao, c.texto, c.icone, JSON.stringify(c.pessoas)];
+const INSERIR = 'INSERT INTO casas (numero, via, lado, x, y, situacao, texto, icone, pessoas, atualizado_por_nome) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
 const descricao = c => `Casa ${c.numero || 's/n'}${c.texto ? `: ${c.texto}` : ''}`;
 
 r.post('/', editar, async (req, res) => {
@@ -163,10 +114,10 @@ async function buscar(req) {
 r.put('/:id', editar, async (req, res) => {
   const atual = await buscar(req);
   const c = lerCasa(req.body, atual);
-  await db.run("UPDATE casas SET numero = ?, via = ?, lado = ?, x = ?, y = ?, situacao = ?, texto = ?, pessoas = ?, atualizado_por_nome = ?, atualizado_em = datetime('now') WHERE id = ?",
+  await db.run("UPDATE casas SET numero = ?, via = ?, lado = ?, x = ?, y = ?, situacao = ?, texto = ?, icone = ?, pessoas = ?, atualizado_por_nome = ?, atualizado_em = datetime('now') WHERE id = ?",
     ...valores(c), req.usuario.nome, atual.id);
   // Só arrastar para outro lugar não vai para o diário (seria uma linha por arrasto).
-  const mudouMaisQueLugar = ['numero', 'situacao', 'texto'].some(k => String(c[k]) !== String(atual[k])) || JSON.stringify(c.pessoas) !== atual.pessoas;
+  const mudouMaisQueLugar = ['numero', 'situacao', 'texto', 'icone'].some(k => String(c[k]) !== String(atual[k])) || JSON.stringify(c.pessoas) !== atual.pessoas;
   if (mudouMaisQueLugar) await anotar(req, 'Editou uma casa do mapa', descricao(c));
   res.json({ ok: true });
 });

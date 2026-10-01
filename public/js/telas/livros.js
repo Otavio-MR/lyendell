@@ -34,12 +34,15 @@ export const MODULOS = {
     aprovador: 'da Senadora',
   },
   leis: {
-    titulo: 'Leis da Capital', icone: 'balanca', no: 'nas Leis da Capital', enviam: 'outros cargos',
-    sub: 'As leis de Lyendell, feitas pelo Lorde Comandante e pela Família Nobre.',
+    titulo: 'Leis de Lyendell', icone: 'balanca', no: 'nas Leis de Lyendell', enviam: 'outros cargos',
+    sub: 'Onde o Lorde Comandante e a Família Nobre escrevem as leis. Os moradores leem tudo arrumado em "Ler as leis".',
     quemComanda: 'o Lorde Comandante e a Família Nobre',
     aprovador: 'do Lorde Comandante ou da Família Nobre',
   },
 };
+
+// Onde começa o módulo. As Leis de Lyendell começam na leitura (todo morador); os livros ficam em /leis/livros.
+export const inicioDoModulo = m => (m === 'leis' ? '#/leis/livros' : `#/${m}`);
 
 const ICONES_LIVRO = ['livro', 'casa', 'coroa', 'loja', 'documento', 'alianca', 'chave', 'escudo', 'grades', 'alvo',
   'pergaminho', 'balanca', 'mapa', 'moeda', 'espada', 'pena', 'bandeira', 'bau', 'usuarios', 'cruz', 'coluna'];
@@ -98,7 +101,7 @@ export async function modulo(m) {
     trocar(raiz, 
       cabecalho({
         titulo: info.titulo, sub: info.sub, icone: info.icone,
-        acoes: [configurar && botao('Novo livro', {
+        acoes: [m === 'leis' && h('a', { class: 'btn', href: '#/leis' }, icone('olho'), h('span', null, 'Ler as leis')), configurar && botao('Novo livro', {
           icone: 'mais', classe: 'btn-ouro',
           onclick: () => configurarLivro(m, null, id => { location.hash = `#/${m}/${id}`; }),
         })],
@@ -132,7 +135,7 @@ function abasModulo(m, atual, contagem = {}) {
   if (contagem.envios || (pode(`${m}.registrar`) && !pode(`${m}.aprovar`))) abas.push(['envios', 'Meus envios', contagem.envios || 0]);
   if (abas.length < 2) return null;
   return h('nav', { class: 'abas', 'aria-label': 'Seções do módulo' }, abas.map(([k, nome, n]) =>
-    h('a', { class: `aba ${atual === k ? 'ativa' : ''}`.trim(), href: `#/${m}${k ? `/${k}` : ''}` },
+    h('a', { class: `aba ${atual === k ? 'ativa' : ''}`.trim(), href: k ? `#/${m}/${k}` : inicioDoModulo(m) },
       nome, n != null && h('span', { class: `aba-n ${k === 'aprovacoes' && n ? 'aba-alerta' : ''}`.trim() }, n))));
 }
 
@@ -279,11 +282,11 @@ export async function livro(m, id, abrir = null) {
     trocar(raiz, 
       cabecalho({
         titulo: l.nome, sub: l.descricao, icone: l.icone,
-        voltar: { href: `#/${m}`, texto: info.titulo },
+        voltar: { href: inicioDoModulo(m), texto: info.titulo },
         acoes: [
           d.permissoes.configurar && botao('Configurar livro', {
             icone: 'ajustes',
-            onclick: () => configurarLivro(m, { ...l, total: d.registros.length }, () => carregar(), () => { location.hash = `#/${m}`; }),
+            onclick: () => configurarLivro(m, { ...l, total: d.registros.length }, () => carregar(), () => { location.hash = inicioDoModulo(m); }),
           }),
           l.podeRegistrar && botao('Novo registro', { icone: 'mais', classe: 'btn-ouro', onclick: () => formRegistro(l, null, abrirDepois) }),
         ],

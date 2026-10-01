@@ -260,7 +260,7 @@ export function atualizarBarra() {
     else texto = `${s.nomeJogo}: sua partida está rolando!`;
   } else {
     const outro = s.jogadores[1 - s.eu];
-    minhaVez = s.jogo === 'velha' || s.jogo === 'lig4' ? s.estado?.vez === s.eu : !s.estado?.minha;
+    minhaVez = ['velha', 'lig4', 'damas'].includes(s.jogo) ? s.estado?.vez === s.eu : !s.estado?.minha;
     texto = `Partida de ${s.nomeJogo} contra ${outro?.nome || '...'}${minhaVez ? ' · sua vez!' : ''}`;
   }
   if (!barra) {

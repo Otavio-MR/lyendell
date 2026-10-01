@@ -5,7 +5,7 @@
 // numa via deitada, "esquerda" é o lado de cima (norte) e "direita" o de baixo.
 // Os números crescem de cima para baixo (via em pé) ou da esquerda para a direita (via deitada).
 
-import { AVENIDAS, RUAS, CIDADE, PREDIOS } from './mapa-lyendell.js';
+import { AVENIDAS, RUAS, CIDADE } from './mapa-lyendell.js';
 
 export const TAMANHO_CASA = 14;
 export const VIAS_DO_MAPA = [...AVENIDAS.map(v => ({ ...v, tipo: 'avenida' })), ...RUAS.map(v => ({ ...v, tipo: 'rua' }))];
@@ -43,6 +43,11 @@ const perto = (p, pts, limite) => pts.some(q => Math.abs(q[0] - p[0]) < limite &
 const AMOSTRAS = VIAS_DO_MAPA.map(v => ({ v, pts: linhasDaVia(v).flatMap(l => amostrar(l, 3)) }));
 const MURO = amostrar([...CIDADE, CIDADE[0]], 4);
 
+// Os prédios do mapa (vêm do banco): as casas não ficam em cima deles.
+let PREDIOS = [];
+export function usarPredios(lista) { PREDIOS = lista || []; }
+const META_PREDIO = { grande: [36, 40], medio: [30, 34], pequeno: [20, 22] };
+
 // A casa cabe aqui? Não pode ficar em cima de outra via, da muralha nem de um prédio público.
 function cabe(p, via) {
   for (const { v, pts } of AMOSTRAS) {
@@ -50,7 +55,10 @@ function cabe(p, via) {
     if (perto(p, pts, limite)) return false;
   }
   if (!dentro(p, CIDADE) || perto(p, MURO, TAMANHO_CASA / 2 + 6)) return false;
-  return !PREDIOS.some(pr => Math.abs(pr.x - p[0]) < (pr.grande ? 36 : 30) && Math.abs(pr.y - p[1]) < (pr.grande ? 40 : 34));
+  return !PREDIOS.some(pr => {
+    const [mx, my] = META_PREDIO[pr.tamanho] || META_PREDIO.medio;
+    return Math.abs(pr.x - p[0]) < mx && Math.abs(pr.y - p[1]) < my;
+  });
 }
 
 function orientar(a, b) {

@@ -38,7 +38,7 @@ r.get('/inicio', async (req, res) => {
   res.json(out);
 });
 
-// As últimas publicações do Congresso e das Leis da Capital, para ninguém ficar sem saber.
+// As últimas publicações do Congresso e das Leis de Lyendell, para ninguém ficar sem saber.
 async function novidades(modulo) {
   const linhas = await db.all(`
     SELECT r.id, r.livro_id, r.numero, r.dados, COALESCE(r.revisado_em, r.criado_em) AS em, l.nome AS livro, l.campos
@@ -77,7 +77,7 @@ async function pendencias(req) {
 r.get('/pendencias', async (req, res) => res.json(await pendencias(req)));
 
 // Envio avulso de imagem (retratos nos registros, imagens de anúncios).
-const PODE_ENVIAR = ['galeria.enviar', 'anuncios.publicar', ...Object.keys(MODULOS).flatMap(m => [`${m}.registrar`, `${m}.editar`])];
+const PODE_ENVIAR = ['galeria.enviar', 'anuncios.publicar', 'mapa.editar', ...Object.keys(MODULOS).flatMap(m => [`${m}.registrar`, `${m}.editar`])];
 r.post('/upload', (req, res, next) => {
   if (!PODE_ENVIAR.some(p => pode(req, p))) return next(erro(403, 'Você não tem permissão para enviar imagens.'));
   next();

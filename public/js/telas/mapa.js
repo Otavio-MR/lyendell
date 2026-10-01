@@ -1,10 +1,12 @@
-// Mapa de Lyendell: a capital vista de cima, como uma planta: avenidas, ruas e prédios públicos.
+// Mapa de Lyendell: a capital vista de cima, como uma planta: avenidas, ruas, prédios e casas.
 // É todo desenhado em SVG: fica nítido em qualquer zoom e dá para baixar como imagem.
 // Os estilos do desenho ficam dentro do próprio SVG, para a imagem baixada sair igual à tela.
+// Os prédios (públicos, comércios e outros pontos) e as casas vêm do banco e são editados aqui mesmo.
 
-import { get, post, put, del, h, trocar, icone, cabecalho, botao, aviso, aoSair, normalizar, ICONES, avatar, modalForm, campo, confirmar, tentar } from '../core.js';
-import { VISTA, CIDADE, RIO, TORRES, PORTAO, CAMINHOS, AVENIDAS, RUAS, PREDIOS } from '../mapa-lyendell.js';
-import { TAMANHO_CASA, amostrar, linhasDaVia, viaPorId, distribuir, encaixar, lerLista, trechoPrincipal } from '../mapa-casas.js';
+import { get, post, put, del, h, trocar, icone, cabecalho, botao, botaoIcone, aviso, aoSair, normalizar, avatar, modal, modalForm, campo, confirmar, tentar, enviarImagem, relativo } from '../core.js';
+import { VISTA, CIDADE, RIO, TORRES, PORTAO, CAMINHOS, AVENIDAS, RUAS } from '../mapa-lyendell.js';
+import { TAMANHO_CASA, amostrar, linhasDaVia, viaPorId, distribuir, encaixar, lerLista, trechoPrincipal, usarPredios } from '../mapa-casas.js';
+import { ICONES_MAPA, desenhoDoIcone } from '../icones-mapa.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 const [VX, VY, VW, VH] = VISTA;
@@ -15,6 +17,13 @@ function s(tag, attrs = {}, ...filhos) {
   for (const [k, v] of Object.entries(attrs)) if (v != null && v !== false) el.setAttribute(k, v);
   for (const f of filhos.flat()) if (f != null && f !== false) el.append(f);
   return el;
+}
+
+// Ícone do mapa como os ícones do site (para listas, botões e a ficha).
+function iconeDoMapa(id, classe = '') {
+  const svg = s('svg', { viewBox: '0 0 24 24', class: `ico ${classe}`.trim(), 'aria-hidden': 'true' });
+  svg.innerHTML = desenhoDoIcone(id);
+  return svg;
 }
 
 /* ─── Geometria ───────────────────────────────────── */
@@ -90,10 +99,16 @@ const ESTILO = `
 .m-praca { fill: ${CHAO}; }
 .m-placa { fill: #0b110d; stroke: #d8b13a; stroke-width: 1.6; }
 .m-placa-dentro { fill: none; stroke: #5e4c1c; stroke-width: 1; }
+.m-cat-comercio .m-placa { stroke: #6fc1b5; }
+.m-cat-comercio .m-placa-dentro { stroke: #24524c; }
+.m-cat-comercio .m-glifo { stroke: #d8f5f0; }
+.m-cat-outro .m-placa { stroke: #b9a27a; }
+.m-cat-outro .m-placa-dentro { stroke: #4d4433; }
 .m-poi.ativa .m-placa { fill: #3d300d; stroke: #ffe28a; stroke-width: 2.2; }
 .m-glifo { fill: none; stroke: #f6e3a6; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 .m-nome { font-size: 11px; font-weight: 700; letter-spacing: 1.4px; fill: #f8ecd2; stroke: #070b08; stroke-width: 3px; paint-order: stroke; stroke-linejoin: round; text-anchor: middle; pointer-events: none; }
 .m-nome.m-grande { font-size: 13px; letter-spacing: 1.8px; }
+.m-nome.m-pequeno { font-size: 8px; letter-spacing: 0.6px; stroke-width: 2.5px; }
 .m-sub { font-size: 8px; letter-spacing: 1px; fill: #c9b98a; stroke: #070b08; stroke-width: 2.5px; paint-order: stroke; text-anchor: middle; pointer-events: none; }
 .m-sub.m-centro { fill: #d6aef5; }
 .m-quadro { fill: #0a0f0b; fill-opacity: 0.9; stroke: #b8943a; stroke-width: 1.2; }
@@ -105,36 +120,20 @@ const ESTILO = `
 .m-casa { cursor: pointer; }
 .m-casa rect { stroke-width: 1.3; }
 .m-casa text { font-size: 6.5px; font-weight: 700; text-anchor: middle; fill: #fff3d0; pointer-events: none; }
+.m-casa .m-glifo { stroke: #fff3d0; stroke-width: 2.6; pointer-events: none; }
 .m-sit-ocupada rect { fill: #5c4a1f; stroke: #e0bd5a; }
 .m-sit-comercio rect { fill: #173f3b; stroke: #6fc1b5; }
 .m-sit-sem_dono rect { fill: #1b201b; stroke: #77725f; stroke-dasharray: 2.5 1.6; }
 .m-sit-sem_dono text { fill: #a39d86; }
+.m-sit-sem_dono .m-glifo { stroke: #a39d86; }
 .m-casa:hover rect, .m-casa.ativa rect { stroke: #ffffff; stroke-width: 2; stroke-dasharray: none; }
-.m-editando .m-casa { cursor: grab; }
-.m-casa.m-arrastada { opacity: 0.85; cursor: grabbing; }
+.m-editando .m-casa, .m-editando .m-poi { cursor: grab; }
+.m-casa.m-arrastada, .m-poi.m-arrastada { opacity: 0.85; cursor: grabbing; }
 `;
-
-function glifo(nome) {
-  if (nome === 'septo') {
-    // Estrela de sete pontas (o Septo).
-    const pts = [];
-    for (let i = 0; i < 14; i++) {
-      const ang = -Math.PI / 2 + (i * Math.PI) / 7;
-      const raio = i % 2 ? 4.2 : 9;
-      pts.push(`${um(12 + raio * Math.cos(ang))} ${um(12 + raio * Math.sin(ang))}`);
-    }
-    return `<path d="M${pts.join(' L')} Z"/>`;
-  }
-  if (nome === 'castelo') {
-    return '<path d="M2.5 21h19"/><path d="M3.5 21V8h2V6h1.8v2h1.7v13"/><path d="M15 21V8h1.7V6h1.8v2h2v13"/>'
-      + '<path d="M9 21V11h6v10"/><path d="M12 11V4.5l3 1-3 1"/><path d="M10.5 21v-2.5a1.5 1.5 0 0 1 3 0V21"/>';
-  }
-  return ICONES[nome] || ICONES.estrela;
-}
 
 function desenhoDoGlifo(nome, x, y, tam) {
   const g = s('g', { class: 'm-glifo', transform: `translate(${um(x - tam / 2)} ${um(y - tam / 2)}) scale(${(tam / 24).toFixed(3)})` });
-  g.innerHTML = glifo(nome);
+  g.innerHTML = desenhoDoIcone(nome);
   return g;
 }
 
@@ -144,29 +143,51 @@ const estrelaCentro = (x, y, r = 7) => s('path', {
   fill: '#c38cf0', stroke: '#1a0f22', 'stroke-width': 1,
 });
 
+// Nome comprido vai em duas linhas, as mais parecidas possível ("Quartel" / "General").
+function linhasDoNome(nome) {
+  const palavras = nome.split(' ');
+  if (nome.length <= 14 || palavras.length < 2) return [nome];
+  let melhor = 1;
+  let menor = Infinity;
+  for (let i = 1; i < palavras.length; i++) {
+    const dif = Math.abs(palavras.slice(0, i).join(' ').length - palavras.slice(i).join(' ').length);
+    if (dif < menor) { menor = dif; melhor = i; }
+  }
+  return [palavras.slice(0, melhor).join(' '), palavras.slice(melhor).join(' ')];
+}
+
 // Todos os prédios com o mesmo desenho: um selo quadrado com o ícone e o nome embaixo.
+const TAM_SELO = { grande: 40, medio: 32, pequeno: 22 };
 function tamanhos(p) {
-  const tam = p.grande ? 40 : 32;
-  const linhas = p.linhas || [p.nome];
-  const largNome = Math.max(...linhas.map(l => l.length * (p.grande ? 10.6 : 9)));
-  return { tam, linhas, larg: Math.max(tam + 26, largNome + 20, p.sub ? p.sub.length * 6 + 20 : 0), alt: tam + 24 + linhas.length * 14 + (p.sub ? 12 : 0) };
+  const tam = TAM_SELO[p.tamanho] || TAM_SELO.medio;
+  const pequeno = p.tamanho === 'pequeno';
+  const linhas = linhasDoNome(p.nome);
+  const letra = p.tamanho === 'grande' ? 10.6 : pequeno ? 6.4 : 9;
+  const alturaLinha = pequeno ? 10 : 14;
+  const largNome = Math.max(...linhas.map(l => l.length * letra));
+  return {
+    tam, linhas, alturaLinha, pequeno,
+    larg: Math.max(tam + (pequeno ? 12 : 26), largNome + (pequeno ? 10 : 20), p.sub ? p.sub.length * 6 + 20 : 0),
+    alt: tam + (pequeno ? 14 : 24) + linhas.length * alturaLinha + (p.sub ? 12 : 0),
+  };
 }
 
 function praca(p) {
-  const { tam, larg, alt } = tamanhos(p);
-  return s('rect', { class: 'm-praca', x: um(p.x - larg / 2), y: p.y - tam / 2 - 10, width: um(larg), height: alt, rx: 10 });
+  const { tam, larg, alt, pequeno } = tamanhos(p);
+  return s('rect', { class: 'm-praca', x: um(p.x - larg / 2), y: p.y - tam / 2 - (pequeno ? 5 : 10), width: um(larg), height: alt, rx: pequeno ? 6 : 10 });
 }
 
 function selo(p) {
-  const { tam, linhas } = tamanhos(p);
-  const g = s('g', { class: 'm-poi', 'data-id': p.id },
-    s('rect', { class: 'm-placa', x: p.x - tam / 2, y: p.y - tam / 2, width: tam, height: tam, rx: 8 }),
-    s('rect', { class: 'm-placa-dentro', x: p.x - tam / 2 + 3.5, y: p.y - tam / 2 + 3.5, width: tam - 7, height: tam - 7, rx: 5 }),
-    desenhoDoGlifo(p.icone, p.x, p.y, tam * 0.58));
-  let y = p.y + tam / 2 + 15;
+  const { tam, linhas, alturaLinha, pequeno } = tamanhos(p);
+  const g = s('g', { class: `m-poi m-cat-${p.categoria}`, 'data-id': `p${p.id}`, 'data-predio': p.id },
+    s('rect', { class: 'm-placa', x: p.x - tam / 2, y: p.y - tam / 2, width: tam, height: tam, rx: pequeno ? 5 : 8 }),
+    !pequeno && s('rect', { class: 'm-placa-dentro', x: p.x - tam / 2 + 3.5, y: p.y - tam / 2 + 3.5, width: tam - 7, height: tam - 7, rx: 5 }),
+    desenhoDoGlifo(p.icone, p.x, p.y, tam * (pequeno ? 0.66 : 0.58)));
+  let y = p.y + tam / 2 + (pequeno ? 10 : 15);
+  const classe = `m-nome ${p.tamanho === 'grande' ? 'm-grande' : pequeno ? 'm-pequeno' : ''}`.trim();
   for (const l of linhas) {
-    g.append(s('text', { class: `m-nome ${p.grande ? 'm-grande' : ''}`.trim(), x: p.x, y }, l.toUpperCase()));
-    y += 14;
+    g.append(s('text', { class: classe, x: p.x, y }, l.toUpperCase()));
+    y += alturaLinha;
   }
   if (p.sub) g.append(s('text', { class: `m-sub ${p.centro ? 'm-centro' : ''}`.trim(), x: p.x, y: y - 2 }, p.sub.toUpperCase()));
   if (p.centro) g.append(estrelaCentro(p.x + tam / 2, p.y - tam / 2));
@@ -205,12 +226,14 @@ function desenharMapa() {
       v.tipo === 'avenida' ? v.nome.toUpperCase() : v.nome))));
 
   // Título, legenda e rosa dos ventos, alinhados na faixa da esquerda (saem também na imagem baixada).
+  const seloLegenda = (y, ic, categoria) => s('g', { class: `m-cat-${categoria}` },
+    s('rect', { class: 'm-placa', x: 34, y: y - 9, width: 18, height: 18, rx: 4 }), desenhoDoGlifo(ic, 43, y, 11));
   const coluna = s('g', {},
     s('rect', { class: 'm-quadro', x: 16, y: 64, width: 170, height: 78, rx: 6 }),
     s('rect', { class: 'm-quadro-dentro', x: 21, y: 69, width: 160, height: 68, rx: 4 }),
     s('text', { class: 'm-titulo', x: 101, y: 105 }, 'LYENDELL'),
     s('text', { class: 'm-subtitulo', x: 101, y: 123 }, 'A CAPITAL · CASA LUCKHAM'),
-    s('rect', { class: 'm-quadro', x: 16, y: 156, width: 170, height: 206, rx: 6, style: 'stroke:#4a3e1f' }),
+    s('rect', { class: 'm-quadro', x: 16, y: 156, width: 170, height: 230, rx: 6, style: 'stroke:#4a3e1f' }),
     s('text', { class: 'm-legenda-titulo', x: 30, y: 178 }, 'LEGENDA'),
     s('path', { d: 'M30 200H56', stroke: '#070b08', 'stroke-width': 12, 'stroke-linecap': 'round' }),
     s('path', { d: 'M30 200H56', stroke: '#c29c3e', 'stroke-width': 8, 'stroke-linecap': 'round' }),
@@ -218,12 +241,13 @@ function desenharMapa() {
     s('path', { d: 'M30 224H56', stroke: '#070b08', 'stroke-width': 8.5, 'stroke-linecap': 'round' }),
     s('path', { d: 'M30 224H56', stroke: '#857d66', 'stroke-width': 5, 'stroke-linecap': 'round' }),
     s('text', { class: 'm-legenda', x: 68, y: 227 }, 'Ruas'),
-    s('rect', { class: 'm-placa', x: 34, y: 239, width: 18, height: 18, rx: 4 }),
-    desenhoDoGlifo('estrela', 43, 248, 11),
+    seloLegenda(248, 'coluna', 'publico'),
     s('text', { class: 'm-legenda', x: 68, y: 251 }, 'Prédios públicos'),
-    estrelaCentro(43, 272, 7),
-    s('text', { class: 'm-legenda', x: 68, y: 275 }, 'Centro da cidade'),
-    ...[['ocupada', 'Casa com morador', 299], ['comercio', 'Comércio', 323], ['sem_dono', 'Sem dono', 347]].map(([sit, texto, y]) =>
+    seloLegenda(272, 'loja', 'comercio'),
+    s('text', { class: 'm-legenda', x: 68, y: 275 }, 'Comércios e pontos'),
+    estrelaCentro(43, 296, 7),
+    s('text', { class: 'm-legenda', x: 68, y: 299 }, 'Centro da cidade'),
+    ...[['ocupada', 'Casa com morador', 323], ['comercio', 'Comércio', 347], ['sem_dono', 'Sem dono', 371]].map(([sit, texto, y]) =>
       s('g', {}, s('g', { class: `m-casa m-sit-${sit}`, transform: `translate(43 ${y - 3})`, style: 'cursor:default' },
         s('rect', { x: -7, y: -7, width: 14, height: 14, rx: 2.5 })), s('text', { class: 'm-legenda', x: 68, y }, texto))),
     s('g', { transform: 'translate(101 690)' },
@@ -242,7 +266,7 @@ function desenharMapa() {
     s('path', { d: rio, fill: 'none', stroke: '#1f4a5e', 'stroke-width': 1.2, 'stroke-dasharray': '10 14', 'stroke-opacity': 0.8 }),
     s('path', { d: cidade, fill: CHAO }),
     s('path', { d: cidade, fill: 'url(#m-casas)' }),
-    s('g', {}, PREDIOS.map(praca)),
+    s('g', { class: 'm-pracas' }),
     camada('m-limpa'), camada('m-borda'), camada('m-cor'),
     s('path', { d: cidade, fill: 'none', stroke: '#3b3119', 'stroke-width': 6, 'stroke-linejoin': 'round' }),
     s('path', { d: cidade, fill: 'none', stroke: '#8a7337', 'stroke-width': 1.4, 'stroke-linejoin': 'round' }),
@@ -255,40 +279,29 @@ function desenharMapa() {
     rotulosVias,
     camada('m-toque'),
     s('g', { class: 'm-casas' }),
-    s('g', {}, PREDIOS.map(selo)),
+    s('g', { class: 'm-predios' }),
     coluna,
     s('rect', { x: VX, y: VY, width: VW, height: VH, fill: 'url(#m-vinheta)', 'pointer-events': 'none' }));
   return svg;
 }
 
-/* ─── A tela ──────────────────────────────────────── */
+/* ─── Textos ──────────────────────────────────────── */
 
-const ITENS = [
+const ITENS_VIAS = [
   ...AVENIDAS.map(v => ({ ...v, tipo: 'avenida', descricao: `Avenida nº ${v.n}` })),
   ...RUAS.map(v => ({ ...v, tipo: 'rua', descricao: `Rua nº ${v.n}` })),
-  ...PREDIOS.map(p => ({ ...p, tipo: 'predio', descricao: p.tipo })),
 ];
-const porId = new Map(ITENS.map(i => [i.id, i]));
+const viaDoItem = new Map(ITENS_VIAS.map(i => [i.id, i]));
 
 const SITUACAO = { ocupada: 'Com morador', comercio: 'Comércio', sem_dono: 'Sem dono' };
-
-// Onde fica cada coisa: a via mais perto de um prédio, e os prédios perto de uma via.
-function arredores(item) {
-  if (item.tipo === 'avenida' || item.tipo === 'rua') {
-    const pts = AMOSTRAS.get(item.id);
-    const perto = PREDIOS.filter(p => distancia([p.x, p.y], pts) < 80).map(p => p.nome);
-    return perto.length ? `Passa perto de: ${perto.join(', ')}.` : '';
-  }
-  const via = VIAS.map(v => ({ v, d: distancia([item.x, item.y], AMOSTRAS.get(v.id)) })).sort((a, b) => a.d - b.d)[0];
-  return via && via.d < 110 ? `Fica perto da ${via.v.nome}.` : '';
-}
-
-function caixaDoItem(item) {
-  const pontos = item.pontos ? linhasDaVia(item).flat() : [[item.x, item.y]];
-  const xs = pontos.map(p => p[0]);
-  const ys = pontos.map(p => p[1]);
-  return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
-}
+const CATEGORIAS = { publico: 'Prédio público', comercio: 'Comércio', outro: 'Outro ponto' };
+const GRUPOS_PREDIOS = [['publico', 'Prédios públicos'], ['comercio', 'Comércios'], ['outro', 'Outros pontos']];
+const TAMANHOS = { grande: 'Grande (prédio importante)', medio: 'Médio', pequeno: 'Pequeno (loja, banca, ponto)' };
+// Telas do site que um prédio pode abrir (as mesmas de src/rotas/predios.js).
+const PAGINAS = {
+  '': 'Nenhuma', '/tabelionato': 'Tabelionato', '/guarda': 'Guarda do Coelho', '/hospital': 'Hospital', '/congresso': 'Congresso',
+  '/leis': 'Leis de Lyendell', '/recreacao': 'Recreação', '/galeria': 'Galeria', '/atividades': 'Mural de Atividades', '/anuncios': 'Mural de Anúncios',
+};
 
 const nomeDaCasa = c => c.texto || c.moradores?.[0]?.nome || SITUACAO[c.situacao];
 const enderecoDaCasa = c => {
@@ -299,6 +312,23 @@ const enderecoDaCasa = c => {
   return [`Casa ${c.numero || 's/n'}`, via && via.nome, lado].filter(Boolean).join(' · ');
 };
 
+// A via mais perto de um ponto (para dizer onde fica um prédio).
+function viaMaisPerto(x, y) {
+  const via = VIAS.map(v => ({ v, d: distancia([x, y], AMOSTRAS.get(v.id)) })).sort((a, b) => a.d - b.d)[0];
+  return via && via.d < 110 ? via.v : null;
+}
+
+// Uma pessoa (de uma casa ou de um prédio): foto e dados do registro no Tabelionato.
+function cartaoPessoa({ nome, foto, detalhes = [], livro, livro_id, registro_id, funcao }, { link = false, aoAbrir } = {}) {
+  return h('li', null,
+    avatar(nome, 'avatar-m', foto),
+    h('div', null,
+      h('strong', null, nome),
+      funcao && h('span', { class: 'predio-funcao' }, funcao),
+      detalhes.length > 0 && h('dl', null, detalhes.map(d => h('div', null, h('dt', null, d.rotulo), h('dd', null, d.valor)))),
+      link && registro_id && h('a', { href: `#/tabelionato/${livro_id}/registro/${registro_id}`, onclick: () => aoAbrir?.() }, `Ver no ${livro}`)));
+}
+
 // A ficha de uma casa: endereço, situação e quem mora (foto e dados do registro do Tabelionato).
 function fichaDaCasa(c, { fixa, podeEditar, aoFechar, aoEditar }) {
   const moradores = c.moradores || [];
@@ -306,12 +336,7 @@ function fichaDaCasa(c, { fixa, podeEditar, aoFechar, aoEditar }) {
     h('small', { class: 'mapa-ficha-end' }, enderecoDaCasa(c)),
     h('strong', { class: 'mapa-ficha-nome' }, nomeDaCasa(c)),
     h('span', { class: `mapa-ficha-sit sit-${c.situacao}` }, SITUACAO[c.situacao]),
-    moradores.length > 0 && h('ul', { class: 'mapa-moradores' }, moradores.slice(0, fixa ? 12 : 4).map(p => h('li', null,
-      avatar(p.nome, 'avatar-m', p.foto),
-      h('div', null,
-        h('strong', null, p.nome),
-        p.detalhes.length > 0 && h('dl', null, p.detalhes.map(d => h('div', null, h('dt', null, d.rotulo), h('dd', null, d.valor)))),
-        fixa && h('a', { href: `#/tabelionato/${p.livro_id}/registro/${p.registro_id}` }, `Ver no ${p.livro}`))))),
+    moradores.length > 0 && h('ul', { class: 'mapa-moradores' }, moradores.slice(0, fixa ? 12 : 4).map(p => cartaoPessoa(p, { link: fixa }))),
     !fixa && moradores.length > 4 && h('small', { class: 'suave' }, `e mais ${moradores.length - 4}. Clique para ver todos.`),
     c.situacao === 'ocupada' && !moradores.length && h('small', { class: 'suave' }, 'Ninguém do Tabelionato ligado a esta casa ainda.'),
     fixa && podeEditar && c.palpite && moradores.length > 0 && h('small', { class: 'suave' }, 'Achado pelo nome da casa. Se não for essa pessoa, escolha em "Editar casa".'),
@@ -319,20 +344,44 @@ function fichaDaCasa(c, { fixa, podeEditar, aoFechar, aoEditar }) {
     fixa && h('button', { class: 'btn-icone mapa-ficha-fechar', type: 'button', title: 'Fechar', 'aria-label': 'Fechar', onclick: aoFechar }, icone('x')));
 }
 
+// Escolher o ícone: uma grade com todos (o de "sem ícone" mostra o número, para as casas).
+function seletorDeIcone(atual, { semIcone = false } = {}) {
+  let valor = atual || (semIcone ? '' : 'estrela');
+  const grade = h('div', { class: 'icone-grade', role: 'radiogroup', 'aria-label': 'Ícone' });
+  const opcoes = [...(semIcone ? [{ id: '', nome: 'Número' }] : []), ...ICONES_MAPA];
+  const desenhar = () => trocar(grade, opcoes.map(i => h('button', {
+    type: 'button', role: 'radio', 'aria-checked': String(valor === i.id), title: i.nome,
+    class: `icone-opcao ${valor === i.id ? 'ativo' : ''}`.trim(),
+    onclick: () => { valor = i.id; desenhar(); },
+  }, i.id ? iconeDoMapa(i.id) : h('span', { class: 'icone-numero' }, '01'), h('small', null, i.nome))));
+  desenhar();
+  return { el: grade, valor: () => valor };
+}
+
+// Um bloco do formulário com título (como o "campo", mas sem <label>: tem vários botões dentro).
+const bloco = (titulo, conteudo, ajuda) => h('div', { class: 'campo' },
+  h('span', { class: 'campo-rotulo' }, titulo), conteudo, ajuda && h('small', { class: 'campo-ajuda' }, ajuda));
+
+/* ─── A tela ──────────────────────────────────────── */
+
 export async function mapa() {
   const svg = desenharMapa();
   const camadaCasas = svg.querySelector('.m-casas');
+  const camadaPredios = svg.querySelector('.m-predios');
+  const camadaPracas = svg.querySelector('.m-pracas');
   const dica = h('div', { class: 'mapa-dica', hidden: true });
   const info = h('div', { class: 'mapa-info', hidden: true });
   const ficha = h('div', { class: 'mapa-ficha-lugar' });
   let vb = [...VISTA];
   let animacao = 0;
-  let selecionado = null;
+  let selecionado = null; // via (av1, r3...) ou prédio (p12)
   let realcado = null;
   let casas = [];
+  let predios = [];
   let nomes = [];
   let podeEditar = false;
   let editando = false;
+  let porNoMapa = 'casa'; // no modo de edição, o clique num lugar vazio põe uma casa ou um prédio
   let casaFixa = null;   // casa com a ficha aberta (clicada)
   let casaSobre = null;  // casa com o mouse em cima
   aoSair(() => cancelAnimationFrame(animacao));
@@ -385,8 +434,10 @@ export async function mapa() {
     const alt = (w * VH) / VW;
     voarPara(limitar([(x0 + x1) / 2 - w / 2, (y0 + y1) / 2 - alt / 2, w, alt]));
   }
+  const enquadrarPonto = (x, y) => enquadrarCaixa([x, y, x, y], 60, VW / 4);
 
   /* Vias e prédios: acender, escolher */
+  const predioPorId = id => predios.find(p => p.id === Number(id));
   function acender() {
     svg.querySelectorAll('[data-id]').forEach(el => el.classList.toggle('ativa', el.dataset.id === selecionado || el.dataset.id === realcado));
     camadaCasas.querySelectorAll('[data-casa]').forEach(el => el.classList.toggle('ativa', Number(el.dataset.casa) === casaFixa || Number(el.dataset.casa) === casaSobre));
@@ -397,19 +448,126 @@ export async function mapa() {
     realcado = id;
     acender();
   }
-  function selecionar(id, { voar = false } = {}) {
-    selecionado = id && porId.has(id) ? id : null;
+  // Escolher uma rua ou avenida: acende e mostra onde fica.
+  function selecionarVia(id, { voar = false } = {}) {
+    selecionado = id && viaDoItem.has(id) ? id : null;
     if (selecionado) fecharFicha();
     acender();
     if (!selecionado) { info.hidden = true; return; }
-    const item = porId.get(selecionado);
+    const item = viaDoItem.get(selecionado);
+    const perto = predios.filter(p => distancia([p.x, p.y], AMOSTRAS.get(item.id)) < 80).map(p => p.nome);
     trocar(info,
       h('strong', null, item.nome),
       h('small', null, item.descricao),
-      h('p', null, arredores(item)),
-      h('button', { class: 'btn-icone', type: 'button', title: 'Fechar', 'aria-label': 'Fechar', onclick: () => selecionar(null) }, icone('x')));
+      h('p', null, perto.length ? `Passa perto de: ${perto.join(', ')}.` : ''),
+      h('button', { class: 'btn-icone', type: 'button', title: 'Fechar', 'aria-label': 'Fechar', onclick: () => selecionarVia(null) }, icone('x')));
     info.hidden = false;
-    if (voar) enquadrarCaixa(caixaDoItem(item));
+    if (voar) {
+      const pontos = linhasDaVia(item).flat();
+      enquadrarCaixa([Math.min(...pontos.map(p => p[0])), Math.min(...pontos.map(p => p[1])), Math.max(...pontos.map(p => p[0])), Math.max(...pontos.map(p => p[1]))]);
+    }
+  }
+
+  /* Prédios */
+  function desenharPredios() {
+    const ordem = [...predios].sort((a, b) => ['pequeno', 'medio', 'grande'].indexOf(a.tamanho) - ['pequeno', 'medio', 'grande'].indexOf(b.tamanho));
+    trocar(camadaPracas, ordem.map(praca));
+    trocar(camadaPredios, ordem.map(selo));
+    acender();
+  }
+
+  // A ficha de um prédio: fotos (de fora e de dentro), para que serve, quem mora e quem trabalha, e mais.
+  function abrirPredio(p, { voar = false } = {}) {
+    fecharFicha();
+    info.hidden = true;
+    selecionado = `p${p.id}`;
+    acender();
+    if (voar) enquadrarPonto(p.x, p.y);
+    let filtro = '';
+    let atual = 0;
+    let janela = null;
+    const galeria = h('div', { class: 'predio-galeria' });
+    const fotosVisiveis = () => p.fotos.filter(f => !filtro || f.tipo === filtro);
+    const mudar = d => {
+      const l = fotosVisiveis();
+      if (l.length < 2) return;
+      atual = (atual + d + l.length) % l.length;
+      desenharGaleria();
+    };
+    function desenharGaleria() {
+      if (!p.fotos.length) {
+        trocar(galeria, h('div', { class: 'predio-sem-foto' }, iconeDoMapa(p.icone),
+          h('p', null, 'Ainda sem fotos.'),
+          podeEditar && h('small', null, 'Coloque fotos de fora e de dentro em "Editar".')));
+        return;
+      }
+      const l = fotosVisiveis();
+      atual = Math.min(atual, l.length - 1);
+      const f = l[atual];
+      const tem = t => p.fotos.some(x => x.tipo === t);
+      trocar(galeria,
+        h('figure', { class: 'predio-foto' },
+          h('a', { href: f.url, target: '_blank', rel: 'noopener', title: 'Abrir a foto inteira' },
+            h('img', { src: f.url, alt: f.legenda || `${p.nome}, ${f.tipo === 'interior' ? 'por dentro' : 'por fora'}` })),
+          h('span', { class: 'predio-foto-tipo' }, f.tipo === 'interior' ? 'Por dentro' : 'Por fora'),
+          l.length > 1 && [
+            botaoIcone('voltar', 'Foto anterior', () => mudar(-1), 'predio-seta esquerda'),
+            botaoIcone('frente', 'Próxima foto', () => mudar(1), 'predio-seta direita'),
+            h('span', { class: 'predio-foto-n' }, `${atual + 1} / ${l.length}`),
+          ],
+          f.legenda && h('figcaption', null, f.legenda)),
+        tem('exterior') && tem('interior') && h('div', { class: 'predio-filtro-fotos', role: 'group', 'aria-label': 'Quais fotos' },
+          [['', 'Todas'], ['exterior', 'Por fora'], ['interior', 'Por dentro']].map(([k, t]) => h('button', {
+            type: 'button', class: `filtro-chip ${filtro === k ? 'ativo' : ''}`.trim(), 'aria-pressed': String(filtro === k),
+            onclick: () => { filtro = k; atual = 0; desenharGaleria(); },
+          }, t, h('span', null, p.fotos.filter(x => !k || x.tipo === k).length)))),
+        l.length > 1 && h('div', { class: 'predio-miniaturas' }, l.map((x, i) => h('button', {
+          type: 'button', class: `predio-mini ${i === atual ? 'ativa' : ''}`.trim(), 'aria-label': `Foto ${i + 1}`,
+          onclick: () => { atual = i; desenharGaleria(); },
+        }, h('img', { src: x.url, alt: '', loading: 'lazy' })))));
+    }
+    desenharGaleria();
+
+    const pessoa = x => cartaoPessoa({
+      ...(x.registro || {}), nome: x.registro?.nome || x.nome, funcao: x.funcao,
+    }, { link: true, aoAbrir: () => janela?.fechar() });
+    const moram = p.pessoas.filter(x => x.papel === 'mora');
+    const trabalham = p.pessoas.filter(x => x.papel === 'trabalha');
+    const via = viaMaisPerto(p.x, p.y);
+    const secao = (titulo, ...conteudo) => h('section', { class: 'predio-secao' }, h('h3', null, titulo), ...conteudo);
+    const corpo = h('div', { class: 'predio-ficha' },
+      galeria,
+      h('div', { class: 'predio-sobre' },
+        h('span', { class: `predio-selo cat-${p.categoria}` }, iconeDoMapa(p.icone)),
+        h('div', null,
+          h('p', { class: 'predio-tipo' }, p.tipo || CATEGORIAS[p.categoria]),
+          h('p', { class: 'predio-onde' }, [p.tipo && p.tipo !== CATEGORIAS[p.categoria] && CATEGORIAS[p.categoria], p.centro && 'Centro da cidade', via && `Fica perto da ${via.nome}`].filter(Boolean).join(' · ')))),
+      p.funcao && secao('Para que serve', h('p', { class: 'predio-texto' }, p.funcao)),
+      moram.length > 0 && secao(`Quem mora aqui (${moram.length})`, h('ul', { class: 'mapa-moradores predio-pessoas' }, moram.map(pessoa))),
+      trabalham.length > 0 && secao(`Quem trabalha aqui (${trabalham.length})`, h('ul', { class: 'mapa-moradores predio-pessoas' }, trabalham.map(pessoa))),
+      p.info.length > 0 && secao('Mais informações', h('dl', { class: 'predio-info' }, p.info.map(i => h('div', null, h('dt', null, i.rotulo), h('dd', null, i.valor))))),
+      p.sobre && secao('Sobre', h('p', { class: 'predio-texto texto-livre' }, p.sobre)),
+      !p.funcao && !p.pessoas.length && !p.info.length && !p.sobre && h('p', { class: 'suave predio-vazio' },
+        podeEditar ? 'Ainda sem informações. Clique em "Editar" para contar para que serve, quem mora e quem trabalha aqui.' : 'Ainda sem informações sobre este lugar.'),
+      p.atualizado_por_nome && p.atualizado_por_nome !== 'Sistema' && h('p', { class: 'predio-atualizado' }, `Atualizado por ${p.atualizado_por_nome} ${relativo(p.atualizado_em)}`));
+    janela = modal({
+      titulo: p.nome, corpo, tamanho: 'grande', classe: 'predio-modal',
+      aoFechar: () => { if (selecionado === `p${p.id}`) { selecionado = null; acender(); } },
+      rodape: [
+        botao('Ver no mapa', { icone: 'mapa', onclick: () => { janela.fechar(); enquadrarPonto(p.x, p.y); selecionado = `p${p.id}`; acender(); } }),
+        p.pagina && h('a', { class: 'btn', href: `#${p.pagina}`, onclick: () => janela.fechar() }, icone('frente'), h('span', null, `Abrir: ${PAGINAS[p.pagina] || p.pagina}`)),
+        h('span', { class: 'espaco' }),
+        podeEditar && botao('Editar', { icone: 'editar', classe: 'btn-ouro', onclick: () => { janela.fechar(); formularioPredio(p); } }),
+      ],
+    });
+    // Setas do teclado passam as fotos.
+    janela.caixa.addEventListener('keydown', e => {
+      if (e.target.closest('input, textarea, select')) return;
+      if (e.key === 'ArrowLeft') mudar(-1);
+      if (e.key === 'ArrowRight') mudar(1);
+    });
+    janela.caixa.tabIndex = -1;
+    janela.caixa.focus({ preventScroll: true });
   }
 
   /* Casas */
@@ -417,14 +575,18 @@ export async function mapa() {
   function desenharCasas() {
     trocar(camadaCasas, casas.map(c => s('g', { class: `m-casa m-sit-${c.situacao}`, 'data-casa': c.id, transform: `translate(${c.x} ${c.y})` },
       s('rect', { x: -TAMANHO_CASA / 2, y: -TAMANHO_CASA / 2, width: TAMANHO_CASA, height: TAMANHO_CASA, rx: 2.5 }),
-      s('text', { dy: '0.36em' }, c.numero))));
+      // Casa com ícone (ex.: uma lojinha) mostra o ícone; as outras, o número.
+      c.icone ? desenhoDoGlifo(c.icone, 0, 0, TAMANHO_CASA * 0.72) : s('text', { dy: '0.36em' }, c.numero))));
     acender();
   }
-  async function carregarCasas() {
+  async function carregar() {
     const d = await get('/api/casas');
     casas = d.casas;
+    predios = d.predios || [];
     nomes = d.nomes || [];
     podeEditar = d.podeEditar;
+    usarPredios(predios);
+    desenharPredios();
     desenharCasas();
     desenharListas();
     if (casaFixa && !casaPorId(casaFixa)) fecharFicha();
@@ -438,7 +600,7 @@ export async function mapa() {
     trocar(ficha, fichaDaCasa(c, {
       fixa: !!casaFixa && c.id === casaFixa, podeEditar,
       aoFechar: fecharFicha,
-      aoEditar: () => editarCasa(c),
+      aoEditar: () => formularioCasa(c),
     }));
     posicionarFicha();
   }
@@ -462,12 +624,28 @@ export async function mapa() {
     acender();
     mostrarFicha();
     const c = casaPorId(id);
-    if (voar && c) enquadrarCaixa([c.x, c.y, c.x, c.y], 60, VW / 4);
+    if (voar && c) enquadrarPonto(c.x, c.y);
   }
   function fecharFicha() {
     casaFixa = null;
     acender();
     mostrarFicha();
+  }
+
+  /* Escolher pessoas do Tabelionato (casas e prédios) */
+  // Onde cada pessoa já mora (outra casa ou prédio), para não ligar a mesma pessoa em dois lugares sem querer.
+  function ondeMora(nome, { casa = null, predio = null } = {}) {
+    const outra = casas.find(x => x.id !== casa?.id && (x.moradores || []).some(p => p.nome === nome));
+    if (outra) return `mora na Casa ${outra.numero || 's/n'}${viaPorId(outra.via) ? ` (${viaPorId(outra.via).nome})` : ''}`;
+    const pr = predios.find(x => x.id !== predio?.id && x.pessoas.some(p => p.papel === 'mora' && (p.registro?.nome || p.nome) === nome));
+    return pr ? `mora em ${pr.nome}` : '';
+  }
+  let listaNomes = 0;
+  function campoBuscaNome(opcoes = {}) {
+    const id = `mapa-nomes-${++listaNomes}`;
+    const lista = h('datalist', { id }, nomes.map(n => h('option', { value: n.nome }, [n.livro, ondeMora(n.nome, opcoes)].filter(Boolean).join(' · '))));
+    const busca = h('input', { class: 'input', list: id, placeholder: 'Digite para procurar no Tabelionato...' });
+    return { busca, lista };
   }
 
   /* Editar casas (quem tem o poder "mapa.editar") */
@@ -481,16 +659,11 @@ export async function mapa() {
       h('option', { value: 'direita', selected: dados.lado === 'direita' }, 'Direita (leste, ou embaixo)'));
     const situacao = h('select', { class: 'input' }, Object.entries(SITUACAO).map(([k, t]) => h('option', { value: k, selected: k === (dados.situacao || 'ocupada') }, t)));
     const texto = h('input', { class: 'input', maxlength: '80', value: dados.texto || '', placeholder: 'Ex.: Layla Weeslay, Casa da Família Lombardi, Bar do Porto' });
+    const icones = seletorDeIcone(dados.icone || '', { semIcone: true });
     // Quem mora: nomes escolhidos dos registros do Tabelionato.
     const escolhidos = [...(dados.pessoas || [])];
     const chips = h('div', { class: 'mapa-chips' });
-    // Onde cada pessoa já mora (em outra casa), para não ligar a mesma pessoa em dois lugares sem querer.
-    const ondeMora = nome => {
-      const outra = casas.find(x => x.id !== c?.id && (x.moradores || []).some(p => p.nome === nome));
-      return outra ? `mora na Casa ${outra.numero || 's/n'}${viaPorId(outra.via) ? ` (${viaPorId(outra.via).nome})` : ''}` : '';
-    };
-    const lista = h('datalist', { id: 'mapa-nomes' }, nomes.map(n => h('option', { value: n.nome }, [n.livro, ondeMora(n.nome)].filter(Boolean).join(' · '))));
-    const busca = h('input', { class: 'input', list: 'mapa-nomes', placeholder: 'Digite para procurar no Tabelionato...' });
+    const { busca, lista } = campoBuscaNome({ casa: c });
     // Casa de família: sugere quem tem o sobrenome, mas só entra quem for clicado (nem todo mundo mora ali).
     const sugestoes = h('div', { class: 'mapa-sugestoes' });
     const desenharSugestoes = () => {
@@ -502,7 +675,7 @@ export async function mapa() {
       trocar(sugestoes, achadas.length > 0 && [
         h('small', { class: 'suave' }, `Com o sobrenome ${familia[1].replace(/\b\w/g, l => l.toUpperCase())} no Tabelionato (clique em quem mora aqui):`),
         h('div', { class: 'mapa-chips' }, achadas.map(n => {
-          const onde = ondeMora(n.nome);
+          const onde = ondeMora(n.nome, { casa: c });
           return h('button', {
             type: 'button', class: `chip mapa-sugestao ${onde ? 'mora-fora' : ''}`.trim(), title: onde || 'Adicionar',
             onclick: () => { escolhidos.push(n.nome); desenharChips(); },
@@ -537,7 +710,7 @@ export async function mapa() {
         if (await tentar(() => del(`/api/casas/${c.id}`), 'Casa tirada do mapa.')) {
           janela?.fechar();
           fecharFicha();
-          await carregarCasas();
+          await carregar();
         }
       },
     }, 'Tirar do mapa');
@@ -547,20 +720,159 @@ export async function mapa() {
         h('div', { class: 'form-grade' }, campo('Número', numero), campo('Situação', situacao)),
         h('div', { class: 'form-grade' }, campo('Rua ou avenida', via), campo('Lado', ladoSel)),
         campo('Nome da casa', texto, { ajuda: 'O que aparece no mapa. Pode ser o morador, a família ou o comércio.' }),
-        campo('Quem mora (do Tabelionato)', h('div', { class: 'mapa-escolher' }, busca, lista, chips, sugestoes),
-          { ajuda: 'Escolha um ou mais registros de Moradores, Nobres ou Outros. A foto e os dados vêm de lá.' }),
+        bloco('Quem mora (do Tabelionato)', h('div', { class: 'mapa-escolher' }, busca, lista, chips, sugestoes),
+          'Escolha um ou mais registros de Moradores, Nobres ou Outros. A foto e os dados vêm de lá.'),
+        h('details', { class: 'mapa-mais', open: !!dados.icone },
+          h('summary', null, 'Ícone no mapa (opcional)'),
+          bloco('', icones.el, 'Com um ícone (ex.: Loja ou Taverna), o quadradinho mostra o ícone em vez do número. O número continua na ficha.')),
       ],
       extraRodape: apagar,
       async aoEnviar() {
-        const corpo = { numero: numero.value, via: via.value || null, lado: ladoSel.value || null, situacao: situacao.value, texto: texto.value, pessoas: escolhidos, x: dados.x, y: dados.y };
+        const corpo = {
+          numero: numero.value, via: via.value || null, lado: ladoSel.value || null, situacao: situacao.value, texto: texto.value,
+          icone: icones.valor(), pessoas: escolhidos, x: dados.x, y: dados.y,
+        };
         if (busca.value.trim() && !escolhidos.includes(busca.value.trim())) corpo.pessoas = [...escolhidos, busca.value.trim()];
         if (c) await put(`/api/casas/${c.id}`, corpo);
         else await post('/api/casas', corpo);
-        await carregarCasas();
+        await carregar();
       },
     });
   }
-  const editarCasa = c => formularioCasa(c);
+
+  /* Editar prédios: ícone, tamanho, fotos, quem mora e trabalha, para que serve e mais */
+  function formularioPredio(p, base = {}) {
+    const dados = { categoria: 'publico', tamanho: 'medio', fotos: [], pessoas: [], info: [], ...base, ...(p || {}) };
+    const nome = h('input', { class: 'input', maxlength: '60', value: dados.nome || '', placeholder: 'Ex.: Senado, Taverna do Porto, Ferraria do Bram', required: true });
+    const tipo = h('input', { class: 'input', maxlength: '80', value: dados.tipo || '', placeholder: 'Ex.: Templo, Castelo da Família Nobre Luckham, Taverna' });
+    const categoria = h('select', { class: 'input' }, Object.entries(CATEGORIAS).map(([k, t]) => h('option', { value: k, selected: k === dados.categoria }, t)));
+    const tamanho = h('select', { class: 'input' }, Object.entries(TAMANHOS).map(([k, t]) => h('option', { value: k, selected: k === dados.tamanho }, t)));
+    const sub = h('input', { class: 'input', maxlength: '40', value: dados.sub || '', placeholder: 'Ex.: Castelo Luckham' });
+    const pagina = h('select', { class: 'input' }, Object.entries(PAGINAS).map(([k, t]) => h('option', { value: k, selected: k === (dados.pagina || '') }, t)));
+    const centro = h('input', { type: 'checkbox', checked: !!dados.centro });
+    const funcao = h('textarea', { class: 'input', rows: 3, maxlength: '1000', placeholder: 'Ex.: Onde o Congresso se reúne e vota as leis.' }, dados.funcao || '');
+    const sobre = h('textarea', { class: 'input', rows: 5, maxlength: '6000', placeholder: 'História, curiosidades, regras do lugar...' }, dados.sobre || '');
+    const icones = seletorDeIcone(dados.icone || 'estrela');
+
+    // Fotos: de fora (exterior) e de dentro (interior), com legenda, na ordem escolhida.
+    const fotos = dados.fotos.map(f => ({ ...f }));
+    const gradeFotos = h('div', { class: 'predio-fotos-editar' });
+    const estadoEnvio = h('small', { class: 'campo-ajuda' });
+    const arquivo = h('input', { type: 'file', accept: 'image/png,image/jpeg,image/webp,image/gif', multiple: true, hidden: true });
+    let tipoNovas = 'exterior';
+    const desenharFotos = () => trocar(gradeFotos, fotos.map((f, i) => h('div', { class: 'predio-foto-editar' },
+      h('img', { src: f.url, alt: '' }),
+      h('select', { class: 'input', 'aria-label': 'De fora ou de dentro', onchange: e => { f.tipo = e.target.value; } },
+        h('option', { value: 'exterior', selected: f.tipo !== 'interior' }, 'Por fora'),
+        h('option', { value: 'interior', selected: f.tipo === 'interior' }, 'Por dentro')),
+      h('input', { class: 'input', maxlength: '120', value: f.legenda || '', placeholder: 'Legenda (opcional)', 'aria-label': 'Legenda', oninput: e => { f.legenda = e.target.value; } }),
+      h('div', { class: 'predio-foto-acoes' },
+        botaoIcone('voltar', 'Mover para antes', () => { if (i > 0) { [fotos[i - 1], fotos[i]] = [fotos[i], fotos[i - 1]]; desenharFotos(); } }),
+        botaoIcone('frente', 'Mover para depois', () => { if (i < fotos.length - 1) { [fotos[i + 1], fotos[i]] = [fotos[i], fotos[i + 1]]; desenharFotos(); } }),
+        botaoIcone('lixo', 'Tirar esta foto', () => { fotos.splice(i, 1); desenharFotos(); })))));
+    arquivo.addEventListener('change', async () => {
+      const lista = [...arquivo.files].slice(0, Math.max(0, 24 - fotos.length));
+      arquivo.value = '';
+      for (const [k, f] of lista.entries()) {
+        estadoEnvio.textContent = `Enviando foto ${k + 1} de ${lista.length}...`;
+        try {
+          fotos.push({ url: await enviarImagem(f), tipo: tipoNovas, legenda: '' });
+          desenharFotos();
+        } catch (e) {
+          aviso(e.message, 'erro');
+        }
+      }
+      estadoEnvio.textContent = fotos.length >= 24 ? 'Chegou ao máximo de 24 fotos.' : '';
+    });
+    const botaoFotos = tipoFoto => botao(tipoFoto === 'interior' ? 'Fotos de dentro' : 'Fotos de fora', {
+      icone: 'imagem', classe: 'btn-pequeno', onclick: () => { tipoNovas = tipoFoto; arquivo.click(); },
+    });
+    desenharFotos();
+
+    // Quem mora e quem trabalha (do Tabelionato, ou só o nome de quem não está lá).
+    const pessoas = dados.pessoas.map(x => ({ nome: x.nome, papel: x.papel, funcao: x.funcao || '' }));
+    const listaPessoas = h('div', { class: 'predio-pessoas-editar' });
+    const { busca, lista } = campoBuscaNome({ predio: p });
+    const papelNovo = h('select', { class: 'input', 'aria-label': 'Mora ou trabalha' },
+      h('option', { value: 'trabalha' }, 'Trabalha aqui'), h('option', { value: 'mora' }, 'Mora aqui'));
+    const desenharPessoas = () => trocar(listaPessoas, pessoas.length
+      ? pessoas.map((x, i) => h('div', { class: 'predio-pessoa-linha' },
+        h('span', { class: 'predio-pessoa-nome' }, avatar(x.nome, 'avatar-p'), x.nome),
+        h('select', { class: 'input', 'aria-label': `${x.nome}: mora ou trabalha`, onchange: e => { x.papel = e.target.value; } },
+          h('option', { value: 'trabalha', selected: x.papel !== 'mora' }, 'Trabalha'), h('option', { value: 'mora', selected: x.papel === 'mora' }, 'Mora')),
+        h('input', { class: 'input', maxlength: '60', value: x.funcao, placeholder: 'Função (ex.: Taverneiro)', 'aria-label': `Função de ${x.nome}`, oninput: e => { x.funcao = e.target.value; } }),
+        botaoIcone('x', `Tirar ${x.nome}`, () => { pessoas.splice(i, 1); desenharPessoas(); })))
+      : h('small', { class: 'suave' }, 'Ninguém ainda.'));
+    const adicionarPessoa = () => {
+      const v = busca.value.trim();
+      if (!v) return;
+      if (!pessoas.some(x => x.nome === v && x.papel === papelNovo.value)) pessoas.push({ nome: v, papel: papelNovo.value, funcao: '' });
+      busca.value = '';
+      desenharPessoas();
+    };
+    busca.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); adicionarPessoa(); } });
+    desenharPessoas();
+
+    // Mais informações: pares "rótulo: valor" (ex.: Fundado em, Responsável, Horário).
+    const info = dados.info.map(i => ({ ...i }));
+    const listaInfo = h('div', { class: 'predio-info-editar' });
+    const desenharInfo = () => trocar(listaInfo, info.map((x, i) => h('div', { class: 'predio-info-linha' },
+      h('input', { class: 'input', maxlength: '40', value: x.rotulo, placeholder: 'Ex.: Fundado em', 'aria-label': 'Rótulo', oninput: e => { x.rotulo = e.target.value; } }),
+      h('input', { class: 'input', maxlength: '300', value: x.valor, placeholder: 'Ex.: Ano 12 da Casa Luckham', 'aria-label': 'Valor', oninput: e => { x.valor = e.target.value; } }),
+      botaoIcone('x', 'Tirar', () => { info.splice(i, 1); desenharInfo(); }))));
+    desenharInfo();
+
+    let janela = null;
+    const apagar = p && h('button', {
+      class: 'btn btn-perigo', type: 'button', onclick: async () => {
+        if (!await confirmar(`Tirar "${p.nome}" do mapa? As fotos dele também são apagadas.`, { ok: 'Tirar', perigo: true })) return;
+        if (await tentar(() => del(`/api/predios/${p.id}`), 'Prédio tirado do mapa.')) {
+          janela?.fechar();
+          await carregar();
+        }
+      },
+    }, 'Tirar do mapa');
+    janela = modalForm({
+      titulo: p ? `Editar ${p.nome}` : 'Novo prédio ou ponto', tamanho: 'grande',
+      conteudo: [
+        h('div', { class: 'form-grade' }, campo('Nome', nome, { obrigatorio: true }), campo('O que é', tipo, { ajuda: 'Aparece embaixo do nome, na ficha.' })),
+        h('div', { class: 'form-grade' }, campo('Categoria', categoria), campo('Tamanho no mapa', tamanho)),
+        bloco('Ícone', icones.el),
+        campo('Para que serve', funcao),
+        bloco('Fotos', h('div', { class: 'predio-fotos-bloco' },
+          gradeFotos,
+          h('div', { class: 'predio-fotos-botoes' }, botaoFotos('exterior'), botaoFotos('interior'), arquivo),
+          estadoEnvio), 'Fotos do lado de fora e de dentro (até 24). O site diminui as fotos antes de enviar.'),
+        bloco('Quem mora e quem trabalha aqui', h('div', { class: 'mapa-escolher' },
+          h('div', { class: 'predio-pessoa-nova' }, busca, lista, papelNovo,
+            botao('Adicionar', { icone: 'mais', classe: 'btn-pequeno', onclick: adicionarPessoa })),
+          listaPessoas), 'Procure no Tabelionato (a foto e os dados vêm de lá) ou escreva o nome de quem não está registrado.'),
+        bloco('Mais informações', h('div', null, listaInfo,
+          botao('Adicionar informação', { icone: 'mais', classe: 'btn-pequeno', onclick: () => { info.push({ rotulo: '', valor: '' }); desenharInfo(); listaInfo.querySelector('.predio-info-linha:last-child input')?.focus(); } }))),
+        campo('Sobre', sobre, { ajuda: 'Texto livre: história, curiosidades, regras do lugar.' }),
+        h('details', { class: 'mapa-mais' },
+          h('summary', null, 'Mais opções'),
+          h('div', { class: 'form-grade' },
+            campo('Linha pequena no mapa', sub, { ajuda: 'Embaixo do nome, no mapa. Opcional.' }),
+            campo('Abre uma tela do site', pagina, { ajuda: 'Ex.: o Senado abre o Congresso.' })),
+          h('label', { class: 'mapa-check' }, centro, h('span', null, 'É o Centro da cidade (a estrela roxa)'))),
+      ],
+      extraRodape: apagar,
+      async aoEnviar() {
+        const pendente = busca.value.trim();
+        if (pendente && !pessoas.some(x => x.nome === pendente)) pessoas.push({ nome: pendente, papel: papelNovo.value, funcao: '' });
+        const corpo = {
+          nome: nome.value, tipo: tipo.value, categoria: categoria.value, tamanho: tamanho.value, icone: icones.valor(),
+          sub: sub.value, pagina: pagina.value, centro: centro.checked, funcao: funcao.value, sobre: sobre.value,
+          fotos, pessoas, info: info.filter(i => i.rotulo.trim() && i.valor.trim()), x: dados.x, y: dados.y,
+        };
+        if (p) await put(`/api/predios/${p.id}`, corpo);
+        else await post('/api/predios', corpo);
+        await carregar();
+        aviso(p ? 'Prédio salvo.' : 'Prédio colocado no mapa.');
+      },
+    });
+  }
 
   function colarLista() {
     const area = h('textarea', { class: 'input', rows: 12, placeholder: 'Avenida Santa Menefreda\n\nEsquerda\nCasa 02 - Layla Weeslay\nCasa 04 - Casa da Família Lombardi\n\nDireita\nCasa 01 - Sem Dono\nCasa 03 - Noctis Caelum' });
@@ -592,8 +904,8 @@ export async function mapa() {
         const postas = distribuir(alvo, l.casas);
         const r = await post('/api/casas/lote', { via: alvo.id, nomeVia: alvo.nome, substituir: substituir.checked, casas: postas });
         aviso(`${r.criadas} casas colocadas na ${alvo.nome}.`);
-        await carregarCasas();
-        enquadrarCaixa(caixaDoItem(alvo), 40);
+        await carregar();
+        selecionarVia(alvo.id, { voar: true });
       },
     });
   }
@@ -603,41 +915,78 @@ export async function mapa() {
     svg.classList.toggle('m-editando', editando);
     barraEdicao.hidden = !editando;
     botaoEditar.classList.toggle('btn-ouro', editando);
-    trocar(botaoEditar, icone(editando ? 'check' : 'casa'), h('span', null, editando ? 'Terminar edição' : 'Editar casas'));
+    trocar(botaoEditar, icone(editando ? 'check' : 'editar'), h('span', null, editando ? 'Terminar edição' : 'Editar mapa'));
     fecharFicha();
   }
+  function escolherOQuePor(tipo) {
+    porNoMapa = tipo;
+    for (const b of seletorPor.querySelectorAll('button')) {
+      b.classList.toggle('ativo', b.dataset.tipo === tipo);
+      b.setAttribute('aria-pressed', String(b.dataset.tipo === tipo));
+    }
+    trocar(textoEdicao, tipo === 'casa'
+      ? 'Clique num lugar vazio para pôr uma casa (ela encosta alinhada na rua). Arraste para mudar de lugar e clique para editar.'
+      : 'Clique num lugar vazio para pôr um prédio, uma loja ou outro ponto (com o ícone que quiser). Arraste para mudar de lugar e clique para editar.');
+  }
 
-  /* Mouse e dedo: arrastar o mapa, rodinha e pinça para o zoom, arrastar casa no modo de edição */
+  /* Mouse e dedo: arrastar o mapa, rodinha e pinça para o zoom, arrastar casa ou prédio no modo de edição */
   const toques = new Map();
   let arrasto = null;
   let moveu = false;
-  let casaArrastada = null;
+  let arrastando = null; // casa ou prédio sendo arrastado
+  const dentroDoMapa = ([x, y]) => ({ x: Math.round(Math.min(VW - 10, Math.max(10, x)) * 2) / 2, y: Math.round(Math.min(VH - 10, Math.max(10, y)) * 2) / 2 });
+  function arrastarLugar(e, el, { aoMover, aoSoltar }) {
+    arrastando = { x: e.clientX, y: e.clientY, pos: null };
+    moveu = false;
+    const mover = ev => {
+      if (Math.abs(ev.clientX - arrastando.x) + Math.abs(ev.clientY - arrastando.y) > 4) moveu = true;
+      if (!moveu) return;
+      arrastando.pos = aoMover(paraMapa(ev.clientX, ev.clientY));
+      el.classList.add('m-arrastada');
+    };
+    const soltar = async () => {
+      window.removeEventListener('pointermove', mover);
+      window.removeEventListener('pointerup', soltar);
+      const { pos } = arrastando;
+      arrastando = null;
+      setTimeout(() => { moveu = false; }, 0);
+      el.classList.remove('m-arrastada');
+      if (pos) await aoSoltar(pos);
+    };
+    window.addEventListener('pointermove', mover);
+    window.addEventListener('pointerup', soltar);
+  }
   svg.addEventListener('pointerdown', e => {
     const alvoCasa = e.target.closest?.('[data-casa]');
-    if (editando && alvoCasa && e.button === 0) {
+    const alvoPredio = e.target.closest?.('[data-predio]');
+    if (editando && e.button === 0 && alvoCasa) {
       const c = casaPorId(Number(alvoCasa.dataset.casa));
-      casaArrastada = { c, el: alvoCasa, x: e.clientX, y: e.clientY, pos: null };
-      moveu = false;
-      const mover = ev => {
-        if (Math.abs(ev.clientX - casaArrastada.x) + Math.abs(ev.clientY - casaArrastada.y) > 4) moveu = true;
-        if (!moveu) return;
-        casaArrastada.pos = encaixar(paraMapa(ev.clientX, ev.clientY));
-        alvoCasa.classList.add('m-arrastada');
-        alvoCasa.setAttribute('transform', `translate(${casaArrastada.pos.x} ${casaArrastada.pos.y})`);
-      };
-      const soltar = async () => {
-        window.removeEventListener('pointermove', mover);
-        window.removeEventListener('pointerup', soltar);
-        const { pos } = casaArrastada;
-        casaArrastada = null;
-        setTimeout(() => { moveu = false; }, 0);
-        alvoCasa.classList.remove('m-arrastada');
-        if (!pos) return;
-        Object.assign(c, pos);
-        if (await tentar(() => put(`/api/casas/${c.id}`, pos))) await carregarCasas();
-      };
-      window.addEventListener('pointermove', mover);
-      window.addEventListener('pointerup', soltar);
+      arrastarLugar(e, alvoCasa, {
+        aoMover: ponto => {
+          const pos = encaixar(ponto);
+          alvoCasa.setAttribute('transform', `translate(${pos.x} ${pos.y})`);
+          return pos;
+        },
+        aoSoltar: async pos => {
+          Object.assign(c, pos);
+          if (await tentar(() => put(`/api/casas/${c.id}`, pos))) await carregar();
+        },
+      });
+      return;
+    }
+    if (editando && e.button === 0 && alvoPredio) {
+      const p = predioPorId(alvoPredio.dataset.predio);
+      arrastarLugar(e, alvoPredio, {
+        aoMover: ponto => {
+          const pos = dentroDoMapa(ponto);
+          alvoPredio.setAttribute('transform', `translate(${um(pos.x - p.x)} ${um(pos.y - p.y)})`);
+          return pos;
+        },
+        aoSoltar: async pos => {
+          Object.assign(p, pos);
+          if (await tentar(() => put(`/api/predios/${p.id}`, pos))) await carregar();
+        },
+      });
       return;
     }
     toques.set(e.pointerId, [e.clientX, e.clientY]);
@@ -698,22 +1047,31 @@ export async function mapa() {
     const casa = e.target.closest('[data-casa]');
     if (casa) {
       const c = casaPorId(Number(casa.dataset.casa));
-      if (editando) editarCasa(c);
+      if (editando) formularioCasa(c);
       else fixarCasa(c.id);
+      return;
+    }
+    const predio = e.target.closest('[data-predio]');
+    if (predio) {
+      const p = predioPorId(predio.dataset.predio);
+      if (editando) formularioPredio(p);
+      else abrirPredio(p);
       return;
     }
     const alvo = e.target.closest('[data-id]');
     if (editando && !alvo) {
-      formularioCasa(null, { ...encaixar(paraMapa(e.clientX, e.clientY)), situacao: 'ocupada' });
+      const ponto = paraMapa(e.clientX, e.clientY);
+      if (porNoMapa === 'casa') formularioCasa(null, { ...encaixar(ponto), situacao: 'ocupada' });
+      else formularioPredio(null, dentroDoMapa(ponto));
       return;
     }
     fecharFicha();
-    selecionar(alvo ? alvo.dataset.id : null);
+    selecionarVia(alvo ? alvo.dataset.id : null);
   });
 
   // Mouse em cima: o nome da via ou do prédio, ou a ficha da casa.
   svg.addEventListener('pointermove', e => {
-    if (arrasto || casaArrastada) return;
+    if (arrasto || arrastando) return;
     const casa = e.target.closest?.('[data-casa]');
     const idCasa = casa ? Number(casa.dataset.casa) : null;
     if (idCasa !== casaSobre) {
@@ -725,7 +1083,12 @@ export async function mapa() {
     realcar(alvo ? alvo.dataset.id : null);
     if (!alvo && !(casa && editando)) { dica.hidden = true; return; }
     const r = quadro.getBoundingClientRect();
-    dica.textContent = casa ? `${enderecoDaCasa(casaPorId(idCasa))} (clique para editar, arraste para mover)` : porId.get(alvo.dataset.id)?.nome || '';
+    const predio = alvo?.dataset.predio ? predioPorId(alvo.dataset.predio) : null;
+    dica.textContent = casa
+      ? `${enderecoDaCasa(casaPorId(idCasa))} (clique para editar, arraste para mover)`
+      : predio
+        ? `${predio.nome}${editando ? ' (clique para editar, arraste para mover)' : ' (clique para ver)'}`
+        : viaDoItem.get(alvo.dataset.id)?.nome || '';
     dica.style.left = `${e.clientX - r.left}px`;
     dica.style.top = `${e.clientY - r.top}px`;
     dica.hidden = false;
@@ -737,10 +1100,18 @@ export async function mapa() {
   });
 
   const botaoEditar = h('button', { class: 'btn', type: 'button', onclick: () => alternarEdicao() });
+  const textoEdicao = h('span');
+  const seletorPor = h('div', { class: 'mapa-por', role: 'group', 'aria-label': 'O que pôr no mapa' },
+    h('span', null, 'Pôr no mapa:'),
+    [['casa', 'Casa', 'casa'], ['predio', 'Prédio ou ponto', 'coluna']].map(([tipo, texto, ic]) => h('button', {
+      type: 'button', class: 'filtro-chip', 'data-tipo': tipo, onclick: () => escolherOQuePor(tipo),
+    }, iconeDoMapa(ic), texto)));
   const barraEdicao = h('div', { class: 'mapa-edicao', hidden: true },
     icone('editar'),
-    h('span', null, 'Clique num lugar vazio para pôr uma casa (ela encosta alinhada na rua). Arraste uma casa para mudar de lugar e clique nela para editar.'),
+    seletorPor,
+    textoEdicao,
     botao('Colar lista de uma rua', { icone: 'mais', classe: 'btn-ouro btn-pequeno', onclick: colarLista }));
+  escolherOQuePor('casa');
   const quadro = h('div', { class: 'mapa-quadro' }, svg, dica, info, ficha, barraEdicao,
     h('div', { class: 'mapa-zoom' },
       h('button', { class: 'btn-icone', type: 'button', title: 'Aproximar', 'aria-label': 'Aproximar', onclick: () => zoom(1 / 1.5) }, icone('mais')),
@@ -748,30 +1119,40 @@ export async function mapa() {
       h('button', { class: 'btn-icone', type: 'button', title: 'Ver a cidade inteira', 'aria-label': 'Ver a cidade inteira', onclick: () => voarPara([...VISTA]) }, icone('mapa'))));
 
   /* Embaixo do mapa: a busca e as listas lado a lado */
-  const busca = h('input', { class: 'input', type: 'search', placeholder: 'Procurar rua, prédio, casa ou morador...', 'aria-label': 'Procurar no mapa' });
+  const busca = h('input', { class: 'input', type: 'search', placeholder: 'Procurar rua, prédio, loja, casa ou morador...', 'aria-label': 'Procurar no mapa' });
   const resumoCasas = h('p', { class: 'suave mapa-resumo' });
   const listas = h('div', { class: 'mapa-listas' });
   const marca = i => {
-    if (i.tipo === 'predio') return h('span', { class: 'mapa-num predio' }, icone({ septo: 'estrela', castelo: 'coroa' }[i.icone] || i.icone));
-    if (i.tipo === 'casa') return h('span', { class: `mapa-num casa sit-${i.casa.situacao}` }, i.casa.numero);
+    if (i.tipo === 'predio') return h('span', { class: `mapa-num predio cat-${i.predio.categoria}` }, iconeDoMapa(i.predio.icone));
+    if (i.tipo === 'casa') return h('span', { class: `mapa-num casa sit-${i.casa.situacao}` }, i.casa.icone ? iconeDoMapa(i.casa.icone) : i.casa.numero);
     return h('span', { class: `mapa-num ${i.tipo}` }, i.n);
   };
   const itensDeCasa = () => casas.map(c => ({
     id: `casa-${c.id}`, tipo: 'casa', casa: c, nome: nomeDaCasa(c), sub: enderecoDaCasa(c),
     busca: normalizar([c.texto, c.numero, ...(c.moradores || []).map(p => p.nome), ...c.pessoas, viaPorId(c.via)?.nome].join(' ')),
   }));
+  const itensDePredio = categoria => predios.filter(p => p.categoria === categoria)
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+    .map(p => ({
+      id: `p${p.id}`, tipo: 'predio', predio: p, nome: p.nome, sub: p.tipo,
+      busca: normalizar([p.nome, p.tipo, p.sub, ...p.pessoas.map(x => x.registro?.nome || x.nome)].join(' ')),
+    }));
   function desenharListas() {
     const q = normalizar(busca.value.trim());
     const n = sit => casas.filter(c => c.situacao === sit).length;
     resumoCasas.textContent = casas.length
       ? `${casas.length} casas no mapa: ${n('ocupada')} com morador, ${n('comercio')} comércios, ${n('sem_dono')} sem dono.`
       : 'Ainda não há casas no mapa.';
-    const grupos = [['Avenidas', 'avenida'], ['Ruas', 'rua'], ['Prédios públicos', 'predio']].map(([titulo, tipo]) => [titulo, ITENS.filter(i => i.tipo === tipo)]);
+    const grupos = [
+      ['Avenidas', ITENS_VIAS.filter(i => i.tipo === 'avenida')],
+      ['Ruas', ITENS_VIAS.filter(i => i.tipo === 'rua')],
+      ...GRUPOS_PREDIOS.map(([cat, titulo]) => [titulo, itensDePredio(cat), cat !== 'publico']),
+    ];
     // As casas só aparecem na lista quando alguém procura (são muitas).
-    if (q) grupos.push(['Casas', itensDeCasa().filter(i => i.busca.includes(q))]);
-    const blocos = grupos.map(([titulo, itens]) => {
-      const achados = itens.filter(i => !q || i.tipo === 'casa' || normalizar(i.nome).includes(q));
-      if (q && !achados.length) return null; // procurando: grupo vazio nem aparece
+    if (q) grupos.push(['Casas', itensDeCasa()]);
+    const blocos = grupos.map(([titulo, itens, someVazio]) => {
+      const achados = itens.filter(i => !q || (i.busca || normalizar(i.nome)).includes(q));
+      if ((q || someVazio) && !achados.length) return null; // grupo vazio nem aparece
       return h('div', { class: 'mapa-grupo' },
         h('h3', { class: 'mapa-sub' }, titulo),
         achados.length
@@ -780,8 +1161,9 @@ export async function mapa() {
               class: `mapa-item ${i.id === selecionado || i.id === `casa-${casaFixa}` ? 'ativa' : ''}`.trim(), type: 'button', 'data-item': i.id,
               onclick: () => {
                 if (i.tipo === 'casa') fixarCasa(i.casa.id, { voar: true });
-                else selecionar(i.id, { voar: true });
-                quadro.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                else if (i.tipo === 'predio') abrirPredio(i.predio, { voar: true });
+                else selecionarVia(i.id, { voar: true });
+                if (i.tipo !== 'predio') quadro.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
               },
               onmouseenter: () => (i.tipo === 'casa' ? null : realcar(i.id)),
               onmouseleave: () => realcar(null),
@@ -822,12 +1204,12 @@ export async function mapa() {
     }
   }
 
-  await carregarCasas();
+  await carregar();
   alternarEdicao(false);
   const pagina = h('div', { class: 'pagina mapa' },
     cabecalho({
       titulo: 'Mapa de Lyendell', icone: 'mapa',
-      sub: 'A capital vista de cima. Arraste para andar, use a rodinha ou os botões para o zoom. Passe o mouse ou clique numa casa para ver quem mora.',
+      sub: 'A capital vista de cima. Arraste para andar, use a rodinha ou os botões para o zoom. Clique num prédio para ver fotos e quem está lá; passe o mouse numa casa para ver quem mora.',
       acoes: [podeEditar && botaoEditar, botao('Baixar imagem', { icone: 'baixar', onclick: baixarImagem })].filter(Boolean),
     }),
     quadro, lado);

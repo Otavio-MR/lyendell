@@ -56,7 +56,7 @@ function painelProgresso(pr) {
     h('p', { class: 'progresso-dica suave' }, 'Ganhe XP conversando no chat, jogando, ajudando nas atividades e deixando recados. Subir de nível libera molduras novas para a foto.'));
 }
 
-// As últimas publicações do Congresso e das Leis da Capital: todo mundo precisa saber o que mudou.
+// As últimas publicações do Congresso e das Leis de Lyendell: todo mundo precisa saber o que mudou.
 function painelNovidades(lista, { titulo, icone: ic, href }) {
   if (!lista?.length) return null; // sem nada publicado ainda, o painel nem aparece
   const classe = t => ({ aprovada: 'lei-aprovada', rejeitada: 'lei-rejeitada' })[normalizar(t)] || '';
@@ -100,7 +100,7 @@ export async function inicio() {
     n.guarda != null && { rotulo: 'Registros da Guarda', valor: n.guarda, icone: 'escudo', href: '#/guarda' },
     n.hospital != null && { rotulo: 'Registros do Hospital', valor: n.hospital, icone: 'cruz', href: '#/hospital' },
     n.congresso != null && { rotulo: 'Votações no Congresso', valor: n.congresso, icone: 'coluna', href: '#/congresso' },
-    n.leis != null && { rotulo: 'Leis da Capital', valor: n.leis, icone: 'balanca', href: '#/leis' },
+    n.leis != null && { rotulo: 'Leis de Lyendell', valor: n.leis, icone: 'balanca', href: '#/leis' },
     n.atividades != null && { rotulo: 'Atividades abertas', valor: n.atividades, icone: 'tarefas', href: '#/atividades' },
     n.fotos != null && { rotulo: 'Fotos na galeria', valor: n.fotos, icone: 'imagem', href: '#/galeria' },
     n.usuarios != null && { rotulo: 'Usuários ativos', valor: n.usuarios, icone: 'usuarios', href: '#/admin/usuarios' },
@@ -120,7 +120,7 @@ export async function inicio() {
 
     avisosDeAprovacao(d.pendencias),
 
-    painelNovidades(d.leis, { titulo: 'Novas leis da Capital', icone: 'balanca', href: '#/leis' }),
+    painelNovidades(d.leis, { titulo: 'Novas Leis de Lyendell', icone: 'balanca', href: '#/leis' }),
 
     painelNovidades(d.congresso, { titulo: 'Novidades do Congresso', icone: 'coluna', href: '#/congresso' }),
 

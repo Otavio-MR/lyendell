@@ -11,6 +11,7 @@ const quiz = require('./quiz');
 const progresso = require('./progresso');
 const antispam = require('./antispam');
 const cobras = require('./cobras');
+const damas = require('./damas');
 
 const ESPERA_MS = Number(process.env.RECREACAO_ESPERA_MS) || 30_000;       // tempo para voltar depois de cair
 const REVALIDAR_MS = Number(process.env.RECREACAO_REVALIDAR_MS) || 120_000; // confere se a sessão ainda vale
@@ -122,6 +123,19 @@ const JOGOS = {
       return null;
     },
     visao: e => ({ tabuleiro: e.tabuleiro, vez: e.vez, ultima: e.ultima, linha: e.linha }),
+  },
+  damas: {
+    nome: 'Damas',
+    max: 2,
+    novo: damas.novo,
+    jogar(e, i, jogada) {
+      try {
+        return damas.jogar(e, i, jogada);
+      } catch (x) {
+        throw x instanceof damas.ErroDamas ? new ErroJogo(x.message) : x;
+      }
+    },
+    visao: damas.visao,
   },
   quiz: {
     nome: 'Quiz de Lyendell',
@@ -461,7 +475,7 @@ function terminarCobras(s) {
 
 // Quem joga Pac-Coelho, Cobrinha ou Quebra-cabeça manda o estado do jogo algumas vezes por segundo,
 // e o servidor repassa para quem está assistindo. Nada disso vai para o banco.
-const SOLO = { pacman: 'Pac-Coelho', cobrinha: 'Cobrinha', quebra: 'Quebra-cabeça', memoria: 'Jogo da Memória' };
+const SOLO = { pacman: 'Pac-Coelho', cobrinha: 'Cobrinha', quebra: 'Quebra-cabeça', memoria: 'Jogo da Memória', minado: 'Campo Minado', 2048: '2048' };
 const transmissoes = new Map(); // id de quem joga -> transmissão
 
 const resumoTransmissoes = () => [...transmissoes.values()].map(t => ({

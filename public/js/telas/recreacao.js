@@ -5,6 +5,8 @@ import { rt, ouvir, enviar, lendoChat, criarPartida, entrarNaPartida, transmitir
 import { assistirPac } from './pac-coelho.js';
 import { abrirSalaQuiz, telaQuiz, teclaQuiz } from './quiz.js';
 import { SuavizadorCobras } from '../cobras-suave.js';
+import { tabuleiroDamas, nomeCor } from './damas.js';
+import { assistirMinado, assistir2048 } from './jogos-sozinho.js';
 
 const AO_VIVO = [
   { id: 'quiz', nome: 'Quiz de Lyendell', icone: 'pergunta', texto: 'Perguntas sobre a Casa Luckham, coelhos, Minecraft e regras de RP. Até 10 pessoas.', abrir: abrirSalaQuiz, botao: 'Abrir sala' },
@@ -12,15 +14,20 @@ const AO_VIVO = [
   { id: 'cobras', nome: 'Cobrinha ao vivo', icone: 'cobra', texto: 'De 2 a 4 cobras no mesmo tabuleiro. Quem bater sai; vence quem sobrar.', botao: 'Abrir sala' },
   { id: 'ppt', nome: 'Pedra, Papel e Tesoura', icone: 'tesoura', texto: 'Melhor de três. A mão do outro só aparece quando os dois escolhem.' },
   { id: 'lig4', nome: 'Lig 4', icone: 'lig4', texto: 'Solte as peças e faça quatro em linha antes do outro.' },
+  { id: 'damas', nome: 'Damas', icone: 'damas', texto: 'Damas brasileiras: a captura é obrigatória e a dama anda longe.' },
 ];
 const SOZINHO = [
   { href: '#/recreacao/pac-coelho', nome: 'Pac-Coelho', icone: 'coelho', texto: 'Coma as moedas, fuja das raposas e pegue a cenoura.' },
   { href: '#/recreacao/cobrinha', nome: 'Cobrinha', icone: 'cobra', texto: 'Coma as cenouras sem bater nas bordas nem em si mesma.' },
   { href: '#/recreacao/quebra-cabeca', nome: 'Quebra-cabeça', icone: 'peca', texto: 'Monte uma foto da galeria no menor tempo.' },
   { href: '#/recreacao/memoria', nome: 'Jogo da Memória', icone: 'cartas', texto: 'Ache os pares com o menor número de jogadas.' },
+  { href: '#/recreacao/campo-minado', nome: 'Campo Minado', icone: 'minado', texto: 'Abra o campo sem pisar nas armadilhas. Vale o menor tempo.' },
+  { href: '#/recreacao/2048', nome: '2048', icone: 'blocos', texto: 'Deslize e junte os blocos iguais até chegar no 2048.' },
 ];
-const ICONE_JOGO = { velha: 'velha', ppt: 'tesoura', quiz: 'pergunta', lig4: 'lig4', cobras: 'cobra' };
-const ICONE_SOLO = { pacman: 'coelho', cobrinha: 'cobra', quebra: 'peca', memoria: 'cartas' };
+const ICONE_JOGO = { velha: 'velha', ppt: 'tesoura', quiz: 'pergunta', lig4: 'lig4', cobras: 'cobra', damas: 'damas' };
+const ICONE_SOLO = { pacman: 'coelho', cobrinha: 'cobra', quebra: 'peca', memoria: 'cartas', minado: 'minado', 2048: 'blocos' };
+// Jogos de dois em que cada um joga na sua vez (no pedra, papel e tesoura, os dois escolhem ao mesmo tempo).
+const POR_VEZ = new Set(['velha', 'lig4', 'damas']);
 const MAOS = { pedra: 'Pedra', papel: 'Papel', tesoura: 'Tesoura' };
 const VENCE = { pedra: 'tesoura', papel: 'pedra', tesoura: 'papel' };
 const VERBO = { pedra: 'quebra', papel: 'embrulha', tesoura: 'corta' };
@@ -270,8 +277,10 @@ function painelRanking() {
   let aba = 'quiz';
   let tamanho = '3x3';
   let tamanhoMem = '4x4';
+  let dificuldade = 'facil';
   const ABAS = [['quiz', 'Quiz'], ['cobras', 'Cobrinha ao vivo'], ['velha', 'Jogo da Velha'], ['ppt', 'Pedra, Papel e Tesoura'], ['lig4', 'Lig 4'],
-    ['pacman', 'Pac-Coelho'], ['cobrinha', 'Cobrinha'], ['quebra', 'Quebra-cabeça'], ['memoria', 'Memória']];
+    ['damas', 'Damas'], ['pacman', 'Pac-Coelho'], ['cobrinha', 'Cobrinha'], ['quebra', 'Quebra-cabeça'], ['memoria', 'Memória'],
+    ['minado', 'Campo Minado'], ['2048', '2048']];
   const eu = estado.eu.nome;
 
   function tabela(cols, linhas) {
@@ -287,15 +296,21 @@ function painelRanking() {
   function desenhar() {
     if (!dados) return;
     let conteudo;
-    if (aba === 'velha' || aba === 'ppt' || aba === 'lig4') {
+    if (aba === 'velha' || aba === 'ppt' || aba === 'lig4' || aba === 'damas') {
       conteudo = tabela([['Vitórias', l => l.vitorias], ['Derrotas', l => l.derrotas], ['Empates', l => l.empates]], dados[aba]);
     } else if (aba === 'quiz') {
       conteudo = [
         tabela([['Vitórias', l => l.vitorias], ['Acertos', l => l.acertos], ['Partidas', l => l.partidas], ['Melhor', l => num(l.melhor)]], dados.quiz),
         h('p', { class: 'suave ranking-nota' }, 'Vitória conta só em partida com pelo menos duas pessoas.'),
       ];
-    } else if (aba === 'pacman') {
-      conteudo = tabela([['Pontos', l => num(l.pontos)]], dados.pacman);
+    } else if (aba === 'pacman' || aba === '2048') {
+      conteudo = tabela([['Pontos', l => num(l.pontos)]], dados[aba] || []);
+    } else if (aba === 'minado') {
+      conteudo = [
+        h('div', { class: 'segmentado ranking-tamanhos' }, Object.entries(DIFICULDADES_MINADO).map(([k, nome]) =>
+          h('button', { class: `seg ${k === dificuldade ? 'ativo' : ''}`, type: 'button', onclick: () => { dificuldade = k; desenhar(); } }, nome))),
+        tabela([['Tempo', l => relogio(l.segundos)]], dados.minado?.[dificuldade] || []),
+      ];
     } else if (aba === 'cobrinha') {
       conteudo = tabela([['Cenouras', l => l.pontos]], dados.cobrinha);
     } else if (aba === 'cobras') {
@@ -386,7 +401,9 @@ export function sala(id) {
               ? 'A partida aparece para todos no salão da Recreação. Assim que alguém entrar, ela começa.'
               : 'Assim que alguém entrar, a partida começa.'),
             !jogador && !rt.minhaSala && botao('Entrar nesta partida', { classe: 'btn-ouro', onclick: () => entrarNaPartida(s.id) }))
-          : s.jogo === 'velha' ? tabuleiroVelha(s) : s.jogo === 'lig4' ? tabuleiroLig4(s) : mesaPpt(s),
+          : s.jogo === 'velha' ? tabuleiroVelha(s) : s.jogo === 'lig4' ? tabuleiroLig4(s)
+            : s.jogo === 'damas' ? tabuleiroDamas(s, { podeJogar: minhaVez(s), jogar: jogada => enviar('sala:jogar', { id: s.id, jogada }) })
+              : mesaPpt(s),
         rodape(s, outro),
         s.espectadores > 0 && h('p', { class: 'espectadores' }, icone('olho'), `${s.espectadores} ${s.espectadores === 1 ? 'pessoa assistindo' : 'pessoas assistindo'}`)));
     if (!document.hidden) tituloOriginal();
@@ -398,11 +415,15 @@ export function sala(id) {
   function cartaoJogador(s, i) {
     const p = s.jogadores[i];
     const e = s.estado;
-    const vez = s.status === 'jogando' && (s.jogo === 'velha' || s.jogo === 'lig4') && e?.vez === i;
+    const vez = s.status === 'jogando' && POR_VEZ.has(s.jogo) && e?.vez === i;
     const venceu = s.status === 'fim' && s.vencedor === i;
     let detalhe = null;
     if (s.jogo === 'velha' && e) detalhe = h('span', { class: `simbolo ${e.simbolos[i].toLowerCase()}` }, desenho(e.simbolos[i]));
     if (s.jogo === 'lig4') detalhe = h('span', { class: `lig4-disco p${i}`, title: i === 0 ? 'Peças douradas' : 'Peças vermelhas' });
+    if (s.jogo === 'damas' && e) {
+      const cor = nomeCor(e, i);
+      detalhe = h('span', { class: `damas-mini ${cor}`, title: `Peças ${cor} (${e.pecas[i]} no tabuleiro)` }, e.pecas[i]);
+    }
     if (s.jogo === 'ppt' && e && s.status === 'jogando') detalhe = h('span', { class: `escolheu ${e.escolheu[i] ? 'sim' : ''}` }, e.escolheu[i] ? icone('check') : h('span', { class: 'pontinhos' }, '...'));
     let situacao = i === s.eu ? 'Você' : '';
     if (p.saiu) situacao = 'Saiu';
@@ -423,14 +444,14 @@ export function sala(id) {
   function minhaVez(s) {
     if (s.eu < 0 || s.status !== 'jogando') return false;
     if (s.grupo) return s.estado?.fase === 'pergunta' && s.estado.minha == null && !s.jogadores[s.eu].saiu;
-    return s.jogo === 'velha' || s.jogo === 'lig4' ? s.estado.vez === s.eu : !s.estado.minha;
+    return POR_VEZ.has(s.jogo) ? s.estado.vez === s.eu : !s.estado.minha;
   }
 
   function textoStatus(s) {
     const nome = i => (i === s.eu ? 'Você' : s.jogadores[i]?.nome);
     if (s.status === 'esperando') return s.eu >= 0 ? 'Esperando alguém entrar...' : `${s.jogadores[0].nome} está esperando um adversário.`;
     if (s.status === 'jogando') {
-      if (s.jogo === 'velha' || s.jogo === 'lig4') {
+      if (POR_VEZ.has(s.jogo)) {
         const v = s.estado.vez;
         if (v === s.eu) return 'Sua vez!';
         return `Vez de ${s.jogadores[v].nome}`;
@@ -439,7 +460,9 @@ export function sala(id) {
       if (s.eu < 0) return `Rodada ${n}`;
       return s.estado.minha ? `Rodada ${n} · esperando ${s.jogadores[1 - s.eu].nome} escolher...` : `Rodada ${n} · escolha a sua mão!`;
     }
-    if (s.empate) return s.jogo === 'velha' ? 'Deu velha! Empate.' : s.jogo === 'lig4' ? 'Tabuleiro cheio! Empate.' : 'Empate.';
+    if (s.empate) {
+      return { velha: 'Deu velha! Empate.', lig4: 'Tabuleiro cheio! Empate.', damas: 'Empate: 20 lances de cada lado só com damas, sem captura.' }[s.jogo] || 'Empate.';
+    }
     const perdedor = 1 - s.vencedor;
     if (s.motivo === 'abandono') return `${nome(perdedor)} ${perdedor === s.eu ? 'desistiu' : 'saiu da partida'}. ${s.vencedor === s.eu ? 'Vitória sua!' : `${nome(s.vencedor)} venceu.`}`;
     if (s.motivo === 'caiu') return `${nome(perdedor)} caiu e não voltou a tempo. ${s.vencedor === s.eu ? 'Vitória sua!' : `${nome(s.vencedor)} venceu.`}`;
@@ -1393,6 +1416,7 @@ function estiloPeca(url, n, p) {
 
 // Tamanhos (linhas x colunas) e as figuras das cartas (ícones do site).
 const MEMORIA = { '4x4': [4, 4], '4x6': [4, 6], '6x6': [6, 6] };
+const DIFICULDADES_MINADO = { facil: 'Fácil', medio: 'Médio', dificil: 'Difícil' };
 const FIGURAS = ['coelho', 'coroa', 'escudo', 'espada', 'moeda', 'pergaminho', 'balanca', 'cruz', 'coluna', 'alvo',
   'bandeira', 'bau', 'chave', 'alianca', 'pena', 'mapa', 'estrela', 'musica', 'trofeu', 'cobra'];
 let tamanhoMemoria = '4x4';
@@ -1693,7 +1717,12 @@ function assistirQuebra(t) {
   };
 }
 
-const TELA_DO_JOGO = { pacman: '#/recreacao/pac-coelho', cobrinha: '#/recreacao/cobrinha', quebra: '#/recreacao/quebra-cabeca', memoria: '#/recreacao/memoria' };
+const TELA_DO_JOGO = {
+  pacman: '#/recreacao/pac-coelho', cobrinha: '#/recreacao/cobrinha', quebra: '#/recreacao/quebra-cabeca', memoria: '#/recreacao/memoria',
+  minado: '#/recreacao/campo-minado', 2048: '#/recreacao/2048',
+};
+// Quem assiste: um visor para cada jogo (quadro(q) recebe o que quem joga transmite).
+const VISORES = { pacman: () => assistirPac(), cobrinha: () => assistirCobrinha(), memoria: () => assistirMemoria(), minado: () => assistirMinado(), 2048: () => assistir2048() };
 
 export function assistir(id) {
   exigirAcesso();
@@ -1733,7 +1762,7 @@ export function assistir(id) {
     if (nova !== chave || !visor) {
       visor?.parar();
       chave = nova;
-      visor = t.jogo === 'pacman' ? assistirPac() : t.jogo === 'cobrinha' ? assistirCobrinha() : t.jogo === 'memoria' ? assistirMemoria() : assistirQuebra(t);
+      visor = VISORES[t.jogo] ? VISORES[t.jogo]() : assistirQuebra(t);
       trocar(area, visor.el);
     }
     if (t.quadro) visor.quadro(t.quadro);

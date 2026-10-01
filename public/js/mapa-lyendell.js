@@ -1,7 +1,7 @@
 // Dados do mapa de Lyendell, tirados da vista de cima do jogo (imagem de 1154 x 773).
 // Todas as coordenadas estão nesse espaço: x para a direita, y para baixo, norte para cima.
 // As vias foram alinhadas (só retas, cantos de 90° e diagonais de 45°), como numa planta da cidade.
-// Para acrescentar algo (ex.: as casas), é só marcar o ponto na mesma imagem e anotar o x e o y.
+// As casas e os prédios ficam no banco e são colocados pelo próprio mapa (modo de edição).
 
 export const VISTA = [0, 0, 1154, 773];
 
@@ -49,14 +49,5 @@ export const RUAS = [
     rotulo: [[855, 370], [962, 370]] },
 ];
 
-// Prédios públicos: o selo fica em x, y (grande = prédio maior); linhas = o nome; sub = a linha pequena embaixo.
-export const PREDIOS = [
-  { id: 'septo', nome: 'Septo', tipo: 'Templo', icone: 'septo', x: 500, y: 372, grande: true },
-  { id: 'coliseu', nome: 'Coliseu', tipo: 'Arena', icone: 'espada', x: 776, y: 200, grande: true },
-  { id: 'toca', nome: 'Toca do Coelho', tipo: 'Castelo da Família Nobre Luckham', icone: 'castelo', x: 928, y: 200, grande: true,
-    linhas: ['Toca do Coelho'], sub: 'Castelo Luckham' },
-  { id: 'tabelionato', nome: 'Tabelionato', tipo: 'Prédio público, no Centro da cidade', icone: 'pergaminho', x: 736, y: 452,
-    sub: 'Centro da cidade', centro: true },
-  { id: 'banco', nome: 'Banco', tipo: 'Prédio público', icone: 'moeda', x: 330, y: 622 },
-  { id: 'quartel', nome: 'Quartel General', tipo: 'Prédio público', icone: 'escudo', x: 1053, y: 610, linhas: ['Quartel', 'General'] },
-];
+// Os prédios públicos e os outros pontos ficam no banco (tabela predios): cada um com ícone, fotos,
+// quem mora e quem trabalha. Os primeiros vêm de src/predios-padrao.js, e o resto é mexido pelo próprio mapa.

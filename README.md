@@ -33,7 +33,7 @@ Todo usuário é morador. Os cargos somam poderes em cima disso, e uma pessoa po
 | Diretor do Hospital | Tudo no Hospital, inclusive aprovar os registros dos médicos |
 | Médico | Ver o Hospital e registrar pacientes, que vão para a aprovação do Diretor do Hospital |
 | Senadora | Tudo no Congresso: publica as PECs, leis e regras votadas e aprova o que outros enviarem |
-| Lorde Comandante | Faz as Leis da Capital junto com a Família Nobre: escreve, publica, edita e revoga |
+| Lorde Comandante | Faz as Leis de Lyendell junto com a Família Nobre: escreve, publica, edita e revoga |
 | Morador | Ver tudo (menos o Hospital), ajudar nas atividades e usar a Recreação |
 
 O Hospital não é aberto a todos os moradores, porque guarda o prontuário dos pacientes: só o
@@ -46,7 +46,7 @@ O administrador pode mudar o que cada cargo faz, ou criar cargos novos, na tela 
 Ninguém consegue conceder a outra pessoa um poder que não tem: por isso a Família Nobre
 não consegue, por exemplo, dar a si mesma o poder de criar usuários.
 
-## Livros (Tabelionato, Guarda, Hospital, Congresso e Leis da Capital)
+## Livros (Tabelionato, Guarda, Hospital, Congresso e Leis de Lyendell)
 
 Cada módulo tem livros de registro, e cada livro tem o próprio formulário. Quem comanda
 o módulo pode, pelo próprio site:
@@ -65,10 +65,22 @@ Livros que já vêm prontos:
 - **Congresso**: Leis e Mudanças (título, tipo: PEC, lei, regra, emenda, decreto..., data da
   votação, resultado, o que muda, texto completo, votos e situação). As últimas publicações
   aparecem para todo mundo na tela de início, em **Novidades do Congresso**.
-- **Leis da Capital**: as leis de Lyendell (título, tipo: lei, decreto, edital, proibição, imposto...,
+- **Leis de Lyendell**: as leis da capital (título, tipo: lei, decreto, edital, proibição, imposto...,
   data, quem fez, o que diz, a pena para quem descumprir e a situação). Só o Lorde Comandante e a
-  Família Nobre escrevem, e publicam direto, sem aprovação; todo morador lê. As novas aparecem na
-  tela de início, em **Novas leis da Capital**.
+  Família Nobre escrevem, e publicam direto, sem aprovação. As novas aparecem na tela de início, em
+  **Novas Leis de Lyendell**.
+
+**Como cada um vê as leis.** O menu **Leis de Lyendell** abre a leitura, igual para todo mundo: as
+leis arrumadas como um código, separadas por tipo (Leis, Decretos, Proibições, Impostos...), com um
+índice ao lado, busca (sem precisar de acento), filtro por tipo, a pena em destaque e o selo "Nova"
+nas da última semana. Lei comprida começa recolhida ("Ler a lei inteira"), as suspensas aparecem
+marcadas e as revogadas ficam guardadas no fim, para consulta. Cada lei tem "Copiar link" e
+"Baixar .book", e o livro inteiro (só as que valem) também sai em .book.
+
+Quem escreve as leis (Lorde Comandante e Família Nobre) vê ainda o botão **Escrever e editar leis**,
+que abre os livros como nos outros módulos (em `#/leis/livros`): lá se escreve, edita, revoga e se
+criam outros livros de regras. Cada livro novo vira uma aba na leitura, e a leitura acha sozinha o
+título, o tipo, o texto, a pena e as datas pelos nomes dos campos.
 
 ## Aprovação de registros
 
@@ -145,8 +157,13 @@ Um salão com **chat ao vivo**, a lista de quem está online e os jogos:
   O servidor anda 8 passos por segundo, mas a tela desenha 60: as cobras deslizam de uma casa para
   a outra, mesmo com a internet irregular, e a sua cobra vira na hora em que você aperta (o site mede
   o atraso da conexão para saber se o servidor ainda vai aplicar a virada naquele passo).
-- **Jogo da Velha**, **Pedra, Papel e Tesoura** (melhor de três) e **Lig 4** (quatro em linha, 7
-  colunas; dá para jogar com as teclas 1 a 7), ao vivo contra outro morador.
+- **Jogo da Velha**, **Pedra, Papel e Tesoura** (melhor de três), **Lig 4** (quatro em linha, 7
+  colunas; dá para jogar com as teclas 1 a 7) e **Damas**, ao vivo contra outro morador.
+- **Damas** seguem as regras brasileiras: a pedra anda para a frente e captura para trás também; a
+  captura é obrigatória e vale a lei da maioria (a sequência que pega mais peças); a dama anda e
+  captura de longe; a pedra só vira dama se terminar a jogada na última fileira. Perde quem fica sem
+  peça ou sem jogada; 20 lances de cada lado só com damas, sem captura, é empate. Clique na peça e
+  depois nas casas por onde ela passa (as casas possíveis acendem). Cada um vê as próprias peças embaixo.
   Quem abre a partida espera alguém clicar em **Entrar**; os outros podem **Assistir**.
   No fim dá para pedir revanche (quem não começou, começa).
 - **Pac-Coelho**: o coelho da Casa come os Lírios do labirinto e foge de quatro raposas
@@ -155,19 +172,28 @@ Um salão com **chat ao vivo**, a lista de quem está online e os jogos:
 - **Cobrinha**, comendo cenouras (setas, W A S D, ou deslizando o dedo no celular).
 - **Quebra-cabeça** com as fotos da Galeria, em 3x3, 4x4 ou 5x5.
 - **Jogo da Memória**, em 4x4, 4x6 ou 6x6: ache os pares com o menor número de jogadas.
+- **Campo Minado**, no fácil (9x9, 10 armadilhas), médio (16x16, 40) ou difícil (30x16, 99). O
+  primeiro clique nunca explode; botão direito (ou segurar o dedo, ou o botão "Tocar põe bandeira" no
+  celular) põe bandeira; clicar num número com as bandeiras certas em volta abre o resto. Vale o tempo.
+- **2048**: deslize com as setas, W A S D ou o dedo; os blocos iguais viram um só. Vale a pontuação.
+
+Os jogos novos (Damas, Campo Minado e 2048) são por vez ou rodam inteiros no navegador: nada fica
+indo e vindo pela internet o tempo todo, então não travam mesmo com a conexão ruim.
 
 As perguntas do quiz ficam no banco: quem tem o poder "Criar e editar as perguntas do quiz"
 (a Família Nobre, e o administrador) corrige, apaga e cria perguntas no botão **Perguntas**
 do cartão do quiz. O sistema já vem com umas 115 perguntas.
 
 Cada jogo tem ranking: vitórias e acertos no quiz, vitórias e cenouras na cobrinha ao vivo, vitórias
-nos jogos de dois, pontos no Pac-Coelho, cenouras na cobrinha, o menor tempo no quebra-cabeça e o
+nos jogos de dois (velha, pedra, papel e tesoura, Lig 4 e Damas), pontos no Pac-Coelho e no 2048,
+cenouras na cobrinha, o menor tempo no quebra-cabeça e no Campo Minado (por dificuldade) e o
 menor número de jogadas na memória. Quem sai de uma partida no
 meio perde (no quiz, fica fora do resultado); quem cai da internet tem 30 segundos para voltar. A Família Nobre (e quem tiver o poder "Apagar mensagens de outros no chat") pode
 apagar mensagens impróprias; cada um pode apagar as suas.
 
-Dá para **assistir qualquer jogo**: as partidas ao vivo (quiz, velha, pedra, papel e tesoura) e
-também quem está jogando sozinho. Quem abre o Pac-Coelho, a Cobrinha ou o Quebra-cabeça aparece
+Dá para **assistir qualquer jogo**: as partidas ao vivo (quiz, velha, pedra, papel e tesoura, Lig 4,
+Damas, cobrinha ao vivo) e também quem está jogando sozinho. Quem abre o Pac-Coelho, a Cobrinha, o
+Quebra-cabeça, a Memória, o Campo Minado ou o 2048 aparece
 em **Jogando agora**, no salão; clicando em Assistir, dá para ver o jogo ao vivo, com o chat do
 lado. Quem joga vê quantas pessoas estão assistindo.
 
@@ -188,38 +214,57 @@ chat, os resultados e os recordes ficam salvos.
 
 A tela **Mapa de Lyendell** mostra a capital vista de cima, como uma planta escura no estilo do
 site: o rio, as muralhas, as torres e o portão com a ponte, as casas em grade, as 4 avenidas
-(douradas) e as 10 ruas alinhadas (só retas e cantos), com o nome escrito em cada uma, e os prédios
-públicos, todos com o mesmo selo: Septo, Coliseu, Toca do Coelho (o Castelo da Família Nobre
-Luckham), Tabelionato (com a estrela roxa do Centro da cidade), Banco e Quartel General.
+(douradas) e as 10 ruas alinhadas (só retas e cantos), com o nome escrito em cada uma, e os prédios.
 
 - Arraste para andar pelo mapa; use a rodinha, a pinça no celular ou os botões + e − para o zoom.
-- Clique numa rua ou prédio (no mapa ou na lista ao lado) para destacar e ver onde fica.
+- Clique numa rua (no mapa ou na lista embaixo) para destacar e ver onde fica.
 - **Baixar imagem** gera um PNG do mapa inteiro, bom para mandar no Discord.
 
+**Prédios e pontos.** Cada prédio é um selo com um ícone e o nome embaixo: dourado para os prédios
+públicos, verde-água para os comércios e bege para os outros pontos. Os que já vêm no mapa: Septo,
+Coliseu, Toca do Coelho (o Castelo da Família Nobre Luckham), Tabelionato (com a estrela roxa do
+Centro da cidade), Banco, Quartel General e o Senado (entre a Rua Corvos e a Rua Bank).
+
+Clicando num prédio abre a ficha dele:
+
+- as **fotos**, de fora e de dentro (com setas, miniaturas e o filtro "Por fora" / "Por dentro");
+- **para que serve**;
+- **quem mora aqui** e **quem trabalha aqui**, com a função de cada um (ex.: Taverneiro). Quem está
+  no Tabelionato aparece com a foto e os dados do registro, como nas casas; quem não está, só com o nome;
+- **mais informações** (pares como "Fundado em" ou "Horário") e um texto livre **sobre** o lugar;
+- um botão que abre a tela ligada ao prédio (o Senado abre o Congresso, o Quartel abre a Guarda).
+
 **Casas.** Cada casa é um quadradinho numerado ao lado da rua (dourado: com morador; verde: comércio;
-tracejado: sem dono, que é o mesmo que sem morador). Passando o mouse, ou clicando, aparece a ficha: o endereço e
-quem mora, com a foto e os dados do registro no Tabelionato (Moradores, Nobres e Outros) e um link
-que abre o registro. Quem mora é escolhido à mão ao editar a casa. Sem ninguém escolhido, o mapa
-tenta achar pelo nome da casa ("Rudeus" acha "Rudeus Greyrat", se for o único), menos em casa de
-família: nem todo mundo com o sobrenome mora nela, então o formulário só sugere quem tem o sobrenome
-e mostra onde cada um já mora. Quem foi escolhido para uma casa não aparece em outra pelo nome
-parecido. Só entram registros aprovados.
+tracejado: sem dono, que é o mesmo que sem morador). A casa pode ganhar um ícone (ex.: Loja ou
+Taverna), que aparece no quadradinho no lugar do número. Passando o mouse, ou clicando, aparece a
+ficha: o endereço e quem mora, com a foto e os dados do registro no Tabelionato (Moradores, Nobres e
+Outros) e um link que abre o registro. Quem mora é escolhido à mão ao editar a casa. Sem ninguém
+escolhido, o mapa tenta achar pelo nome da casa ("Rudeus" acha "Rudeus Greyrat", se for o único),
+menos em casa de família: nem todo mundo com o sobrenome mora nela, então o formulário só sugere quem
+tem o sobrenome e mostra onde cada um já mora. Quem foi escolhido para uma casa ou para morar num
+prédio não aparece em outra casa pelo nome parecido. Só entram registros aprovados.
 
-Quem tem o poder "Colocar, mover e editar as casas do mapa" (a Família Nobre e a Tabeliã) usa
-**Editar casas**:
+Quem tem o poder "Colocar, mover e editar as casas e os prédios do mapa" (a Família Nobre e a
+Tabeliã) usa **Editar mapa** e escolhe o que pôr: **Casa** ou **Prédio ou ponto**.
 
+- clicar num lugar vazio põe o que foi escolhido (a casa encosta alinhada na rua mais perto; o
+  prédio fica onde foi clicado);
+- arrastar uma casa ou um prédio muda o lugar; clicar abre para editar;
+- no prédio dá para escolher o nome, o que é, a categoria (público, comércio ou outro), o tamanho do
+  selo (grande, médio ou pequeno), o ícone (casa, loja, mercado, taverna, padaria, peixaria,
+  ferraria, boticário, fazenda, estábulo, porto, castelo, torre, templo, capela, senado, justiça,
+  guarda, prisão, arena, banco, hospital, biblioteca, teatro, jardim, poço e outros), as fotos (até
+  24, de fora e de dentro), quem mora e quem trabalha, as informações e o texto sobre o lugar;
 - **Colar lista de uma rua**: uma linha "Esquerda" ou "Direita" e depois "Casa 02 - Nome" em cada
-  linha. O site põe as casas enfileiradas dos dois lados, na mesma altura, desviando das esquinas.
-  "Sem dono" e "Sem morador" viram casas vazias; bar, peixaria, pousada e afins viram comércio.
-- clicar num lugar vazio põe uma casa (ela encosta alinhada na rua mais perto);
-- arrastar uma casa muda o lugar; clicar nela abre para editar número, situação, nome e quem mora.
+  linha. O site põe as casas enfileiradas dos dois lados, na mesma altura, desviando das esquinas e
+  dos prédios. "Sem dono" e "Sem morador" viram casas vazias; bar, peixaria, pousada e afins viram comércio.
 
 Numa rua em pé, esquerda é o lado oeste; numa rua deitada, é o lado de cima. Os números crescem de
 cima para baixo, ou da esquerda para a direita. As casas da Avenida Santa Menefreda já vêm no mapa.
 
-Os dados ficam em `public/js/mapa-lyendell.js`, com as coordenadas tiradas da vista de cima do
-jogo (imagem de 1154 x 773, norte para cima). Para acrescentar algo (ex.: as casas), é só marcar o
-ponto nessa mesma imagem e anotar o x e o y.
+As ruas e o contorno da cidade ficam em `public/js/mapa-lyendell.js`, com as coordenadas tiradas da
+vista de cima do jogo (imagem de 1154 x 773, norte para cima). As casas e os prédios ficam no banco
+e são mexidos pelo próprio mapa; os prédios que vêm prontos estão em `src/predios-padrao.js`.
 
 ## Perfil e Comunidade
 
@@ -242,7 +287,7 @@ Para incentivar a visita de todo dia:
   (bronze no 5, prata no 10, ouro no 15, esmeralda no 20 e coroa no 25).
 - **Sequência de dias**: entrar todo dia aumenta a sequência e o XP da visita.
 - **Missões do dia**: três por dia, as mesmas para todo mundo, que renovam à meia-noite.
-- **Conquistas**: 26 no total (Tagarela, Sábio da Toca, Terror das Raposas, Braço forte...).
+- **Conquistas**: 29 no total (Tagarela, Sábio da Toca, Terror das Raposas, Dama de ferro, Pisa leve...).
 
 Conquistas, missões cumpridas, nível novo e recado novo aparecem na hora, em qualquer tela.
 A tela de início mostra o progresso, as missões, as conquistas recentes e os mais ativos da semana.

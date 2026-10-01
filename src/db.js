@@ -5,6 +5,7 @@ const { hashSenha } = require('./senhas');
 const { CARGOS_PADRAO, DESCRICOES, EXCLUSIVAS } = require('./permissoes');
 const { LIVROS_PADRAO, AJUDA_ABERTURA, CAMPOS_PENA, CAMPO_GUARDAS, CAMPOS_FICHA, FICHAS } = require('./livros-padrao');
 const { CASAS_PADRAO } = require('./casas-padrao');
+const { PREDIOS_PADRAO } = require('./predios-padrao');
 const { PERGUNTAS_PADRAO } = require('./perguntas-padrao');
 const { linha, chaveNome } = require('./util');
 
@@ -298,6 +299,29 @@ CREATE TABLE IF NOT EXISTS casas (
   y REAL NOT NULL,
   situacao TEXT NOT NULL DEFAULT 'ocupada',
   texto TEXT NOT NULL DEFAULT '',
+  icone TEXT NOT NULL DEFAULT '',
+  pessoas TEXT NOT NULL DEFAULT '[]',
+  atualizado_por_nome TEXT NOT NULL DEFAULT '',
+  atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Prédios públicos e outros pontos do mapa. info, fotos e pessoas são listas em JSON.
+CREATE TABLE IF NOT EXISTS predios (
+  id INTEGER PRIMARY KEY,
+  nome TEXT NOT NULL,
+  tipo TEXT NOT NULL DEFAULT '',
+  categoria TEXT NOT NULL DEFAULT 'publico',
+  icone TEXT NOT NULL DEFAULT 'estrela',
+  tamanho TEXT NOT NULL DEFAULT 'medio',
+  x REAL NOT NULL,
+  y REAL NOT NULL,
+  sub TEXT NOT NULL DEFAULT '',
+  centro INTEGER NOT NULL DEFAULT 0,
+  pagina TEXT NOT NULL DEFAULT '',
+  funcao TEXT NOT NULL DEFAULT '',
+  sobre TEXT NOT NULL DEFAULT '',
+  info TEXT NOT NULL DEFAULT '[]',
+  fotos TEXT NOT NULL DEFAULT '[]',
   pessoas TEXT NOT NULL DEFAULT '[]',
   atualizado_por_nome TEXT NOT NULL DEFAULT '',
   atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
@@ -339,7 +363,7 @@ CREATE TABLE IF NOT EXISTS diario (
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 15;
+const VERSAO = 16;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -409,6 +433,7 @@ async function migrar() {
   // v14: casas no mapa. A Família Nobre e a Tabeliã colocam e editam as casas.
   if (versao < 14) await darPermissoes({ 'Família Nobre': ['mapa.editar'], 'Tabeliã': ['mapa.editar'] });
   if (versao < 15) await migrarLeisDaCapital();
+  if (versao < 16) await migrarLeisDeLyendell();
 
   await db.run("INSERT INTO meta (chave, valor) VALUES ('versao', ?) ON CONFLICT (chave) DO UPDATE SET valor = excluded.valor", String(VERSAO));
 }
@@ -496,6 +521,16 @@ async function migrarLeisDaCapital() {
     await db.run('INSERT INTO livros (modulo, nome, descricao, icone, aberto, campos, cobranca, ordem) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       l.modulo, l.nome, l.descricao, l.icone, l.aberto, JSON.stringify(l.campos), null, ordem + 1);
   }
+}
+
+// v16: "Leis da Capital" virou "Leis de Lyendell", e as casas do mapa ganharam ícone (opcional).
+// Os prédios do mapa passaram para o banco (entram no semear, com o Senado).
+async function migrarLeisDeLyendell() {
+  if (!await colunaExiste('casas', 'icone')) await db.run("ALTER TABLE casas ADD COLUMN icone TEXT NOT NULL DEFAULT ''");
+  await db.run("UPDATE livros SET nome = 'Leis de Lyendell' WHERE modulo = 'leis' AND nome = 'Leis da Capital'");
+  await db.run("UPDATE livros SET descricao = ? WHERE modulo = 'leis' AND descricao = ?",
+    'As leis da capital, feitas pelo Lorde Comandante e pela Família Nobre.', 'As leis de Lyendell, feitas pelo Lorde Comandante e pela Família Nobre.');
+  await atualizarDescricoes();
 }
 
 // Descrições de cargo que ainda estão no texto antigo passam para o texto novo (as editadas à mão ficam).
@@ -653,6 +688,18 @@ async function semear() {
     ]);
   }
 
+  // Os prédios do mapa (Septo, Coliseu, Toca do Coelho, Tabelionato, Banco, Quartel e Senado), uma vez só.
+  if (!await db.get("SELECT valor FROM meta WHERE chave = 'predios_semeados'")) {
+    const vazio = !(await db.get('SELECT COUNT(*) AS n FROM predios')).n;
+    await db.lote([
+      ...(vazio ? PREDIOS_PADRAO.map(p => [
+        'INSERT INTO predios (nome, tipo, categoria, icone, tamanho, x, y, sub, centro, pagina, funcao, atualizado_por_nome) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        p.nome, p.tipo, p.categoria, p.icone, p.tamanho, p.x, p.y, p.sub || '', p.centro || 0, p.pagina || '', p.funcao || '', 'Sistema',
+      ]) : []),
+      ["INSERT INTO meta (chave, valor) VALUES ('predios_semeados', '1')"],
+    ]);
+  }
+
   // As perguntas padrão do quiz entram uma vez só: se alguém apagar todas depois, não voltam.
   if (!await db.get("SELECT valor FROM meta WHERE chave = 'perguntas_semeadas'")) {
     await db.lote([
@@ -690,7 +737,8 @@ async function faxina() {
       AND NOT EXISTS (SELECT 1 FROM usuarios WHERE usuarios.foto = '/uploads/' || arquivos.nome)
       AND NOT EXISTS (SELECT 1 FROM usuarios WHERE usuarios.capa = '/uploads/' || arquivos.nome)
       AND NOT EXISTS (SELECT 1 FROM musicas WHERE musicas.url = '/uploads/' || arquivos.nome)
-      AND NOT EXISTS (SELECT 1 FROM registros WHERE instr(registros.dados, arquivos.nome) > 0)`);
+      AND NOT EXISTS (SELECT 1 FROM registros WHERE instr(registros.dados, arquivos.nome) > 0)
+      AND NOT EXISTS (SELECT 1 FROM predios WHERE instr(predios.fotos, arquivos.nome) > 0)`);
 }
 
 async function iniciarBanco() {

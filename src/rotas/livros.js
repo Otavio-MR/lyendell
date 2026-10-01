@@ -236,6 +236,25 @@ r.get('/modulos/:modulo/livros', async (req, res) => {
   res.json({ livros: saida, contagem: await contagemModulo(req, m) });
 });
 
+// Leitura do módulo inteiro (as Leis de Lyendell): todos os livros com os registros aprovados, em ordem
+// de número. É o que todo morador vê; quem escreve as leis usa as telas de livros (gerenciar).
+r.get('/modulos/:modulo/leitura', async (req, res) => {
+  const m = modulo(req.params.modulo);
+  checar(req, `${m}.ver`);
+  const livros = (await db.all('SELECT * FROM livros WHERE modulo = ? ORDER BY ordem, id', m)).map(formatarLivro);
+  const registros = await db.all(`
+    SELECT r.id, r.livro_id, r.numero, r.dados, r.criado_em, r.revisado_em, r.atualizado_em
+    FROM registros r JOIN livros l ON l.id = r.livro_id
+    WHERE l.modulo = ? AND r.situacao = 'aprovado' ORDER BY r.numero, r.id`, m);
+  res.json({
+    livros: livros.map(l => ({
+      id: l.id, nome: l.nome, descricao: l.descricao, icone: l.icone, campos: l.campos,
+      registros: registros.filter(x => x.livro_id === l.id).map(x => ({ ...x, dados: JSON.parse(x.dados) })),
+    })),
+    gerenciar: ['registrar', 'editar', 'configurar', 'aprovar'].some(a => pode(req, `${m}.${a}`)),
+  });
+});
+
 r.post('/modulos/:modulo/livros', async (req, res) => {
   const m = modulo(req.params.modulo);
   checar(req, `${m}.configurar`);
