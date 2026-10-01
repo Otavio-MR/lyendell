@@ -3,6 +3,7 @@
 
 import { h, trocar, icone, botao, cabecalho, aviso, get, post, pode, aoSair, estado, num } from '../core.js';
 import { rt, ouvir, transmitir, enviarQuadro, pararTransmissao } from '../tempo-real.js';
+import { desafioNoJogo } from './desafio.js';
 
 const MAPA = [
   '############################',
@@ -440,6 +441,12 @@ export function pacCoelho() {
   let quadro = null;
   let ultimo = 0;
   let vel = velocidades(1);
+  // Desafio: todos largam juntos; não dá para pausar (o tempo corre igual para todos).
+  const ds = desafioNoJogo('pacman', {
+    aoLargar: () => { if (situacao === 'inicio') comecar(); },
+    aoAcabar: () => { if (situacao !== 'fim') { situacao = 'fim'; mostrarSobre(); } },
+  });
+  const sorte = ds ? ds.sorte : Math.random;
 
   /* ─── Andamento do jogo ─── */
 
@@ -487,6 +494,7 @@ export function pacCoelho() {
 
   function somar(n) {
     pontos += n;
+    ds?.progresso(pontos);
     if (!vidaExtra && pontos >= 10000) {
       vidaExtra = true;
       vidas++;
@@ -567,7 +575,7 @@ export function pacCoelho() {
   function escolherCaminho(r) {
     const opcoes = DIRS.filter(d => !contraria(d, r.dir) && livre(r.tx + d[0], r.ty + d[1]));
     if (!opcoes.length) return [-r.dir[0], -r.dir[1]];
-    if (r.assustada) return opcoes[Math.floor(Math.random() * opcoes.length)];
+    if (r.assustada) return opcoes[Math.floor(sorte() * opcoes.length)];
     const [ax, ay] = alvo(r);
     let melhor = opcoes[0];
     let menor = Infinity;
@@ -711,6 +719,7 @@ export function pacCoelho() {
 
   async function fimDeJogo() {
     situacao = 'fim';
+    ds?.terminar(pontos);
     mostrarSobre();
     if (!pontos) return;
     try {
@@ -769,6 +778,7 @@ export function pacCoelho() {
   }
 
   function comecar() {
+    if (ds && (!ds.largou() || ds.acabou())) return;
     if (situacao === 'fim') { novoJogo(); }
     if (situacao === 'inicio') situacao = 'pronto';
     if (situacao === 'pausado') situacao = retomar || 'jogando';
@@ -777,7 +787,7 @@ export function pacCoelho() {
 
   let retomar = null;
   function pausar() {
-    if (!['jogando', 'pronto'].includes(situacao)) return;
+    if (ds || !['jogando', 'pronto'].includes(situacao)) return;
     retomar = situacao;
     situacao = 'pausado';
     mostrarSobre();
@@ -787,7 +797,9 @@ export function pacCoelho() {
     if (!['inicio', 'pausado', 'fim'].includes(situacao)) { sobre.hidden = true; return; }
     sobre.hidden = false;
     const toque = matchMedia('(pointer: coarse)').matches;
-    if (situacao === 'inicio') {
+    if (situacao === 'inicio' && ds) {
+      trocar(sobre, h('div', { class: 'cobra-caixa' }, h('h2', null, 'Prepare-se!'), h('p', null, 'O desafio começa junto para todos.')));
+    } else if (situacao === 'inicio') {
       trocar(sobre, h('div', { class: 'cobra-caixa' },
         h('h2', null, 'Pac-Coelho'),
         h('p', null, 'Coma todos os Lírios e fuja das raposas.'),
@@ -801,7 +813,7 @@ export function pacCoelho() {
         h('p', { class: 'cobra-placar' }, `${num(pontos)} pontos`),
         h('p', null, `Chegou ao nível ${nivel}.`),
         extra && h('p', { class: 'cobra-recorde' }, icone('trofeu'), extra),
-        botao('Jogar de novo', { classe: 'btn-ouro', onclick: () => { novoJogo(); comecar(); } })));
+        ds ? ds.botoesFim(() => { novoJogo(); comecar(); }) : botao('Jogar de novo', { classe: 'btn-ouro', onclick: () => { novoJogo(); comecar(); } })));
     }
   }
 
@@ -818,7 +830,7 @@ export function pacCoelho() {
       e.preventDefault();
       if (situacao === 'jogando' || situacao === 'pronto') pausar(); else comecar();
     }
-    if (e.code === 'Enter' && (situacao === 'fim' || situacao === 'inicio')) { e.preventDefault(); if (situacao === 'fim') novoJogo(); comecar(); }
+    if (e.code === 'Enter' && !ds && (situacao === 'fim' || situacao === 'inicio')) { e.preventDefault(); if (situacao === 'fim') novoJogo(); comecar(); }
   };
   document.addEventListener('keydown', aoTeclar);
 
@@ -865,11 +877,11 @@ export function pacCoelho() {
   const bolinha = (cor, tam) => h('span', { class: 'pac-bola', style: { '--cor': cor, '--tam': tam } });
 
   novoJogo();
-  carregarRanking();
+  if (!ds) carregarRanking();
   quadro = requestAnimationFrame(passo);
 
   return h('div', { class: 'pagina' },
-    cabecalho({ titulo: 'Pac-Coelho', icone: 'coelho', voltar: { href: '#/recreacao', texto: 'Recreação' }, sub: 'O coelho da Casa Luckham atrás dos Lírios, com as raposas no encalço.' }),
+    cabecalho({ titulo: ds ? 'Pac-Coelho: desafio' : 'Pac-Coelho', icone: 'coelho', voltar: { href: '#/recreacao', texto: 'Recreação' }, sub: ds ? 'Todos no mesmo labirinto, ao mesmo tempo. Faça o máximo de pontos antes de acabar o tempo!' : 'O coelho da Casa Luckham atrás dos Lírios, com as raposas no encalço.' }),
     h('div', { class: 'jogo-solo' },
       h('div', { class: 'jogo-area pac-area' },
         h('div', { class: 'cobra-placar-linha' },
@@ -877,13 +889,13 @@ export function pacCoelho() {
           h('span', null, 'Nível ', nivelEl),
           vidasEl,
           plateiaEl,
-          h('span', null, icone('trofeu'), ' ', recordeEl)),
+          !ds && h('span', null, icone('trofeu'), ' ', recordeEl)),
         h('div', { class: 'cobra-moldura pac-moldura' }, tela, sobre),
         h('div', { class: 'dpad' },
           seta('cima', CIMA, 'Para cima'), seta('voltar', ESQ, 'Para a esquerda'),
           seta('frente', DIR, 'Para a direita'), seta('baixo', BAIXO, 'Para baixo'))),
       h('aside', { class: 'jogo-lateral pac-lateral' },
-        h('section', { class: 'painel' },
+        ds ? ds.painel : h('section', { class: 'painel' },
           h('div', { class: 'painel-cab' }, h('h2', null, icone('trofeu'), 'Melhores')),
           ranking),
         h('section', { class: 'painel' },

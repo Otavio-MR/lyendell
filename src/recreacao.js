@@ -13,6 +13,8 @@ const antispam = require('./antispam');
 const cobras = require('./cobras');
 const damas = require('./damas');
 const raposa = require('./raposa');
+const { MESAS, ErroMesa } = require('./mesa');
+const desafio = require('./desafio');
 const cidade = require('./cidade');
 const { paraCriancas } = require('./censura');
 
@@ -22,7 +24,8 @@ const HISTORICO = 80;
 const COBRAS_PASSO_MS = Number(process.env.COBRAS_PASSO_MS) || 125;     // velocidade da cobrinha ao vivo
 const COBRAS_LARGADA_MS = Number(process.env.COBRAS_LARGADA_MS) || 3000; // contagem antes de largar
 const COLHEITA_MS = Number(process.env.COLHEITA_MS) || 90_000;             // quanto dura a colheita (co-op)
-const RAPOSA_MS = Number(process.env.RAPOSA_MS) || 800;                  // a Raposa "pensa" antes de jogar
+const RAPOSA_MS = Number(process.env.RAPOSA_MS) || 800;                    // a Raposa "pensa" antes de jogar
+const MEMORIA_FECHAR_MS = Number(process.env.MEMORIA_FECHAR_MS) || 1100;   // as duas cartas erradas ficam à mostra
 
 class ErroJogo extends Error {}
 
@@ -164,7 +167,14 @@ const JOGOS = {
     min: cidade.MIN,
     grupo: true,
   },
+  // Mesas compartilhadas (veja mesa.js): todos no mesmo tabuleiro.
+  minado: { nome: 'Campo Minado', max: 6, min: 1, grupo: true, mesa: true },
+  quebra: { nome: 'Quebra-cabeça', max: 6, min: 1, grupo: true, mesa: true },
+  memoria: { nome: 'Jogo da Memória', max: 6, min: 1, grupo: true, mesa: true },
+  // Desafio: um jogo de uma pessoa só, com a mesma semente para todos (veja desafio.js).
+  desafio: { nome: 'Desafio', max: 6, min: 1, grupo: true },
 };
+const ehMesa = s => !!JOGOS[s.jogo]?.mesa;
 
 /* ─── Salas ───────────────────────────────────────── */
 
@@ -177,12 +187,27 @@ function validarOpcoesDaSala(jogo, opcoes = {}) {
     throw x instanceof quiz.ErroQuiz ? new ErroJogo(x.message) : x;
   }
   if (jogo === 'cobras') return { modo: cobras.MODOS.includes(opcoes?.modo) ? opcoes.modo : 'todos' };
+  if (MESAS[jogo]) return MESAS[jogo].opcoes(opcoes || {});
+  if (jogo === 'desafio') return desafio.opcoes(opcoes || {});
   // Velha, Lig 4 e Damas: um contra o outro (versus) ou contra a Raposa, o computador (co-op).
   if (raposa.COM_RAPOSA.includes(jogo)) return { modo: opcoes?.modo === 'raposa' ? 'raposa' : 'versus' };
   return null;
 }
 
 const indiceNa = (s, id) => s.jogadores.findIndex(p => p.id === id);
+const MODO_COBRAS = { colheita: 'Colheita, co-op', duplas: '2 contra 2' };
+const MODO_QUIZ = { equipe: 'em equipe', times: 'dois times' };
+function nomeDaSala(s) {
+  const nome = JOGOS[s.jogo].nome;
+  const o = s.opcoes || {};
+  if (s.jogo === 'desafio') return `Desafio de ${desafio.nomeDo(o)}`;
+  if (o.modo === 'raposa') return `${nome} contra a Raposa`;
+  if (s.jogo === 'quiz' && MODO_QUIZ[o.modo]) return `${nome} (${MODO_QUIZ[o.modo]})`;
+  if (s.jogo === 'cobras' && MODO_COBRAS[o.modo]) return `${nome} (${MODO_COBRAS[o.modo]})`;
+  if (s.jogo === 'memoria') return `${nome} (${o.modo === 'coop' ? 'co-op' : 'versus'})`;
+  if (s.jogo === 'minado' || s.jogo === 'quebra') return `${nome} (co-op)`;
+  return nome;
+}
 const salaAtivaDe = id => [...salas.values()].find(s => s.status !== 'fim' && s.jogadores.some(p => p.id === id && !p.saiu));
 const ehGrupo = s => !!JOGOS[s.jogo].grupo;
 const ehQuiz = s => s.jogo === 'quiz';
@@ -195,7 +220,9 @@ function visaoSala(s, id) {
   const jogo = JOGOS[s.jogo];
   let estado = null;
   if (s.estado) {
-    estado = ehQuiz(s) ? visaoQuiz(s, id) : s.jogo === 'cobras' ? visaoCobras(s) : s.jogo === 'cidade' ? cidade.visao(s.estado, eu) : jogo.visao(s.estado, eu);
+    estado = ehQuiz(s) ? visaoQuiz(s, id) : s.jogo === 'cobras' ? visaoCobras(s) : s.jogo === 'cidade' ? cidade.visao(s.estado, eu)
+      : ehMesa(s) ? { ...MESAS[s.jogo].visao(s.estado), vencedores: s.estado.vencedores || null }
+      : s.jogo === 'desafio' ? desafio.visao(s.estado, indicesAtivos(s)) : jogo.visao(s.estado, eu);
     if (s.jogo === 'cidade' && ehCrianca(id)) {
       estado.chat = Object.fromEntries(Object.entries(estado.chat).map(([c, l]) => [c, l.map(limparMsg)]));
     }
@@ -203,7 +230,7 @@ function visaoSala(s, id) {
   return {
     id: s.id,
     jogo: s.jogo,
-    nomeJogo: jogo.nome,
+    nomeJogo: nomeDaSala(s),
     grupo: !!jogo.grupo,
     max: jogo.max,
     min: jogo.min || 1,
@@ -286,7 +313,7 @@ function enviarSala(s) {
 const resumoSalas = () => [...salas.values()]
   .filter(s => s.status !== 'fim')
   .map(s => ({
-    id: s.id, jogo: s.jogo, nomeJogo: JOGOS[s.jogo].nome, status: s.status, grupo: ehGrupo(s), max: JOGOS[s.jogo].max,
+    id: s.id, jogo: s.jogo, nomeJogo: nomeDaSala(s), status: s.status, grupo: ehGrupo(s), max: JOGOS[s.jogo].max,
     opcoes: s.opcoes || null, jogadores: ativos(s).map(p => p.nome), espectadores: s.espectadores.size,
   }));
 
@@ -486,6 +513,12 @@ function sairDoGrupo(id, s, i) {
   if (!ativos(s).length) { fecharSala(s); avisarLobby(); return; }
   if (s.status === 'jogando' && ehQuiz(s)) conferirRespostas(s);
   if (s.status === 'jogando' && s.jogo === 'cobras') { s.estado.cobras[i].saiu = true; cobras.eliminar(s.estado, i); } // a cobra de quem saiu vira cenouras (e não renasce)
+  if (s.status === 'jogando' && s.jogo === 'memoria' && s.estado.vez === i) {
+    s.estado.abertas = [];
+    s.estado.fechar = false;
+    MESAS.memoria.passarVez(s.estado, indicesAtivos(s));
+  }
+  if (s.status === 'jogando' && s.jogo === 'desafio' && desafio.acabou(s.estado, indicesAtivos(s))) { terminarDesafio(s); return; }
   if (s.status === 'jogando' && s.jogo === 'cidade') {
     cidade.sair(s.estado, i); // quem sai morre na cidade
     if (s.estado.fase === 'fim') { terminarCidade(s); return; }
@@ -615,6 +648,115 @@ function terminarCobras(s) {
     for (const i of r.venceram) await progresso.registrar(e.cobras[i].id, 'vitoria');
   }).catch(err => console.error('Erro ao guardar a cobrinha:', err.message));
   enviarQuadroCobras(s);
+  enviarSala(s);
+  avisarLobby();
+}
+
+/* ─── Mesas compartilhadas ────────────────────────── */
+
+const indicesAtivos = s => s.jogadores.map((p, i) => (p.saiu ? -1 : i)).filter(i => i >= 0);
+
+function comecarMesa(s) {
+  const jogadores = ativos(s);
+  if (s.jogo === 'memoria' && s.opcoes.modo === 'versus' && jogadores.length < 2) throw new ErroJogo('A Memória em versus precisa de pelo menos 2 pessoas.');
+  s.jogadores = jogadores;
+  s.estado = MESAS[s.jogo].novo(s.opcoes, jogadores.length);
+  Object.assign(s, { status: 'jogando', vencedor: null, empate: false, motivo: null });
+  s.revanche.clear();
+  enviarSala(s);
+  avisarLobby();
+}
+
+function jogarMesa(s, i, jogada) {
+  const e = s.estado;
+  try {
+    MESAS[s.jogo].agir(e, i, jogada, indicesAtivos(s));
+  } catch (x) {
+    throw x instanceof ErroMesa ? new ErroJogo(x.message) : x;
+  }
+  // Memória: as cartas erradas ficam à mostra um instante e depois a vez passa.
+  if (s.jogo === 'memoria' && e.fechar && !e.fim) {
+    clearTimeout(s.timer);
+    s.timer = setTimeout(() => {
+      if (!salas.has(s.id) || s.status !== 'jogando') return;
+      MESAS.memoria.fecharCartas(e, indicesAtivos(s));
+      enviarSala(s);
+    }, MEMORIA_FECHAR_MS);
+  }
+  if (e.fim) terminarMesa(s);
+  else enviarSala(s);
+}
+
+function terminarMesa(s) {
+  clearTimeout(s.timer);
+  const e = s.estado;
+  const ativosIdx = indicesAtivos(s);
+  const venceram = MESAS[s.jogo].vencedores(e, ativosIdx);
+  e.vencedores = venceram;
+  Object.assign(s, { status: 'fim', vencedor: venceram.length === 1 ? venceram[0] : null, empate: !venceram.length, motivo: e.fim, terminou: Date.now() });
+  const lista = ativosIdx.map(i => s.jogadores[i]);
+  db.lote(ativosIdx.map(i => [
+    'INSERT INTO resultados (jogo, usuario_id, usuario_nome, posicao, jogadores, pontos, venceu) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    `${s.jogo}_${s.jogo === 'memoria' ? s.opcoes.modo : 'coop'}`, s.jogadores[i].id, s.jogadores[i].nome, venceram.includes(i) ? 1 : 2, lista.length,
+    s.jogo === 'memoria' ? e.pares[i] : 0, venceram.includes(i) ? 1 : 0,
+  ])).then(async () => {
+    for (const i of ativosIdx) {
+      await progresso.registrar(s.jogadores[i].id, lista.length > 1 ? 'partida' : 'solo');
+      if (lista.length > 1 && venceram.includes(i)) await progresso.registrar(s.jogadores[i].id, 'vitoria');
+    }
+  }).catch(err => console.error('Erro ao guardar a mesa:', err.message));
+  enviarSala(s);
+  avisarLobby();
+}
+
+/* ─── Desafio ─────────────────────────────────────── */
+
+function comecarDesafio(s) {
+  const jogadores = ativos(s);
+  if (jogadores.length < desafio.minimo(s.opcoes)) throw new ErroJogo('O versus precisa de pelo menos 2 pessoas.');
+  s.jogadores = jogadores;
+  s.estado = desafio.novo(s.opcoes, jogadores.length);
+  Object.assign(s, { status: 'jogando', vencedor: null, empate: false, motivo: null });
+  s.revanche.clear();
+  // Quando o tempo acabar, o desafio termina com os pontos que cada um mandou.
+  clearTimeout(s.timer);
+  s.timer = setTimeout(() => {
+    if (salas.has(s.id) && s.status === 'jogando' && desafio.acabou(s.estado, indicesAtivos(s), Math.max(Date.now(), s.estado.limite))) terminarDesafio(s);
+  }, s.estado.limite - Date.now() + 50);
+  enviarSala(s);
+  avisarLobby();
+}
+
+function jogarDesafio(s, i, jogada) {
+  let terminou;
+  try {
+    terminou = desafio.agir(s.estado, i, jogada, indicesAtivos(s));
+  } catch (x) {
+    throw x instanceof desafio.ErroDesafio ? new ErroJogo(x.message) : x;
+  }
+  if (terminou) terminarDesafio(s);
+  else enviarSala(s);
+}
+
+function terminarDesafio(s) {
+  clearTimeout(s.timer);
+  const e = s.estado;
+  const ativosIdx = indicesAtivos(s);
+  const venceram = e.vencedores || [];
+  Object.assign(s, { status: 'fim', vencedor: venceram.length === 1 ? venceram[0] : null, empate: !venceram.length, motivo: e.fim, terminou: Date.now() });
+  const lista = ativosIdx.map(i => s.jogadores[i]);
+  // Posição: no versus, pela ordem de chegada (corrida) ou pelos pontos; no co-op, todos juntos.
+  const ordem = [...ativosIdx].sort((a, b) => (e.prog[b].completo - e.prog[a].completo) || (e.prog[a].completo ? e.prog[a].seg - e.prog[b].seg : e.prog[b].pontos - e.prog[a].pontos));
+  db.lote(ativosIdx.map(i => [
+    'INSERT INTO resultados (jogo, usuario_id, usuario_nome, posicao, jogadores, pontos, venceu) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    `desafio_${e.jogo}_${e.modo}`, s.jogadores[i].id, s.jogadores[i].nome, e.modo === 'coop' ? (venceram.length ? 1 : 2) : ordem.indexOf(i) + 1, lista.length,
+    e.prog[i].pontos, venceram.includes(i) ? 1 : 0,
+  ])).then(async () => {
+    for (const i of ativosIdx) {
+      await progresso.registrar(s.jogadores[i].id, lista.length > 1 ? 'partida' : 'solo');
+      if (lista.length > 1 && venceram.includes(i)) await progresso.registrar(s.jogadores[i].id, 'vitoria');
+    }
+  }).catch(err => console.error('Erro ao guardar o desafio:', err.message));
   enviarSala(s);
   avisarLobby();
 }
@@ -751,7 +893,7 @@ const acoes = {
     salas.set(s.id, s);
     enviarSala(s);
     avisarLobby();
-    paraTodos('aviso', { texto: `${u.nome} abriu ${JOGOS[jogo].grupo ? 'uma sala' : 'uma partida'} de ${JOGOS[jogo].nome}.`, sala: s.id, de: u.id });
+    paraTodos('aviso', { texto: `${u.nome} abriu ${JOGOS[jogo].grupo ? 'uma sala' : 'uma partida'} de ${nomeDaSala(s)}.`, sala: s.id, de: u.id });
   },
 
   'sala:entrar'(u, { id }) {
@@ -788,6 +930,8 @@ const acoes = {
     if (ehRaposa(s)) { comecarRaposa(s); return; }
     if (s.jogo === 'cobras') { comecarCobras(s); return; }
     if (s.jogo === 'cidade') { comecarCidade(s); return; }
+    if (ehMesa(s)) { comecarMesa(s); return; }
+    if (s.jogo === 'desafio') { comecarDesafio(s); return; }
     s.comecando = true;
     try {
       await comecarQuiz(s);
@@ -805,6 +949,8 @@ const acoes = {
     if (s.status !== 'jogando') throw new ErroJogo('A partida não está em andamento.');
     if (ehQuiz(s)) { responder(s, i, jogada || {}); return; }
     if (s.jogo === 'cidade') { jogarCidade(s, i, jogada || {}); return; }
+    if (ehMesa(s)) { jogarMesa(s, i, jogada || {}); return; }
+    if (s.jogo === 'desafio') { jogarDesafio(s, i, jogada || {}); return; }
     if (ehRaposa(s)) { jogarContraRaposa(s, u, jogada); return; }
     if (ehGrupo(s)) throw new ErroJogo('Use as setas para jogar.');
     const resultado = JOGOS[s.jogo].jogar(s.estado, i, jogada || {});

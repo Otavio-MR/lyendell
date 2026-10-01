@@ -2253,3 +2253,54 @@ body.modo-crianca .tabela th { color: var(--rosa); }
 .raposa-avatar { display: grid; place-items: center; background: linear-gradient(135deg, #e08a52, #9c4a22); color: #fff3e0; }
 .raposa-avatar .ico { width: 24px; height: 24px; }
 .jogador.raposa-pc.na-vez .raposa-avatar { animation: piscar 1s ease-in-out infinite; }
+/* Mesas compartilhadas */
+.mesa { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 18px; align-items: start; }
+.mesa-lado { position: sticky; top: 20px; }
+.mesa-lado li.na-vez { background: var(--ouro-fundo); box-shadow: inset 3px 0 0 var(--ouro); }
+.mesa-opcoes { display: grid; gap: 10px; margin: 12px 0; }
+.mesa-fotos { max-height: 260px; overflow-y: auto; }
+.qc-foto.escolhida { outline: 3px solid var(--ouro); outline-offset: 2px; }
+.qc-foto:disabled { cursor: default; }
+.minado-casa.ultimo { box-shadow: inset 0 0 0 2px var(--quem, #fff); }
+.qc-peca.trocada { box-shadow: inset 0 0 0 3px var(--quem, #fff); }
+.mem-carta.achada { box-shadow: 0 0 0 3px var(--quem, var(--ouro)); }
+.mesa-vez { font-family: var(--f-titulo); color: var(--texto-2); }
+.mesa-vez.minha { color: var(--ouro-l); animation: piscar 1.4s ease-in-out infinite; }
+.mesa-fim { margin-top: 14px; }
+@media (max-width: 960px) { .mesa { grid-template-columns: minmax(0, 1fr); } .mesa-lado { position: static; } }
+
+/* Salão: títulos das listas de jogos */
+.jogos-titulo { margin: 6px 0 -2px; font-family: var(--f-titulo); font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--suave); }
+.jogos-titulo:first-child { margin-top: 0; }
+
+/* Desafio (corrida e meta da equipe) */
+.desafio-tempo { margin: 0 0 10px; display: flex; align-items: center; gap: 6px; color: var(--texto-2); }
+.desafio-tempo strong { font-size: 1.25rem; color: var(--ouro-l); font-variant-numeric: tabular-nums; }
+.desafio-lista, .desafio-placar { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 6px; }
+.desafio-lista li, .desafio-placar li { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: var(--raio-p); background: var(--sup-2); }
+.desafio-lista li.fora, .desafio-placar li.fora { opacity: 0.55; }
+.desafio-lista li.eu-linha, .desafio-placar li.eu-linha { box-shadow: inset 3px 0 0 var(--ouro); }
+.desafio-nome { flex: 1; min-width: 0; display: grid; }
+.desafio-nome small { color: var(--suave); font-size: 0.82rem; }
+.desafio-lista strong, .desafio-pontos { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.desafio-pos { width: 2.2em; font-family: var(--f-titulo); color: var(--ouro); }
+.desafio-placar .coroa { color: var(--ouro); display: inline-grid; }
+.desafio-meta { margin: 0 0 12px; display: grid; gap: 6px; }
+.desafio-meta-texto strong { color: var(--ouro-l); }
+.desafio-dica { font-size: 0.82rem; margin: 0; }
+.desafio-sala { display: grid; gap: 12px; justify-items: stretch; }
+.desafio-sala > .btn-grande { justify-self: center; }
+.desafio-contagem {
+  position: fixed; inset: 0; z-index: 150; display: grid; place-content: center; justify-items: center; gap: 6px;
+  background: rgba(2, 5, 3, 0.45); pointer-events: none;
+}
+.desafio-contagem span { font-family: var(--f-titulo); font-size: clamp(4rem, 14vw, 9rem); color: var(--ouro-l); text-shadow: 0 4px 30px rgba(0, 0, 0, 0.6); }
+.desafio-contagem small { color: var(--texto-2); font-size: 1.1rem; }
+.desafio-contagem .desafio-ja { color: #7fb069; }
+.desafio-fim {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 160; width: min(440px, calc(100vw - 32px));
+  display: grid; gap: 10px; justify-items: center; text-align: center; padding: 18px 20px;
+  border-radius: var(--raio); background: var(--sup); border: 1px solid var(--ouro-d); box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+}
+.desafio-fim h2 { margin: 0; display: flex; align-items: center; gap: 8px; color: var(--ouro-l); }
+.desafio-fim p { margin: 0; }

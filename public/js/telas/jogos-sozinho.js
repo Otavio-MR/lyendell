@@ -3,6 +3,7 @@
 
 import { h, trocar, icone, botao, cabecalho, aviso, get, post, pode, aoSair, estado, num } from '../core.js';
 import { rt, ouvir, transmitir, enviarQuadro, pararTransmissao } from '../tempo-real.js';
+import { desafioNoJogo } from './desafio.js';
 
 const escutar = (tipo, fn) => aoSair(ouvir(tipo, fn));
 const relogio = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -78,7 +79,7 @@ function vizinhosDe(i, lin, col) {
 
 // Uma casa do campo, pelo código que também vai para quem assiste:
 // "." fechada, "f" bandeira, "0" a "8" aberta, "m" armadilha (no fim), "x" a que explodiu, "e" bandeira errada.
-function pintarCasa(el, codigo) {
+export function pintarCasa(el, codigo) {
   if (el.dataset.c === codigo) return;
   el.dataset.c = codigo;
   el.className = `minado-casa ${codigo === '.' ? 'fechada' : codigo === 'f' ? 'fechada bandeira' : /\d/.test(codigo) ? `aberta n${codigo}` : codigo === 'e' ? 'fechada errada' : `aberta mina ${codigo === 'x' ? 'explodiu' : ''}`}`.trim();
@@ -111,10 +112,25 @@ export function campoMinado() {
   let relogioId = null;
   let modoBandeira = false;
   let segurou = false;
+  // Desafio (corrida): o mesmo campo para todos, com a casa do meio já aberta na largada.
+  const ds = desafioNoJogo('minado', { aoLargar: () => largarDesafio(), aoAcabar: () => { if (situacao !== 'fim') { parar(); desenhar(); } } });
+  const sorte = ds ? ds.sorte : Math.random;
+  const dificuldade = () => (ds ? ds.opcoes.dificuldade : dificuldadeAtual);
+  const abertasAgora = () => abertas.reduce((a, b) => a + b, 0);
+
+  function largarDesafio() {
+    if (situacao !== 'pronto' || !minas) return;
+    situacao = 'jogando';
+    inicio = Date.now();
+    relogioId = setInterval(tique, 500);
+    abrir(Math.floor(d.lin / 2) * d.col + Math.floor(d.col / 2));
+    desenhar();
+    transmitirQuadro(true);
+  }
 
   function novoJogo() {
     clearInterval(relogioId);
-    d = DIFICULDADES[dificuldadeAtual];
+    d = DIFICULDADES[dificuldade()];
     const total = d.lin * d.col;
     minas = null;
     abertas = new Uint8Array(total);
@@ -129,10 +145,11 @@ export function campoMinado() {
     casas = Array.from({ length: total }, (_, i) => h('button', { type: 'button', class: 'minado-casa fechada', 'aria-label': `Casa ${i + 1}`, 'data-i': i }));
     trocar(grade, casas);
     sobre.hidden = true;
+    if (ds) plantar(Math.floor(d.lin / 2) * d.col + Math.floor(d.col / 2));
     desenharSeletor();
     desenhar();
-    carregarRanking();
-    if (rt.conectado) transmitir('minado', { d: dificuldadeAtual });
+    if (!ds) carregarRanking();
+    if (rt.conectado) transmitir('minado', { d: dificuldade() });
     transmitirQuadro(true);
   }
 
@@ -142,7 +159,7 @@ export function campoMinado() {
     const livres = [];
     for (let i = 0; i < total; i++) if (!proibidas.has(i)) livres.push(i);
     for (let k = livres.length - 1; k > 0; k--) {
-      const j = Math.floor(Math.random() * (k + 1));
+      const j = Math.floor(sorte() * (k + 1));
       [livres[k], livres[j]] = [livres[j], livres[k]];
     }
     minas = new Set(livres.slice(0, d.minas));
@@ -184,12 +201,13 @@ export function campoMinado() {
   }
 
   function clicar(i, bandeira = false) {
-    if (situacao === 'fim') return;
+    if (situacao === 'fim' || (ds && situacao !== 'jogando')) return;
     if (bandeira || (modoBandeira && !abertas[i])) marcar(i);
     else if (abertas[i]) abrirEmVolta(i);
     else abrir(i);
     desenhar();
     transmitirQuadro(true);
+    if (situacao === 'jogando') ds?.progresso(abertasAgora());
   }
 
   function tique() {
@@ -227,10 +245,11 @@ export function campoMinado() {
     explodiu = i;
     parar();
     desenhar();
+    ds?.terminar(abertasAgora(), false);
     trocar(sobre, h('div', { class: 'cobra-caixa' },
       h('h2', null, 'Pisou numa armadilha!'),
       h('p', null, `Faltavam ${abertas.length - d.minas - abertas.reduce((a, b) => a + b, 0)} casas.`),
-      botao('Tentar de novo', { classe: 'btn-ouro', icone: 'frente', onclick: novoJogo })));
+      ds ? ds.botoesFim(novoJogo) : botao('Tentar de novo', { classe: 'btn-ouro', icone: 'frente', onclick: novoJogo })));
     sobre.hidden = false;
     transmitirQuadro(true);
   }
@@ -240,13 +259,15 @@ export function campoMinado() {
     // No fim, as armadilhas que faltavam ganham bandeira.
     for (const m of minas) bandeiras[m] = 1;
     desenhar();
+    ds?.terminar(abertasAgora(), true);
     const caixa = h('div', { class: 'cobra-caixa' },
       h('h2', null, 'Campo limpo!'),
       h('p', { class: 'cobra-placar' }, `${d.nome} em ${relogio(seg)}`),
-      botao('Jogar de novo', { classe: 'btn-ouro', icone: 'frente', onclick: novoJogo }));
+      ds ? ds.botoesFim(novoJogo) : botao('Jogar de novo', { classe: 'btn-ouro', icone: 'frente', onclick: novoJogo }));
     trocar(sobre, caixa);
     sobre.hidden = false;
     transmitirQuadro(true);
+    if (ds) return;
     if (await guardarResultado({ jogo: 'minado', variante: dificuldadeAtual, pontos: seg, detalhe: relogio(seg) }, caixa)) carregarRanking();
   }
 
@@ -293,9 +314,9 @@ export function campoMinado() {
     if (!casas.length) return;
     let marcadas = 0;
     for (const b of bandeiras) marcadas += b;
-    enviarQuadro({ d: dificuldadeAtual, v: casas.map((_, i) => codigoDe(i)).join(''), s: situacao, seg, r: d.minas - marcadas, x: explodiu >= 0 }, urgente);
+    enviarQuadro({ d: dificuldade(), v: casas.map((_, i) => codigoDe(i)).join(''), s: situacao, seg, r: d.minas - marcadas, x: explodiu >= 0 }, urgente);
   }
-  escutar('estado', () => { if (rt.conectado) { transmitir('minado', { d: dificuldadeAtual }); transmitirQuadro(true); } });
+  escutar('estado', () => { if (rt.conectado) { transmitir('minado', { d: dificuldade() }); transmitirQuadro(true); } });
 
   async function carregarRanking() {
     const meu = await ranking.carregar(`Melhores (${d.nome})`, r => r.minado?.[dificuldadeAtual], l => relogio(l.segundos));
@@ -307,21 +328,21 @@ export function campoMinado() {
 
   return h('div', { class: 'pagina' },
     cabecalho({
-      titulo: 'Campo Minado', icone: 'minado', voltar: { href: '#/recreacao', texto: 'Recreação' },
-      sub: 'Abra todas as casas sem pisar nas armadilhas. O número diz quantas armadilhas há em volta. Botão direito (ou segurar o dedo) põe bandeira.',
-      acoes: [botao('Novo jogo', { icone: 'aleatorio', onclick: novoJogo })],
+      titulo: ds ? 'Campo Minado: desafio' : 'Campo Minado', icone: 'minado', voltar: { href: '#/recreacao', texto: 'Recreação' },
+      sub: ds ? 'Corrida: o mesmo campo para todos. Quem limpar primeiro vence; pisou numa armadilha, está fora.' : 'Abra todas as casas sem pisar nas armadilhas. O número diz quantas armadilhas há em volta. Botão direito (ou segurar o dedo) põe bandeira.',
+      acoes: ds ? [] : [botao('Novo jogo', { icone: 'aleatorio', onclick: novoJogo })],
     }),
     h('div', { class: 'jogo-solo' },
       h('div', { class: 'jogo-area' },
-        seletor,
+        !ds && seletor,
         h('div', { class: 'cobra-placar-linha minado-placar' },
           h('span', null, icone('minado'), ' ', restantesEl),
           h('span', null, icone('relogio'), ' ', tempoEl),
           contadorPlateia(),
-          h('span', null, icone('trofeu'), ' Seu recorde: ', recordeEl),
+          !ds && h('span', null, icone('trofeu'), ' Seu recorde: ', recordeEl),
           botaoModo),
         (moldura.append(sobre), moldura)),
-      ranking.el));
+      ds ? ds.painel : ranking.el));
 }
 
 export function assistirMinado() {
@@ -390,6 +411,12 @@ export function jogo2048() {
   let situacao = 'jogando';
   let chegou2048 = false;
   const timers = new Set();
+  // Desafio: os mesmos blocos novos para todos (mesma semente); antes da largada, o tabuleiro não mexe.
+  const ds = desafioNoJogo('2048', {
+    aoLargar: () => { if (situacao === 'esperando') { situacao = 'jogando'; tabuleiro.focus({ preventScroll: true }); } },
+    aoAcabar: () => { if (situacao !== 'fim') situacao = 'fim'; },
+  });
+  const sorte = ds ? ds.sorte : Math.random;
   const depois = (fn, ms) => { const t = setTimeout(() => { timers.delete(t); fn(); }, ms); timers.add(t); };
 
   function novoJogo() {
@@ -399,14 +426,14 @@ export function jogo2048() {
     elementos = new Map();
     trocar(camada);
     pontos = 0;
-    situacao = 'jogando';
+    situacao = ds && !ds.largou() ? 'esperando' : 'jogando';
     chegou2048 = false;
     faixa.hidden = true;
     sobre.hidden = true;
     novoBloco();
     novoBloco();
     desenhar();
-    carregarRanking();
+    if (!ds) carregarRanking();
     if (rt.conectado) transmitir('2048', {});
     transmitirQuadro();
     tabuleiro.focus({ preventScroll: true });
@@ -420,8 +447,8 @@ export function jogo2048() {
   function novoBloco() {
     const l = livres();
     if (!l.length) return;
-    const i = l[Math.floor(Math.random() * l.length)];
-    blocos.push({ id: proximoId++, v: Math.random() < 0.9 ? 2 : 4, l: Math.floor(i / 4), c: i % 4, novo: true });
+    const i = l[Math.floor(sorte() * l.length)];
+    blocos.push({ id: proximoId++, v: sorte() < 0.9 ? 2 : 4, l: Math.floor(i / 4), c: i % 4, novo: true });
   }
 
   // Desliza tudo para um lado. Dois blocos iguais que se encontram viram um (só uma vez por jogada).
@@ -475,6 +502,7 @@ export function jogo2048() {
       faixa.textContent = 'Chegou no 2048! Pode continuar para fazer mais pontos.';
     }
     if (!temJogada()) fim();
+    else ds?.progresso(pontos);
     transmitirQuadro();
   }
 
@@ -514,11 +542,12 @@ export function jogo2048() {
 
   async function fim() {
     situacao = 'fim';
+    ds?.terminar(pontos);
     const maior = Math.max(...blocos.map(b => b.v));
     const caixa = h('div', { class: 'cobra-caixa' },
       h('h2', null, 'Sem jogadas!'),
       h('p', { class: 'cobra-placar' }, `${num(pontos)} pontos · maior bloco: ${maior}`),
-      botao('Jogar de novo', { classe: 'btn-ouro', icone: 'frente', onclick: novoJogo }));
+      ds ? ds.botoesFim(novoJogo) : botao('Jogar de novo', { classe: 'btn-ouro', icone: 'frente', onclick: novoJogo }));
     depois(() => { trocar(sobre, caixa); sobre.hidden = false; }, 400);
     transmitirQuadro();
     if (await guardarResultado({ jogo: '2048', pontos, detalhe: `maior bloco ${maior}` }, caixa)) carregarRanking();
@@ -566,9 +595,9 @@ export function jogo2048() {
 
   return h('div', { class: 'pagina' },
     cabecalho({
-      titulo: '2048', icone: 'blocos', voltar: { href: '#/recreacao', texto: 'Recreação' },
-      sub: 'Deslize com as setas (ou o dedo): os blocos iguais que se encontram viram um só, com o dobro. Chegue no 2048!',
-      acoes: [botao('Novo jogo', { icone: 'aleatorio', onclick: novoJogo })],
+      titulo: ds ? '2048: desafio' : '2048', icone: 'blocos', voltar: { href: '#/recreacao', texto: 'Recreação' },
+      sub: ds ? 'Todos recebem os mesmos blocos. Junte o máximo de pontos antes de acabar o tempo!' : 'Deslize com as setas (ou o dedo): os blocos iguais que se encontram viram um só, com o dobro. Chegue no 2048!',
+      acoes: ds ? [] : [botao('Novo jogo', { icone: 'aleatorio', onclick: novoJogo })],
     }),
     h('div', { class: 'jogo-solo' },
       h('div', { class: 'jogo-area' },
@@ -576,10 +605,10 @@ export function jogo2048() {
           h('span', null, 'Pontos: ', pontosEl),
           h('span', null, 'Maior bloco: ', maiorEl),
           contadorPlateia(),
-          h('span', null, icone('trofeu'), ' Seu recorde: ', recordeEl)),
+          !ds && h('span', null, icone('trofeu'), ' Seu recorde: ', recordeEl)),
         faixa,
         moldura),
-      ranking.el));
+      ds ? ds.painel : ranking.el));
 }
 
 export function assistir2048() {
