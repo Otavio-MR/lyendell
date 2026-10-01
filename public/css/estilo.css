@@ -2095,3 +2095,124 @@ button.cid-papel:disabled { cursor: default; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* ─── Personagem criança: o site do jeito de uma criança ─────────── */
+/* Céu de noite com estrelas, letra de caderno, cantos bem redondos e cores de giz de cera. */
+body.modo-crianca {
+  --bg: #0c1330;
+  --bg-2: #101a3d;
+  --sup: #152052;
+  --sup-2: #1a275e;
+  --sup-3: #22306d;
+  --borda: #2d3d82;
+  --borda-2: #3d50a0;
+  --texto: #f6efff;
+  --texto-2: #ddd4f5;
+  --suave: #aaa4cf;
+  --ouro: #ffd45c;
+  --ouro-l: #ffeaa0;
+  --ouro-d: #d9a521;
+  --ouro-fundo: rgba(255, 212, 92, 0.14);
+  --rosa: #ff9ad5;
+  --menta: #8ef0c8;
+  --ceu: #8fd3ff;
+  --lilas: #c6a6ff;
+  --raio: 22px;
+  --raio-p: 14px;
+  --f-titulo: 'Fredoka', 'Trebuchet MS', sans-serif;
+  --f-destaque: 'Fredoka', 'Trebuchet MS', sans-serif;
+  --f-texto: 'Patrick Hand', 'Comic Sans MS', cursive;
+  font-size: 19px;
+  background:
+    radial-gradient(1.6px 1.6px at 12% 18%, #fff 60%, transparent 100%),
+    radial-gradient(1.2px 1.2px at 28% 62%, #fffbe0 60%, transparent 100%),
+    radial-gradient(2px 2px at 44% 12%, #fff 60%, transparent 100%),
+    radial-gradient(1.3px 1.3px at 63% 38%, #e7f3ff 60%, transparent 100%),
+    radial-gradient(1.8px 1.8px at 78% 72%, #fff 60%, transparent 100%),
+    radial-gradient(1.2px 1.2px at 88% 24%, #fffbe0 60%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 52% 86%, #fff 60%, transparent 100%),
+    radial-gradient(1.1px 1.1px at 6% 80%, #e7f3ff 60%, transparent 100%),
+    radial-gradient(70px 70px at 92% 8%, rgba(255, 244, 196, 0.9) 45%, rgba(255, 244, 196, 0.12) 60%, transparent 72%),
+    radial-gradient(900px 500px at 20% 110%, rgba(198, 166, 255, 0.18), transparent 60%),
+    linear-gradient(180deg, #0a1028, #131c47 60%, #1b1f52);
+  background-attachment: fixed;
+}
+body.modo-crianca .pag-titulo { color: var(--ouro); letter-spacing: 0.01em; }
+body.modo-crianca .pag-icone { color: var(--rosa); transform: rotate(-6deg); }
+body.modo-crianca .pag-sub { font-size: 1.12rem; color: var(--texto-2); }
+body.modo-crianca .painel, body.modo-crianca .livro-card, body.modo-crianca .jogo-cartao {
+  border-width: 2px; box-shadow: 0 6px 0 rgba(0, 0, 0, 0.25);
+}
+body.modo-crianca .btn { border-radius: 999px; }
+body.modo-crianca .btn-ouro { color: #2a1a00; box-shadow: 0 3px 0 #b5860f; }
+body.modo-crianca .btn-ouro:active { transform: translateY(2px); box-shadow: 0 1px 0 #b5860f; }
+body.modo-crianca .lateral { background: linear-gradient(180deg, #0f1740, #0b1232); border-right: 2px dashed var(--borda-2); }
+body.modo-crianca .menu-titulo { color: var(--rosa); }
+body.modo-crianca .menu-item { border-radius: 999px; }
+body.modo-crianca .menu-item .ico { transition: transform 0.2s; }
+body.modo-crianca .menu-item:hover .ico { transform: rotate(-12deg) scale(1.15); }
+body.modo-crianca .menu-secao .menu-item:nth-of-type(6n + 1) .ico { color: var(--ouro); }
+body.modo-crianca .menu-secao .menu-item:nth-of-type(6n + 2) .ico { color: var(--rosa); }
+body.modo-crianca .menu-secao .menu-item:nth-of-type(6n + 3) .ico { color: var(--menta); }
+body.modo-crianca .menu-secao .menu-item:nth-of-type(6n + 4) .ico { color: var(--ceu); }
+body.modo-crianca .menu-secao .menu-item:nth-of-type(6n + 5) .ico { color: var(--lilas); }
+body.modo-crianca .menu-secao .menu-item:nth-of-type(6n) .ico { color: #ffb38a; }
+body.modo-crianca .marca strong { color: var(--ouro); }
+body.modo-crianca .vazio h3 { color: var(--ouro); }
+body.modo-crianca .tabela th { color: var(--rosa); }
+
+.chip-crianca { --cor: #ff9ad5; }
+.nota-crianca { border-style: dashed; border-color: rgba(255, 154, 213, 0.5); background: rgba(255, 154, 213, 0.08); }
+.nota-crianca .ico { color: #ff9ad5; }
+
+/* A fala do coelho da Casa (na toca e nas fichas do mapa). */
+.cr-fala { display: flex; align-items: flex-start; gap: 10px; }
+.cr-coelho { display: grid; place-items: center; width: 46px; height: 46px; flex: none; border-radius: 50%; background: #fff4d6; color: #b5860f; border: 2px solid var(--ouro); }
+.cr-coelho .ico { width: 28px; height: 28px; }
+.cr-fala p {
+  position: relative; margin: 0; padding: 10px 14px; border-radius: 18px 18px 18px 4px; background: #fff8e6; color: #3a2a12;
+  font-family: 'Patrick Hand', 'Comic Sans MS', cursive; font-size: 1.15rem; line-height: 1.3; box-shadow: 0 4px 0 rgba(0, 0, 0, 0.2);
+}
+.cr-fala p small { display: block; font-size: 0.8rem; color: #8c6d15; }
+.cr-fala-predio { margin-top: 2px; }
+
+/* A toca (início da criança). */
+.inicio-crianca { display: grid; gap: 18px; }
+.cr-boas-vindas {
+  display: flex; align-items: center; gap: 22px; padding: 24px 26px; border-radius: var(--raio);
+  background: radial-gradient(400px 200px at 0% 0%, rgba(255, 154, 213, 0.18), transparent), radial-gradient(400px 200px at 100% 100%, rgba(143, 211, 255, 0.16), transparent), var(--sup);
+  border: 2px solid var(--borda-2); box-shadow: 0 6px 0 rgba(0, 0, 0, 0.25);
+}
+.cr-eu .avatar { width: 96px; height: 96px; font-size: 1.8rem; box-shadow: 0 0 0 4px var(--ouro), 0 0 0 8px rgba(255, 212, 92, 0.25); }
+.cr-texto { display: grid; gap: 10px; min-width: 0; }
+.cr-texto .pag-titulo { font-size: 2.3rem; }
+.cr-portas { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; }
+.cr-porta {
+  display: grid; justify-items: center; gap: 6px; padding: 20px 14px 18px; text-align: center; border-radius: var(--raio);
+  background: var(--sup); border: 2px solid var(--borda-2); color: var(--texto); box-shadow: 0 6px 0 rgba(0, 0, 0, 0.28);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.cr-porta:hover { transform: translateY(-3px) rotate(-1deg); color: var(--texto); box-shadow: 0 9px 0 rgba(0, 0, 0, 0.28); }
+.cr-porta strong { font-family: var(--f-titulo); font-size: 1.15rem; }
+.cr-porta small { color: var(--texto-2); font-size: 1rem; }
+.cr-porta-icone { display: grid; place-items: center; width: 62px; height: 62px; border-radius: 50%; background: rgba(0, 0, 0, 0.22); }
+.cr-porta-icone .ico { width: 32px; height: 32px; }
+.cr-porta.cor-0 { border-color: #ffd45c; } .cr-porta.cor-0 .cr-porta-icone { color: #ffd45c; }
+.cr-porta.cor-1 { border-color: #ff9ad5; } .cr-porta.cor-1 .cr-porta-icone { color: #ff9ad5; }
+.cr-porta.cor-2 { border-color: #8ef0c8; } .cr-porta.cor-2 .cr-porta-icone { color: #8ef0c8; }
+.cr-porta.cor-3 { border-color: #8fd3ff; } .cr-porta.cor-3 .cr-porta-icone { color: #8fd3ff; }
+.cr-porta.cor-4 { border-color: #c6a6ff; } .cr-porta.cor-4 .cr-porta-icone { color: #c6a6ff; }
+.cr-porta.cor-5 { border-color: #ffb38a; } .cr-porta.cor-5 .cr-porta-icone { color: #ffb38a; }
+.cr-curiosidade { display: flex; align-items: center; gap: 14px; border-style: dashed; }
+.cr-curiosidade-icone { display: grid; place-items: center; width: 48px; height: 48px; flex: none; border-radius: 50%; background: var(--ouro-fundo); color: var(--ouro); }
+.cr-curiosidade-icone .ico { width: 26px; height: 26px; animation: cr-brilho 2.4s ease-in-out infinite; }
+@keyframes cr-brilho { 50% { transform: scale(1.15) rotate(12deg); } }
+.cr-curiosidade strong { font-family: var(--f-titulo); color: var(--ouro); }
+.cr-curiosidade p { margin: 2px 0 0; font-size: 1.12rem; }
+@media (max-width: 640px) {
+  .cr-boas-vindas { flex-direction: column; text-align: center; padding: 20px 16px; }
+  .cr-texto .chips { justify-content: center; }
+  .cr-texto .pag-titulo { font-size: 1.9rem; }
+  .cr-portas { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .cr-porta { padding: 16px 10px 14px; }
+}

@@ -8,7 +8,7 @@ const { erro, texto, idDaRota } = require('../util');
 const r = express.Router();
 r.use(exigirLogin);
 
-const CAMPOS_PUBLICOS = 'id, nome, foto, is_root, titulo_perfil, bio, cor, capa, moldura, mc_nick, emblemas, xp, sequencia, sequencia_max, criado_em, ultimo_acesso';
+const CAMPOS_PUBLICOS = 'id, nome, foto, is_root, crianca, titulo_perfil, bio, cor, capa, moldura, mc_nick, emblemas, xp, sequencia, sequencia_max, criado_em, ultimo_acesso';
 
 // Cargos de cada pessoa (sem o cargo base, que é de todos).
 async function cargosPorUsuario() {
@@ -29,6 +29,7 @@ function publico(u, cargos = []) {
     nome: u.nome,
     foto: u.foto || null,
     is_root: !!u.is_root,
+    crianca: !!u.crianca,
     titulo_perfil: u.titulo_perfil || '',
     cor: u.cor || null,
     capa: u.capa || null,

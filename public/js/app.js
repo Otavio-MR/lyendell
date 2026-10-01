@@ -1,4 +1,5 @@
-import { estado, get, post, h, trocar, icone, pode, podeAlgum, aviso, avatar, cargoPrincipal, vazio, limparTela } from './core.js';
+import { estado, get, post, h, trocar, icone, pode, podeAlgum, aviso, avatar, cargoPrincipal, vazio, limparTela, ehCrianca } from './core.js';
+import { MENU_CRIANCA, SECOES_CRIANCA } from './crianca.js';
 import { ligar, desligar, ouvir, rt } from './tempo-real.js';
 import { inicio } from './telas/inicio.js';
 import { modulo, livro, aprovacoes, envios, MODULOS } from './telas/livros.js';
@@ -102,6 +103,7 @@ window.addEventListener('sessao-expirada', () => {
 
 function telaLogin() {
   limparTela();
+  document.body.classList.remove('modo-crianca'); // a tela de entrar é a mesma para todos
   document.title = 'Entrar · Casa Luckham';
   const nome = h('input', { class: 'input', name: 'nome', autocomplete: 'username', placeholder: 'Ex.: Evran Luckham', required: true, autofocus: true });
   const senha = h('input', { class: 'input', type: 'password', name: 'senha', autocomplete: 'current-password', required: true });
@@ -152,13 +154,16 @@ function telaLogin() {
 
 function montar() {
   const eu = estado.eu;
+  // Personagem criança: o site inteiro muda de cara (céu estrelado, letra de caderno, nomes de criança).
+  const crianca = ehCrianca();
+  document.body.classList.toggle('modo-crianca', crianca);
   const nav = h('nav', { class: 'menu', 'aria-label': 'Menu principal' },
     MENU.map(s => {
       const itens = s.itens.filter(i => !i.perm || podeAlgum(...i.perm));
       if (!itens.length) return null;
       return h('div', { class: 'menu-secao' },
-        h('p', { class: 'menu-titulo' }, s.secao),
-        itens.map(i => h('a', { class: 'menu-item', href: `#${i.rota}`, 'data-rota': i.rota }, icone(i.icone), h('span', null, i.nome))));
+        h('p', { class: 'menu-titulo' }, crianca ? SECOES_CRIANCA[s.secao] || s.secao : s.secao),
+        itens.map(i => h('a', { class: 'menu-item', href: `#${i.rota}`, 'data-rota': i.rota }, icone(i.icone), h('span', null, crianca ? MENU_CRIANCA[i.rota] || i.nome : i.nome))));
     }));
 
   const sair = async () => {
@@ -173,7 +178,7 @@ function montar() {
   const lateral = h('aside', { class: 'lateral' },
     h('a', { class: 'marca', href: '#/' },
       h('img', { src: '/img/brasao.png', alt: '' }),
-      h('span', null, h('strong', null, 'Casa Luckham'), h('small', null, 'Lyendell'))),
+      h('span', null, h('strong', null, 'Casa Luckham'), h('small', null, crianca ? 'a minha cidade' : 'Lyendell'))),
     nav,
     h('div', { class: 'eu' },
       h('a', { class: 'eu-link', href: `#/pessoa/${eu.id}`, title: 'Meu perfil' },
@@ -244,12 +249,16 @@ async function rotear() {
     } catch (err) {
       if (g !== geracao) return;
       trocar(tela, err.status === 403
-        ? vazio('Acesso restrito', 'Seu cargo não dá acesso a esta parte do sistema.', h('a', { class: 'btn', href: '#/' }, 'Voltar ao início'))
+        ? ehCrianca()
+          ? vazio('Essa porta é alta demais!', 'Isso é coisa de gente grande. Vamos brincar em outro lugar?', h('a', { class: 'btn', href: '#/recreacao' }, 'Ir brincar'))
+          : vazio('Acesso restrito', 'Seu cargo não dá acesso a esta parte do sistema.', h('a', { class: 'btn', href: '#/' }, 'Voltar ao início'))
         : vazio('Algo deu errado', err.message, h('a', { class: 'btn', href: '#/' }, 'Voltar ao início')));
     }
     return;
   }
-  trocar(tela, vazio('Página não encontrada', 'Esse caminho não existe em Lyendell.', h('a', { class: 'btn', href: '#/' }, 'Voltar ao início')));
+  trocar(tela, ehCrianca()
+    ? vazio('Ué, me perdi!', 'Esse caminho não leva a lugar nenhum.', h('a', { class: 'btn', href: '#/' }, 'Voltar para a minha toca'))
+    : vazio('Página não encontrada', 'Esse caminho não existe em Lyendell.', h('a', { class: 'btn', href: '#/' }, 'Voltar ao início')));
 }
 
 window.addEventListener('hashchange', rotear);

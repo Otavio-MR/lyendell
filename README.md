@@ -36,6 +36,8 @@ Todo usuário é morador. Os cargos somam poderes em cima disso, e uma pessoa po
 | Lorde Comandante | Faz as Leis de Lyendell junto com a Família Nobre: escreve, publica, edita e revoga |
 | Morador | Ver tudo (menos o Hospital), ajudar nas atividades e usar a Recreação |
 
+Qualquer usuário pode ser marcado como **criança** (veja "Personagem criança" mais abaixo): mesmo com cargo, só olha, brinca e ajuda.
+
 O Hospital não é aberto a todos os moradores, porque guarda o prontuário dos pacientes: só o
 Diretor, os Médicos, a Família Nobre e o administrador veem. Para abrir a todos, marque
 "Ver os livros e registros" do Hospital no cargo Morador, na tela **Cargos**.
@@ -81,6 +83,36 @@ Quem escreve as leis (Lorde Comandante e Família Nobre) vê ainda o botão **Es
 que abre os livros como nos outros módulos (em `#/leis/livros`): lá se escreve, edita, revoga e se
 criam outros livros de regras. Cada livro novo vira uma aba na leitura, e a leitura acha sozinha o
 título, o tipo, o texto, a pena e as datas pelos nomes dos campos.
+
+## Personagem criança
+
+Ao criar ou editar um usuário, o administrador pode ligar **Personagem criança**. A criança pode ter
+qualquer cargo (até Família Nobre, e o cargo continua aparecendo), mas só fica com o que uma criança
+faria:
+
+- **pode**: olhar tudo o que o cargo deixa ver (os livros, o mapa, as leis, a galeria, os anúncios),
+  brincar e conversar na Recreação, ajudar nas atividades, arrumar o próprio perfil e deixar recados;
+- **não pode**: registrar, editar, apagar, aprovar, publicar anúncios, enviar fotos, mexer no mapa,
+  moderar o chat ou ver a administração. O servidor bloqueia de verdade (não é só esconder botão), e
+  qualquer porta fechada responde "Isso é coisa de gente grande!".
+
+E o site aparece para ela **do jeito de uma criança**:
+
+- céu de noite estrelado com lua, letra de caderno, cantos redondos e cores de giz de cera;
+- os lugares com nome de criança: Minha toca (início), O mapa do tesouro, A casa dos livros
+  gigantes (Tabelionato), Os soldados de armadura (Guarda), Onde cuidam dos dodóis (Hospital), A casa
+  do falatório (Congresso), As regras dos grandes (Leis), Hora de brincar! (Recreação), As
+  figurinhas (Galeria), Ajudar os grandes (Atividades)...;
+- cada tela explica o lugar como uma criança entende ("Os grandes entram lá, falam, falam, falam...");
+- na toca, o coelho da Casa fala com ela, tem portas grandes para os lugares, as "aventuras de hoje"
+  (as missões) e uma curiosidade do dia;
+- os livros ganham nomes de criança ("O livro dos casamentos (eca, beijo!)", "Quem está de castigo
+  na torre") e avisam que "dá para olhar tudinho, mas não pode rabiscar";
+- no mapa, cada prédio tem "o que eu acho" do lugar ("Onde guardam as moedinhas. Será que dá para
+  pegar uma?").
+
+Para os outros, o perfil e a comunidade mostram a etiqueta "Criança". Os textos de criança ficam em
+`public/js/crianca.js`.
 
 ## Aprovação de registros
 

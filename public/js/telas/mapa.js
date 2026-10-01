@@ -3,7 +3,8 @@
 // Os estilos do desenho ficam dentro do próprio SVG, para a imagem baixada sair igual à tela.
 // Os prédios (públicos, comércios e outros pontos) e as casas vêm do banco e são editados aqui mesmo.
 
-import { get, post, put, del, h, trocar, icone, cabecalho, botao, botaoIcone, aviso, aoSair, normalizar, avatar, modal, modalForm, campo, confirmar, tentar, enviarImagem, relativo } from '../core.js';
+import { get, post, put, del, h, trocar, icone, cabecalho, botao, botaoIcone, aviso, aoSair, normalizar, avatar, modal, modalForm, campo, confirmar, tentar, enviarImagem, relativo, ehCrianca } from '../core.js';
+import { opiniaoDoLugar } from '../crianca.js';
 import { VISTA, CIDADE, RIO, TORRES, PORTAO, CAMINHOS, AVENIDAS, RUAS } from '../mapa-lyendell.js';
 import { TAMANHO_CASA, amostrar, linhasDaVia, viaPorId, distribuir, encaixar, lerLista, trechoPrincipal, usarPredios } from '../mapa-casas.js';
 import { ICONES_MAPA, desenhoDoIcone } from '../icones-mapa.js';
@@ -542,7 +543,10 @@ export async function mapa() {
         h('div', null,
           h('p', { class: 'predio-tipo' }, p.tipo || CATEGORIAS[p.categoria]),
           h('p', { class: 'predio-onde' }, [p.tipo && p.tipo !== CATEGORIAS[p.categoria] && CATEGORIAS[p.categoria], p.centro && 'Centro da cidade', via && `Fica perto da ${via.nome}`].filter(Boolean).join(' · ')))),
-      p.funcao && secao('Para que serve', h('p', { class: 'predio-texto' }, p.funcao)),
+      // A criança conta o que acha do lugar (do jeito dela).
+      ehCrianca() && h('div', { class: 'cr-fala cr-fala-predio' }, h('span', { class: 'cr-coelho', 'aria-hidden': 'true' }, icone('coelho')),
+        h('p', null, h('small', null, 'O que eu acho:'), opiniaoDoLugar(p))),
+      p.funcao && secao(ehCrianca() ? 'Os grandes dizem que serve para' : 'Para que serve', h('p', { class: 'predio-texto' }, p.funcao)),
       moram.length > 0 && secao(`Quem mora aqui (${moram.length})`, h('ul', { class: 'mapa-moradores predio-pessoas' }, moram.map(pessoa))),
       trabalham.length > 0 && secao(`Quem trabalha aqui (${trabalham.length})`, h('ul', { class: 'mapa-moradores predio-pessoas' }, trabalham.map(pessoa))),
       p.info.length > 0 && secao('Mais informações', h('dl', { class: 'predio-info' }, p.info.map(i => h('div', null, h('dt', null, i.rotulo), h('dd', null, i.valor))))),

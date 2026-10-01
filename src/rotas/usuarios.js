@@ -73,7 +73,7 @@ async function buscarAlvo(req) {
 
 r.get('/', exigir('usuarios.ver'), async (req, res) => {
   const [lista, vinculos, todosCargos] = await Promise.all([
-    db.all('SELECT id, nome, foto, is_root, ativo, criado_em, ultimo_acesso FROM usuarios ORDER BY is_root DESC, chave'),
+    db.all('SELECT id, nome, foto, is_root, ativo, crianca, criado_em, ultimo_acesso FROM usuarios ORDER BY is_root DESC, chave'),
     db.all('SELECT usuario_id, cargo_id FROM usuario_cargos'),
     db.all('SELECT * FROM cargos ORDER BY ordem, id'),
   ]);
@@ -90,6 +90,7 @@ r.get('/', exigir('usuarios.ver'), async (req, res) => {
         ...u,
         is_root: !!u.is_root,
         ativo: !!u.ativo,
+        crianca: !!u.crianca,
         cargos: [...ids],
         gerenciavel: podeGerenciar(req.usuario, completo),
       };
@@ -105,12 +106,13 @@ r.post('/', exigir('usuarios.criar'), async (req, res) => {
   if (problema) throw erro(400, problema);
   const cargos = await validarCargos(req.usuario, req.body?.cargos || []);
   const chave = chaveNome(nome);
+  const crianca = req.body?.crianca ? 1 : 0;
 
   const [criado] = await db.lote([
-    ['INSERT INTO usuarios (nome, chave, senha_hash) VALUES (?, ?, ?)', nome, chave, await hashSenha(req.body.senha)],
+    ['INSERT INTO usuarios (nome, chave, senha_hash, crianca) VALUES (?, ?, ?, ?)', nome, chave, await hashSenha(req.body.senha), crianca],
     ...cargos.map(c => ['INSERT INTO usuario_cargos (usuario_id, cargo_id) SELECT id, ? FROM usuarios WHERE chave = ?', c.id, chave]),
   ]);
-  await anotar(req, 'Criou um usuário', `${nome}${cargos.length ? ` (${cargos.map(c => c.nome).join(', ')})` : ''}`);
+  await anotar(req, 'Criou um usuário', `${nome}${crianca ? ', criança' : ''}${cargos.length ? ` (${cargos.map(c => c.nome).join(', ')})` : ''}`);
   res.status(201).json({ id: Number(criado.lastInsertRowid) });
 });
 
@@ -149,6 +151,10 @@ r.put('/:id', exigir('usuarios.editar'), async (req, res) => {
     comandos.push(['DELETE FROM usuario_cargos WHERE usuario_id = ?', alvo.id],
       ...cargos.map(c => ['INSERT INTO usuario_cargos (usuario_id, cargo_id) VALUES (?, ?)', alvo.id, c.id]));
     mudancas.push(`cargos: ${cargos.map(c => c.nome).join(', ') || 'só morador'}`);
+  }
+  if (req.body?.crianca !== undefined && !alvo.is_root && !!req.body.crianca !== alvo.crianca) {
+    comandos.push(['UPDATE usuarios SET crianca = ? WHERE id = ?', req.body.crianca ? 1 : 0, alvo.id]);
+    mudancas.push(req.body.crianca ? 'agora é criança' : 'não é mais criança');
   }
   if (req.body?.ativo !== undefined && !alvo.is_root && !proprio) {
     const ativo = req.body.ativo ? 1 : 0;

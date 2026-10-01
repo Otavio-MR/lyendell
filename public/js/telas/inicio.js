@@ -1,4 +1,5 @@
-import { estado, get, h, icone, chipCargo, barra, num, pacotes, relativo, dataCurta, seloNivel, avatarPessoa, normalizar } from '../core.js';
+import { estado, get, h, icone, chipCargo, chipCrianca, barra, num, pacotes, relativo, dataCurta, seloNivel, avatarPessoa, normalizar, pode, avatar } from '../core.js';
+import { MENU_CRIANCA, falaDoDia, curiosidadeDoDia } from '../crianca.js';
 import { barraNivel } from './pessoas.js';
 import { MODULOS } from './livros.js';
 
@@ -30,7 +31,7 @@ function avisosDeAprovacao(p = {}) {
 }
 
 // Nível, sequência de dias e as missões de hoje: o motivo para voltar amanhã.
-function painelProgresso(pr) {
+function painelProgresso(pr, { crianca = false } = {}) {
   const feitas = pr.missoes.filter(m => m.feito >= m.meta).length;
   return h('section', { class: 'painel progresso-inicio' },
     h('div', { class: 'progresso-topo' },
@@ -42,7 +43,7 @@ function painelProgresso(pr) {
         icone('fogo'), h('strong', null, pr.sequencia), h('small', null, pr.sequencia === 1 ? 'dia seguido' : 'dias seguidos'))),
     h('div', { class: 'missoes' },
       h('div', { class: 'missoes-cab' },
-        h('h3', null, icone('tarefas'), 'Missões de hoje'),
+        h('h3', null, icone('tarefas'), crianca ? 'Aventuras de hoje' : 'Missões de hoje'),
         h('small', { class: 'suave' }, feitas === pr.missoes.length ? 'Todas cumpridas! Amanhã tem mais.' : `${feitas} de ${pr.missoes.length} cumpridas · renovam à meia-noite`)),
       h('ul', null, pr.missoes.map(m => {
         const pronta = m.feito >= m.meta;
@@ -53,7 +54,9 @@ function painelProgresso(pr) {
             m.meta > 1 && !pronta && h('div', { class: 'missao-barra' }, barra(m.feito, m.meta), h('small', null, `${m.feito}/${m.meta}`))),
           h('span', { class: 'missao-xp' }, `+${m.xp} XP`));
       }))),
-    h('p', { class: 'progresso-dica suave' }, 'Ganhe XP conversando no chat, jogando, ajudando nas atividades e deixando recados. Subir de nível libera molduras novas para a foto.'));
+    h('p', { class: 'progresso-dica suave' }, crianca
+      ? 'Brincar, conversar e ajudar os grandes faz o seu coelhinho crescer. Quanto maior ele fica, mais molduras bonitas você ganha!'
+      : 'Ganhe XP conversando no chat, jogando, ajudando nas atividades e deixando recados. Subir de nível libera molduras novas para a foto.'));
 }
 
 // As últimas publicações do Congresso e das Leis de Lyendell: todo mundo precisa saber o que mudou.
@@ -70,11 +73,11 @@ function painelNovidades(lista, { titulo, icone: ic, href }) {
       h('small', null, x.data ? `${href === '#/leis' ? 'Feita' : 'Votada'} em ${dataCurta(x.data)}` : `Publicada ${relativo(x.em)}`, x.numero ? ` · nº ${x.numero}` : '')))));
 }
 
-function painelComunidade(pr) {
+function painelComunidade(pr, { crianca = false } = {}) {
   if (!pr.novidades.length && !pr.semana.length) return null;
   return h('div', { class: 'inicio-grade' },
     h('section', { class: 'painel' },
-      h('header', { class: 'painel-cab' }, h('h2', null, icone('estrela'), 'Conquistas recentes'), h('a', { href: '#/comunidade' }, 'Comunidade')),
+      h('header', { class: 'painel-cab' }, h('h2', null, icone('estrela'), crianca ? 'Quem ganhou medalha' : 'Conquistas recentes'), h('a', { href: '#/comunidade' }, crianca ? 'Todo mundo' : 'Comunidade')),
       pr.novidades.length
         ? h('div', { class: 'novidades' }, pr.novidades.map(n => h('a', { class: 'novidade', href: `#/pessoa/${n.id}` },
           avatarPessoa(n, 'avatar-p'),
@@ -82,7 +85,7 @@ function painelComunidade(pr) {
           h('small', null, relativo(n.em)))))
         : h('p', { class: 'painel-vazio' }, 'Ninguém ganhou conquistas ainda.')),
     h('section', { class: 'painel' },
-      h('header', { class: 'painel-cab' }, h('h2', null, icone('fogo'), 'Mais ativos da semana')),
+      h('header', { class: 'painel-cab' }, h('h2', null, icone('fogo'), crianca ? 'Quem mais brincou na semana' : 'Mais ativos da semana')),
       pr.semana.length
         ? h('ol', { class: 'mini-ranking' }, pr.semana.map(p => h('li', { class: p.id === estado.eu.id ? 'eu-linha' : '' },
           h('a', { href: `#/pessoa/${p.id}`, class: 'semana-pessoa' }, avatarPessoa(p, 'avatar-p'), h('span', null, p.nome)),
@@ -90,9 +93,50 @@ function painelComunidade(pr) {
         : h('p', { class: 'painel-vazio' }, 'Ainda ninguém nesta semana.')));
 }
 
+// A toca da criança: o coelho da Casa conversa com ela, as portas grandes levam aos lugares
+// e o resto (números, anúncios, registros) fica para os grandes.
+function inicioCrianca(d, pr) {
+  const eu = estado.eu;
+  const portas = [
+    pode('recreacao.usar') && ['/recreacao', 'jogos', 'Jogos e amigos esperando'],
+    ['/mapa', 'mapa', 'Onde será que fica o tesouro?'],
+    ['/comunidade', 'usuarios', 'Ver quem mora na cidade'],
+    pode('atividades.ver') && ['/atividades', 'tarefas', 'Os grandes precisam de mim'],
+    pode('galeria.ver') && ['/galeria', 'imagem', 'Retratos e desenhos'],
+    pode('leis.ver') && ['/leis', 'balanca', 'O que não pode fazer'],
+  ].filter(Boolean);
+  return h('div', { class: 'pagina inicio inicio-crianca' },
+    h('section', { class: 'cr-boas-vindas' },
+      h('div', { class: 'cr-eu' }, avatar(eu.nome, 'avatar-g', eu.foto)),
+      h('div', { class: 'cr-texto' },
+        h('h1', { class: 'pag-titulo' }, `Oi, ${eu.nome.split(' ')[0]}!`),
+        h('div', { class: 'chips' }, chipCrianca(), eu.cargos.map(chipCargo)),
+        h('div', { class: 'cr-fala' },
+          h('span', { class: 'cr-coelho', 'aria-hidden': 'true' }, icone('coelho')),
+          h('p', null, h('small', null, 'O coelho da Casa diz:'), falaDoDia())))),
+    h('nav', { class: 'cr-portas', 'aria-label': 'Aonde ir' }, portas.map(([rota, ic, texto], i) =>
+      h('a', { class: `cr-porta cor-${i % 6}`, href: `#${rota}` },
+        h('span', { class: 'cr-porta-icone' }, icone(ic)),
+        h('strong', null, MENU_CRIANCA[rota]),
+        h('small', null, texto)))),
+    pr && painelProgresso(pr, { crianca: true }),
+    h('section', { class: 'painel cr-curiosidade' },
+      h('span', { class: 'cr-curiosidade-icone' }, icone('estrela')),
+      h('div', null, h('strong', null, 'Você sabia?'), h('p', null, curiosidadeDoDia()))),
+    painelNovidades(d.leis, { titulo: 'Regras novas dos grandes', icone: 'balanca', href: '#/leis' }),
+    d.atividades?.length > 0 && h('section', { class: 'painel' },
+      h('header', { class: 'painel-cab' }, h('h2', null, icone('tarefas'), 'Os grandes precisam de ajuda!'), h('a', { href: '#/atividades' }, 'Quero ajudar')),
+      h('div', { class: 'lista-simples' }, d.atividades.map(a => h('a', { class: 'ativ-mini', href: `#/atividades/${a.id}` },
+        h('div', { class: 'ativ-mini-topo' }, h('strong', null, a.titulo), h('span', { class: 'suave' }, `${Math.floor(Math.min(100, (a.total / a.meta) * 100))}%`)),
+        barra(a.total, a.meta),
+        h('small', null, `Precisa de ${num(a.meta)} ${a.item}`))))),
+    pr && painelComunidade(pr, { crianca: true }));
+}
+
 export async function inicio() {
   const [d, pr] = await Promise.all([get('/api/inicio'), get('/api/auth/progresso').catch(() => null)]);
   const eu = estado.eu;
+  if (eu.crianca) return inicioCrianca(d, pr);
   const n = d.numeros;
 
   const numeros = [

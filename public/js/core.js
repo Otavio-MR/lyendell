@@ -1,5 +1,7 @@
 // Base compartilhada por todas as telas: estado, API, criação de elementos, modais e formatação.
 
+import { tituloInfantil } from './crianca.js';
+
 export const estado = { eu: null };
 
 // Coisas que uma tela deixa rodando (relógio de jogo, teclado, conexão) e que param quando se troca de tela.
@@ -12,6 +14,8 @@ export function limparTela() {
 }
 export const pode = p => !!estado.eu && estado.eu.permissoes.includes(p);
 export const podeAlgum = (...ps) => ps.some(pode);
+// Personagem criança: só olha, brinca e ajuda, e vê o site do jeito de uma criança (veja crianca.js).
+export const ehCrianca = () => !!estado.eu?.crianca;
 
 /* ─── API ─────────────────────────────────────────── */
 
@@ -244,6 +248,12 @@ export function botaoIcone(ic, rotulo, onclick, classe = '') {
 }
 
 export function cabecalho({ titulo, sub, icone: ic, acoes = [], voltar }) {
+  // A criança vê os lugares com outros nomes e explicações.
+  if (ehCrianca()) {
+    const c = tituloInfantil(titulo);
+    if (c) { titulo = c.titulo; sub = c.sub ?? sub; }
+    if (voltar && tituloInfantil(voltar.texto)) voltar = { ...voltar, texto: tituloInfantil(voltar.texto).titulo };
+  }
   return h('header', { class: 'pag-cab' },
     h('div', { class: 'pag-cab-texto' },
       voltar && h('a', { class: 'voltar', href: voltar.href }, icone('voltar'), voltar.texto),
@@ -543,5 +553,9 @@ export const normalizar = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]
 
 export function cargoPrincipal(u) {
   if (u.is_root) return 'Administrador';
+  if (u.crianca) return u.cargos?.[0] ? `Criança · ${u.cargos[0].nome}` : 'Criança';
   return u.cargos?.[0]?.nome || 'Morador';
 }
+
+// Etiqueta "Criança" (aparece no perfil, na comunidade e na lista de usuários).
+export const chipCrianca = () => h('span', { class: 'chip chip-crianca', title: 'Personagem criança' }, icone('coelho'), 'Criança');

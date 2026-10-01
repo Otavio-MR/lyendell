@@ -1,10 +1,15 @@
 import {
-  estado, get, post, put, del, h, trocar, icone, pode, cabecalho, vazio, botao, botaoIcone, modal, modalForm, confirmar,
+  estado, get, post, put, del, h, trocar, icone, pode, ehCrianca, cabecalho, vazio, botao, botaoIcone, modal, modalForm, confirmar,
   aviso, tentar, campo, interruptor, enviarImagem, dataHora, dataCurta, num, normalizar, ErroApi,
   textoDuracao, listaDeNomes, relativo,
 } from '../core.js';
 import { livroDeRegistro, livroDeRegistros } from '../livro-mc.js';
 import { verPagamentos, resumoCobranca } from './pagamentos.js';
+import { nomeInfantil } from '../crianca.js';
+
+// Para a criança: os livros são dos grandes; dá para olhar, mas não pode rabiscar.
+const notaCrianca = () => ehCrianca() && h('p', { class: 'nota nota-crianca' }, icone('coelho'),
+  h('span', null, 'Esses livros são dos grandes. Dá para olhar tudinho, mas não pode rabiscar!'));
 
 // Tabelionato, Guarda do Coelho, Hospital e Congresso usam a mesma tela: livros com formulários configuráveis.
 // "no" é como o nome entra numa frase ("aguarda a sua aprovação no Hospital"); "enviam" dá o exemplo de quem envia.
@@ -107,6 +112,7 @@ export async function modulo(m) {
         })],
       }),
       abasModulo(m, '', contagem),
+      notaCrianca(),
       livros.length
         ? h('div', { class: 'grade-livros' }, livros.map(l => cartaoLivro(m, l)))
         : vazio('Nenhum livro ainda', configurar ? 'Crie o primeiro livro de registros.' : 'Quando houver livros, eles aparecem aqui.'));
@@ -119,7 +125,7 @@ export async function modulo(m) {
 function cartaoLivro(m, l) {
   return h('a', { class: 'livro-card', href: `#/${m}/${l.id}` },
     h('span', { class: 'livro-icone' }, icone(l.icone)),
-    h('div', { class: 'livro-info' }, h('h3', null, l.nome), l.descricao && h('p', null, l.descricao)),
+    h('div', { class: 'livro-info' }, h('h3', null, ehCrianca() ? nomeInfantil(l.nome) : l.nome), l.descricao && h('p', null, l.descricao)),
     h('div', { class: 'livro-rodape' },
       h('span', null, h('strong', null, num(l.total)), l.total === 1 ? ' registro' : ' registros'),
       l.pendentes > 0 && h('span', { class: 'etiqueta etiqueta-ouro', title: 'Registros aguardando a sua aprovação' }, icone('relogio'), `${l.pendentes} aguardando`),
@@ -291,6 +297,7 @@ export async function livro(m, id, abrir = null) {
           l.podeRegistrar && botao('Novo registro', { icone: 'mais', classe: 'btn-ouro', onclick: () => formRegistro(l, null, abrirDepois) }),
         ],
       }),
+      notaCrianca(),
       !l.aberto && !l.podeRegistrar && pode(`${m}.registrar`)
         ? h('p', { class: 'nota' }, icone('cadeado'), `Livro restrito: só ${info.quemComanda} registra aqui.`)
         : null,

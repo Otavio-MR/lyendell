@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const { db } = require('./db');
-const { TODAS, VALIDAS } = require('./permissoes');
+const { TODAS, VALIDAS, PERMITIDAS_CRIANCA } = require('./permissoes');
 const { erro } = require('./util');
 
 const COOKIE = 'lyendell_sessao';
@@ -45,9 +45,11 @@ const SQL_CARGOS = `
   ORDER BY ordem, id`;
 
 // Soma as permissões dos cargos (o cargo base "Morador" vale para todos).
+// Criança fica só com as de olhar, brincar e ajudar, mesmo que o cargo dê mais.
 function montarUsuario(u, cargos) {
   const permissoes = new Set();
-  for (const c of cargos) for (const p of JSON.parse(c.permissoes)) if (VALIDAS.has(p)) permissoes.add(p);
+  const crianca = !!u.crianca && !u.is_root;
+  for (const c of cargos) for (const p of JSON.parse(c.permissoes)) if (VALIDAS.has(p) && (!crianca || PERMITIDAS_CRIANCA.has(p))) permissoes.add(p);
   if (u.is_root) TODAS.forEach(p => permissoes.add(p));
   return {
     id: u.id,
@@ -55,19 +57,20 @@ function montarUsuario(u, cargos) {
     foto: u.foto || null,
     is_root: !!u.is_root,
     ativo: !!u.ativo,
+    crianca,
     cargos: cargos.filter(c => !c.base).map(({ id, nome, cor }) => ({ id, nome, cor })),
     permissoes,
   };
 }
 
 async function carregarUsuario(id) {
-  const u = await db.get('SELECT id, nome, foto, is_root, ativo FROM usuarios WHERE id = ?', id);
+  const u = await db.get('SELECT id, nome, foto, is_root, ativo, crianca FROM usuarios WHERE id = ?', id);
   if (!u) return null;
   return montarUsuario(u, await db.all(SQL_CARGOS, id));
 }
 
 function perfil(u) {
-  return { id: u.id, nome: u.nome, foto: u.foto, is_root: u.is_root, cargos: u.cargos, permissoes: [...u.permissoes] };
+  return { id: u.id, nome: u.nome, foto: u.foto, is_root: u.is_root, crianca: u.crianca, cargos: u.cargos, permissoes: [...u.permissoes] };
 }
 
 const CINCO_MINUTOS = 5 * 60 * 1000;
@@ -77,7 +80,7 @@ async function usuarioDaRequisicao(req) {
   const token = lerCookie(req);
   if (!token) return null;
   const u = await db.get(`
-    SELECT u.id, u.nome, u.foto, u.is_root, u.ativo, u.ultimo_acesso FROM sessoes s JOIN usuarios u ON u.id = s.usuario_id
+    SELECT u.id, u.nome, u.foto, u.is_root, u.ativo, u.crianca, u.ultimo_acesso FROM sessoes s JOIN usuarios u ON u.id = s.usuario_id
     WHERE s.token_hash = ? AND s.expira_em > datetime('now') AND u.ativo = 1`, sha(token));
   if (!u) return null;
   return { usuario: montarUsuario(u, await db.all(SQL_CARGOS, u.id)), token, ultimoAcesso: u.ultimo_acesso };
@@ -105,7 +108,7 @@ const pode = (req, p) => !!req.usuario && req.usuario.permissoes.has(p);
 
 function checar(req, ...perms) {
   if (!req.usuario) throw erro(401, 'Faça login para continuar.');
-  if (!perms.every(p => req.usuario.permissoes.has(p))) throw erro(403, 'Você não tem permissão para isso.');
+  if (!perms.every(p => req.usuario.permissoes.has(p))) throw erro(403, req.usuario.crianca ? 'Isso é coisa de gente grande!' : 'Você não tem permissão para isso.');
 }
 
 const exigirLogin = (req, res, next) => next(req.usuario ? undefined : erro(401, 'Faça login para continuar.'));

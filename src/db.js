@@ -61,7 +61,8 @@ CREATE TABLE IF NOT EXISTS usuarios (
   ativo INTEGER NOT NULL DEFAULT 1,
   criado_em TEXT NOT NULL DEFAULT (datetime('now')),
   ultimo_acesso TEXT,
-  foto TEXT
+  foto TEXT,
+  crianca INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS cargos (
@@ -363,7 +364,7 @@ CREATE TABLE IF NOT EXISTS diario (
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 16;
+const VERSAO = 17;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -434,6 +435,8 @@ async function migrar() {
   if (versao < 14) await darPermissoes({ 'Família Nobre': ['mapa.editar'], 'Tabeliã': ['mapa.editar'] });
   if (versao < 15) await migrarLeisDaCapital();
   if (versao < 16) await migrarLeisDeLyendell();
+  // v17: personagem criança (só olha, brinca e ajuda; o site aparece do jeito de uma criança).
+  if (versao < 17 && !await colunaExiste('usuarios', 'crianca')) await db.run('ALTER TABLE usuarios ADD COLUMN crianca INTEGER NOT NULL DEFAULT 0');
 
   await db.run("INSERT INTO meta (chave, valor) VALUES ('versao', ?) ON CONFLICT (chave) DO UPDATE SET valor = excluded.valor", String(VERSAO));
 }

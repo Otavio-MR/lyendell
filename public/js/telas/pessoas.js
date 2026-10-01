@@ -1,6 +1,6 @@
 // Comunidade: todo mundo que usa o site e o perfil público de cada um (com conquistas e mural de recados).
 
-import { estado, get, post, del, h, trocar, icone, botao, botaoIcone, cabecalho, vazio, avatarPessoa, seloNivel, barra, chipCargo, confirmar, tentar, aviso, num, relativo, dataCurta, dataHora, normalizar, aoSair, pode } from '../core.js';
+import { estado, get, post, del, h, trocar, icone, botao, botaoIcone, cabecalho, vazio, avatarPessoa, seloNivel, barra, chipCargo, chipCrianca, ehCrianca, confirmar, tentar, aviso, num, relativo, dataCurta, dataHora, normalizar, aoSair, pode } from '../core.js';
 import { rt, ouvir } from '../tempo-real.js';
 
 const escutar = (tipo, fn) => aoSair(ouvir(tipo, fn));
@@ -34,7 +34,7 @@ export function cartaoPerfil(p, { acoes = [], conquistas = [] } = {}) {
       h('div', { class: 'perfil-nome' },
         h('h1', { class: 'pag-titulo perfil-titulo' }, p.nome),
         p.titulo_perfil && h('p', { class: 'perfil-frase' }, p.titulo_perfil),
-        h('div', { class: 'chips' }, (p.cargos?.length ? p.cargos : [{ nome: 'Morador', cor: '#9a9b74' }]).map(chipCargo))),
+        h('div', { class: 'chips' }, p.crianca && chipCrianca(), (p.cargos?.length ? p.cargos : [{ nome: 'Morador', cor: '#9a9b74' }]).map(chipCargo))),
       acoes.length ? h('div', { class: 'perfil-acoes' }, acoes) : null),
     h('div', { class: 'perfil-progresso' },
       h('div', { class: 'perfil-nivel' },
@@ -117,7 +117,7 @@ export async function pessoa(id) {
   carregarMural();
 
   trocar(raiz,
-    h('a', { class: 'voltar', href: '#/comunidade' }, icone('voltar'), 'Comunidade'),
+    h('a', { class: 'voltar', href: '#/comunidade' }, icone('voltar'), ehCrianca() ? 'Todo mundo' : 'Comunidade'),
     topo,
     h('div', { class: 'perfil-grade' },
       h('div', { class: 'perfil-coluna' },
@@ -169,6 +169,7 @@ export async function comunidade() {
         capaDe(p.capa, 'pessoa-capa'),
         h('div', { class: 'pessoa-foto' }, avatarPessoa(p, 'avatar-g'), estaOnline(p.id) && h('span', { class: 'perfil-online', title: 'No site agora' })),
         h('strong', { class: 'pessoa-nome' }, p.nome),
+        p.crianca && chipCrianca(),
         h('small', { class: 'pessoa-frase' }, p.titulo_perfil || (p.cargos[0]?.nome ?? 'Morador')),
         h('div', { class: 'pessoa-rodape' },
           seloNivel(p.nivel),

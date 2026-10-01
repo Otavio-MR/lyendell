@@ -1,6 +1,6 @@
 import {
   estado, get, post, put, del, h, trocar, icone, pode, cabecalho, vazio, botao, modal, modalForm, confirmar,
-  aviso, tentar, campo, interruptor, avatar, chipCargo, dataHora, relativo, num, normalizar,
+  aviso, tentar, campo, interruptor, avatar, chipCargo, chipCrianca, dataHora, relativo, num, normalizar,
 } from '../core.js';
 
 /* ─── Usuários ────────────────────────────────────── */
@@ -24,6 +24,7 @@ export async function usuarios() {
       const chips = u.is_root
         ? [h('span', { class: 'chip chip-ouro' }, icone('coroa'), 'Administrador')]
         : u.cargos.length ? u.cargos.map(id => porId.get(id)).filter(Boolean).map(chipCargo) : [h('span', { class: 'chip' }, 'Morador')];
+      if (u.crianca) chips.unshift(chipCrianca());
       const eu = u.id === estado.eu.id;
       return h('tr', { class: u.ativo ? '' : 'inativo' },
         h('td', { 'data-rotulo': 'Personagem' }, h('span', { class: 'pessoa' }, avatar(u.nome, 'avatar-p', u.foto), h('strong', null, u.nome), eu && h('small', { class: 'suave' }, ' (você)'))),
@@ -63,7 +64,7 @@ export async function usuarios() {
 
 function formUsuario(u, cargos, concediveis, depois) {
   const eu = u?.id === estado.eu.id;
-  const s = { nome: u?.nome || '', senha: '', cargos: new Set(u?.cargos || []), ativo: u ? u.ativo : true };
+  const s = { nome: u?.nome || '', senha: '', cargos: new Set(u?.cargos || []), ativo: u ? u.ativo : true, crianca: !!u?.crianca };
   const podeConceder = new Set(concediveis);
 
   const listaCargos = h('div', { class: 'cargos-escolha' },
@@ -104,6 +105,8 @@ function formUsuario(u, cargos, concediveis, depois) {
         campo('Nome do personagem', h('input', { class: 'input', value: s.nome, maxlength: '40', placeholder: 'Ex.: Alianor Bulton Luckham', autocomplete: 'off', oninput: e => { s.nome = e.target.value; } }),
           { obrigatorio: true, ajuda: 'É o login. Maiúsculas e minúsculas não importam.' }),
         campo(u ? 'Nova senha' : 'Senha', senha, { obrigatorio: !u, ajuda: u ? 'Deixe em branco para manter a senha atual.' : 'Mínimo de 4 caracteres. Passe para a pessoa em particular.' })),
+      !u?.is_root && interruptor('Personagem criança', s.crianca, v => { s.crianca = v; },
+        'Pode ter cargo (até Família Nobre), mas só olha, brinca, conversa e ajuda nas atividades: não registra, não edita, não apaga e não aprova nada. O site aparece para ele do jeito de uma criança.'),
       !u?.is_root && h('div', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Cargos'), listaCargos),
       u && !u.is_root && !eu && interruptor('Acesso ativo', s.ativo, v => { s.ativo = v; }, 'Desligado, a pessoa não consegue entrar, mas nada do que ela fez é apagado.'),
     ],
@@ -112,7 +115,7 @@ function formUsuario(u, cargos, concediveis, depois) {
       if (!u && s.senha.length < 4) throw new Error('A senha precisa ter pelo menos 4 caracteres.');
       const corpo = { nome: s.nome };
       if (s.senha) corpo.senha = s.senha;
-      if (!u?.is_root) corpo.cargos = [...s.cargos];
+      if (!u?.is_root) { corpo.cargos = [...s.cargos]; corpo.crianca = s.crianca; }
       if (u && !u.is_root && !eu) corpo.ativo = s.ativo;
       if (u) await put(`/api/usuarios/${u.id}`, corpo);
       else await post('/api/usuarios', { ...corpo, senha: s.senha });

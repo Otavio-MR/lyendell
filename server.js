@@ -90,6 +90,8 @@ app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
     status = 400;
     mensagem = err.code === 'LIMIT_FILE_SIZE' ? `A imagem é grande demais (máximo ${TAMANHO_MAX_MB} MB).` : 'Não foi possível receber o arquivo.';
+  } else if (status === 403 && req.usuario?.crianca) {
+    mensagem = 'Isso é coisa de gente grande!'; // para o personagem criança, qualquer porta fechada é assim
   } else if (err.type === 'entity.parse.failed') {
     mensagem = 'Dados inválidos.';
   } else if (err.type === 'entity.too.large') {

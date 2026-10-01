@@ -79,6 +79,13 @@ const CATALOGO = [
 ];
 
 const TODAS = CATALOGO.flatMap(g => g.itens.map(i => i.chave));
+
+// Personagem criança: mesmo com cargo (até Família Nobre), só olha, brinca, conversa e ajuda nas atividades.
+// Nada de registrar, editar, apagar, aprovar, publicar ou administrar (isso é coisa de gente grande).
+const PERMITIDAS_CRIANCA = new Set([
+  ...TODAS.filter(p => p.endsWith('.ver') && p !== 'usuarios.ver' && p !== 'diario.ver'),
+  'atividades.participar', 'recreacao.usar',
+]);
 const VALIDAS = new Set(TODAS);
 
 // Todo usuário é morador: estas permissões valem para qualquer um.
@@ -149,4 +156,4 @@ const CARGOS_PADRAO = [
     permissoes: [...MEMBRO, ...acoes('congresso', 'registrar', 'editar', 'apagar', 'configurar', 'aprovar')] },
 ];
 
-module.exports = { CATALOGO, TODAS, VALIDAS, CARGOS_PADRAO, DESCRICOES, EXCLUSIVAS, MODULOS };
+module.exports = { CATALOGO, TODAS, VALIDAS, PERMITIDAS_CRIANCA, CARGOS_PADRAO, DESCRICOES, EXCLUSIVAS, MODULOS };

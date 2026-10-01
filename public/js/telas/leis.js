@@ -4,7 +4,7 @@
 // Funciona com qualquer livro de leis ou regras: os papéis dos campos (título, tipo, texto, pena...)
 // são achados pelo tipo e pelo nome do campo.
 
-import { get, h, trocar, icone, cabecalho, vazio, botao, dataCurta, relativo, normalizar, estado, podeAlgum, num, aviso, textoDuracao, listaDeNomes } from '../core.js';
+import { get, h, trocar, icone, cabecalho, vazio, botao, dataCurta, relativo, normalizar, estado, podeAlgum, num, aviso, textoDuracao, listaDeNomes, ehCrianca } from '../core.js';
 import { livroDeRegistro, livroDeRegistros } from '../livro-mc.js';
 
 const TITULO = 'Leis de Lyendell';
@@ -127,12 +127,14 @@ export async function leis(livroId = null, regId = null) {
   if (!d.livros.length || !d.livros.some(l => l.registros.length)) {
     trocar(raiz,
       cabecalho({ titulo: TITULO, icone: 'balanca', sub: 'As leis da capital, feitas pelo Lorde Comandante e pela Família Nobre.', acoes: [gerenciar] }),
-      vazio('Nenhuma lei publicada ainda', 'Quando o Lorde Comandante ou a Família Nobre publicarem uma lei, ela aparece aqui, arrumada para ler.'));
+      ehCrianca()
+        ? vazio('Ainda não tem regra nenhuma', 'Então pode tudo? Melhor perguntar para um grande antes...')
+        : vazio('Nenhuma lei publicada ainda', 'Quando o Lorde Comandante ou a Família Nobre publicarem uma lei, ela aparece aqui, arrumada para ler.'));
     return raiz;
   }
 
   const busca = h('input', {
-    class: 'input', type: 'search', placeholder: 'Procurar nas leis: imposto, toque de recolher, prisão...', 'aria-label': 'Procurar nas leis',
+    class: 'input', type: 'search', placeholder: ehCrianca() ? 'Procurar uma regra...' : 'Procurar nas leis: imposto, toque de recolher, prisão...', 'aria-label': 'Procurar nas leis',
     oninput: () => { termo = semAcentoPorLetra(busca.value.trim().toLowerCase()); desenharConteudo(); },
   });
   const abasLivros = h('nav', { class: 'abas leis-abas', 'aria-label': 'Livros de leis' });
@@ -173,7 +175,7 @@ export async function leis(livroId = null, regId = null) {
         (d.livros.length > 1 || livro.nome !== TITULO) && h('h2', null, livro.nome),
         livro.descricao && h('p', null, livro.descricao),
         h('p', { class: 'leis-capa-numeros' },
-          h('span', null, h('strong', null, vigor), ' em vigor'),
+          h('span', null, h('strong', null, vigor), ehCrianca() ? ' valendo' : ' em vigor'),
           todas.length > vigor && h('span', null, h('strong', null, todas.length - vigor), todas.length - vigor === 1 ? ' revogada' : ' revogadas'),
           novas > 0 && h('span', { class: 'leis-capa-novas' }, h('strong', null, novas), novas === 1 ? ' nova nesta semana' : ' novas nesta semana'),
           ultima && h('span', null, `atualizado ${relativo(ultima)}`))),
@@ -240,8 +242,8 @@ export async function leis(livroId = null, regId = null) {
           type: 'button', class: 'leis-fora-botao', 'aria-expanded': String(mostrarFora),
           onclick: () => { mostrarFora = !mostrarFora; desenharConteudo(); },
         }, icone(mostrarFora ? 'cima' : 'baixo'),
-        h('span', null, `Revogadas e fora de vigor (${fora.length})`),
-        h('small', null, mostrarFora ? 'Esconder' : 'Não valem mais. Ficam aqui para consulta.')),
+        h('span', null, ehCrianca() ? `Regras que não valem mais, ufa! (${fora.length})` : `Revogadas e fora de vigor (${fora.length})`),
+        h('small', null, mostrarFora ? 'Esconder' : ehCrianca() ? 'Agora pode!' : 'Não valem mais. Ficam aqui para consulta.')),
         mostrarFora && fora.map(x => artigo(x, p))));
     trocar(conteudo, indice, textoDasLeis);
   }
@@ -277,7 +279,7 @@ export async function leis(livroId = null, regId = null) {
         onclick: () => { abertas.add(r.id); corpoTexto.classList.remove('recolhida'); document.querySelector(`#lei-${r.id} .lei-continuar`)?.remove(); },
       }, 'Ler a lei inteira', icone('baixo')),
       pena && h('div', { class: 'lei-pena', role: 'note' }, icone('alerta'),
-        h('p', null, h('strong', null, 'Quem descumprir: '), realcar(pena, termo))),
+        h('p', null, h('strong', null, ehCrianca() ? 'Quem desobedecer fica de castigo assim: ' : 'Quem descumprir: '), realcar(pena, termo))),
       outros.length > 0 && h('dl', { class: 'lei-mais' }, outros.map(([c, v]) => h('div', null, h('dt', null, c.nome.replace(/:$/, '')),
         h('dd', { class: c.tipo === 'texto_longo' ? 'texto-livre' : '' }, realcar(v, termo))))),
       h('footer', { class: 'lei-rodape' },
