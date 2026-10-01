@@ -142,6 +142,9 @@ Um salão com **chat ao vivo**, a lista de quem está online e os jogos:
 - **Cobrinha ao vivo**, de 2 a 4 pessoas (1v1, 1v1v1 ou 1v1v1v1) no mesmo tabuleiro: quem abre a sala
   começa quando tiver gente, e há uma contagem de 3 segundos. Quem bate na borda, noutra cobra ou em
   si mesma sai e o corpo vira cenouras; vence quem sobrar. Cabeça com cabeça tira as duas.
+  O servidor anda 8 passos por segundo, mas a tela desenha 60: as cobras deslizam de uma casa para
+  a outra, mesmo com a internet irregular, e a sua cobra vira na hora em que você aperta (o site mede
+  o atraso da conexão para saber se o servidor ainda vai aplicar a virada naquele passo).
 - **Jogo da Velha**, **Pedra, Papel e Tesoura** (melhor de três) e **Lig 4** (quatro em linha, 7
   colunas; dá para jogar com as teclas 1 a 7), ao vivo contra outro morador.
   Quem abre a partida espera alguém clicar em **Entrar**; os outros podem **Assistir**.

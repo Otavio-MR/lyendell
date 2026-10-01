@@ -4,6 +4,7 @@ import { h, trocar, icone, botao, botaoIcone, cabecalho, vazio, avatar, avatarPe
 import { rt, ouvir, enviar, lendoChat, criarPartida, entrarNaPartida, transmitir, enviarQuadro, pararTransmissao } from '../tempo-real.js';
 import { assistirPac } from './pac-coelho.js';
 import { abrirSalaQuiz, telaQuiz, teclaQuiz } from './quiz.js';
+import { SuavizadorCobras } from '../cobras-suave.js';
 
 const AO_VIVO = [
   { id: 'quiz', nome: 'Quiz de Lyendell', icone: 'pergunta', texto: 'Perguntas sobre a Casa Luckham, coelhos, Minecraft e regras de RP. Até 10 pessoas.', abrir: abrirSalaQuiz, botao: 'Abrir sala' },
@@ -516,18 +517,42 @@ export function sala(id) {
   }
 
   /* Cobrinha ao vivo: o tabuleiro (canvas) é o mesmo durante a partida e só é redesenhado a cada quadro. */
+  // A tela desenha 60 vezes por segundo, deslizando as cobras entre os quadros do servidor (veja cobras-suave.js).
   let visorCobras = null;
   let quadroCobras = null;
   let fimLargada = 0;
   let placarCobras = null;
-  let ultimaVirada = null;
+  let chavePlacar = '';
+  let laco = 0;
+  const suave = new SuavizadorCobras();
 
   function virarCobra(dir) {
     const s = rt.partidas.get(id);
     if (!s || s.jogo !== 'cobras' || s.status !== 'jogando' || s.eu < 0 || s.jogadores[s.eu].saiu) return;
-    if (ultimaVirada && ultimaVirada[0] === dir[0] && ultimaVirada[1] === dir[1] && quadroCobras?.fase === 'jogando') return;
-    ultimaVirada = dir;
+    if (!suave.virar(dir, performance.now())) return; // meia-volta ou a mesma direção: nem manda
     enviar('cobras:virar', { id, dir }, { silencioso: true });
+  }
+
+  function receberQuadroCobras(q) {
+    const s = rt.partidas.get(id);
+    quadroCobras = q;
+    if (q.fase === 'largada') fimLargada = Date.now() + q.largada;
+    suave.receber(q, performance.now(), s?.eu ?? -1);
+    avisoCobras();
+    desenharPlacarCobras();
+    if (q.fase === 'jogando') { if (!laco) laco = requestAnimationFrame(desenharLaco); } else desenharAgora();
+  }
+
+  function desenharAgora() {
+    const s = rt.partidas.get(id);
+    if (visorCobras && quadroCobras && s) desenharArena(visorCobras, quadroCobras, suave.quadro(performance.now()), s.eu);
+  }
+
+  function desenharLaco() {
+    laco = 0;
+    if (!visorCobras?.tela.isConnected || !quadroCobras) return;
+    desenharAgora();
+    if (quadroCobras.fase === 'jogando') laco = requestAnimationFrame(desenharLaco);
   }
 
   function telaDasCobras() {
@@ -544,16 +569,8 @@ export function sala(id) {
       if (Math.max(Math.abs(dx), Math.abs(dy)) < 20) return;
       virarCobra(Math.abs(dx) > Math.abs(dy) ? [Math.sign(dx), 0] : [0, Math.sign(dy)]);
     });
-    visorCobras = { tela, g: tela.getContext('2d'), aviso: aviso_, moldura: h('div', { class: 'cobras-moldura' }, tela, aviso_) };
+    visorCobras = { tela, g: tela.getContext('2d', { alpha: false }), aviso: aviso_, moldura: h('div', { class: 'cobras-moldura' }, tela, aviso_), fundo: null };
     return visorCobras;
-  }
-
-  function desenharQuadroCobras() {
-    const s = rt.partidas.get(id);
-    if (!visorCobras || !quadroCobras || !s) return;
-    desenharArena(visorCobras.g, quadroCobras, s.eu);
-    avisoCobras();
-    desenharPlacarCobras();
   }
 
   function avisoCobras() {
@@ -577,6 +594,10 @@ export function sala(id) {
     const q = quadroCobras;
     if (!placarCobras || !q || !s) return;
     const ordem = q.classificacao ? q.classificacao.map(c => c.i) : s.jogadores.map((_, i) => i);
+    // O placar só é refeito quando muda alguma coisa (os quadros chegam várias vezes por segundo).
+    const chave = JSON.stringify([ordem, q.c.map(c => [c.v, c.p]), s.status, s.vencedor, s.jogadores.map(p => p.saiu)]);
+    if (chave === chavePlacar && placarCobras.childElementCount) return;
+    chavePlacar = chave;
     trocar(placarCobras,
       h('div', { class: 'painel-cab' }, h('h2', null, icone('trofeu'), 'Placar')),
       h('ol', { class: 'cobras-lista' }, ordem.map(i => {
@@ -608,14 +629,10 @@ export function sala(id) {
       sub: 'De 2 a 4 cobras no mesmo tabuleiro. Quem bater sai e vira cenouras; vence quem sobrar.',
     });
     if (s.status === 'esperando') return [topo, esperaCobras(s, { jogador, souDono })];
-    if (s.estado) {
-      quadroCobras = s.estado;
-      if (s.estado.fase === 'largada') fimLargada = Date.now() + s.estado.largada;
-    }
-    if (s.status === 'jogando' && quadroCobras?.fase === 'largada') ultimaVirada = null;
     const v = telaDasCobras();
     placarCobras = h('aside', { class: 'painel cobras-placar' });
-    desenharQuadroCobras();
+    chavePlacar = '';
+    if (s.estado) receberQuadroCobras(s.estado);
     const toque = matchMedia('(pointer: coarse)').matches;
     const seta = (ic, d, rotulo) => h('button', { class: `dpad-${ic}`, type: 'button', 'aria-label': rotulo, onpointerdown: ev => { ev.preventDefault(); virarCobra(d); } }, icone(ic));
     return [topo,
@@ -732,13 +749,24 @@ export function sala(id) {
   document.addEventListener('keydown', aoTeclar);
   // Contagem da largada da cobrinha.
   const relogioCobras = setInterval(() => { if (quadroCobras?.fase === 'largada') avisoCobras(); }, 200);
-  escutar('cobras:quadro', ({ id: sid, q }) => {
-    if (sid !== id) return;
-    quadroCobras = q;
-    if (q.fase === 'largada') fimLargada = Date.now() + q.largada;
-    desenharQuadroCobras();
+  escutar('cobras:quadro', ({ id: sid, q }) => { if (sid === id) receberQuadroCobras(q); });
+  // Mede o atraso da conexão de tempos em tempos (a sua cobra vira na tela na hora certa).
+  let pingou = false;
+  const pingar = () => { if (rt.partidas.get(id)?.jogo === 'cobras') enviar('ping', { t: performance.now() }, { silencioso: true }); };
+  escutar('pong', ({ t }) => {
+    const ida = performance.now() - t;
+    suave.rtt = pingou ? suave.rtt * 0.7 + ida * 0.3 : ida;
+    pingou = true;
   });
-  aoSair(() => { clearInterval(relogioQuiz); clearInterval(relogioCobras); document.removeEventListener('keydown', aoTeclar); });
+  const relogioPing = setInterval(pingar, 2000);
+  setTimeout(pingar, 300);
+  aoSair(() => {
+    clearInterval(relogioQuiz);
+    clearInterval(relogioCobras);
+    clearInterval(relogioPing);
+    cancelAnimationFrame(laco);
+    document.removeEventListener('keydown', aoTeclar);
+  });
 
   // Se a pessoa está em outra aba do navegador, o título avisa que é a vez dela.
   function avisarNaAba(s) {
@@ -854,47 +882,75 @@ const escurecer = (hex, t) => {
   return `rgb(${c.join(', ')})`;
 };
 
-// q = { l, a, c: [{ v, p, d, b: [x, y, x, y...] }], f: [x, y...] }; eu = índice de quem está vendo (ou -1).
-function desenharArena(g, q, eu) {
-  const C = g.canvas.width / q.l;
+// O fundo quadriculado e a cenoura ficam prontos numa imagem guardada (desenhar 768 casas a cada
+// quadro de tela, 60 vezes por segundo, é trabalho à toa).
+function prepararArena(visor, q) {
+  const C = visor.tela.width / q.l;
+  if (visor.fundo?.l === q.l && visor.fundo?.a === q.a) return C;
+  const fundo = document.createElement('canvas');
+  fundo.width = visor.tela.width;
+  fundo.height = visor.tela.height;
+  const g = fundo.getContext('2d');
   for (let y = 0; y < q.a; y++) {
     for (let x = 0; x < q.l; x++) {
       g.fillStyle = (x + y) % 2 ? '#0c170f' : '#0f1c12';
       g.fillRect(x * C, y * C, C, C);
     }
   }
-  for (let k = 0; k + 1 < q.f.length; k += 2) desenharCenoura(g, q.f[k], q.f[k + 1], C);
-  q.c.forEach((c, i) => {
-    if (!c.v || !c.b.length) return;
-    const n = c.b.length / 2;
-    for (let k = n - 1; k >= 0; k--) {
-      const x = c.b[k * 2];
-      const y = c.b[k * 2 + 1];
-      g.fillStyle = k === 0 ? CORES_COBRAS[i] : escurecer(CORES_COBRAS[i], 0.2 + 0.35 * (k / Math.max(1, n - 1)));
-      const m = k === 0 ? 1 : 2.5;
+  const cenoura = document.createElement('canvas');
+  cenoura.width = Math.ceil(C);
+  cenoura.height = Math.ceil(C);
+  desenharCenoura(cenoura.getContext('2d'), 0, 0, C);
+  visor.fundo = { l: q.l, a: q.a, img: fundo, cenoura };
+  return C;
+}
+
+// q = quadro do servidor (as cenouras); cobras = o que o suavizador diz para desenhar agora:
+// [{ i, pontos: [[x, y]...] em casas (podem ser fracionados), dir }]. eu = índice de quem vê (ou -1).
+function desenharArena(visor, q, cobras, eu) {
+  const g = visor.g;
+  const C = prepararArena(visor, q);
+  g.drawImage(visor.fundo.img, 0, 0);
+  for (let k = 0; k + 1 < q.f.length; k += 2) g.drawImage(visor.fundo.cenoura, q.f[k] * C, q.f[k + 1] * C);
+  g.lineCap = 'round';
+  g.lineJoin = 'round';
+  for (const c of cobras) {
+    if (!c || !c.pontos.length) continue;
+    const cor = CORES_COBRAS[c.i];
+    const pts = c.pontos.map(([x, y]) => [x * C + C / 2, y * C + C / 2]);
+    const linha = () => {
       g.beginPath();
-      if (g.roundRect) g.roundRect(x * C + m, y * C + m, C - m * 2, C - m * 2, k === 0 ? 7 : 5);
-      else g.rect(x * C + m, y * C + m, C - m * 2, C - m * 2);
-      g.fill();
-    }
-    const [hx, hy] = [c.b[0], c.b[1]];
-    if (i === eu) {
-      // A cabeça da sua cobra tem contorno branco.
+      pts.forEach(([x, y], k) => (k ? g.lineTo(x, y) : g.moveTo(x, y)));
+      if (pts.length === 1) g.lineTo(pts[0][0] + 0.01, pts[0][1]);
+    };
+    // Corpo: uma linha grossa passando pelo meio das casas, com um brilho no meio.
+    g.strokeStyle = escurecer(cor, 0.42);
+    g.lineWidth = C * 0.74;
+    linha();
+    g.stroke();
+    g.strokeStyle = escurecer(cor, 0.18);
+    g.lineWidth = C * 0.38;
+    linha();
+    g.stroke();
+    // Cabeça
+    const [hx, hy] = pts[0];
+    g.fillStyle = cor;
+    g.beginPath();
+    g.arc(hx, hy, C * 0.47, 0, Math.PI * 2);
+    g.fill();
+    if (c.i === eu) {
       g.strokeStyle = '#ffffff';
       g.lineWidth = 2;
-      g.beginPath();
-      if (g.roundRect) g.roundRect(hx * C + 1, hy * C + 1, C - 2, C - 2, 7);
-      else g.rect(hx * C + 1, hy * C + 1, C - 2, C - 2);
       g.stroke();
     }
-    const [dx, dy] = c.d;
+    const [dx, dy] = c.dir;
     g.fillStyle = '#1b1403';
     for (const lado of [-1, 1]) {
       g.beginPath();
-      g.arc(hx * C + C / 2 + dx * C * 0.18 + dy * lado * C * 0.2, hy * C + C / 2 + dy * C * 0.18 + dx * lado * C * 0.2, C * 0.1, 0, Math.PI * 2);
+      g.arc(hx + dx * C * 0.18 + dy * lado * C * 0.2, hy + dy * C * 0.18 + dx * lado * C * 0.2, C * 0.1, 0, Math.PI * 2);
       g.fill();
     }
-  });
+  }
 }
 
 // Mostra quantas pessoas estão assistindo quem joga.

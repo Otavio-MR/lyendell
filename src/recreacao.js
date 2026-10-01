@@ -391,6 +391,7 @@ function visaoCobras(s) {
   const e = s.estado;
   return {
     ...cobras.visao(e),
+    ms: COBRAS_PASSO_MS, // a tela usa para deslizar as cobras entre um passo e outro
     fase: e.fase,
     largada: e.fase === 'largada' ? Math.max(0, e.largada - Date.now()) : 0,
     classificacao: e.fase === 'fim' ? cobras.classificacao(e).map(c => ({ i: c.i, pontos: c.pontos, viva: c.viva })) : null,
@@ -414,21 +415,31 @@ function comecarCobras(s) {
   s.timer = setTimeout(() => {
     if (!salas.has(s.id) || s.status !== 'jogando') return;
     s.estado.fase = 'jogando';
-    s.timer = setInterval(() => passoCobras(s), COBRAS_PASSO_MS);
+    s.proximoPasso = Date.now();
+    agendarPasso(s);
   }, COBRAS_LARGADA_MS);
   enviarSala(s);
   avisarLobby();
 }
 
+// Relógio dos passos sem atraso acumulado: cada passo é marcado a partir da hora certa do anterior.
+function agendarPasso(s) {
+  s.proximoPasso += COBRAS_PASSO_MS;
+  s.timer = setTimeout(() => {
+    passoCobras(s);
+    if (salas.has(s.id) && s.status === 'jogando') agendarPasso(s);
+  }, Math.max(0, s.proximoPasso - Date.now()));
+}
+
 function passoCobras(s) {
-  if (!salas.has(s.id) || s.status !== 'jogando') { clearInterval(s.timer); return; }
+  if (!salas.has(s.id) || s.status !== 'jogando') return;
   cobras.passo(s.estado);
   if (cobras.acabou(s.estado)) terminarCobras(s);
   else enviarQuadroCobras(s);
 }
 
 function terminarCobras(s) {
-  clearInterval(s.timer);
+  clearTimeout(s.timer);
   const e = s.estado;
   e.fase = 'fim';
   const v = cobras.vencedor(e);
@@ -571,6 +582,11 @@ const acoes = {
     if (resultado) finalizar(s, resultado, resultado.empate ? 'empate' : 'vitoria');
     enviarSala(s);
     if (resultado) avisarLobby();
+  },
+
+  // Mede o atraso da conexão (a cobrinha ao vivo usa para virar na hora certa na tela).
+  ping(u, { t }, ws) {
+    enviar(ws, 'pong', { t });
   },
 
   // Cobrinha ao vivo: para onde a cobra vira (as setas de quem joga).

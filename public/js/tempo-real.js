@@ -118,6 +118,8 @@ const rotaDaSala = id => `#/recreacao/sala/${id}`;
 const estouNaSala = id => location.hash === rotaDaSala(id);
 
 function tratar(m) {
+  // Mensagens que chegam várias vezes por segundo: só a tela do jogo cuida delas (via emitir).
+  if (m.tipo === 'cobras:quadro' || m.tipo === 'pong') return;
   switch (m.tipo) {
     case 'ola':
       tentativas = 0;
