@@ -4,6 +4,8 @@
 import { h, trocar, icone, botao, cabecalho, aviso, get, post, pode, aoSair, estado, num } from '../core.js';
 import { rt, ouvir, transmitir, enviarQuadro, pararTransmissao } from '../tempo-real.js';
 import { desafioNoJogo } from './desafio.js';
+import { segredosDoJogo } from '../segredos.js';
+import { efeito } from '../bobo-efeitos.js';
 
 const escutar = (tipo, fn) => aoSair(ouvir(tipo, fn));
 const relogio = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -116,6 +118,8 @@ export function campoMinado() {
   const ds = desafioNoJogo('minado', { aoLargar: () => largarDesafio(), aoAcabar: () => { if (situacao !== 'fim') { parar(); desenhar(); } } });
   const sorte = ds ? ds.sorte : Math.random;
   const dificuldade = () => (ds ? ds.opcoes.dificuldade : dificuldadeAtual);
+  const pontoXyzzy = h('span', { class: 'xyzzy-ponto', hidden: true, 'aria-hidden': 'true' });
+  const segredos = segredosDoJogo('minado', { bloqueado: !!ds, aoMudar: () => { pontoXyzzy.hidden = !segredos.ativo('minado-xyzzy'); pontoXyzzy.classList.remove('perigo'); } });
   const abertasAgora = () => abertas.reduce((a, b) => a + b, 0);
 
   function largarDesafio() {
@@ -139,6 +143,7 @@ export function campoMinado() {
     situacao = 'pronto';
     explodiu = -1;
     seg = 0;
+    segredos.novaPartida();
     grade.style.setProperty('--col', d.col);
     grade.style.setProperty('--lin', d.lin);
     moldura.classList.toggle('largo', d.col > 16);
@@ -260,6 +265,7 @@ export function campoMinado() {
     for (const m of minas) bandeiras[m] = 1;
     desenhar();
     ds?.terminar(abertasAgora(), true);
+    if (segredos.ativo('festa')) efeito('confete');
     const caixa = h('div', { class: 'cobra-caixa' },
       h('h2', null, 'Campo limpo!'),
       h('p', { class: 'cobra-placar' }, `${d.nome} em ${relogio(seg)}`),
@@ -268,6 +274,7 @@ export function campoMinado() {
     sobre.hidden = false;
     transmitirQuadro(true);
     if (ds) return;
+    if (!segredos.valeRecorde()) { caixa.insertBefore(h('p', { class: 'cobra-recorde' }, icone('estrela'), 'Modo secreto ligado: esta partida não vale recorde.'), caixa.lastChild); return; }
     if (await guardarResultado({ jogo: 'minado', variante: dificuldadeAtual, pontos: seg, detalhe: relogio(seg) }, caixa)) carregarRanking();
   }
 
@@ -309,6 +316,13 @@ export function campoMinado() {
     e.preventDefault();
     if (!segurou) clicar(Number(el.dataset.i), true);
   });
+  // xyzzy: com o mouse em cima de uma casa com armadilha, o pontinho fica vermelho.
+  grade.addEventListener('pointermove', e => {
+    if (!segredos.ativo('minado-xyzzy')) return;
+    const i = Number(e.target.closest('[data-i]')?.dataset.i ?? -1);
+    pontoXyzzy.classList.toggle('perigo', !!(minas && i >= 0 && minas.has(i) && !abertas[i]));
+  });
+  grade.addEventListener('pointerleave', () => pontoXyzzy.classList.remove('perigo'));
 
   function transmitirQuadro(urgente = false) {
     if (!casas.length) return;
@@ -340,7 +354,8 @@ export function campoMinado() {
           h('span', null, icone('relogio'), ' ', tempoEl),
           contadorPlateia(),
           !ds && h('span', null, icone('trofeu'), ' Seu recorde: ', recordeEl),
-          botaoModo),
+          botaoModo,
+          pontoXyzzy),
         (moldura.append(sobre), moldura)),
       ds ? ds.painel : ranking.el));
 }
@@ -417,6 +432,44 @@ export function jogo2048() {
     aoAcabar: () => { if (situacao !== 'fim') situacao = 'fim'; },
   });
   const sorte = ds ? ds.sorte : Math.random;
+  let historico = []; // para desfazer (código secreto)
+  let ouroUsado = false;
+  const botaoDesfazer = botao('Desfazer', { icone: 'voltar', classe: 'btn-pequeno', onclick: () => desfazer() });
+  botaoDesfazer.hidden = true;
+  const seg = segredosDoJogo('2048', {
+    bloqueado: !!ds,
+    aoMudar: chave => {
+      if (chave === '2048-desfazer') botaoDesfazer.hidden = !seg.ativo('2048-desfazer');
+      if (chave === '2048-coelho') desenhar();
+    },
+    aoUsar: chave => {
+      if (chave !== '2048-ouro' || ouroUsado || situacao !== 'jogando') return false;
+      const l = livres();
+      if (!l.length) return false;
+      const i = l[Math.floor(Math.random() * l.length)];
+      blocos.push({ id: proximoId++, v: 128, l: Math.floor(i / 4), c: i % 4, novo: true });
+      ouroUsado = true;
+      desenhar();
+      transmitirQuadro();
+      return true;
+    },
+  });
+
+  function desfazer() {
+    const antes = historico.pop();
+    if (!antes) { aviso('Não tem jogada para desfazer.'); return; }
+    for (const t of timers) clearTimeout(t);
+    timers.clear();
+    elementos = new Map();
+    trocar(camada);
+    blocos = antes.blocos.map(b => ({ ...b, id: proximoId++ }));
+    pontos = antes.pontos;
+    chegou2048 = antes.chegou2048;
+    situacao = 'jogando';
+    sobre.hidden = true;
+    desenhar();
+    transmitirQuadro();
+  }
   const depois = (fn, ms) => { const t = setTimeout(() => { timers.delete(t); fn(); }, ms); timers.add(t); };
 
   function novoJogo() {
@@ -428,6 +481,9 @@ export function jogo2048() {
     pontos = 0;
     situacao = ds && !ds.largou() ? 'esperando' : 'jogando';
     chegou2048 = false;
+    historico = [];
+    ouroUsado = false;
+    seg.novaPartida();
     faixa.hidden = true;
     sobre.hidden = true;
     novoBloco();
@@ -454,6 +510,7 @@ export function jogo2048() {
   // Desliza tudo para um lado. Dois blocos iguais que se encontram viram um (só uma vez por jogada).
   function mover(dir) {
     if (situacao !== 'jogando') return;
+    const foto = { blocos: blocos.map(b => ({ v: b.v, l: b.l, c: b.c })), pontos, chegou2048 };
     const vertical = dir === 'cima' || dir === 'baixo';
     const inverso = dir === 'direita' || dir === 'baixo';
     let mexeu = false;
@@ -484,6 +541,8 @@ export function jogo2048() {
       }
     }
     if (!mexeu) return;
+    historico.push(foto);
+    if (historico.length > 50) historico.shift();
     for (const b of blocos) b.novo = false;
     const juntaram = blocos.filter(b => b.juntou);
     // Os que somem deslizam até o bloco com que juntaram, e só depois saem.
@@ -527,7 +586,8 @@ export function jogo2048() {
       blocoNaTela(el, b);
       const pinta = () => {
         el.dataset.v = b.v > 2048 ? 'grande' : b.v;
-        el.textContent = b.v;
+        if (seg.ativo('2048-coelho')) trocar(el, icone('coelho', 'b2048-coelho'), h('span', null, b.v));
+        else el.textContent = b.v;
       };
       if (juntaram.includes(b)) {
         // O número muda quando o outro bloco chega, com um pulinho.
@@ -550,6 +610,7 @@ export function jogo2048() {
       ds ? ds.botoesFim(novoJogo) : botao('Jogar de novo', { classe: 'btn-ouro', icone: 'frente', onclick: novoJogo }));
     depois(() => { trocar(sobre, caixa); sobre.hidden = false; }, 400);
     transmitirQuadro();
+    if (!ds && !seg.valeRecorde()) { caixa.insertBefore(h('p', { class: 'cobra-recorde' }, icone('estrela'), 'Modo secreto ligado: esta partida não vale recorde.'), caixa.lastChild); return; }
     if (await guardarResultado({ jogo: '2048', pontos, detalhe: `maior bloco ${maior}` }, caixa)) carregarRanking();
   }
 
@@ -581,7 +642,9 @@ export function jogo2048() {
     const [dx, dy] = [e.clientX - toque[0], e.clientY - toque[1]];
     toque = null;
     if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
-    mover(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'direita' : 'esquerda') : (dy > 0 ? 'baixo' : 'cima'));
+    const dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'direita' : 'esquerda') : (dy > 0 ? 'baixo' : 'cima');
+    seg.direcao(dir);
+    mover(dir);
   });
   tabuleiro.addEventListener('pointercancel', () => { toque = null; });
 
@@ -604,6 +667,7 @@ export function jogo2048() {
         h('div', { class: 'cobra-placar-linha b2048-placar' },
           h('span', null, 'Pontos: ', pontosEl),
           h('span', null, 'Maior bloco: ', maiorEl),
+          botaoDesfazer,
           contadorPlateia(),
           !ds && h('span', null, icone('trofeu'), ' Seu recorde: ', recordeEl)),
         faixa,

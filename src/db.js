@@ -250,6 +250,13 @@ CREATE TABLE IF NOT EXISTS proposta_apoios (
   PRIMARY KEY (proposta_id, usuario_id)
 );
 
+CREATE TABLE IF NOT EXISTS segredos (
+  usuario_id INTEGER NOT NULL,
+  chave TEXT NOT NULL,
+  em TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (usuario_id, chave)
+);
+
 CREATE TABLE IF NOT EXISTS pegadinhas (
   id INTEGER PRIMARY KEY,
   tipo TEXT NOT NULL,

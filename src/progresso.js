@@ -164,6 +164,9 @@ const CONQUISTAS = [
   { chave: 'bobo25', nome: 'Mestre das gargalhadas', desc: 'Pregou 25 peças como Bobo da Corte.', icone: 'bobo', stat: 'pegadinhas', meta: 25, tipos: ['pegadinha'] },
   { chave: 'caiu5', nome: 'Bom de rir', desc: 'Caiu em 5 pegadinhas do Bobo da Corte.', icone: 'nariz', stat: 'caiu', meta: 5, tipos: ['caiu'] },
   { chave: 'proposta1', nome: 'Voz do povo', desc: 'Teve uma proposta aprovada no Congresso.', icone: 'coluna', stat: 'propostasAprovadas', meta: 1, tipos: ['proposta_aprovada'] },
+  { chave: 'segredo1', nome: 'Curioso', desc: 'Descobriu um código secreto num joguinho.', icone: 'chave', stat: 'segredos', meta: 1, tipos: ['segredo'] },
+  { chave: 'segredo7', nome: 'Caçador de segredos', desc: 'Descobriu 7 códigos secretos.', icone: 'olho', stat: 'segredos', meta: 7, tipos: ['segredo'] },
+  { chave: 'segredo14', nome: 'Mestre dos segredos', desc: 'Descobriu todos os 14 códigos secretos dos joguinhos.', icone: 'coroa', stat: 'segredos', meta: 14, tipos: ['segredo'] },
   { chave: 'nivel10', nome: 'Coelho Veloz', desc: 'Chegou ao nível 10.', icone: 'estrela', stat: 'nivel', meta: 10, tipos: ['nivel'] },
   { chave: 'nivel20', nome: 'Coelho Dourado', desc: 'Chegou ao nível 20.', icone: 'coroa', stat: 'nivel', meta: 20, tipos: ['nivel'] },
 ];
@@ -197,6 +200,7 @@ const STATS = {
   fotos: id => n('SELECT COUNT(*) AS n FROM fotos WHERE enviado_por = ?', id),
   registros: id => n('SELECT COUNT(*) AS n FROM registros WHERE criado_por = ?', id),
   propostasAprovadas: id => n("SELECT COUNT(*) AS n FROM propostas WHERE autor_id = ? AND situacao = 'aprovada'", id),
+  segredos: id => n('SELECT COUNT(*) AS n FROM segredos WHERE usuario_id = ?', id),
   pegadinhas: id => n('SELECT COUNT(*) AS n FROM pegadinhas WHERE de_id = ?', id),
   caiu: id => n('SELECT COUNT(*) AS n FROM pegadinhas WHERE alvo_id = ?', id),
   recadosPessoas: id => n('SELECT COUNT(DISTINCT perfil_id) AS n FROM recados WHERE autor_id = ? AND perfil_id <> ?', id, id),

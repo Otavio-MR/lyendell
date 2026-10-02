@@ -42,6 +42,11 @@ function cartao(p) {
   setTimeout(() => { el.classList.add('saindo'); setTimeout(() => el.remove(), 300); }, 15_000);
 }
 
+// Os efeitos sozinhos (ex.: o confete do modo festa nos joguinhos).
+export function efeito(tipo) {
+  EFEITOS[tipo]?.();
+}
+
 const camada = (classe, filhos, ms) => {
   const el = h('div', { class: `bobo-camada ${classe}`, 'aria-hidden': 'true' }, filhos);
   document.body.append(el);

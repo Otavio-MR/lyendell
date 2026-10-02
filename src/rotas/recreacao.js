@@ -107,6 +107,25 @@ r.post('/recordes', async (req, res) => {
   res.status(201).json({ recorde, anterior: antes });
 });
 
+/* ─── Códigos secretos dos joguinhos ──────────────── */
+
+// As sequências ficam no navegador (public/js/segredos.js); aqui só se guarda quem descobriu qual.
+const SEGREDOS = ['cobra-arcoiris', 'cobra-portal', 'cobra-turbo', 'pac-konami', 'pac-buuu', 'pac-neve', '2048-desfazer',
+  '2048-ouro', '2048-coelho', 'minado-xyzzy', 'memoria-espiar', 'quebra-numeros', 'quebra-ima', 'festa'];
+
+r.get('/segredos', async (req, res) => {
+  const linhas = await db.all('SELECT chave, em FROM segredos WHERE usuario_id = ? ORDER BY em', req.usuario.id);
+  res.json({ descobertos: linhas.filter(l => SEGREDOS.includes(l.chave)), total: SEGREDOS.length });
+});
+
+r.post('/segredos', async (req, res) => {
+  const chave = String(req.body?.chave || '');
+  if (!SEGREDOS.includes(chave)) throw erro(400, 'Esse código secreto não existe.');
+  const { changes } = await db.run('INSERT INTO segredos (usuario_id, chave) VALUES (?, ?) ON CONFLICT (usuario_id, chave) DO NOTHING', req.usuario.id, chave);
+  if (changes) await progresso.registrar(req.usuario.id, 'segredo');
+  res.json({ novo: !!changes });
+});
+
 /* ─── Quiz ────────────────────────────────────────── */
 
 // Categorias e quantas perguntas cada uma tem (para quem vai abrir uma sala).

@@ -199,6 +199,7 @@ r.delete('/:id', exigir('usuarios.remover'), async (req, res) => {
     ['DELETE FROM eventos_dia WHERE usuario_id = ?', id],
     ['UPDATE propostas SET autor_id = NULL WHERE autor_id = ?', id],
     ['DELETE FROM proposta_apoios WHERE usuario_id = ?', id],
+    ['DELETE FROM segredos WHERE usuario_id = ?', id],
     ['DELETE FROM pegadinhas WHERE alvo_id = ? OR de_id = ?', id, id],
     ['DELETE FROM usuarios WHERE id = ?', id],
     comandoApagarArquivo(alvo.foto),

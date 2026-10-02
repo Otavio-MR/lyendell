@@ -4,6 +4,7 @@
 import { h, trocar, icone, botao, cabecalho, aviso, get, post, pode, aoSair, estado, num } from '../core.js';
 import { rt, ouvir, transmitir, enviarQuadro, pararTransmissao } from '../tempo-real.js';
 import { desafioNoJogo } from './desafio.js';
+import { segredosDoJogo } from '../segredos.js';
 
 const MAPA = [
   '############################',
@@ -49,6 +50,7 @@ const ESQ = [-1, 0];
 const BAIXO = [0, 1];
 const DIR = [1, 0];
 const DIRS = [CIMA, ESQ, BAIXO, DIR]; // ordem de desempate das raposas
+const nomeDir = ([x, y]) => (x ? (x > 0 ? 'direita' : 'esquerda') : y > 0 ? 'baixo' : 'cima');
 const TECLAS = {
   ArrowUp: CIMA, KeyW: CIMA, ArrowDown: BAIXO, KeyS: BAIXO,
   ArrowLeft: ESQ, KeyA: ESQ, ArrowRight: DIR, KeyD: DIR,
@@ -85,6 +87,7 @@ const contraria = (a, b) => a[0] === -b[0] && a[1] === -b[1];
 // Estado que o desenho usa: e = { moedas, pac: { x, y, dir, parado }, raposas: [{ x, y, dir, modo, assustada, cor }],
 // situacao, relogio, susto, cenoura, popups, nivel, pontos, congelado }. t = tempo em segundos (animações).
 function criarDesenhoPac() {
+  let paleta = null; // 'neve': o coelho branquinho (código secreto)
   const escala = Math.min(2, window.devicePixelRatio || 1);
   const tela = h('canvas', { class: 'pac-tela', width: W * escala, height: H * escala, 'aria-label': 'Labirinto do Pac-Coelho' });
   const g = tela.getContext('2d');
@@ -198,7 +201,7 @@ function criarDesenhoPac() {
       g.save();
       g.translate(ox, oy);
       g.rotate(rot);
-      g.fillStyle = '#d4a52c';
+      g.fillStyle = paleta === 'neve' ? '#dfe7ef' : '#d4a52c';
       g.beginPath();
       g.ellipse(0, -r * 0.45, r * 0.26, r * 0.62, 0, 0, Math.PI * 2);
       g.fill();
@@ -209,8 +212,8 @@ function criarDesenhoPac() {
       g.restore();
     }
     const brilho = g.createRadialGradient(-r * 0.35, -r * 0.35, r * 0.1, 0, 0, r);
-    brilho.addColorStop(0, '#f8e79a');
-    brilho.addColorStop(1, '#c99a22');
+    brilho.addColorStop(0, paleta === 'neve' ? '#ffffff' : '#f8e79a');
+    brilho.addColorStop(1, paleta === 'neve' ? '#a9b8c8' : '#c99a22');
     g.fillStyle = brilho;
     g.beginPath();
     g.moveTo(0, 0);
@@ -337,7 +340,7 @@ function criarDesenhoPac() {
     }
   }
 
-  return { tela, desenhar };
+  return { tela, desenhar, definirPaleta: p => { paleta = p; } };
 }
 
 /* ─── Transmissão (quem assiste recebe o estado resumido) ─── */
@@ -447,12 +450,41 @@ export function pacCoelho() {
     aoAcabar: () => { if (situacao !== 'fim') { situacao = 'fim'; mostrarSobre(); } },
   });
   const sorte = ds ? ds.sorte : Math.random;
+  // Códigos secretos: Konami (+5 vidas), "buuu" (susto nas raposas) e "neve" (coelho branco).
+  let konamiUsado = false;
+  let buuuNoNivel = 0;
+  const seg = segredosDoJogo('pacman', {
+    bloqueado: !!ds,
+    aoMudar: (chave, ligado) => { if (chave === 'pac-neve') desenho.definirPaleta(ligado ? 'neve' : null); },
+    aoUsar: chave => {
+      if (situacao === 'fim') return false;
+      if (chave === 'pac-konami') {
+        if (konamiUsado) return false;
+        konamiUsado = true;
+        vidas += 5;
+        popups.push({ x: 13.5, y: 20, texto: '+5 vidas!', ate: 2 });
+        atualizarHud();
+        return true;
+      }
+      if (chave === 'pac-buuu') {
+        if (buuuNoNivel === nivel || !['jogando', 'pronto', 'pausado'].includes(situacao)) return false;
+        buuuNoNivel = nivel;
+        assustar();
+        popups.push({ x: 13.5, y: 14, texto: 'Buuu!', ate: 1.6 });
+        return true;
+      }
+      return false;
+    },
+  });
 
   /* ─── Andamento do jogo ─── */
 
   function novoJogo() {
     pontos = 0;
     vidas = 3;
+    konamiUsado = false;
+    buuuNoNivel = 0;
+    seg.novaPartida();
     nivel = 1;
     vidaExtra = false;
     novoNivel();
@@ -722,6 +754,7 @@ export function pacCoelho() {
     ds?.terminar(pontos);
     mostrarSobre();
     if (!pontos) return;
+    if (!seg.valeRecorde()) { mostrarSobre('Modo secreto: esta partida não vale recorde.'); return; }
     try {
       const r = await post('/api/recreacao/recordes', { jogo: 'pacman', pontos, detalhe: `nível ${nivel}` });
       if (r.recorde) {
@@ -842,7 +875,9 @@ export function pacCoelho() {
     const dy = e.clientY - inicio.y;
     inicio = null;
     if (Math.max(Math.abs(dx), Math.abs(dy)) < 18) return;
-    virar(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? DIR : ESQ) : (dy > 0 ? BAIXO : CIMA));
+    const d = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? DIR : ESQ) : (dy > 0 ? BAIXO : CIMA);
+    seg.direcao(nomeDir(d));
+    virar(d);
   });
 
   const aoEsconder = () => { if (document.hidden) pausar(); };
@@ -872,7 +907,7 @@ export function pacCoelho() {
     }).catch(() => {});
   }
 
-  const seta = (ic, d, rotulo) => h('button', { class: `dpad-${ic}`, type: 'button', 'aria-label': rotulo, onpointerdown: e => { e.preventDefault(); virar(d); } }, icone(ic));
+  const seta = (ic, d, rotulo) => h('button', { class: `dpad-${ic}`, type: 'button', 'aria-label': rotulo, onpointerdown: e => { e.preventDefault(); seg.direcao(nomeDir(d)); virar(d); } }, icone(ic));
   const legenda = (el, nome, texto) => h('li', null, el, h('span', null, h('strong', null, nome), ' ', texto));
   const bolinha = (cor, tam) => h('span', { class: 'pac-bola', style: { '--cor': cor, '--tam': tam } });
 

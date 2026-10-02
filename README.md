@@ -267,6 +267,35 @@ Pedra, Papel e Tesoura continua só versus, e o Lyendell Dorme já é por times.
 o modo de cada sala. No desafio, cada um joga no próprio navegador (por isso não trava) e o placar
 da sala anda ao vivo; sair da tela do jogo no meio encerra a sua partida (vale o que fez até ali).
 
+### Códigos secretos
+
+Os jogos de uma pessoa só escondem códigos: uma sequência de setas (no teclado, deslizando o dedo ou
+nas setinhas da tela) ou uma palavra escrita no teclado. O código liga um modo secreto, e repetir o
+código desliga. Os que facilitam deixam a partida sem recorde; os de enfeite e os que dificultam
+valem. No desafio (versus e co-op) os códigos não funcionam, para todos jogarem igual.
+
+| Jogo | Código | O que faz |
+|---|---|---|
+| Cobrinha | ↓ ↓ ↑ ↑ ← ← → → | cobra arco-íris (vale recorde; quem assiste também vê) |
+| Cobrinha | ← → ← → ← → | paredes de portal: sai de um lado e entra do outro |
+| Cobrinha | ↑ ↓ ↑ ↓ ↑ ↓ | cobra turbo, bem mais rápida (vale recorde) |
+| Pac-Coelho | ↑ ↑ ↓ ↓ ← → ← → (Konami) | mais 5 vidas, uma vez por partida |
+| Pac-Coelho | escrever "buuu" | as raposas levam um susto, uma vez por nível |
+| Pac-Coelho | escrever "neve" | coelho branquinho (vale recorde) |
+| 2048 | ↑ ↑ ↓ ↓ ← → ← → | botão de desfazer jogada |
+| 2048 | escrever "ouro" | um bloco de 128, uma vez por partida |
+| 2048 | escrever "coelho" | blocos com coelhinho (vale recorde) |
+| Campo Minado | escrever "xyzzy" | o pontinho fica vermelho com o mouse em cima de uma armadilha (o truque do Windows antigo) |
+| Memória | escrever "espiar" | mostra todas as cartas por 2 segundos, uma vez por partida |
+| Quebra-cabeça | escrever "numeros" | cada peça mostra o número do lugar dela |
+| Quebra-cabeça | escrever "ima" | as peças no lugar certo brilham |
+| Minado, Memória, Quebra | escrever "festa" | chuva de confete quando ganha (vale recorde) |
+
+Cada código descoberto fica no **livro de segredos**, no salão da Recreação: os descobertos aparecem
+com o código, e os que faltam aparecem como "???" com uma dica. Descobrir dá conquistas (Curioso,
+Caçador de segredos e Mestre dos segredos). As palavras precisam de teclado; as setas funcionam
+também no celular.
+
 ### Lyendell Dorme
 
 O jogo do "Cidade Dorme" (ou "Lobisomem") da Casa: de 4 a 15 pessoas, cada uma com uma carta
@@ -448,7 +477,7 @@ Para incentivar a visita de todo dia:
   criar pergunta do quiz, ou pregar peças e contar piadas, para o Bobo) e duas para todo mundo (chat,
   partidas, vitória, jogar em equipe, quiz, jogos sozinho, recado, entrega). Quem não trabalha no
   Tabelionato nunca recebe missão de registrar lá; o morador sem cargo recebe só as de todo mundo.
-- **Conquistas**: 34 no total (Tagarela, Sábio da Toca, Terror das Raposas, Faro afiado, Dama de ferro, Primeira travessura, Voz do povo...).
+- **Conquistas**: 37 no total (Tagarela, Sábio da Toca, Terror das Raposas, Faro afiado, Dama de ferro, Primeira travessura, Voz do povo, Mestre dos segredos...).
 
 Conquistas, missões cumpridas, nível novo e recado novo aparecem na hora, em qualquer tela.
 A tela de início mostra o progresso, as missões, as conquistas recentes e os mais ativos da semana.

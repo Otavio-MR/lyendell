@@ -9,6 +9,11 @@ import { tabuleiroDamas, nomeCor } from './damas.js';
 import { criarTelaCidade } from './cidade.js';
 import { telaMesa } from './mesa.js';
 import { desafioNoJogo, telaDesafio, abrirDesafio, JOGOS_DESAFIO } from './desafio.js';
+import { segredosDoJogo, segredosDescobertos, SEGREDOS, NOME_JOGO, comoFazer } from '../segredos.js';
+import { efeito } from '../bobo-efeitos.js';
+
+// Seta [x, y] do jogo virando o nome que os códigos secretos usam.
+const nomeDir = ([x, y]) => (x ? (x > 0 ? 'direita' : 'esquerda') : y > 0 ? 'baixo' : 'cima');
 import { assistirMinado, assistir2048 } from './jogos-sozinho.js';
 
 // Cada jogo e os modos que ele tem (os botões do cartão). Versus: uns contra os outros. Co-op: todos do mesmo lado.
@@ -191,8 +196,28 @@ export function recreacao() {
       h('div', { class: 'rec-lado' },
         h('section', { class: 'painel' }, h('div', { class: 'painel-cab' }, h('h2', null, icone('jogos'), 'Jogos')), jogos),
         h('section', { class: 'painel' }, h('div', { class: 'painel-cab' }, h('h2', null, icone('bandeira'), 'Jogando agora')), abertas),
-        h('section', { class: 'painel' }, h('div', { class: 'painel-cab' }, h('h2', null, icone('usuarios'), tituloOnline)), online))),
+        h('section', { class: 'painel' }, h('div', { class: 'painel-cab' }, h('h2', null, icone('usuarios'), tituloOnline)), online),
+        painelSegredos())),
     ranking);
+}
+
+// Livro de segredos: os códigos secretos dos joguinhos que a pessoa já descobriu e dicas dos que faltam.
+function painelSegredos() {
+  const resumo = h('span', null, 'Códigos secretos');
+  const corpo = h('div', { class: 'segredos-lista' }, h('p', { class: 'painel-vazio' }, 'Abrindo o livro de segredos...'));
+  segredosDescobertos().then(({ descobertos }) => {
+    const ja = new Set(descobertos.map(d => d.chave));
+    const lista = Object.entries(SEGREDOS);
+    resumo.textContent = `Códigos secretos: ${ja.size} de ${lista.length}`;
+    trocar(corpo,
+      h('p', { class: 'suave' }, 'Alguns joguinhos escondem códigos: setas (no teclado, no dedo ou nas setinhas da tela) ou palavras escritas no teclado. Repetir o código desliga. Os que facilitam deixam a partida sem recorde.'),
+      h('ul', null, lista.map(([chave, s]) => (ja.has(chave)
+        ? h('li', { class: 'segredo-achado' }, icone('estrela'), h('div', null, h('strong', null, s.nome),
+          h('small', null, `${s.jogos.map(j => NOME_JOGO[j]).join(', ')}: ${comoFazer(s)}`), h('small', null, s.efeito)))
+        : h('li', { class: 'segredo-escondido' }, icone('cadeado'), h('div', null, h('strong', null, '???'), h('small', null, s.dica)))))));
+  }).catch(() => trocar(corpo, h('p', { class: 'painel-vazio' }, 'Não consegui abrir o livro de segredos.')));
+  return h('section', { class: 'painel' },
+    h('details', { class: 'segredos-livro' }, h('summary', { class: 'painel-cab' }, h('h2', null, icone('chave'), resumo)), corpo));
 }
 
 function painelChat() {
@@ -996,7 +1021,7 @@ function desenharCenoura(g, x, y, C) {
 }
 
 // Desenha o tabuleiro da cobrinha: e = { cobra: [{x, y}], comida: {x, y} | null, direcao: [dx, dy], bateu }.
-function desenharCobrinha(g, { cobra, comida, direcao, bateu }) {
+function desenharCobrinha(g, { cobra, comida, direcao, bateu, arcoIris = false }) {
   const C = C_COBRA;
   for (let y = 0; y < N_COBRA; y++) {
     for (let x = 0; x < N_COBRA; x++) {
@@ -1007,7 +1032,8 @@ function desenharCobrinha(g, { cobra, comida, direcao, bateu }) {
   if (comida) desenharCenoura(g, comida.x, comida.y, C);
   cobra.forEach((p, i) => {
     const t = i / Math.max(1, cobra.length - 1);
-    g.fillStyle = i === 0 ? (bateu ? '#d8674a' : '#d8b13a') : `rgb(${Math.round(127 - 50 * t)}, ${Math.round(176 - 60 * t)}, ${Math.round(105 - 40 * t)})`;
+    g.fillStyle = arcoIris && !(i === 0 && bateu) ? `hsl(${Math.round((i * 26 + performance.now() / 12) % 360)} 78% ${i === 0 ? 62 : 56}%)`
+      : i === 0 ? (bateu ? '#d8674a' : '#d8b13a') : `rgb(${Math.round(127 - 50 * t)}, ${Math.round(176 - 60 * t)}, ${Math.round(105 - 40 * t)})`;
     const m = i === 0 ? 1.5 : 3;
     g.beginPath();
     if (g.roundRect) g.roundRect(p.x * C + m, p.y * C + m, C - m * 2, C - m * 2, i === 0 ? 9 : 7);
@@ -1150,6 +1176,9 @@ export function cobrinha() {
     aoAcabar: () => { if (situacao !== 'fim') { situacao = 'fim'; clearTimeout(timer); mostrarSobre(); } },
   });
   const sorte = ds ? ds.sorte : Math.random;
+  // Códigos secretos (no desafio não valem: todos jogam igual).
+  const seg = segredosDoJogo('cobrinha', { bloqueado: !!ds, aoMudar: () => { if (cobra) desenharTudo(); } });
+  const ritmo = () => (seg.ativo('cobra-turbo') ? Math.max(40, passoMs * 0.55) : passoMs);
 
   function novoJogo() {
     cobra = [{ x: 6, y: 10 }, { x: 5, y: 10 }, { x: 4, y: 10 }];
@@ -1157,6 +1186,7 @@ export function cobrinha() {
     fila = [];
     pontos = 0;
     passoMs = 135;
+    seg.novaPartida();
     pontosEl.textContent = '0';
     novaComida();
     situacao = 'pronto';
@@ -1177,7 +1207,7 @@ export function cobrinha() {
     situacao = 'jogando';
     mostrarSobre();
     clearTimeout(timer);
-    timer = setTimeout(passo, passoMs);
+    timer = setTimeout(passo, ritmo());
   }
 
   function pausar() {
@@ -1198,7 +1228,8 @@ export function cobrinha() {
   function passo() {
     if (situacao !== 'jogando') return;
     if (fila.length) direcao = fila.shift();
-    const cabeca = { x: cobra[0].x + direcao[0], y: cobra[0].y + direcao[1] };
+    let cabeca = { x: cobra[0].x + direcao[0], y: cobra[0].y + direcao[1] };
+    if (seg.ativo('cobra-portal')) cabeca = { x: (cabeca.x + N) % N, y: (cabeca.y + N) % N }; // sai de um lado, entra do outro
     const come = comida && cabeca.x === comida.x && cabeca.y === comida.y;
     const corpo = come ? cobra : cobra.slice(0, -1); // a ponta do rabo sai do lugar neste passo
     if (cabeca.x < 0 || cabeca.y < 0 || cabeca.x >= N || cabeca.y >= N || corpo.some(p => p.x === cabeca.x && p.y === cabeca.y)) {
@@ -1217,7 +1248,7 @@ export function cobrinha() {
       cobra.pop();
     }
     desenharTudo();
-    timer = setTimeout(passo, passoMs);
+    timer = setTimeout(passo, ritmo());
   }
 
   async function fimDeJogo() {
@@ -1227,6 +1258,7 @@ export function cobrinha() {
     desenharTudo(true);
     mostrarSobre();
     if (!pontos) return;
+    if (!seg.valeRecorde()) { mostrarSobre('Modo secreto ligado: esta partida não vale recorde.'); return; }
     try {
       const r = await post('/api/recreacao/recordes', { jogo: 'cobrinha', pontos });
       if (r.recorde) {
@@ -1266,14 +1298,14 @@ export function cobrinha() {
   let bateuAgora = false;
   function desenharTudo(bateu = false) {
     bateuAgora = bateu;
-    desenharCobrinha(g, { cobra, comida, direcao, bateu });
+    desenharCobrinha(g, { cobra, comida, direcao, bateu, arcoIris: seg.ativo('cobra-arcoiris') });
     transmitirQuadro();
   }
 
   // Quem assiste recebe a cobra, a cenoura e a situação a cada passo.
   function transmitirQuadro() {
     if (!cobra) return;
-    enviarQuadro({ c: cobra.flatMap(p => [p.x, p.y]), f: comida ? [comida.x, comida.y] : null, d: direcao, pts: pontos, s: situacao, b: bateuAgora ? 1 : 0 }, true);
+    enviarQuadro({ c: cobra.flatMap(p => [p.x, p.y]), f: comida ? [comida.x, comida.y] : null, d: direcao, pts: pontos, s: situacao, b: bateuAgora ? 1 : 0, ai: seg.ativo('cobra-arcoiris') ? 1 : 0 }, true);
   }
   escutar('estado', () => { if (rt.conectado) { transmitir('cobrinha'); transmitirQuadro(); } });
   if (rt.conectado) transmitir('cobrinha');
@@ -1300,7 +1332,9 @@ export function cobrinha() {
     const dy = e.clientY - inicio.y;
     inicio = null;
     if (Math.max(Math.abs(dx), Math.abs(dy)) < 20) return;
-    virar(Math.abs(dx) > Math.abs(dy) ? [Math.sign(dx), 0] : [0, Math.sign(dy)]);
+    const d = Math.abs(dx) > Math.abs(dy) ? [Math.sign(dx), 0] : [0, Math.sign(dy)];
+    seg.direcao(nomeDir(d));
+    virar(d);
   });
 
   const aoEsconder = () => { if (document.hidden) pausar(); };
@@ -1313,7 +1347,7 @@ export function cobrinha() {
     document.removeEventListener('visibilitychange', aoEsconder);
   });
 
-  const seta = (ic, d, rotulo) => h('button', { class: `dpad-${ic}`, type: 'button', 'aria-label': rotulo, onpointerdown: e => { e.preventDefault(); virar(d); } }, icone(ic));
+  const seta = (ic, d, rotulo) => h('button', { class: `dpad-${ic}`, type: 'button', 'aria-label': rotulo, onpointerdown: e => { e.preventDefault(); seg.direcao(nomeDir(d)); virar(d); } }, icone(ic));
 
   function carregarRanking() {
     get('/api/recreacao/ranking').then(r => {
@@ -1360,6 +1394,8 @@ export function quebraCabeca() {
   let largar = null;
   let acabar = null;
   const ds = desafioNoJogo('quebra', { aoLargar: () => largar?.(), aoAcabar: () => acabar?.() });
+  let redesenharQuebra = null;
+  const seg = segredosDoJogo('quebra', { bloqueado: !!ds, aoMudar: () => redesenharQuebra?.() });
   aoSair(() => {
     clearInterval(cronometro);
     pararTransmissao();
@@ -1417,6 +1453,7 @@ export function quebraCabeca() {
     const variante = `${n}x${n}`;
     const total = n * n;
     let pecas = embaralhar(total, ds?.sorte);
+    seg.novaPartida();
     let selecionada = null;
     let movimentos = 0;
     let comeco = null;
@@ -1433,16 +1470,19 @@ export function quebraCabeca() {
     const segundos = () => (comeco ? (Date.now() - comeco) / 1000 : 0);
 
     function desenhar() {
+      const ima = seg.ativo('quebra-ima');
+      const numeros = seg.ativo('quebra-numeros');
       trocar(tabuleiro, pecas.map((p, i) => h('button', {
-        class: `qc-peca ${selecionada === i ? 'selecionada' : ''}`.trim(),
+        class: `qc-peca ${selecionada === i ? 'selecionada' : ''} ${ima && p === i ? 'ima-certa' : ''}`.replace(/\s+/g, ' ').trim(),
         type: 'button',
         'data-i': i,
         'aria-label': `Peça ${i + 1}`,
         style: estiloPeca(urlImagem, n, p),
-      })));
+      }, numeros && h('span', { class: 'qc-numero' }, p + 1))));
       if (transmissao) enviarQuadro(transmissao.estado(), true);
     }
 
+    redesenharQuebra = desenhar;
     // Quem assiste vê a mesma imagem e a posição de cada peça.
     transmissao = {
       info: { src: fonteAtual, n, titulo, variante },
@@ -1530,7 +1570,9 @@ export function quebraCabeca() {
         h('div', { class: 'qc-resultado-acoes' }, ds ? ds.botoesFim(() => jogar(titulo)) : [
           botao('Jogar de novo', { classe: 'btn-ouro', onclick: () => jogar(titulo) }),
           botao('Outra imagem', { onclick: escolher })]));
+      if (seg.ativo('festa')) efeito('confete');
       if (ds) return;
+      if (!seg.valeRecorde()) { resultado.insertBefore(h('p', { class: 'cobra-recorde' }, icone('estrela'), 'Modo secreto ligado: esta partida não vale recorde.'), resultado.children[2]); return; }
       try {
         const r = await post('/api/recreacao/recordes', { jogo: 'quebra', variante, pontos: s, detalhe: `${movimentos} trocas` });
         if (r.recorde) resultado.insertBefore(h('p', { class: 'cobra-recorde' }, icone('trofeu'), r.anterior == null ? 'Primeiro tempo registrado!' : `Novo recorde pessoal! (antes: ${relogio(r.anterior)})`), resultado.children[2]);
@@ -1638,6 +1680,16 @@ export function memoria() {
   let relogioId = null;
   let fecharTimer = null;
   let recorde = null;
+  let espiou = false;
+  const segredos = segredosDoJogo('memoria', {
+    aoUsar: chave => {
+      if (chave !== 'memoria-espiar' || espiou || situacao === 'fim') return false;
+      espiou = true;
+      botoes.forEach((b, i) => { if (!cartas[i].achada) b.classList.add('virada'); });
+      setTimeout(atualizar, 2000);
+      return true;
+    },
+  });
 
   function novoJogo() {
     clearInterval(relogioId);
@@ -1650,6 +1702,8 @@ export function memoria() {
     achados = 0;
     seg = 0;
     situacao = 'pronto';
+    espiou = false;
+    segredos.novaPartida();
     moldura.style.setProperty('--colunas', col);
     moldura.style.setProperty('--linhas', lin);
     botoes = cartas.map((c, i) => cartaMemoria(c.fig, () => clicar(i)));
@@ -1724,6 +1778,8 @@ export function memoria() {
     sobre.hidden = false;
     atualizar();
     transmitirQuadro(true);
+    if (segredos.ativo('festa')) efeito('confete');
+    if (!segredos.valeRecorde()) { caixa.insertBefore(h('p', { class: 'cobra-recorde' }, icone('estrela'), 'Modo secreto ligado: esta partida não vale recorde.'), caixa.lastChild); return; }
     try {
       const r = await post('/api/recreacao/recordes', { jogo: 'memoria', variante: tamanhoMemoria, pontos: jogadas, detalhe: relogio(seg) });
       if (r.recorde) {
@@ -1848,7 +1904,7 @@ function assistirCobrinha() {
     quadro(q) {
       const cobra = [];
       for (let i = 0; i + 1 < (q.c || []).length; i += 2) cobra.push({ x: q.c[i], y: q.c[i + 1] });
-      desenharCobrinha(g, { cobra, comida: q.f ? { x: q.f[0], y: q.f[1] } : null, direcao: q.d || [1, 0], bateu: !!q.b });
+      desenharCobrinha(g, { cobra, comida: q.f ? { x: q.f[0], y: q.f[1] } : null, direcao: q.d || [1, 0], bateu: !!q.b, arcoIris: !!q.ai });
       pontosEl.textContent = q.pts ?? 0;
       const texto = { pronto: 'Preparando...', pausado: 'Pausado', fim: `Fim de jogo: ${q.pts} ${q.pts === 1 ? 'cenoura' : 'cenouras'}` }[q.s];
       aviso_.hidden = !texto;
