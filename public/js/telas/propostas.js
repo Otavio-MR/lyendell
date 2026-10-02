@@ -144,9 +144,9 @@ export async function propostas() {
       h('p', { class: 'proposta-autor' },
         p.autor_id ? h('a', { href: `#/pessoa/${p.autor_id}` }, avatarPessoa({ nome: p.autor_nome, foto: p.foto, moldura: p.moldura }, 'avatar-p')) : avatarPessoa({ nome: p.autor_nome }, 'avatar-p'),
         h('span', null, 'Proposta de ', h('strong', null, p.autor_nome), ` · ${relativo(p.criado_em)}`)),
-      h('div', { class: 'proposta-bloco' }, h('h4', null, 'O que muda'), h('p', { class: 'texto-livre' }, p.resumo)),
+      h('div', { class: 'proposta-bloco' }, h('h4', null, 'O que muda'), textoGrande(p.resumo)),
       p.texto && h('details', { class: 'proposta-mais' }, h('summary', null, 'Texto completo'), h('p', { class: 'texto-livre' }, p.texto)),
-      p.justificativa && h('div', { class: 'proposta-bloco' }, h('h4', null, 'Por que é uma boa ideia'), h('p', { class: 'texto-livre' }, p.justificativa)),
+      p.justificativa && h('div', { class: 'proposta-bloco' }, h('h4', null, 'Por que é uma boa ideia'), textoGrande(p.justificativa)),
       p.parecer && h('div', { class: `proposta-parecer ${p.situacao === 'inviavel' ? 'ruim' : ''}`.trim() },
         h('strong', null, icone('balanca'), ` Parecer${p.parecer_nome ? ` de ${p.parecer_nome}` : ' da Senadora'}`), h('p', { class: 'texto-livre' }, p.parecer)),
       ['aprovada', 'rejeitada'].includes(p.situacao) && h('div', { class: `proposta-votacao ${p.situacao}` },
@@ -166,6 +166,16 @@ export async function propostas() {
   return raiz;
 }
 
+// Texto comprido: mostra o começo e um botão para ler o resto.
+const CORTE = 700;
+function textoGrande(texto) {
+  if (texto.length <= CORTE * 1.3) return h('p', { class: 'texto-livre' }, texto);
+  const corte = texto.lastIndexOf(' ', CORTE) > CORTE * 0.7 ? texto.lastIndexOf(' ', CORTE) : CORTE;
+  const el = h('p', { class: 'texto-livre' }, `${texto.slice(0, corte)}…`);
+  const botaoLer = h('button', { type: 'button', class: 'link-botao', onclick: () => { el.textContent = texto; botaoLer.remove(); } }, `Ler tudo (${Math.ceil(texto.length / 1000)} mil letras)`);
+  return h('div', null, el, botaoLer);
+}
+
 const passo = (ic, titulo, texto) => h('li', null, h('span', { class: 'propostas-passo-icone' }, icone(ic)), h('div', null, h('strong', null, titulo), h('small', null, texto)));
 
 /* ─── Formulários ─────────────────────────────────── */
@@ -178,10 +188,10 @@ function formProposta(d, p, depois) {
     titulo: p ? 'Editar a proposta' : 'Mandar uma proposta ao Congresso', tamanho: 'medio', textoOk: p ? 'Salvar' : 'Mandar para a Senadora',
     conteudo: h('div', { class: 'form-grade' },
       campo('Tipo', h('select', { class: 'input', onchange: e => { v.tipo = e.target.value; } }, d.tipos.map(t => h('option', { value: t, selected: t === v.tipo }, t))), { ajuda: AJUDA_TIPO, obrigatorio: true }),
-      campo('Título', entrada('titulo', { maxlength: '120', placeholder: 'Ex.: Lei da Feira aos Domingos' }), { obrigatorio: true }),
-      campo('O que muda', area('resumo', { rows: '3', maxlength: '800', placeholder: 'Em poucas palavras: o que muda para os moradores de Lyendell?' }), { obrigatorio: true, classe: 'largo' }),
-      campo('Texto completo', area('texto', { rows: '6', maxlength: '5000', placeholder: 'Se quiser, escreva a lei inteira, artigo por artigo.' }), { classe: 'largo' }),
-      campo('Por que é uma boa ideia', area('justificativa', { rows: '3', maxlength: '1500', placeholder: 'Convença a Senadora e o Congresso!' }), { classe: 'largo' }),
+      campo('Título', entrada('titulo', { maxlength: '200', placeholder: 'Ex.: Lei da Feira aos Domingos' }), { obrigatorio: true }),
+      campo('O que muda', area('resumo', { rows: '4', placeholder: 'Em poucas palavras: o que muda para os moradores de Lyendell?' }), { obrigatorio: true, classe: 'largo' }),
+      campo('Texto completo', area('texto', { rows: '10', placeholder: 'Se quiser, escreva a lei inteira, artigo por artigo. Não tem limite de tamanho.' }), { classe: 'largo' }),
+      campo('Por que é uma boa ideia', area('justificativa', { rows: '4', placeholder: 'Convença a Senadora e o Congresso!' }), { classe: 'largo' }),
       !p && h('p', { class: 'suave largo' }, `A Senadora avalia e você é avisado na hora. Dá para ter até ${d.limite} propostas esperando ao mesmo tempo.`)),
     aoEnviar: async () => {
       if (p) await put(`/api/propostas/${p.id}`, v);
@@ -201,7 +211,7 @@ function avaliar(p, viavel, depois) {
       h('p', { class: 'form-intro largo' }, viavel
         ? `A proposta vai para a pauta do Congresso, e ${p.autor_nome} é avisado na hora. Depois da sessão, registre a votação.`
         : `${p.autor_nome} vai ler o motivo. Seja clara e gentil: a ideia pode voltar melhor.`),
-      campo(viavel ? 'Recado para quem propôs (opcional)' : 'Por que é inviável', h('textarea', { class: 'input', rows: '4', maxlength: '800', oninput: e => { v.parecer = e.target.value; } }),
+      campo(viavel ? 'Recado para quem propôs (opcional)' : 'Por que é inviável', h('textarea', { class: 'input', rows: '5', oninput: e => { v.parecer = e.target.value; } }),
         { obrigatorio: !viavel, classe: 'largo' })),
     aoEnviar: async () => {
       await post(`/api/propostas/${p.id}/avaliar`, { viavel, parecer: v.parecer });
@@ -232,7 +242,7 @@ function decidir(p, depois) {
       campo('Votos a favor', numero('a_favor')),
       campo('Votos contra', numero('contra')),
       campo('Abstenções', numero('abstencoes')),
-      campo('Observação (opcional)', h('textarea', { class: 'input', rows: '2', maxlength: '500', oninput: e => { v.observacao = e.target.value; } }, v.observacao), { classe: 'largo' })),
+      campo('Observação (opcional)', h('textarea', { class: 'input', rows: '3', oninput: e => { v.observacao = e.target.value; } }, v.observacao), { classe: 'largo' })),
     aoEnviar: async () => {
       await post(`/api/propostas/${p.id}/decidir`, v);
       aviso({ aprovada: 'Proposta aprovada!', rejeitada: 'Proposta rejeitada.', adiada: 'Votação adiada: a proposta continua na pauta.' }[v.resultado]);

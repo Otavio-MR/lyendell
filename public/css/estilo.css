@@ -2442,3 +2442,5 @@ body.modo-crianca .tabela th { color: var(--rosa); }
 .proposta-acoes { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-top: 6px; border-top: 1px solid var(--borda); }
 .propostas-livros { display: grid; gap: 8px; }
 @media (max-width: 760px) { .propostas-passos { grid-template-columns: minmax(0, 1fr); } }
+
+.link-botao { background: none; border: 0; padding: 0; margin-top: 4px; color: var(--ouro-l); font: inherit; font-size: 0.9rem; text-decoration: underline; cursor: pointer; }

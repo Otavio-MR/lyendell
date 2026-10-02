@@ -128,7 +128,8 @@ Para os outros, o perfil e a comunidade mostram a etiqueta "Criança". Os textos
 
 Na aba **Propostas do povo** do Congresso, qualquer morador manda uma ideia para a cidade: lei, PEC,
 emenda, regra, decreto, resolução ou outra, com o título, o que muda, o texto completo (se quiser) e
-por que é uma boa ideia. Dá para ter até 3 propostas esperando ao mesmo tempo, corrigir enquanto não
+por que é uma boa ideia, sem limite de tamanho (cabe uma lei inteira, artigo por artigo; no cartão aparece o
+começo e um "Ler tudo"). Dá para ter até 3 propostas esperando ao mesmo tempo, corrigir enquanto não
 foram avaliadas e retirar. Os outros moradores podem **apoiar** as propostas, para a Senadora ver
 quais o povo mais quer.
 

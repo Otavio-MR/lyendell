@@ -28,10 +28,11 @@ async function buscar(id) {
 function ler(body) {
   const p = {
     tipo: TIPOS.includes(body?.tipo) ? body.tipo : null,
-    titulo: texto(body?.titulo, 120).replace(/\s+/g, ' '),
-    resumo: texto(body?.resumo, 800),
-    texto: texto(body?.texto, 5000),
-    justificativa: texto(body?.justificativa, 1500),
+    titulo: texto(body?.titulo, 200).replace(/\s+/g, ' '),
+    // Sem limite de tamanho: a proposta pode ser uma lei inteira, artigo por artigo.
+    resumo: texto(body?.resumo, Infinity),
+    texto: texto(body?.texto, Infinity),
+    justificativa: texto(body?.justificativa, Infinity),
   };
   if (!p.tipo) throw erro(400, 'Escolha o tipo da proposta (lei, PEC, regra...).');
   if (p.titulo.length < 3) throw erro(400, 'Dê um título para a proposta.');
@@ -143,7 +144,7 @@ r.post('/:id/avaliar', exigir('congresso.aprovar'), async (req, res) => {
   const p = await buscar(idDaRota(req));
   if (!['enviada', 'inviavel', 'em_pauta'].includes(p.situacao)) throw erro(409, 'Esta proposta já foi votada. Para mudar, corrija a votação.');
   const viavel = !!req.body?.viavel;
-  const parecer = texto(req.body?.parecer, 800);
+  const parecer = texto(req.body?.parecer, Infinity);
   if (!viavel && parecer.length < 5) throw erro(400, 'Explique por que a proposta é inviável (quem propôs vai ler).');
   const situacao = viavel ? 'em_pauta' : 'inviavel';
   const historico = registrarPasso(p, situacao, req.usuario.nome, parecer ? { texto: parecer } : {});
@@ -168,7 +169,7 @@ r.post('/:id/decidir', exigir('congresso.aprovar'), async (req, res) => {
   if (!RESULTADOS[resultado]) throw erro(400, 'Escolha o resultado: aprovada, rejeitada ou adiada.');
   const votacao = req.body?.votacao ? dataValida(req.body.votacao) : null;
   if (req.body?.votacao && !votacao) throw erro(400, 'Data da votação inválida.');
-  const observacao = texto(req.body?.observacao, 500);
+  const observacao = texto(req.body?.observacao, Infinity);
   const [aFavor, contra, abst] = [votos(req.body?.a_favor), votos(req.body?.contra), votos(req.body?.abstencoes)];
   const situacao = RESULTADOS[resultado];
   const historico = registrarPasso(p, resultado, req.usuario.nome, {

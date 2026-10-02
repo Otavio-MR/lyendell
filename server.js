@@ -48,6 +48,8 @@ app.get('/api/saude', async (req, res) => {
   res.set('Cache-Control', 'no-store').json({ ok: true });
 });
 
+// Propostas do povo e textos de lei podem ser enormes (um livro inteiro): essas rotas aceitam até 5 MB.
+app.use(['/api/propostas', '/api/livros', '/api/registros'], express.json({ limit: '5mb' }));
 app.use(express.json({ limit: '1mb' }));
 
 // Pedidos que alteram dados só valem vindos do próprio site.

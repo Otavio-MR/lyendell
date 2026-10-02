@@ -455,7 +455,7 @@ export async function formRegistro(l, r, aoSalvar, inicial = null) {
     fontes[id] = await get(`/api/livros/${id}/opcoes`).catch(() => null);
   }));
   const calculados = [];
-  const ctx = { envio: { n: 0 }, fontes, calculados, mudou: () => calculados.forEach(f => f()) };
+  const ctx = { envio: { n: 0 }, fontes, calculados, mudou: () => calculados.forEach(f => f()), semLimite: ['congresso', 'leis'].includes(l.modulo) };
   const nomeDo = id => l.campos.find(x => x.id === id)?.nome || id;
 
   modalForm({
@@ -507,7 +507,7 @@ function entradaDoCampo(c, valores, ctx) {
     case 'referencia':
       return entradaReferencia(c, v, definir, ctx.fontes[c.livro]);
     case 'texto_longo':
-      return campo(c.nome, h('textarea', { class: 'input', rows: '4', maxlength: '10000', oninput: e => definir(e.target.value) }, v ?? ''), { ...opcoes, classe: 'largo' });
+      return campo(c.nome, h('textarea', { class: 'input', rows: ctx.semLimite ? '8' : '4', maxlength: ctx.semLimite ? null : '10000', oninput: e => definir(e.target.value) }, v ?? ''), { ...opcoes, classe: 'largo' });
     case 'numero':
       return campo(c.nome, h('input', { class: 'input', type: 'number', step: 'any', value: v ?? '', oninput: e => definir(e.target.value) }), opcoes);
     case 'data':
