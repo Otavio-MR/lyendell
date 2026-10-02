@@ -16,7 +16,8 @@ const CAMPO_GUARDAS = { id: 'guarda', nome: 'Guardas responsáveis', tipo: 'refe
 // "sinonimos" servem para achar o campo mesmo que o nome no formulário seja um pouco diferente.
 const CAMPOS_FICHA = {
   nome: { nome: 'Nome', sinonimos: ['nome', 'nome do personagem', 'nome completo'] },
-  nickname: { nome: 'Nickname', sinonimos: ['nickname', 'nick', 'nick do minecraft'], ajuda: 'O nick do jogador no Minecraft.' },
+  // No RP ninguém fala "nickname": o nick do jogador é o "Endereço" da pessoa (a rua e o número são a Residência).
+  nickname: { nome: 'Endereço', sinonimos: ['nickname', 'nick', 'nick do minecraft'], ajuda: 'O nick do jogador no Minecraft (no RP, o endereço da pessoa).' },
   idade: { nome: 'Idade', sinonimos: ['idade'] },
   cargo: { nome: 'Cargo', sinonimos: ['cargo'] },
   residencia: { nome: 'Residência', sinonimos: ['residencia', 'endereco', 'moradia'] },
@@ -27,7 +28,7 @@ const FICHAS = {
   'registro de moradores': ['nome', 'nickname', 'idade', 'cargo', 'residencia', 'estado_civil', 'profissao'],
   'registro de nobres': ['nome', 'nickname', 'idade', 'cargo', 'residencia', 'estado_civil', 'profissao'],
 };
-const NICKNAME = { id: 'nickname', nome: 'Nickname', tipo: 'texto', ajuda: CAMPOS_FICHA.nickname.ajuda };
+const NICKNAME = { id: 'nickname', nome: CAMPOS_FICHA.nickname.nome, tipo: 'texto', ajuda: CAMPOS_FICHA.nickname.ajuda };
 const FICHA_PESSOA = [
   NICKNAME,
   { id: 'idade', nome: 'Idade', tipo: 'texto' },
@@ -75,7 +76,7 @@ const LIVROS_PADRAO = [
       { id: 'idade', nome: 'Idade', tipo: 'texto' },
       { id: 'genero', nome: 'Gênero', tipo: 'texto' },
       { id: 'estado_civil', nome: 'Estado civil', tipo: 'texto' },
-      { id: 'endereco', nome: 'Endereço', tipo: 'texto', destaque: true },
+      { id: 'endereco', nome: 'Residência', tipo: 'texto', destaque: true, ajuda: 'A rua e o número onde a pessoa mora.' },
       { id: 'familia', nome: 'A qual família pertence', tipo: 'texto', destaque: true },
       { id: 'cargo_familia', nome: 'Cargo na família', tipo: 'texto', destaque: true },
     ],

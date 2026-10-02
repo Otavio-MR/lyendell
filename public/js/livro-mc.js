@@ -298,9 +298,10 @@ function tituloDoRegistro(livro, dados, semNome = 'Registro') {
 
 /* ─── Fichas de registro (modelo da Casa) ─────────── */
 
-// Os modelos de Moradores, Nobres e Outros são copiados letra por letra dos livros feitos
-// pela Casa no jogo: cada valor entra na linha em branco logo abaixo do rótulo.
-// Os outros livros seguem o mesmo desenho, com os próprios campos.
+// Os modelos de Moradores, Nobres e Outros copiam a capa e o rodapé dos livros feitos pela Casa no jogo.
+// As linhas de dentro seguem SEMPRE o formulário de registro do site: os mesmos campos, na mesma ordem e com
+// os mesmos nomes (no RP o nick se chama "Endereço"). Campo que não existe no formulário não vai para o livro.
+// Cada valor entra na linha em branco logo abaixo do rótulo. Os outros livros seguem o mesmo desenho.
 
 const SEP = '🐇 ────────── 🐇';
 const FIM = '§4   §6  Casa Luckham';
@@ -327,9 +328,8 @@ const IDS_FICHA = {
   nickname: 'nickname', nome: 'nome', idade: 'idade', cargo: 'cargo', residencia: 'residencia', estadoCivil: 'estado_civil',
   profissao: 'profissao', genero: 'genero', endereco: 'endereco', familia: 'familia', cargoFamilia: 'cargo_familia',
 };
-// As linhas de cada modelo (o nome entra no de Outros só para o título da capa, se não houver nick).
-const LINHAS_PESSOA = ['nickname', 'nome', 'idade', 'cargo', 'residencia', 'estadoCivil', 'profissao'];
-const LINHAS_OUTROS = ['nickname', 'nome', 'idade', 'genero', 'estadoCivil', 'endereco', 'familia', 'cargoFamilia'];
+// Na capa vai o nome (ou o nick, no de Outros) da pessoa registrada.
+const LINHAS_CAPA = ['nickname', 'nome'];
 
 const semCodigos = s => s.replace(/§./g, '');
 // Valor numa linha só, sem § (que o Minecraft leria como código de cor).
@@ -401,32 +401,27 @@ function capaDaFicha({ cor, fecho = '', cabecalho = TABELIONATO, tipo, numero, t
 
 const rodapeMoradores = reg => `§8${SEP}\nRegistrado por: ${quemRegistrou(reg)}§0\n§8em ${quandoRegistrou(reg)}\n${SEP}\n${FIM}`;
 const rodapePadrao = reg => `§8${SEP}\n§0Registrado por: ${quemRegistrou(reg)}\nem ${quandoRegistrou(reg)}§8\n${SEP}\n${FIM}`;
-// Valor em preto na linha em branco; o §4 no fim devolve o vermelho para o próximo rótulo.
-const vaga = v => (v ? `§0${v}§4` : '');
 
 function fichaMoradoresOuNobres(livro, reg, nobres) {
-  const v = leitorDaFicha(livro, reg, LINHAS_PESSOA);
-  const cargo = v('cargo');
+  const v = leitorDaFicha(livro, reg, LINHAS_CAPA);
   return [
     capaDaFicha({
       cor: nobres ? '6' : '2', fecho: nobres ? '§2' : '',
       tipo: ['       Registro de', nobres ? '         Nobres' : '       Moradores'],
       numero: numeroDoRegistro(reg), titulo: v('nome') || v('nickname'),
     }),
-    `§4\nNickname:\n${vaga(v('nickname'))}\n\nNome:\n${vaga(v('nome'))}\n§0\n§4Idade:\n${vaga(v('idade'))}\n\nCargo:${cargo ? `\n${vaga(cargo)}` : ''}`,
-    `§4Residência:\n§0${v('residencia')}\n§4Estado Civil:\n${vaga(v('estadoCivil'))}\nProfissão:§0\n${v('profissao')}\n\n${nobres ? rodapePadrao(reg) : rodapeMoradores(reg)}`,
+    ...paginasDosCampos(livro, reg, nobres ? rodapePadrao(reg) : rodapeMoradores(reg)),
   ];
 }
 
 function fichaOutros(livro, reg) {
-  const v = leitorDaFicha(livro, reg, LINHAS_OUTROS);
+  const v = leitorDaFicha(livro, reg, LINHAS_CAPA);
   return [
     capaDaFicha({
       cor: '3', fecho: '§2', tipo: ['       Registro de', '         Outros'],
       numero: numeroDoRegistro(reg), titulo: v('nickname') || v('nome'),
     }),
-    `§4\nNickname:\n${vaga(v('nickname'))}\n\nIdade:\n${vaga(v('idade'))}\n\nGênero:\n${vaga(v('genero'))}\n\nEstado civil:\n${vaga(v('estadoCivil'))}`,
-    `§4Endereço:\n${vaga(v('endereco'))}\nA qual família pertence:\n${vaga(v('familia'))}\nCargo na família:§0\n${v('cargoFamilia')}\n\n${rodapePadrao(reg)}`,
+    ...paginasDosCampos(livro, reg, rodapePadrao(reg)),
   ];
 }
 
@@ -465,15 +460,21 @@ function fichaGenerica(nomeModulo, livro, reg) {
     ...capaDoModulo(nomeModulo),
     tipo: tipoDoLivro(livro.nome), numero: numeroDoRegistro(reg), titulo: tituloDoRegistro(livro, reg.dados || {}, ''),
   });
+  return [capa, ...paginasDosCampos(livro, reg, rodapePadrao(reg))];
+}
+
+// As páginas de dentro: cada campo do formulário (na ordem e com o nome dele) e o valor logo abaixo.
+// Imagem não cabe no livro do Minecraft; campo que o formulário não tem não aparece.
+function paginasDosCampos(livro, reg, rodape) {
   const blocos = [];
   for (const c of livro.campos) {
     if (c.tipo === 'imagem') continue;
     if (c.tipo === 'secao') { blocos.push([`§8✦ ${umaLinha(c.nome).toUpperCase()} ✦§4`]); continue; }
     const valor = String(valorFormatado(c, reg)).replace(/§/g, '');
     const linhasValor = valor ? valor.split('\n').map(p => (p.trim() ? `§0${p.trim()}§4` : '')) : [''];
-    blocos.push([`${umaLinha(c.nome)}:`, ...linhasValor, '']);
+    blocos.push([`${umaLinha(c.nome).replace(/:\s*$/, '')}:`, ...linhasValor, '']);
   }
-  blocos.push(rodapePadrao(reg).split('\n'));
+  blocos.push(rodape.split('\n'));
 
   // Enche as páginas sem separar um campo do seu valor (a não ser que ele sozinho passe de uma página).
   const paginas = [];
@@ -492,7 +493,7 @@ function fichaGenerica(nomeModulo, livro, reg) {
     }
   }
   if (atual.length) fechar();
-  return [capa, ...paginas];
+  return paginas;
 }
 
 // Se um valor comprido fizer uma página passar de 14 linhas, o resto vai para a página seguinte,

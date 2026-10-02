@@ -183,16 +183,17 @@ O arquivo é o mesmo formato que o mod **Scribble** salva. Para usar no jogo:
 1. coloque o `.book` na pasta `books` do perfil do Minecraft (no Modrinth: `ModrinthApp\profiles\<perfil>\books`);
 2. no jogo, abra um livro e pena e use o botão do Scribble para carregar um livro salvo.
 
-As fichas de **Moradores**, **Nobres** e **Outros** saem exatamente no modelo feito pela Casa no
-jogo: capa com o cabeçalho do Tabelionato (verde, dourado e azul, nessa ordem), o número do
-registro com 4 dígitos e o nome entre os coelhos; depois os campos do modelo (Nickname, Nome,
-Idade, Cargo, Residência, Estado Civil e Profissão; no Outros: Nickname, Idade, Gênero, Estado
-civil, Endereço, família e cargo na família), cada valor na linha logo abaixo do rótulo, e no fim
-quem registrou e quando. Uma ficha em branco sai igual, byte por byte, ao arquivo modelo.
-Os campos são achados pelo nome no formulário (o nome mais exato ganha) e, se a Tabeliã renomear um
-campo que veio pronto, pelo campo original. Em Lyendell o "Endereço" é o nick do jogador (vai na linha
-Nickname) e a "Residência" é a rua e o número. O Tabelionato pode ter outros campos além desses (eles só
-não entram no livro).
+As fichas de **Moradores**, **Nobres** e **Outros** saem no modelo feito pela Casa no jogo: capa com
+o cabeçalho do Tabelionato (verde, dourado e azul, nessa ordem), o número do registro com 4 dígitos e
+o nome entre os coelhos; depois os campos, cada valor na linha logo abaixo do rótulo, e no fim quem
+registrou e quando.
+
+**O livro sempre segue o formulário de registro**: os mesmos campos, na mesma ordem e com os mesmos
+nomes que estão no formulário do site. Campo que não existe no formulário não vai para o livro, e se a
+Tabeliã criar, renomear ou mudar a ordem de um campo, o livro muda junto (as imagens ficam de fora,
+porque o livro do Minecraft não mostra imagem). No RP ninguém fala "nickname": o nick do jogador é o
+**Endereço** da pessoa, e a rua e o número são a **Residência**; por isso o campo do nick se chama
+Endereço em todos os livros.
 
 Os outros livros (Comerciantes, Casamentos, Prisioneiros...) seguem o mesmo desenho, com os
 próprios campos. O livro inteiro junta as fichas uma atrás da outra, até 100 páginas. Se um valor

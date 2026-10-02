@@ -417,7 +417,7 @@ CREATE TABLE IF NOT EXISTS diario (
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 19;
+const VERSAO = 20;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -491,6 +491,8 @@ async function migrar() {
   // v17: personagem criança (só olha, brinca e ajuda; o site aparece do jeito de uma criança).
   if (versao < 17 && !await colunaExiste('usuarios', 'crianca')) await db.run('ALTER TABLE usuarios ADD COLUMN crianca INTEGER NOT NULL DEFAULT 0');
   if (versao < 18) await migrarBobo();
+  // v20: o campo "Nickname" vira "Endereço" em todos os livros (no RP o nick é o endereço da pessoa).
+  if (versao < 20) await nickVirouEndereco();
   // v19: propostas do povo para o Congresso (todo morador manda; a Senadora avalia).
   if (versao < 19) {
     await darPermissoes({ base: ['congresso.propor'] });
@@ -605,6 +607,29 @@ async function migrarBobo() {
     await db.run('INSERT INTO cargos (nome, descricao, cor, permissoes, base, ordem) VALUES (?, ?, ?, ?, 0, ?)', bobo.nome, bobo.descricao, bobo.cor, '[]', ordem + 1);
   }
   await darPermissoes({ [bobo.nome]: bobo.permissoes });
+}
+
+// v20: campo do nick ainda com o nome antigo "Nickname" passa a se chamar "Endereço" (os renomeados à mão ficam).
+async function nickVirouEndereco() {
+  for (const l of await db.all('SELECT id, campos FROM livros')) {
+    const campos = JSON.parse(l.campos);
+    let mudou = false;
+    // O campo de onde a pessoa mora que ainda se chama Endereço (modelo antigo de Outros) vira Residência,
+    // para não ficarem dois campos com o mesmo nome.
+    if (campos.some(c => c.id === 'nickname')) {
+      for (const c of campos) {
+        if (c.id === 'endereco' && chaveNome(c.nome) === 'endereco') { c.nome = 'Residência'; mudou = true; }
+      }
+    }
+    for (const c of campos) {
+      if (c.tipo === 'texto' && chaveNome(c.nome) === 'nickname') {
+        c.nome = CAMPOS_FICHA.nickname.nome;
+        if (!c.ajuda || c.ajuda === 'O nick do jogador no Minecraft.') c.ajuda = CAMPOS_FICHA.nickname.ajuda;
+        mudou = true;
+      }
+    }
+    if (mudou) await db.run('UPDATE livros SET campos = ? WHERE id = ?', JSON.stringify(campos), l.id);
+  }
 }
 
 // Descrições de cargo que ainda estão no texto antigo passam para o texto novo (as editadas à mão ficam).
