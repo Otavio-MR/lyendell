@@ -150,6 +150,7 @@ r.post('/perguntas', gerenciar, async (req, res) => {
   const { id } = await db.run('INSERT INTO perguntas (categoria, texto, alternativas, correta, criado_por_nome) VALUES (?, ?, ?, ?, ?)',
     p.categoria, p.texto, JSON.stringify(p.alternativas), p.correta, req.usuario.nome);
   await anotar(req, 'Criou uma pergunta do quiz', p.texto);
+  await progresso.registrar(req.usuario.id, 'pergunta');
   res.status(201).json({ id });
 });
 

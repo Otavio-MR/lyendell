@@ -215,8 +215,23 @@ CREATE TABLE IF NOT EXISTS chat_mensagens (
   usuario_id INTEGER,
   usuario_nome TEXT NOT NULL,
   texto TEXT NOT NULL,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  tipo TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS pegadinhas (
+  id INTEGER PRIMARY KEY,
+  tipo TEXT NOT NULL,
+  de_id INTEGER NOT NULL,
+  de_nome TEXT NOT NULL,
+  alvo_id INTEGER,
+  alvo_nome TEXT,
+  entregue INTEGER NOT NULL DEFAULT 0,
+  reacao TEXT,
   criado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE INDEX IF NOT EXISTS idx_pegadinhas_alvo ON pegadinhas(alvo_id, criado_em);
+CREATE INDEX IF NOT EXISTS idx_pegadinhas_de ON pegadinhas(de_id, criado_em);
 
 CREATE TABLE IF NOT EXISTS partidas (
   id INTEGER PRIMARY KEY,
@@ -364,7 +379,7 @@ CREATE TABLE IF NOT EXISTS diario (
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 17;
+const VERSAO = 18;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -437,6 +452,7 @@ async function migrar() {
   if (versao < 16) await migrarLeisDeLyendell();
   // v17: personagem criança (só olha, brinca e ajuda; o site aparece do jeito de uma criança).
   if (versao < 17 && !await colunaExiste('usuarios', 'crianca')) await db.run('ALTER TABLE usuarios ADD COLUMN crianca INTEGER NOT NULL DEFAULT 0');
+  if (versao < 18) await migrarBobo();
 
   await db.run("INSERT INTO meta (chave, valor) VALUES ('versao', ?) ON CONFLICT (chave) DO UPDATE SET valor = excluded.valor", String(VERSAO));
 }
@@ -534,6 +550,18 @@ async function migrarLeisDeLyendell() {
   await db.run("UPDATE livros SET descricao = ? WHERE modulo = 'leis' AND descricao = ?",
     'As leis da capital, feitas pelo Lorde Comandante e pela Família Nobre.', 'As leis de Lyendell, feitas pelo Lorde Comandante e pela Família Nobre.');
   await atualizarDescricoes();
+}
+
+// v18: o Bobo da Corte (cargo com a Caixa de Pegadinhas) e as piadas no chat.
+async function migrarBobo() {
+  if (!await colunaExiste('chat_mensagens', 'tipo')) await db.run("ALTER TABLE chat_mensagens ADD COLUMN tipo TEXT NOT NULL DEFAULT ''");
+  if (!(await db.get('SELECT COUNT(*) AS n FROM cargos')).n) return; // banco novo: o semear cria tudo
+  const bobo = CARGOS_PADRAO.find(c => c.nome === 'Bobo da Corte');
+  if (!await db.get('SELECT id FROM cargos WHERE nome = ?', bobo.nome)) {
+    const { ordem } = await db.get('SELECT COALESCE(MAX(ordem), 0) AS ordem FROM cargos');
+    await db.run('INSERT INTO cargos (nome, descricao, cor, permissoes, base, ordem) VALUES (?, ?, ?, ?, 0, ?)', bobo.nome, bobo.descricao, bobo.cor, '[]', ordem + 1);
+  }
+  await darPermissoes({ [bobo.nome]: bobo.permissoes });
 }
 
 // Descrições de cargo que ainda estão no texto antigo passam para o texto novo (as editadas à mão ficam).

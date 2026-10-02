@@ -25,7 +25,7 @@ Todo usuário é morador. Os cargos somam poderes em cima disso, e uma pessoa po
 | Cargo | O que pode |
 |---|---|
 | Administrador (Evran) | Tudo, inclusive criar usuários e criar ou editar cargos |
-| Família Nobre | Tudo, menos criar usuários e mexer nos cargos |
+| Família Nobre | Tudo, menos criar usuários e mexer nos cargos (e as pegadinhas, que são só do Bobo) |
 | Tabeliã | Tudo no Tabelionato: aprovar registros, editar, apagar, criar livros, seções, campos e opções, e marcar pagamentos |
 | Escriba | Fazer registros no Tabelionato, que vão para a aprovação da Tabeliã |
 | Comandante da Guarda | Tudo na Guarda do Coelho, inclusive aprovar os registros dos guardas |
@@ -34,6 +34,7 @@ Todo usuário é morador. Os cargos somam poderes em cima disso, e uma pessoa po
 | Médico | Ver o Hospital e registrar pacientes, que vão para a aprovação do Diretor do Hospital |
 | Senadora | Tudo no Congresso: publica as PECs, leis e regras votadas e aprova o que outros enviarem |
 | Lorde Comandante | Faz as Leis de Lyendell junto com a Família Nobre: escreve, publica, edita e revoga |
+| Bobo da Corte | A Caixa de Pegadinhas, só dele: prega peças no pessoal e conta piadas na praça (veja "Bobo da Corte") |
 | Morador | Ver tudo (menos o Hospital), ajudar nas atividades e usar a Recreação |
 
 Qualquer usuário pode ser marcado como **criança** (veja "Personagem criança" mais abaixo): mesmo com cargo, só olha, brinca e ajuda.
@@ -223,6 +224,24 @@ Um salão com **chat ao vivo**, a lista de quem está online e os jogos:
 Os jogos novos (Damas, Campo Minado e 2048) são por vez ou rodam inteiros no navegador: nada fica
 indo e vindo pela internet o tempo todo, então não travam mesmo com a conexão ruim.
 
+### Versus e co-op
+
+Cada jogo tem os modos que fazem sentido, nos botões do cartão do jogo no salão:
+
+| Jogo | Versus | Co-op |
+|---|---|---|
+| Quiz | todos contra todos, ou dois times | em equipe: a sala inteira contra a meta de 60% de acertos |
+| Cobrinha ao vivo | todos contra todos, ou 2 contra 2 | Colheita: juntos, comer as cenouras da meta antes do tempo (quem bate renasce) |
+| Velha, Lig 4 e Damas | um contra o outro | contra a Raposa (o computador), sozinho ou em dupla, um lance cada |
+| Pac-Coelho, Cobrinha e 2048 | desafio: todos jogam a mesma partida (a mesma sorte) ao mesmo tempo; vence quem fizer mais em 3 minutos | desafio: os pontos de todos somam para a meta da equipe; quem perde joga de novo e continua somando |
+| Campo Minado | corrida no mesmo campo (com a casa do meio já aberta): vence quem limpar primeiro, e quem explode está fora | todos abrem o mesmo campo; se alguém pisar numa armadilha, a equipe perde |
+| Quebra-cabeça | corrida com a mesma foto e o mesmo embaralhado | todos montam a mesma imagem, trocando as peças |
+| Jogo da Memória | cada um na sua vez (achou o par, joga de novo); vence quem achar mais pares | a equipe, um de cada vez, acha todos os pares sem passar da meta de jogadas |
+
+Pedra, Papel e Tesoura continua só versus, e o Lyendell Dorme já é por times. "Jogando agora" mostra
+o modo de cada sala. No desafio, cada um joga no próprio navegador (por isso não trava) e o placar
+da sala anda ao vivo; sair da tela do jogo no meio encerra a sua partida (vale o que fez até ali).
+
 ### Lyendell Dorme
 
 O jogo do "Cidade Dorme" (ou "Lobisomem") da Casa: de 4 a 15 pessoas, cada uma com uma carta
@@ -300,6 +319,27 @@ O chat guarda as últimas 2000 mensagens. As partidas em andamento ficam só na 
 servidor: se o site reiniciar (por exemplo, depois de um `git push`), elas se perdem, mas o
 chat, os resultados e os recordes ficam salvos.
 
+## Bobo da Corte
+
+Quem tem o cargo **Bobo da Corte** ganha a **Caixa de Pegadinhas** no menu (e o botão "Pregar uma
+peça" no perfil das pessoas):
+
+- **Torta na cara**: um respingo de creme na tela da pessoa, que precisa limpar (3 cliques).
+- **Mundo de ponta-cabeça**: o site da pessoa vira de cabeça para baixo por 8 segundos.
+- **Almofada de pum**: o barulho (feito pelo próprio navegador, sem arquivo de som) e uma nuvenzinha.
+- **Nariz de palhaço**: um nariz vermelho na foto da pessoa por 30 minutos, e todo mundo vê.
+- **Estouro de coelhos**: uma manada de coelhinhos atravessa a tela.
+- **Chuva de confete**: na tela de todo mundo que está no site.
+- **Piada na praça**: aparece em destaque no chat da cidade ("Ba dum tss!"), com um botão de ideias.
+
+Tempos justos: uma pegadinha a cada 10 minutos; quem caiu fica protegido por 2 horas (de qualquer
+Bobo); confete a cada 30 minutos e piada a cada 15. Quem está fora do site cai quando entrar (até 2
+dias depois). Quem caiu pode responder "Kkkk, essa foi boa!" ou "Vou me vingar!", e o Bobo fica
+sabendo na hora. No chat, o nome do Bobo aparece colorido, com o chapéu de guizos. A Caixa mostra o
+mural das últimas pegadinhas e quem mais caiu, e há conquistas (Primeira travessura, Mestre das
+gargalhadas e, para quem cai, Bom de rir). Nem a Família Nobre tem as pegadinhas (o administrador
+tem, para testar). Um Bobo criança também pode, porque pegadinha é brincadeira.
+
 ## Mapa de Lyendell
 
 A tela **Mapa de Lyendell** mostra a capital vista de cima, como uma planta escura no estilo do
@@ -376,8 +416,13 @@ Para incentivar a visita de todo dia:
   de coelho (Filhote, Láparo, Coelho do Campo... até Coelho Coroado) e libera molduras novas
   (bronze no 5, prata no 10, ouro no 15, esmeralda no 20 e coroa no 25).
 - **Sequência de dias**: entrar todo dia aumenta a sequência e o XP da visita.
-- **Missões do dia**: três por dia, as mesmas para todo mundo, que renovam à meia-noite.
-- **Conquistas**: 30 no total (Tagarela, Sábio da Toca, Terror das Raposas, Faro afiado, Dama de ferro...).
+- **Missões do dia**: três por pessoa, que renovam à meia-noite: uma **da sua função** (do cargo:
+  registrar ou conferir no Tabelionato, na Guarda ou no Hospital, enviar ao Congresso, escrever leis,
+  marcar pagamento, mexer no mapa, publicar anúncio, criar atividade, conferir entrega, enviar foto,
+  criar pergunta do quiz, ou pregar peças e contar piadas, para o Bobo) e duas para todo mundo (chat,
+  partidas, vitória, jogar em equipe, quiz, jogos sozinho, recado, entrega). Quem não trabalha no
+  Tabelionato nunca recebe missão de registrar lá; o morador sem cargo recebe só as de todo mundo.
+- **Conquistas**: 33 no total (Tagarela, Sábio da Toca, Terror das Raposas, Faro afiado, Dama de ferro, Primeira travessura...).
 
 Conquistas, missões cumpridas, nível novo e recado novo aparecem na hora, em qualquer tela.
 A tela de início mostra o progresso, as missões, as conquistas recentes e os mais ativos da semana.

@@ -128,6 +128,7 @@ r.post('/', exigir('atividades.criar'), async (req, res) => {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   a.titulo, a.descricao, a.item, a.meta, a.pacote, a.recompensa_valor, a.recompensa_unidade, a.prazo, req.usuario.id, req.usuario.nome);
   await anotar(req, 'Criou uma atividade', `${a.titulo} (${a.meta} ${a.item})`);
+  await progresso.registrar(req.usuario.id, 'atividade');
   res.status(201).json({ id });
 });
 
@@ -209,6 +210,7 @@ r.patch('/contribuicoes/:id', async (req, res) => {
   await db.run('UPDATE contribuicoes SET conferida = ? WHERE id = ?', conferida, c.id);
   if (conferida) await anotar(req, 'Conferiu uma entrega', `${c.quantidade} ${a.item} de ${c.usuario_nome}`);
   if (conferida && !c.conferida) await progresso.registrar(c.usuario_id, 'entrega');
+  if (conferida && !c.conferida && c.usuario_id !== req.usuario.id) await progresso.registrar(req.usuario.id, 'conferencia');
   res.json({ ok: true });
 });
 

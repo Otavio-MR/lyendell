@@ -2,7 +2,7 @@
 // Uma única conexão para o site todo: ela continua aberta enquanto a pessoa navega,
 // para avisar quando alguém entra na partida dela ou manda mensagem no chat.
 
-import { estado, get, h, icone, aviso } from './core.js';
+import { estado, get, h, icone, aviso, definirNarizes } from './core.js';
 
 export const rt = {
   conectado: false,
@@ -12,6 +12,7 @@ export const rt = {
   salas: [],        // partidas abertas (resumo para o salão)
   partidas: new Map(), // id -> visão completa das partidas que eu jogo ou assisto
   minhaSala: null,
+  bobos: new Set(),   // quem é Bobo da Corte (o chat mostra o chapéu de guizos)
   naoLidas: 0,
   lendoChat: false,
   transmissoes: [], // quem está jogando Pac-Coelho, Cobrinha ou Quebra-cabeça agora (dá para assistir)
@@ -124,6 +125,8 @@ function tratar(m) {
     case 'ola':
       tentativas = 0;
       Object.assign(rt, { conectado: true, eu: m.eu, online: m.online, historico: m.historico, salas: m.salas, minhaSala: m.minhaSala, transmissoes: m.transmissoes || [], silenciadoAte: m.eu?.silenciadoAte || 0 });
+      rt.bobos = new Set(m.bobos || []);
+      definirNarizes(m.narizes || {});
       emitir('estado');
       break;
     case 'online':
@@ -179,6 +182,16 @@ function tratar(m) {
       break;
     case 'progresso':
       m.notas.slice(0, 4).forEach(mostrarNota);
+      break;
+    case 'bobo':
+      rt.bobos = new Set(m.bobos || []);
+      definirNarizes(m.narizes || {});
+      break;
+    case 'pegadinha':
+      import('./bobo-efeitos.js').then(x => x.mostrarPegadinha(m.p)).catch(e => console.error('Pegadinha:', e));
+      break;
+    case 'bobo:reacao':
+      chamar(`${m.nome} ${m.texto}${m.pegadinha ? ` (${m.pegadinha})` : ''}${m.reacao === 'vinganca' ? '. Cuidado, Bobo!' : '!'}`, 'Caixa de Pegadinhas', '#/bobo', 9000, 'bobo', 'chamada-bobo');
       break;
     case 'erro':
       if (criando || indoPara) { criando = false; indoPara = null; }

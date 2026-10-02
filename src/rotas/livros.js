@@ -350,6 +350,7 @@ r.post('/livros/:id/registros', async (req, res) => {
   await anotar(req, situacao === 'pendente' ? `Enviou para aprovação em "${l.nome}"` : `Registrou em "${l.nome}"`,
     `${numero ? `nº ${numero}: ` : ''}${tituloDoRegistro(l, dados)}`);
   await progresso.registrar(req.usuario.id, 'registro');
+  await progresso.registrar(req.usuario.id, `registro_${l.modulo}`);
   res.status(201).json({ id, situacao, numero });
 });
 
@@ -471,6 +472,7 @@ async function revisar(req, situacao, motivo) {
 r.post('/registros/:id/aprovar', async (req, res) => {
   const { reg, livro } = await revisar(req, 'aprovado', null);
   await anotar(req, `Aprovou um registro em "${livro.nome}"`, `nº ${reg.numero}: ${tituloDoRegistro(livro, reg.dados)} (enviado por ${reg.criado_por_nome})`);
+  await progresso.registrar(req.usuario.id, `revisao_${livro.modulo}`);
   res.json({ ok: true });
 });
 
@@ -478,6 +480,7 @@ r.post('/registros/:id/recusar', async (req, res) => {
   const motivo = texto(req.body?.motivo, 500) || null;
   const { reg, livro } = await revisar(req, 'recusado', motivo);
   await anotar(req, `Recusou um registro em "${livro.nome}"`, `${tituloDoRegistro(livro, reg.dados)} (enviado por ${reg.criado_por_nome})${motivo ? `: ${motivo}` : ''}`);
+  await progresso.registrar(req.usuario.id, `revisao_${livro.modulo}`);
   res.json({ ok: true });
 });
 
@@ -536,6 +539,7 @@ r.post('/registros/:id/pagamentos', async (req, res) => {
   await db.run('INSERT INTO pagamentos (registro_id, vencimento, pago_em, observacao, marcado_por, marcado_por_nome) VALUES (?, ?, ?, ?, ?, ?)',
     reg.id, vencimento, pagoEm, observacao, req.usuario.id, req.usuario.nome);
   await anotar(req, 'Marcou um pagamento como pago', `${tituloDoRegistro(livro, reg.dados)}: parcela de ${dataBr(vencimento)} (${observacao})`);
+  await progresso.registrar(req.usuario.id, 'pagamento');
   res.status(201).json({ ok: true });
 });
 

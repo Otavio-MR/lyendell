@@ -7,6 +7,7 @@ const express = require('express');
 const { db } = require('../db');
 const { exigirLogin, exigir, pode } = require('../auth');
 const { anotar } = require('../diario');
+const progresso = require('../progresso');
 const { erro, linha, idDaRota } = require('../util');
 const { pessoasRegistradas, acharPessoas, semChave } = require('../moradores');
 const { formatarPredio, comPessoas } = require('./predios');
@@ -84,6 +85,7 @@ r.post('/', editar, async (req, res) => {
   const c = lerCasa(req.body);
   const { id } = await db.run(INSERIR, ...valores(c), req.usuario.nome);
   await anotar(req, 'Colocou uma casa no mapa', descricao(c));
+  await progresso.registrar(req.usuario.id, 'mapa');
   res.status(201).json({ id });
 });
 
@@ -118,7 +120,10 @@ r.put('/:id', editar, async (req, res) => {
     ...valores(c), req.usuario.nome, atual.id);
   // Só arrastar para outro lugar não vai para o diário (seria uma linha por arrasto).
   const mudouMaisQueLugar = ['numero', 'situacao', 'texto', 'icone'].some(k => String(c[k]) !== String(atual[k])) || JSON.stringify(c.pessoas) !== atual.pessoas;
-  if (mudouMaisQueLugar) await anotar(req, 'Editou uma casa do mapa', descricao(c));
+  if (mudouMaisQueLugar) {
+    await anotar(req, 'Editou uma casa do mapa', descricao(c));
+    await progresso.registrar(req.usuario.id, 'mapa');
+  }
   res.json({ ok: true });
 });
 

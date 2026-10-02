@@ -6,6 +6,7 @@ const express = require('express');
 const { db } = require('../db');
 const { exigirLogin, exigir } = require('../auth');
 const { anotar } = require('../diario');
+const progresso = require('../progresso');
 const { urlValida, comandoApagarArquivo } = require('../uploads');
 const { erro, texto, linha, idDaRota } = require('../util');
 const { acharPessoas, semChave } = require('../moradores');
@@ -87,6 +88,7 @@ r.post('/', editar, async (req, res) => {
   const { id } = await db.run(`INSERT INTO predios (${COLUNAS.join(', ')}, atualizado_por_nome) VALUES (${COLUNAS.map(() => '?').join(', ')}, ?)`,
     ...valores(p), req.usuario.nome);
   await anotar(req, 'Colocou um prédio no mapa', p.nome);
+  await progresso.registrar(req.usuario.id, 'mapa');
   res.status(201).json({ id });
 });
 
@@ -108,7 +110,10 @@ r.put('/:id', editar, async (req, res) => {
   ]);
   // Só arrastar para outro lugar não vai para o diário (seria uma linha por arrasto).
   const soMoveu = COLUNAS.filter(c => c !== 'x' && c !== 'y').every(c => String(valores(p)[COLUNAS.indexOf(c)]) === String(atual[c] ?? ''));
-  if (!soMoveu) await anotar(req, 'Editou um prédio do mapa', p.nome);
+  if (!soMoveu) {
+    await anotar(req, 'Editou um prédio do mapa', p.nome);
+    await progresso.registrar(req.usuario.id, 'mapa');
+  }
   res.json({ ok: true });
 });
 

@@ -226,6 +226,12 @@ export const ICONES = {
   minado: '<circle cx="12" cy="13" r="6"/><path d="M12 4v3M12 19v3M3 13h3M18 13h3M5.6 6.6l2.1 2.1M16.3 17.3l2.1 2.1M5.6 19.4l2.1-2.1M16.3 8.7l2.1-2.1"/><circle cx="10" cy="11" r="1.2"/>',
   blocos: '<rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/><path d="M6 7h2M16 6v2M6 16h2v2H6M15.5 16h3"/>',
   presente: '<rect x="3.5" y="9" width="17" height="11" rx="1.5"/><path d="M3 9h18v-3H3zM12 6v14"/><path d="M12 6c-1-2.5-4.5-3.5-5-1.5S9.5 6 12 6zM12 6c1-2.5 4.5-3.5 5-1.5S14.5 6 12 6z"/>',
+  // Bobo da Corte: o chapéu de guizos e as pegadinhas
+  bobo: '<path d="M6 17.5h12V20H6z"/><path d="M6.5 17.5C6 13 4.5 10 2 9.5c1-2.5 4-3.5 6.5-2 1.4.8 2.6 2.6 3.5 5.2.9-2.6 2.1-4.4 3.5-5.2 2.5-1.5 5.5-.5 6.5 2-2.5.5-4 3.5-4.5 8"/><circle cx="2.4" cy="11.6" r="1.3"/><circle cx="21.6" cy="11.6" r="1.3"/><path d="M9 18.8h.01M12 18.8h.01M15 18.8h.01"/>',
+  torta: '<path d="M3 13h18l-1.6 5.5a1 1 0 0 1-1 .7H5.6a1 1 0 0 1-1-.7z"/><path d="M3 13c.8-3.6 4.4-6 9-6s8.2 2.4 9 6"/><path d="M7 13v-1.2M10.5 13v-2M14 13v-1.5M17.5 13v-1"/><path d="M12 7V5.2"/><circle cx="12" cy="4.3" r="1"/>',
+  confete: '<path d="M4 20.5 8.6 8l7.4 7.4z"/><path d="M8.6 8 16 15.4"/><path d="M14 3.5l.8 1.8M19.5 5.5l-1.8.8M20.5 10.5l-2-.3M11.5 2.8l-.3 1.4M17 2.5l.4 2"/><path d="M13.5 8.5c1.2-1.5 3-2 4.5-1.3"/>',
+  nariz: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12.6" r="2.6"/><path d="M8.6 9h.01M15.4 9h.01"/><path d="M8 16.2c2.2 1.6 5.8 1.6 8 0"/>',
+  pum: '<path d="M3.5 15c0-3.2 3.8-5.2 8.5-5.2s8.5 2 8.5 5.2-3.8 4.5-8.5 4.5-8.5-1.3-8.5-4.5z"/><path d="M12 9.8V7.5"/><path d="M9.5 4.8c.8-1 1.7-1 2.5 0s1.7 1 2.5 0"/><path d="M7 7.2c.6-.7 1.2-.7 1.8 0M15.2 7.2c.6-.7 1.2-.7 1.8 0"/>',
 };
 export const NOMES_ICONES = Object.keys(ICONES);
 
@@ -271,9 +277,19 @@ export function vazio(titulo, texto, acao) {
 }
 
 // Foto de perfil, ou as iniciais do nome quando a pessoa ainda não tem foto.
+// Quem está de nariz de palhaço (pegadinha do Bobo da Corte): nome -> até quando (ms).
+let narizes = {};
+const comNariz = nome => (narizes[nome] || 0) > Date.now();
+export function definirNarizes(lista = {}) {
+  narizes = lista;
+  // As fotos que já estão na tela ganham (ou perdem) o nariz na hora.
+  for (const el of document.querySelectorAll('.avatar[data-nome]')) el.classList.toggle('nariz', comNariz(el.dataset.nome));
+}
+
 export function avatar(nome, classe = '', foto = null) {
-  return h('span', { class: `avatar ${foto ? 'com-foto' : ''} ${classe}`.replace(/\s+/g, ' ').trim(), 'aria-hidden': 'true' },
-    foto ? h('img', { src: foto, alt: '', loading: 'lazy' }) : iniciais(nome));
+  return h('span', {
+    class: `avatar ${foto ? 'com-foto' : ''} ${classe} ${comNariz(nome) ? 'nariz' : ''}`.replace(/\s+/g, ' ').trim(), 'aria-hidden': 'true', 'data-nome': nome,
+  }, foto ? h('img', { src: foto, alt: '', loading: 'lazy' }) : iniciais(nome));
 }
 
 // Foto com a moldura escolhida no perfil (bronze, prata, ouro...). p = { nome, foto, moldura }.

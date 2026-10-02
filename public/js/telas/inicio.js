@@ -50,7 +50,7 @@ function painelProgresso(pr, { crianca = false } = {}) {
         return h('li', { class: `missao ${pronta ? 'pronta' : ''}`.trim() },
           h('span', { class: 'missao-marca' }, icone(pronta ? 'check' : 'alvo')),
           h('div', { class: 'missao-texto' },
-            h('span', null, m.texto),
+            h('span', null, m.texto, m.funcao && h('span', { class: 'missao-funcao', title: 'Missão do seu cargo' }, crianca ? 'só sua' : 'da sua função')),
             m.meta > 1 && !pronta && h('div', { class: 'missao-barra' }, barra(m.feito, m.meta), h('small', null, `${m.feito}/${m.meta}`))),
           h('span', { class: 'missao-xp' }, `+${m.xp} XP`));
       }))),

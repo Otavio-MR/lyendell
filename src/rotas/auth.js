@@ -199,7 +199,7 @@ r.post('/capa', exigirLogin, upload.single('arquivo'), async (req, res) => {
 r.get('/progresso', exigirLogin, async (req, res) => {
   const u = await meuPerfil(req.usuario.id);
   const [missoes, novidades, semana] = await Promise.all([
-    progresso.missoesDe(u.id),
+    progresso.missoesDe(u.id, req.usuario.permissoes),
     db.all(`SELECT cu.chave, cu.em, u.id, u.nome, u.foto, u.moldura FROM conquistas_usuario cu JOIN usuarios u ON u.id = cu.usuario_id
       WHERE u.ativo = 1 ORDER BY cu.em DESC, cu.rowid DESC LIMIT 12`),
     db.all(`SELECT u.id, u.nome, u.foto, u.moldura, SUM(e.qtd) AS xp FROM eventos_dia e JOIN usuarios u ON u.id = e.usuario_id

@@ -76,6 +76,9 @@ const CATALOGO = [
   { grupo: 'Trilha sonora', itens: [
     { chave: 'trilha.gerenciar', nome: 'Adicionar e tirar músicas da trilha sonora' },
   ] },
+  { grupo: 'Bobo da Corte', itens: [
+    { chave: 'bobo.pegadinhas', nome: 'Pregar peças no pessoal e contar piadas na praça (a Caixa de Pegadinhas, coisa do Bobo da Corte)' },
+  ] },
 ];
 
 const TODAS = CATALOGO.flatMap(g => g.itens.map(i => i.chave));
@@ -84,8 +87,10 @@ const TODAS = CATALOGO.flatMap(g => g.itens.map(i => i.chave));
 // Nada de registrar, editar, apagar, aprovar, publicar ou administrar (isso é coisa de gente grande).
 const PERMITIDAS_CRIANCA = new Set([
   ...TODAS.filter(p => p.endsWith('.ver') && p !== 'usuarios.ver' && p !== 'diario.ver'),
-  'atividades.participar', 'recreacao.usar',
+  'atividades.participar', 'recreacao.usar', 'bobo.pegadinhas',
 ]);
+// Coisas só do Bobo da Corte: nem a Família Nobre recebe junto com "tudo".
+const SO_DO_BOBO = new Set(['bobo.pegadinhas']);
 const VALIDAS = new Set(TODAS);
 
 // Todo usuário é morador: estas permissões valem para qualquer um.
@@ -129,7 +134,7 @@ const CARGOS_PADRAO = [
     permissoes: MORADOR },
   { nome: 'Família Nobre', cor: '#d8b13a',
     descricao: DESCRICOES['Família Nobre'][1],
-    permissoes: TODAS.filter(p => p !== 'usuarios.criar' && p !== 'cargos.gerenciar' && !EXCLUSIVAS[p]) },
+    permissoes: TODAS.filter(p => p !== 'usuarios.criar' && p !== 'cargos.gerenciar' && !EXCLUSIVAS[p] && !SO_DO_BOBO.has(p)) },
   { nome: 'Tabeliã', cor: '#c98b4a',
     descricao: DESCRICOES['Tabeliã'][1],
     permissoes: [...MEMBRO, ...acoes('tabelionato', 'registrar', 'editar', 'apagar', 'configurar', 'pagamentos', 'aprovar'), 'mapa.editar'] },
@@ -154,6 +159,9 @@ const CARGOS_PADRAO = [
   { nome: 'Senadora', cor: '#7f93d8',
     descricao: 'Publica no Congresso as PECs, leis e regras votadas; aprova o que outros enviarem para lá.',
     permissoes: [...MEMBRO, ...acoes('congresso', 'registrar', 'editar', 'apagar', 'configurar', 'aprovar')] },
+  { nome: 'Bobo da Corte', cor: '#c46bd8',
+    descricao: 'Alegra Lyendell: tem a Caixa de Pegadinhas (torta na cara, almofada de pum, nariz de palhaço...) e conta piadas na praça.',
+    permissoes: [...MEMBRO, 'bobo.pegadinhas'] },
 ];
 
-module.exports = { CATALOGO, TODAS, VALIDAS, PERMITIDAS_CRIANCA, CARGOS_PADRAO, DESCRICOES, EXCLUSIVAS, MODULOS };
+module.exports = { CATALOGO, TODAS, VALIDAS, PERMITIDAS_CRIANCA, CARGOS_PADRAO, DESCRICOES, EXCLUSIVAS, MODULOS, SO_DO_BOBO };

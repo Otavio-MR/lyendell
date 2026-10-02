@@ -16,6 +16,7 @@ import { pacCoelho } from './telas/pac-coelho.js';
 import { leis, gerenciaLeis } from './telas/leis.js';
 import { campoMinado, jogo2048 } from './telas/jogos-sozinho.js';
 import { perguntasQuiz } from './telas/quiz.js';
+import { caixaDePegadinhas } from './telas/bobo.js';
 
 const app = document.getElementById('app');
 
@@ -30,6 +31,7 @@ const MENU = [
     { rota: '/atividades', nome: 'Mural de Atividades', icone: 'tarefas', perm: ['atividades.ver'] },
     { rota: '/galeria', nome: 'Galeria', icone: 'imagem', perm: ['galeria.ver'] },
     { rota: '/recreacao', nome: 'Recreação', icone: 'jogos', perm: ['recreacao.usar'] },
+    { rota: '/bobo', nome: 'Caixa de Pegadinhas', icone: 'bobo', perm: ['bobo.pegadinhas'] },
   ] },
   { secao: 'Registros', itens: [
     { rota: '/tabelionato', nome: 'Tabelionato', icone: 'pergaminho', perm: ['tabelionato.ver'] },
@@ -66,6 +68,7 @@ const ROTAS = [
   [/^\/admin\/cargos$/, () => cargos()],
   [/^\/admin\/diario$/, () => diario()],
   [/^\/recreacao$/, () => recreacao()],
+  [/^\/bobo$/, () => caixaDePegadinhas()],
   [/^\/recreacao\/cobrinha$/, () => cobrinha()],
   [/^\/recreacao\/quebra-cabeca$/, () => quebraCabeca()],
   [/^\/recreacao\/pac-coelho$/, () => pacCoelho()],

@@ -3,6 +3,7 @@
 
 const { db } = require('./db');
 const { hoje } = require('./cobranca');
+const { carregarUsuario } = require('./auth');
 
 /* ─── XP ──────────────────────────────────────────── */
 
@@ -18,6 +19,8 @@ const REGRAS = {
   foto: { xp: 5, teto: 10 },
   registro: { xp: 10, teto: 10 },
   recado: { xp: 3, teto: 10 },
+  pegadinha: { xp: 5, teto: 6 },
+  piada: { xp: 5, teto: 4 },
 };
 
 // XP total para chegar em cada nível: 2 = 100, 3 = 300, 5 = 1000, 10 = 4500, 20 = 19000.
@@ -49,17 +52,39 @@ function infoNivel(xp = 0) {
 
 /* ─── Missões do dia ──────────────────────────────── */
 
+// Cada missão só aparece para quem pode fazer aquilo (perm: basta ter uma delas).
+// As "da função" vêm do cargo da pessoa: quem não trabalha no Tabelionato nunca recebe missão de registrar lá.
+// tipos: os eventos que contam (registrar(id, tipo) em cada parte do sistema).
 const MISSOES = [
-  { chave: 'chat5', tipo: 'chat', meta: 5, xp: 30, texto: 'Converse no chat da cidade: 5 mensagens (spam, repetidas e "kkkk" não contam)' },
-  { chave: 'partida3', tipo: 'partida', meta: 3, xp: 40, texto: 'Termine 3 partidas ao vivo (quiz, velha, pedra-papel-tesoura, Lig 4 ou cobrinha ao vivo)' },
-  { chave: 'vitoria1', tipo: 'vitoria', meta: 1, xp: 50, texto: 'Vença uma partida ao vivo' },
-  { chave: 'quiz5', tipo: 'quiz_acerto', meta: 5, xp: 40, texto: 'Acerte 5 perguntas no Quiz de Lyendell' },
-  { chave: 'solo2', tipo: 'solo', meta: 2, xp: 25, texto: 'Jogue 2 vezes Pac-Coelho, Cobrinha, Quebra-cabeça ou Memória' },
-  { chave: 'recado1', tipo: 'recado', meta: 1, xp: 25, texto: 'Deixe um recado no perfil de alguém' },
-  { chave: 'entrega1', tipo: 'entrega', meta: 1, xp: 50, texto: 'Tenha uma entrega conferida numa atividade' },
+  // Para todo mundo
+  { chave: 'chat5', tipos: ['chat'], meta: 5, xp: 30, perm: 'recreacao.usar', texto: 'Converse no chat da cidade: 5 mensagens (spam, repetidas e "kkkk" não contam)' },
+  { chave: 'partida3', tipos: ['partida'], meta: 3, xp: 40, perm: 'recreacao.usar', texto: 'Termine 3 partidas com mais gente (ao vivo, mesas ou desafios)' },
+  { chave: 'vitoria1', tipos: ['vitoria'], meta: 1, xp: 50, perm: 'recreacao.usar', texto: 'Vença uma partida com mais gente' },
+  { chave: 'coop1', tipos: ['coop'], meta: 1, xp: 40, perm: 'recreacao.usar', texto: 'Jogue uma partida em equipe (co-op): quiz em equipe, Colheita, contra a Raposa, mesa ou desafio co-op' },
+  { chave: 'quiz5', tipos: ['quiz_acerto'], meta: 5, xp: 40, perm: 'recreacao.usar', texto: 'Acerte 5 perguntas no Quiz de Lyendell' },
+  { chave: 'solo2', tipos: ['solo'], meta: 2, xp: 25, perm: 'recreacao.usar', texto: 'Jogue 2 vezes sozinho (Pac-Coelho, Cobrinha, 2048, Campo Minado, Quebra-cabeça ou Memória)' },
+  { chave: 'recado1', tipos: ['recado'], meta: 1, xp: 25, texto: 'Deixe um recado no perfil de alguém' },
+  { chave: 'entrega1', tipos: ['entrega'], meta: 1, xp: 50, perm: 'atividades.participar', texto: 'Tenha uma entrega conferida numa atividade' },
+  // Da função (do cargo)
+  { chave: 'tabelionato', funcao: true, tipos: ['registro_tabelionato', 'revisao_tabelionato'], meta: 1, xp: 45, perm: ['tabelionato.registrar', 'tabelionato.aprovar'], texto: 'Faça um registro no Tabelionato (ou confira um que espera aprovação)' },
+  { chave: 'pagamento', funcao: true, tipos: ['pagamento'], meta: 1, xp: 40, perm: 'tabelionato.pagamentos', texto: 'Marque um pagamento de comerciante como pago no Tabelionato' },
+  { chave: 'guarda', funcao: true, tipos: ['registro_guarda', 'revisao_guarda'], meta: 1, xp: 45, perm: ['guarda.registrar', 'guarda.aprovar'], texto: 'Faça um registro na Guarda do Coelho (ou confira um que espera aprovação)' },
+  { chave: 'hospital', funcao: true, tipos: ['registro_hospital', 'revisao_hospital'], meta: 1, xp: 45, perm: ['hospital.registrar', 'hospital.aprovar'], texto: 'Registre um atendimento no Hospital (ou confira um que espera aprovação)' },
+  { chave: 'congresso', funcao: true, tipos: ['registro_congresso', 'revisao_congresso'], meta: 1, xp: 45, perm: ['congresso.registrar', 'congresso.aprovar'], texto: 'Envie ou publique algo no Congresso (lei, PEC ou mudança votada)' },
+  { chave: 'leis', funcao: true, tipos: ['registro_leis', 'revisao_leis'], meta: 1, xp: 45, perm: ['leis.registrar', 'leis.aprovar'], texto: 'Escreva ou revise uma das Leis de Lyendell' },
+  { chave: 'mapa', funcao: true, tipos: ['mapa'], meta: 1, xp: 35, perm: 'mapa.editar', texto: 'Coloque ou atualize uma casa ou um prédio no mapa de Lyendell' },
+  { chave: 'anuncio', funcao: true, tipos: ['anuncio'], meta: 1, xp: 35, perm: 'anuncios.publicar', texto: 'Publique um anúncio no mural' },
+  { chave: 'atividade', funcao: true, tipos: ['atividade'], meta: 1, xp: 35, perm: 'atividades.criar', texto: 'Crie uma atividade no mural (algo que a cidade precisa juntar)' },
+  { chave: 'conferir', funcao: true, tipos: ['conferencia'], meta: 1, xp: 35, perm: 'atividades.gerenciar', texto: 'Confira a entrega de alguém numa atividade' },
+  { chave: 'foto', funcao: true, tipos: ['foto'], meta: 1, xp: 30, perm: 'galeria.enviar', texto: 'Envie uma foto para a galeria' },
+  { chave: 'pergunta', funcao: true, tipos: ['pergunta'], meta: 1, xp: 35, perm: 'recreacao.perguntas', texto: 'Crie uma pergunta nova para o Quiz de Lyendell' },
+  { chave: 'pegadinha2', funcao: true, tipos: ['pegadinha'], meta: 2, xp: 40, perm: 'bobo.pegadinhas', texto: 'Prepare 2 pegadinhas com o pessoal (Caixa de Pegadinhas)' },
+  { chave: 'piada1', funcao: true, tipos: ['piada'], meta: 1, xp: 35, perm: 'bobo.pegadinhas', texto: 'Conte uma piada na praça (o chat da cidade)' },
 ];
 
-// Números "aleatórios" que se repetem para a mesma data: todo mundo tem as mesmas missões no dia.
+const podeFazer = (m, perms) => !m.perm || [].concat(m.perm).some(p => perms.has(p));
+
+// Números "aleatórios" que se repetem para a mesma pessoa no mesmo dia (as missões não mudam ao recarregar).
 function sorteio(texto) {
   let h = 2166136261;
   for (const c of texto) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
@@ -70,14 +95,33 @@ function sorteio(texto) {
   };
 }
 
-function missoesDoDia(dia = hoje()) {
-  const r = sorteio(`missoes-${dia}`);
-  const lista = [...MISSOES];
-  for (let i = lista.length - 1; i > 0; i--) {
+const embaralhar = (lista, r) => {
+  const a = [...lista];
+  for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(r() * (i + 1));
-    [lista[i], lista[j]] = [lista[j], lista[i]];
+    [a[i], a[j]] = [a[j], a[i]];
   }
-  return lista.slice(0, 3);
+  return a;
+};
+
+// As 3 missões do dia de uma pessoa: uma da função dela (se tiver alguma) e as outras para todo mundo.
+function missoesDoDia(perms, id, dia = hoje()) {
+  const r = sorteio(`missoes-${dia}-${id}`);
+  const funcao = embaralhar(MISSOES.filter(m => m.funcao && podeFazer(m, perms)), r);
+  const gerais = embaralhar(MISSOES.filter(m => !m.funcao && podeFazer(m, perms)), r);
+  return [...funcao.slice(0, 1), ...gerais].slice(0, 3);
+}
+
+// Os poderes de cada pessoa ficam guardados um minuto (registrar é chamado a cada mensagem do chat).
+const poderes = new Map();
+async function poderesDe(id) {
+  const ja = poderes.get(id);
+  if (ja && ja.ate > Date.now()) return ja.perms;
+  const u = await carregarUsuario(id);
+  const perms = u?.ativo ? u.permissoes : new Set();
+  poderes.set(id, { perms, ate: Date.now() + 60_000 });
+  if (poderes.size > 500) poderes.delete(poderes.keys().next().value);
+  return perms;
 }
 
 /* ─── Conquistas ──────────────────────────────────── */
@@ -113,6 +157,9 @@ const CONQUISTAS = [
   { chave: 'foto5', nome: 'Pintor da corte', desc: 'Enviou 5 fotos para a galeria.', icone: 'imagem', stat: 'fotos', meta: 5, tipos: ['foto'] },
   { chave: 'registro10', nome: 'Pena afiada', desc: 'Fez 10 registros nos livros (Tabelionato, Guarda, Hospital ou Congresso).', icone: 'pena', stat: 'registros', meta: 10, tipos: ['registro'] },
   { chave: 'recado5', nome: 'Amigo de todos', desc: 'Deixou recado no perfil de 5 pessoas diferentes.', icone: 'usuarios', stat: 'recadosPessoas', meta: 5, tipos: ['recado'] },
+  { chave: 'bobo1', nome: 'Primeira travessura', desc: 'Pregou a primeira peça como Bobo da Corte.', icone: 'bobo', stat: 'pegadinhas', meta: 1, tipos: ['pegadinha'] },
+  { chave: 'bobo25', nome: 'Mestre das gargalhadas', desc: 'Pregou 25 peças como Bobo da Corte.', icone: 'bobo', stat: 'pegadinhas', meta: 25, tipos: ['pegadinha'] },
+  { chave: 'caiu5', nome: 'Bom de rir', desc: 'Caiu em 5 pegadinhas do Bobo da Corte.', icone: 'nariz', stat: 'caiu', meta: 5, tipos: ['caiu'] },
   { chave: 'nivel10', nome: 'Coelho Veloz', desc: 'Chegou ao nível 10.', icone: 'estrela', stat: 'nivel', meta: 10, tipos: ['nivel'] },
   { chave: 'nivel20', nome: 'Coelho Dourado', desc: 'Chegou ao nível 20.', icone: 'coroa', stat: 'nivel', meta: 20, tipos: ['nivel'] },
 ];
@@ -145,6 +192,8 @@ const STATS = {
   anuncios: id => n('SELECT COUNT(*) AS n FROM anuncios WHERE autor_id = ?', id),
   fotos: id => n('SELECT COUNT(*) AS n FROM fotos WHERE enviado_por = ?', id),
   registros: id => n('SELECT COUNT(*) AS n FROM registros WHERE criado_por = ?', id),
+  pegadinhas: id => n('SELECT COUNT(*) AS n FROM pegadinhas WHERE de_id = ?', id),
+  caiu: id => n('SELECT COUNT(*) AS n FROM pegadinhas WHERE alvo_id = ?', id),
   recadosPessoas: id => n('SELECT COUNT(DISTINCT perfil_id) AS n FROM recados WHERE autor_id = ? AND perfil_id <> ?', id, id),
   nivel: async id => nivelDe(await n('SELECT xp AS n FROM usuarios WHERE id = ?', id)),
 };
@@ -211,8 +260,11 @@ async function registrar(id, tipo, qtd = 1) {
     const regra = REGRAS[tipo];
     let xp = regra ? Math.max(0, Math.min(qtd, regra.teto - antes)) * regra.xp : 0;
     const notas = [];
-    for (const m of missoesDoDia(dia)) {
-      if (m.tipo === tipo && antes < m.meta && antes + qtd >= m.meta) {
+    const missoes = missoesDoDia(await poderesDe(id), id, dia).filter(m => m.tipos.includes(tipo));
+    for (const m of missoes) {
+      // Missão de vários tipos (ex.: registrar OU conferir): conta a soma de todos.
+      const outros = m.tipos.length > 1 ? await feitosNoDia(id, dia, m.tipos.filter(x => x !== tipo)) : 0;
+      if (antes + outros < m.meta && antes + outros + qtd >= m.meta) {
         xp += m.xp;
         notas.push({ tipo: 'missao', texto: m.texto, xp: m.xp });
       }
@@ -224,6 +276,12 @@ async function registrar(id, tipo, qtd = 1) {
     console.error('Erro ao registrar progresso:', e.message);
     return [];
   }
+}
+
+async function feitosNoDia(id, dia, tipos) {
+  if (!tipos.length) return 0;
+  const l = await db.get(`SELECT SUM(qtd) AS n FROM eventos_dia WHERE usuario_id = ? AND dia = ? AND tipo IN (${tipos.map(() => '?').join(', ')})`, id, dia, ...tipos);
+  return Number(l?.n || 0);
 }
 
 const diaAnterior = dia => new Date(Date.UTC(+dia.slice(0, 4), +dia.slice(5, 7) - 1, +dia.slice(8, 10)) - 864e5).toISOString().slice(0, 10);
@@ -251,9 +309,12 @@ async function registrarVisita(id) {
 
 /* ─── Leitura (telas) ─────────────────────────────── */
 
-async function missoesDe(id, dia = hoje()) {
+async function missoesDe(id, perms = null, dia = hoje()) {
   const feitos = Object.fromEntries((await db.all('SELECT tipo, qtd FROM eventos_dia WHERE usuario_id = ? AND dia = ?', id, dia)).map(e => [e.tipo, Number(e.qtd)]));
-  return missoesDoDia(dia).map(m => ({ chave: m.chave, texto: m.texto, meta: m.meta, xp: m.xp, feito: Math.min(m.meta, feitos[m.tipo] || 0) }));
+  return missoesDoDia(perms || await poderesDe(id), id, dia).map(m => ({
+    chave: m.chave, texto: m.texto, meta: m.meta, xp: m.xp, funcao: !!m.funcao,
+    feito: Math.min(m.meta, m.tipos.reduce((n, x) => n + (feitos[x] || 0), 0)),
+  }));
 }
 
 // Todas as conquistas, com data de quem já tem e o quanto falta para as outras.

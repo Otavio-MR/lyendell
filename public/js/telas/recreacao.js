@@ -243,16 +243,20 @@ function painelChat() {
   const descer = () => { lista.scrollTop = lista.scrollHeight; };
 
   function linha(m, anterior) {
-    const junto = anterior && anterior.usuario_nome === m.usuario_nome && paraData(m.criado_em) - paraData(anterior.criado_em) < 5 * 60_000;
+    const piada = m.tipo === 'piada';
+    const junto = !piada && anterior?.tipo !== 'piada' && anterior && anterior.usuario_nome === m.usuario_nome && paraData(m.criado_em) - paraData(anterior.criado_em) < 5 * 60_000;
     const minha = m.usuario_id != null && m.usuario_id === rt.eu?.id;
     const podeApagar = minha || rt.eu?.moderar;
-    return h('div', { class: `chat-msg ${junto ? 'junto' : ''} ${minha ? 'minha' : ''}`.replace(/\s+/g, ' ').trim() },
+    const bobo = rt.bobos.has(m.usuario_id);
+    return h('div', { class: `chat-msg ${junto ? 'junto' : ''} ${minha ? 'minha' : ''} ${bobo ? 'chat-bobo' : ''} ${piada ? 'chat-piada' : ''}`.replace(/\s+/g, ' ').trim() },
       junto ? h('span', { class: 'chat-av' }) : h('span', { class: 'chat-av' }, linkPerfil(m.usuario_id, avatarPessoa({ nome: m.usuario_nome, foto: m.foto, moldura: m.moldura }, 'avatar-p'))),
       h('div', { class: 'chat-corpo' },
         !junto && h('div', { class: 'chat-cab' },
-          linkPerfil(m.usuario_id, h('strong', { style: m.cor ? { color: m.cor } : null }, m.usuario_nome)),
+          linkPerfil(m.usuario_id, h('strong', { style: m.cor && !bobo ? { color: m.cor } : null, title: bobo ? 'Bobo da Corte' : null }, bobo && icone('bobo'), m.usuario_nome)),
+          piada && h('span', { class: 'chat-piada-selo' }, 'piada na praça'),
           h('time', { title: dataHora(m.criado_em) }, hora(m.criado_em))),
-        h('p', { class: 'chat-texto' }, m.texto)),
+        h('p', { class: 'chat-texto' }, m.texto),
+        piada && h('p', { class: 'chat-piada-fim' }, 'Ba dum tss!')),
       podeApagar && botaoIcone('lixo', 'Apagar mensagem', async () => {
         if (await confirmar(minha ? 'Apagar sua mensagem do chat?' : `Apagar a mensagem de ${m.usuario_nome}?`, { ok: 'Apagar', perigo: true })) enviar('chat:apagar', { id: m.id });
       }, 'chat-apagar perigo'));

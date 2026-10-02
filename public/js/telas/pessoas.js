@@ -2,6 +2,7 @@
 
 import { estado, get, post, del, h, trocar, icone, botao, botaoIcone, cabecalho, vazio, avatarPessoa, seloNivel, barra, chipCargo, chipCrianca, ehCrianca, confirmar, tentar, aviso, num, relativo, dataCurta, dataHora, normalizar, aoSair, pode } from '../core.js';
 import { rt, ouvir } from '../tempo-real.js';
+import { botaoPegadinha } from './bobo.js';
 
 const escutar = (tipo, fn) => aoSair(ouvir(tipo, fn));
 
@@ -64,6 +65,7 @@ export async function pessoa(id) {
       acoes: [
         souEu && h('a', { class: 'btn btn-ouro', href: '#/perfil' }, icone('paleta'), h('span', null, 'Personalizar')),
         jogo && h('a', { class: 'btn', href: `#/recreacao/assistir/${p.id}` }, icone('olho'), h('span', null, `Assistir ${jogo.nomeJogo}`)),
+        botaoPegadinha(p),
       ].filter(Boolean),
     }));
   }

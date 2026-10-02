@@ -2304,3 +2304,99 @@ body.modo-crianca .tabela th { color: var(--rosa); }
 }
 .desafio-fim h2 { margin: 0; display: flex; align-items: center; gap: 8px; color: var(--ouro-l); }
 .desafio-fim p { margin: 0; }
+
+/* ─── Bobo da Corte ─────────────────────────────── */
+.toast.chamada-bobo { border-color: #c46bd8; background: linear-gradient(160deg, rgba(196, 107, 216, 0.2), var(--sup-2) 60%); }
+.toast.chamada-bobo > .ico { color: #e3a3f0; }
+.bobo-reacoes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.btn-bobo { border-color: rgba(196, 107, 216, 0.6); color: #e3a3f0; }
+.btn-bobo:hover { border-color: #c46bd8; color: #f1c8f8; }
+.missao-funcao { margin-left: 8px; font-family: var(--f-titulo); font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ouro); border: 1px solid rgba(216, 177, 58, 0.4); border-radius: 999px; padding: 1px 6px; white-space: nowrap; }
+
+/* Nariz de palhaço na foto */
+.avatar.nariz { position: relative; overflow: visible; }
+.avatar.nariz.com-foto img { border-radius: 50%; }
+.avatar.nariz::after {
+  content: ''; position: absolute; left: 50%; top: 56%; width: 34%; height: 34%; transform: translate(-50%, -50%); border-radius: 50%; z-index: 1; pointer-events: none;
+  background: radial-gradient(circle at 35% 32%, #ffb3b3 0 12%, #e5302a 40%, #8f0d0d 100%); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* Chat: o Bobo com chapéu de guizos e a piada em destaque */
+.chat-bobo .chat-cab strong { display: inline-flex; align-items: center; gap: 4px; background: linear-gradient(90deg, #e3a3f0, #f4dd80, #7fd1c3, #e3a3f0); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: bobo-brilho 6s linear infinite; }
+.chat-bobo .chat-cab strong .ico { color: #e3a3f0; width: 16px; height: 16px; }
+@keyframes bobo-brilho { to { background-position: 200% 0; } }
+.chat-piada { background: linear-gradient(160deg, rgba(196, 107, 216, 0.16), rgba(216, 177, 58, 0.08)); border: 1px solid rgba(196, 107, 216, 0.4); margin: 10px 0; }
+.chat-piada .chat-texto { font-size: 1.08rem; font-style: italic; }
+.chat-piada-selo { font-family: var(--f-titulo); font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; color: #e3a3f0; border: 1px solid rgba(196, 107, 216, 0.5); border-radius: 999px; padding: 1px 6px; }
+.chat-piada-fim { margin: 2px 0 0; font-family: var(--f-titulo); font-size: 0.8rem; color: var(--ouro); letter-spacing: 0.06em; }
+
+/* Caixa de Pegadinhas */
+.bobo-relogios { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.bobo-relogio { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; background: var(--sup-2); border: 1px solid var(--borda); color: var(--texto-2); }
+.bobo-relogio strong { color: var(--suave); font-variant-numeric: tabular-nums; }
+.bobo-relogio.pronto { border-color: rgba(127, 176, 105, 0.6); }
+.bobo-relogio.pronto strong { color: var(--verde); }
+.bobo-grade { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.bobo-lado { display: grid; gap: 18px; }
+.bobo-lado .painel > .btn { margin-top: 4px; }
+.bobo-tipos { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.bobo-tipo { display: grid; gap: 4px; justify-items: start; text-align: left; padding: 12px; border-radius: var(--raio-p); background: var(--sup-2); border: 1px solid var(--borda); color: var(--texto); cursor: pointer; font: inherit; }
+.bobo-tipo:hover { border-color: rgba(196, 107, 216, 0.6); }
+.bobo-tipo.ativo { border-color: #c46bd8; box-shadow: 0 0 0 1px #c46bd8 inset; background: linear-gradient(160deg, rgba(196, 107, 216, 0.16), var(--sup-2)); }
+.bobo-tipo small { color: var(--suave); font-size: 0.84rem; line-height: 1.3; }
+.bobo-tipo-icone { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 10px; background: rgba(196, 107, 216, 0.14); color: #e3a3f0; }
+.bobo-cab2 { margin-top: 6px; }
+.bobo-pessoas { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px; max-height: 330px; overflow-y: auto; margin: 10px 0 14px; padding-right: 4px; }
+.bobo-pessoa { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 8px; align-items: center; text-align: left; padding: 6px 10px; border-radius: var(--raio-p); background: var(--sup-2); border: 1px solid var(--borda); color: var(--texto); cursor: pointer; font: inherit; }
+.bobo-pessoa > .avatar { grid-row: span 2; }
+.bobo-pessoa-nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bobo-pessoa small { color: var(--suave); font-size: 0.78rem; }
+.bobo-pessoa.escolhida { border-color: #c46bd8; box-shadow: 0 0 0 1px #c46bd8 inset; }
+.bobo-pessoa.protegida { opacity: 0.5; cursor: not-allowed; }
+.bobo-pessoa .ponto-online { position: absolute; right: 8px; top: 8px; width: 8px; height: 8px; border-radius: 50%; background: var(--verde); }
+.bobo-acao { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.bobo-acao p { margin: 0; }
+.bobo-piada-botoes { display: flex; justify-content: space-between; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.bobo-mural { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.bobo-mural li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: start; font-size: 0.9rem; padding: 6px 8px; border-radius: var(--raio-p); background: var(--sup-2); }
+.bobo-mural li > .ico { color: #e3a3f0; margin-top: 2px; }
+.bobo-mural em { color: var(--suave); }
+.bobo-mural time { color: var(--suave); font-size: 0.78rem; white-space: nowrap; }
+.bobo-vitimas h3 { margin: 14px 0 6px; font-size: 0.95rem; }
+@media (max-width: 960px) { .bobo-grade { grid-template-columns: minmax(0, 1fr); } }
+
+/* As pegadinhas na tela */
+.bobo-camada { position: fixed; inset: 0; z-index: 180; pointer-events: none; overflow: hidden; }
+.bobo-torta { cursor: pointer; display: grid; place-items: end center; padding-bottom: 12vh; transition: opacity 0.4s; opacity: calc(1 - var(--limpo, 0) * 0.55); }
+.bobo-torta.saindo { opacity: 0; }
+.bobo-gota {
+  position: absolute; width: var(--tam); height: var(--tam); transform: translate(-50%, -50%) scale(0);
+  background: radial-gradient(circle at 42% 38%, #fffdf6 0 28%, #f7ecd2 52%, #ead5a6 100%);
+  animation: bobo-splat 0.35s cubic-bezier(0.2, 1.6, 0.4, 1) forwards;
+}
+.bobo-gota.grande { filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.45)); }
+.bobo-escorre { position: absolute; width: 16px; height: var(--alto); border-radius: 0 0 10px 10px; background: linear-gradient(#f7ecd2, #ead5a6); transform-origin: top; transform: scaleY(0); animation: bobo-escorrer 3.5s ease-in forwards; }
+.bobo-massa { position: absolute; width: 26px; height: 14px; border-radius: 6px 10px 4px 8px; background: linear-gradient(160deg, #d9a35e, #a8692c); box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4); opacity: 0; animation: bobo-aparece 0.2s 0.25s forwards; }
+@keyframes bobo-splat { to { transform: translate(-50%, -50%) scale(1); } }
+@keyframes bobo-escorrer { to { transform: scaleY(1); } }
+@keyframes bobo-aparece { to { opacity: 1; } }
+.bobo-limpe { position: relative; margin: 0; padding: 10px 16px; border-radius: 999px; background: rgba(14, 24, 17, 0.85); color: var(--ouro-l); font-family: var(--f-titulo); }
+#app { transition: transform 0.8s cubic-bezier(0.6, -0.2, 0.3, 1.3); }
+#app.bobo-ponta { transform: rotate(180deg); }
+.bobo-girando, .bobo-girando body { overflow-x: hidden; }
+#app.bobo-tremer { animation: bobo-tremer 0.6s; }
+@keyframes bobo-tremer { 10%, 50%, 90% { transform: translateX(-6px) rotate(-0.4deg); } 30%, 70% { transform: translateX(6px) rotate(0.4deg); } }
+.bobo-pum { display: grid; place-items: end center; padding-bottom: 8vh; }
+.bobo-nuvem { color: #9fc27a; animation: bobo-nuvem 2.6s ease-out forwards; }
+.bobo-nuvem .ico { width: 140px; height: 140px; filter: drop-shadow(0 0 18px rgba(159, 194, 122, 0.6)); }
+@keyframes bobo-nuvem { from { transform: translateY(40px) scale(0.4); opacity: 0; } 20% { opacity: 1; } to { transform: translateY(-60vh) scale(1.6); opacity: 0; } }
+.bobo-nariz { display: grid; place-items: center; }
+.bobo-narizao { width: 160px; height: 160px; border-radius: 50%; background: radial-gradient(circle at 35% 32%, #ffc2c2 0 10%, #e5302a 42%, #8f0d0d 100%); box-shadow: 0 10px 40px rgba(229, 48, 42, 0.5); animation: bobo-boing 2.2s cubic-bezier(0.3, 1.8, 0.5, 1) forwards; }
+@keyframes bobo-boing { 0% { transform: scale(0); } 25% { transform: scale(1.2, 0.85); } 40% { transform: scale(0.9, 1.1); } 55%, 80% { transform: scale(1); opacity: 1; } 100% { transform: scale(0.2); opacity: 0; } }
+.bobo-coelho { position: absolute; left: -80px; color: #f1e6c8; animation-name: bobo-pulo; animation-timing-function: linear; animation-fill-mode: forwards; }
+.bobo-coelho .ico { width: var(--tam); height: var(--tam); filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.5)); animation: bobo-saltinho 0.45s ease-in-out infinite alternate; }
+@keyframes bobo-pulo { to { left: calc(100% + 80px); } }
+@keyframes bobo-saltinho { from { transform: translateY(0); } to { transform: translateY(-26px); } }
+.bobo-confete { position: absolute; top: -20px; width: 9px; height: 14px; border-radius: 2px; animation-name: bobo-cair; animation-timing-function: linear; animation-fill-mode: forwards; }
+@keyframes bobo-cair { to { transform: translate(var(--vento), 110vh) rotate(var(--giro)); } }
+@media (prefers-reduced-motion: reduce) { #app.bobo-ponta { transform: none; } .bobo-coelho, .bobo-confete { animation-duration: 0.01s !important; } }

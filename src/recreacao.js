@@ -17,6 +17,7 @@ const { MESAS, ErroMesa } = require('./mesa');
 const desafio = require('./desafio');
 const cidade = require('./cidade');
 const { paraCriancas } = require('./censura');
+const bobo = require('./bobo');
 
 const ESPERA_MS = Number(process.env.RECREACAO_ESPERA_MS) || 30_000;       // tempo para voltar depois de cair
 const REVALIDAR_MS = Number(process.env.RECREACAO_REVALIDAR_MS) || 120_000; // confere se a sessão ainda vale
@@ -299,6 +300,7 @@ function finalizarRaposa(s, resultado, motivo) {
   ])).then(async () => {
     for (const p of humanos) {
       await progresso.registrar(p.id, 'partida');
+      await progresso.registrar(p.id, 'coop');
       if (venceram) await progresso.registrar(p.id, 'vitoria');
     }
   }).catch(err => console.error('Erro ao guardar a partida contra a Raposa:', err.message));
@@ -485,6 +487,7 @@ function terminarQuiz(s) {
       for (const c of lista) {
         if (c.acertos) await progresso.registrar(c.id, 'quiz_acerto', c.acertos);
         if (lista.length > 1) await progresso.registrar(c.id, 'partida');
+        if (resumo.modo === 'equipe') await progresso.registrar(c.id, 'coop');
         if (lista.length > 1 && venceu(c)) await progresso.registrar(c.id, 'vitoria');
       }
     }).catch(err => console.error('Erro ao guardar o quiz:', err.message));
@@ -645,6 +648,7 @@ function terminarCobras(s) {
     'cobras', c.id, s.jogadores[c.i].nome, posicao + 1, lista.length, c.pontos, r.venceram.includes(c.i) ? 1 : 0,
   ])).then(async () => {
     for (const c of lista) await progresso.registrar(c.id, 'partida');
+    if (e.modo === 'colheita') for (const c of lista) await progresso.registrar(c.id, 'coop');
     for (const i of r.venceram) await progresso.registrar(e.cobras[i].id, 'vitoria');
   }).catch(err => console.error('Erro ao guardar a cobrinha:', err.message));
   enviarQuadroCobras(s);
@@ -704,6 +708,8 @@ function terminarMesa(s) {
       await progresso.registrar(s.jogadores[i].id, lista.length > 1 ? 'partida' : 'solo');
       if (lista.length > 1 && venceram.includes(i)) await progresso.registrar(s.jogadores[i].id, 'vitoria');
     }
+  }).then(async () => {
+    if (s.jogo !== 'memoria' || s.opcoes.modo === 'coop') for (const i of ativosIdx) await progresso.registrar(s.jogadores[i].id, 'coop');
   }).catch(err => console.error('Erro ao guardar a mesa:', err.message));
   enviarSala(s);
   avisarLobby();
@@ -756,6 +762,8 @@ function terminarDesafio(s) {
       await progresso.registrar(s.jogadores[i].id, lista.length > 1 ? 'partida' : 'solo');
       if (lista.length > 1 && venceram.includes(i)) await progresso.registrar(s.jogadores[i].id, 'vitoria');
     }
+  }).then(async () => {
+    if (e.modo === 'coop') for (const i of ativosIdx) await progresso.registrar(s.jogadores[i].id, 'coop');
   }).catch(err => console.error('Erro ao guardar o desafio:', err.message));
   enviarSala(s);
   avisarLobby();
@@ -1097,6 +1105,46 @@ const acoes = {
   },
 };
 
+/* ─── Bobo da Corte ───────────────────────────────── */
+
+// Quem é Bobo (o chat mostra o chapéu de guizos) e quem está de nariz de palhaço. Vão para todos no "ola".
+let bobosDoChat = new Set();
+let narizesAgora = {};
+async function atualizarBobo(avisar = true) {
+  try {
+    const antes = JSON.stringify([[...bobosDoChat], narizesAgora]);
+    [bobosDoChat, narizesAgora] = [new Set(await bobo.bobos()), await bobo.narizes()];
+    if (avisar && JSON.stringify([[...bobosDoChat], narizesAgora]) !== antes) paraTodos('bobo', { bobos: [...bobosDoChat], narizes: narizesAgora });
+  } catch (e) {
+    console.error('Erro ao ler o Bobo da Corte:', e.message);
+  }
+}
+
+// Mensagem especial no chat da cidade (a piada do Bobo): grava e manda para todo mundo.
+async function publicarNoChat(u, texto, tipo = '') {
+  const { id } = await db.run('INSERT INTO chat_mensagens (usuario_id, usuario_nome, texto, tipo) VALUES (?, ?, ?, ?)', u.id, u.nome, texto, tipo);
+  const msg = { ...(await db.get('SELECT * FROM chat_mensagens WHERE id = ?', id)), ...(await visualDe(u.id)) };
+  for (const [quem, lista] of conexoes) for (const w of lista) enviar(w, 'chat:msg', { msg: msgPara(quem, msg) });
+  return msg;
+}
+
+// Pegadinha: chega na hora para quem está online (o confete, para todos). Quem está fora recebe ao entrar.
+function entregarPegadinha(p) {
+  const pacote = bobo.pacote(p);
+  if (p.tipo === 'confete') { paraTodos('pegadinha', { p: pacote }); return true; }
+  if (p.tipo === 'nariz') atualizarBobo();
+  if (!conexoes.has(p.alvo_id)) return false;
+  paraUsuario(p.alvo_id, 'pegadinha', { p: pacote });
+  return true;
+}
+async function entregarPendentes(id) {
+  for (const p of await bobo.pendentes(id)) {
+    paraUsuario(id, 'pegadinha', { p: bobo.pacote(p) });
+    await bobo.marcarEntregue(p.id);
+  }
+}
+const estaOnline = id => conexoes.has(id);
+
 /* ─── Conexões ────────────────────────────────────── */
 
 function conectar(ws, usuario, token) {
@@ -1127,16 +1175,23 @@ function conectar(ws, usuario, token) {
     }
   });
 
-  db.all(`SELECT * FROM (
+  Promise.all([
+    db.all(`SELECT * FROM (
       SELECT c.*, u.foto, u.cor, u.moldura FROM chat_mensagens c LEFT JOIN usuarios u ON u.id = c.usuario_id ORDER BY c.id DESC LIMIT ?
-    ) ORDER BY id`, HISTORICO)
-    .then(historico => {
+    ) ORDER BY id`, HISTORICO),
+    // Um Bobo chegando (talvez com o cargo novo): a lista de quem é Bobo é lida de novo.
+    usuario.permissoes.has('bobo.pegadinhas') && !bobosDoChat.has(id) ? atualizarBobo() : null,
+  ])
+    .then(([historico]) => {
       const minha = salaAtivaDe(id);
       enviar(ws, 'ola', {
         eu: { id, nome: usuario.nome, moderar: usuario.permissoes.has('recreacao.moderar'), silenciadoAte: antispam.silenciadoAte(id) },
         online: online(), historico: usuario.crianca ? historico.map(limparMsg) : historico, salas: resumoSalas(), minhaSala: minha ? minha.id : null, transmissoes: resumoTransmissoes(),
+        bobos: [...bobosDoChat], narizes: narizesAgora,
       });
       if (minha) enviarSala(minha); // voltou a tempo: a partida continua
+      // Pegadinha que chegou enquanto a pessoa estava fora (espera um pouco a tela abrir).
+      setTimeout(() => entregarPendentes(id).catch(e => console.error('Erro ao entregar pegadinhas:', e.message)), 2500);
     })
     .catch(e => console.error('Erro ao abrir a recreação:', e.message));
 
@@ -1172,6 +1227,9 @@ function desconectar(ws) {
 function iniciarRecreacao(servidor) {
   // Conquistas, missões e níveis chegam na hora para quem está no site.
   progresso.definirNotificador((id, notas) => paraUsuario(id, 'progresso', { notas }));
+  atualizarBobo(false);
+  // O nariz de palhaço some sozinho depois de 30 minutos; os cargos podem mudar (quem é Bobo).
+  setInterval(() => atualizarBobo(), 60_000).unref();
 
   const wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 });
 
@@ -1225,4 +1283,4 @@ function iniciarRecreacao(servidor) {
   }, 60_000).unref();
 }
 
-module.exports = { iniciarRecreacao };
+module.exports = { iniciarRecreacao, entregarPegadinha, publicarNoChat, estaOnline, paraUsuario, atualizarBobo };
