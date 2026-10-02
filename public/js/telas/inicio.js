@@ -60,7 +60,7 @@ function painelProgresso(pr, { crianca = false } = {}) {
 }
 
 // As últimas publicações do Congresso e das Leis de Lyendell: todo mundo precisa saber o que mudou.
-function painelNovidades(lista, { titulo, icone: ic, href }) {
+function painelNovidades(lista, { titulo, icone: ic, href, extra = null }) {
   if (!lista?.length) return null; // sem nada publicado ainda, o painel nem aparece
   const classe = t => ({ aprovada: 'lei-aprovada', rejeitada: 'lei-rejeitada' })[normalizar(t)] || '';
   return h('section', { class: 'painel' },
@@ -70,7 +70,8 @@ function painelNovidades(lista, { titulo, icone: ic, href }) {
         x.etiquetas.map((t, i) => h('span', { class: `etiqueta ${i === 0 ? 'etiqueta-ouro' : classe(t)}`.trim() }, t))),
       h('strong', null, x.titulo),
       x.resumo && h('p', null, x.resumo),
-      h('small', null, x.data ? `${href === '#/leis' ? 'Feita' : 'Votada'} em ${dataCurta(x.data)}` : `Publicada ${relativo(x.em)}`, x.numero ? ` · nº ${x.numero}` : '')))));
+      h('small', null, x.data ? `${href === '#/leis' ? 'Feita' : 'Votada'} em ${dataCurta(x.data)}` : `Publicada ${relativo(x.em)}`, x.numero ? ` · nº ${x.numero}` : '')))),
+    extra);
 }
 
 function painelComunidade(pr, { crianca = false } = {}) {
@@ -166,7 +167,8 @@ export async function inicio() {
 
     painelNovidades(d.leis, { titulo: 'Novas Leis de Lyendell', icone: 'balanca', href: '#/leis' }),
 
-    painelNovidades(d.congresso, { titulo: 'Novidades do Congresso', icone: 'coluna', href: '#/congresso' }),
+    painelNovidades(d.congresso, { titulo: 'Novidades do Congresso', icone: 'coluna', href: '#/congresso', extra: pode('congresso.propor') && h('a', { class: 'nota nota-link', href: '#/congresso/propostas' },
+      icone('pena'), h('span', null, 'Tem uma ideia para Lyendell? Mande uma proposta de lei ao Congresso.'), h('strong', null, 'Propor')) }),
 
     pr && painelProgresso(pr),
 

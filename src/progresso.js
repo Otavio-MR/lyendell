@@ -20,6 +20,8 @@ const REGRAS = {
   registro: { xp: 10, teto: 10 },
   recado: { xp: 3, teto: 10 },
   pegadinha: { xp: 5, teto: 6 },
+  proposta: { xp: 10, teto: 1 },
+  proposta_avaliada: { xp: 5, teto: 5 },
   piada: { xp: 5, teto: 4 },
 };
 
@@ -70,7 +72,8 @@ const MISSOES = [
   { chave: 'pagamento', funcao: true, tipos: ['pagamento'], meta: 1, xp: 40, perm: 'tabelionato.pagamentos', texto: 'Marque um pagamento de comerciante como pago no Tabelionato' },
   { chave: 'guarda', funcao: true, tipos: ['registro_guarda', 'revisao_guarda'], meta: 1, xp: 45, perm: ['guarda.registrar', 'guarda.aprovar'], texto: 'Faça um registro na Guarda do Coelho (ou confira um que espera aprovação)' },
   { chave: 'hospital', funcao: true, tipos: ['registro_hospital', 'revisao_hospital'], meta: 1, xp: 45, perm: ['hospital.registrar', 'hospital.aprovar'], texto: 'Registre um atendimento no Hospital (ou confira um que espera aprovação)' },
-  { chave: 'congresso', funcao: true, tipos: ['registro_congresso', 'revisao_congresso'], meta: 1, xp: 45, perm: ['congresso.registrar', 'congresso.aprovar'], texto: 'Envie ou publique algo no Congresso (lei, PEC ou mudança votada)' },
+  { chave: 'congresso', funcao: true, tipos: ['registro_congresso', 'revisao_congresso'], meta: 1, xp: 45, perm: ['congresso.registrar'], texto: 'Envie ou publique algo no Congresso (lei, PEC ou mudança votada)' },
+  { chave: 'propostas', funcao: true, tipos: ['proposta_avaliada', 'registro_congresso', 'revisao_congresso'], meta: 1, xp: 45, perm: ['congresso.aprovar'], texto: 'Avalie uma proposta do povo ou publique algo no Congresso' },
   { chave: 'leis', funcao: true, tipos: ['registro_leis', 'revisao_leis'], meta: 1, xp: 45, perm: ['leis.registrar', 'leis.aprovar'], texto: 'Escreva ou revise uma das Leis de Lyendell' },
   { chave: 'mapa', funcao: true, tipos: ['mapa'], meta: 1, xp: 35, perm: 'mapa.editar', texto: 'Coloque ou atualize uma casa ou um prédio no mapa de Lyendell' },
   { chave: 'anuncio', funcao: true, tipos: ['anuncio'], meta: 1, xp: 35, perm: 'anuncios.publicar', texto: 'Publique um anúncio no mural' },
@@ -160,6 +163,7 @@ const CONQUISTAS = [
   { chave: 'bobo1', nome: 'Primeira travessura', desc: 'Pregou a primeira peça como Bobo da Corte.', icone: 'bobo', stat: 'pegadinhas', meta: 1, tipos: ['pegadinha'] },
   { chave: 'bobo25', nome: 'Mestre das gargalhadas', desc: 'Pregou 25 peças como Bobo da Corte.', icone: 'bobo', stat: 'pegadinhas', meta: 25, tipos: ['pegadinha'] },
   { chave: 'caiu5', nome: 'Bom de rir', desc: 'Caiu em 5 pegadinhas do Bobo da Corte.', icone: 'nariz', stat: 'caiu', meta: 5, tipos: ['caiu'] },
+  { chave: 'proposta1', nome: 'Voz do povo', desc: 'Teve uma proposta aprovada no Congresso.', icone: 'coluna', stat: 'propostasAprovadas', meta: 1, tipos: ['proposta_aprovada'] },
   { chave: 'nivel10', nome: 'Coelho Veloz', desc: 'Chegou ao nível 10.', icone: 'estrela', stat: 'nivel', meta: 10, tipos: ['nivel'] },
   { chave: 'nivel20', nome: 'Coelho Dourado', desc: 'Chegou ao nível 20.', icone: 'coroa', stat: 'nivel', meta: 20, tipos: ['nivel'] },
 ];
@@ -192,6 +196,7 @@ const STATS = {
   anuncios: id => n('SELECT COUNT(*) AS n FROM anuncios WHERE autor_id = ?', id),
   fotos: id => n('SELECT COUNT(*) AS n FROM fotos WHERE enviado_por = ?', id),
   registros: id => n('SELECT COUNT(*) AS n FROM registros WHERE criado_por = ?', id),
+  propostasAprovadas: id => n("SELECT COUNT(*) AS n FROM propostas WHERE autor_id = ? AND situacao = 'aprovada'", id),
   pegadinhas: id => n('SELECT COUNT(*) AS n FROM pegadinhas WHERE de_id = ?', id),
   caiu: id => n('SELECT COUNT(*) AS n FROM pegadinhas WHERE alvo_id = ?', id),
   recadosPessoas: id => n('SELECT COUNT(DISTINCT perfil_id) AS n FROM recados WHERE autor_id = ? AND perfil_id <> ?', id, id),

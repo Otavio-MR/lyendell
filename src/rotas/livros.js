@@ -423,7 +423,13 @@ async function contagemModulo(req, m) {
   const c = await db.get(`
     SELECT SUM(r.situacao = 'pendente') AS aprovacoes, SUM(r.situacao <> 'aprovado' AND r.criado_por = ?) AS envios
     FROM registros r JOIN livros l ON l.id = r.livro_id WHERE l.modulo = ? AND r.situacao <> 'aprovado'`, req.usuario.id, m);
-  return { aprovacoes: pode(req, `${m}.aprovar`) ? c.aprovacoes || 0 : 0, envios: c.envios || 0 };
+  const saida = { aprovacoes: pode(req, `${m}.aprovar`) ? c.aprovacoes || 0 : 0, envios: c.envios || 0 };
+  // Congresso: as propostas do povo esperando a Senadora (para quem avalia) ou na pauta (para todos).
+  if (m === 'congresso') {
+    const p = await db.get("SELECT SUM(situacao = 'enviada') AS enviadas, SUM(situacao = 'em_pauta') AS pauta FROM propostas");
+    saida.propostas = pode(req, 'congresso.aprovar') ? Number(p.enviadas || 0) : Number(p.pauta || 0);
+  }
+  return saida;
 }
 
 // Registros não aprovados de um módulo, junto com os livros deles (para montar os formulários).

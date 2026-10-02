@@ -232,6 +232,7 @@ function mostrarNota(n) {
   if (n.tipo === 'conquista') chamar(`Conquista desbloqueada: ${n.nome}! ${n.desc}`, 'Ver no perfil', meuPerfil, 9000, n.icone || 'trofeu', 'chamada-ouro');
   else if (n.tipo === 'missao') chamar(`Missão do dia cumprida: ${n.texto}. +${n.xp} XP`, 'Ver missões', '#/', 7000, 'check', 'chamada-verde');
   else if (n.tipo === 'nivel') chamar(`Você subiu para o nível ${n.nivel}: ${n.titulo}!${n.moldura ? ` Moldura ${n.moldura} liberada.` : ''}`, 'Personalizar', '#/perfil', 10000, 'estrela', 'chamada-ouro');
+  else if (n.tipo === 'proposta') chamar(n.texto, 'Ver as propostas', '#/congresso/propostas', 12000, 'coluna', 'chamada-ouro');
   else if (n.tipo === 'recado') chamar(`${n.de} deixou um recado no seu perfil: "${n.texto.length > 80 ? `${n.texto.slice(0, 80)}…` : n.texto}"`, 'Ver recado', meuPerfil, 10000, 'chat');
   emitir('nota', n);
 }

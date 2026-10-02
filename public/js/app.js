@@ -17,6 +17,7 @@ import { leis, gerenciaLeis } from './telas/leis.js';
 import { campoMinado, jogo2048 } from './telas/jogos-sozinho.js';
 import { perguntasQuiz } from './telas/quiz.js';
 import { caixaDePegadinhas } from './telas/bobo.js';
+import { propostas } from './telas/propostas.js';
 
 const app = document.getElementById('app');
 
@@ -57,6 +58,7 @@ const ROTAS = [
   [/^\/leis\/(\d+)$/, id => gerenciaLeis(() => livro('leis', id), () => leis(id))],
   [/^\/leis\/(\d+)\/registro\/(\d+)$/, (id, reg) => gerenciaLeis(() => livro('leis', id, reg), () => leis(id, reg))],
   [/^\/(tabelionato|guarda|hospital|congresso)$/, m => modulo(m)],
+  [/^\/congresso\/propostas$/, () => propostas()],
   [/^\/(tabelionato|guarda|hospital|congresso|leis)\/aprovacoes$/, m => aprovacoes(m)],
   [/^\/(tabelionato|guarda|hospital|congresso|leis)\/envios$/, m => envios(m)],
   [/^\/(tabelionato|guarda|hospital|congresso)\/(\d+)$/, (m, id) => livro(m, id)],
@@ -275,8 +277,8 @@ async function atualizarAvisos() {
     const item = document.querySelector(`.menu-item[data-rota="/${m}"]`);
     if (!item) continue;
     item.querySelector('.menu-aviso')?.remove();
-    const { aprovar = 0, recusados = 0 } = p[m] || {};
-    if (aprovar) item.append(h('span', { class: 'menu-aviso', title: `${aprovar} aguardando a sua aprovação` }, aprovar));
+    const { aprovar = 0, recusados = 0, propostas: novas = 0 } = p[m] || {};
+    if (aprovar + novas) item.append(h('span', { class: 'menu-aviso', title: [aprovar && `${aprovar} aguardando a sua aprovação`, novas && `${novas} ${novas === 1 ? 'proposta do povo' : 'propostas do povo'} para avaliar`].filter(Boolean).join(' e ') }, aprovar + novas));
     else if (recusados) item.append(h('span', { class: 'menu-aviso recusado', title: `${recusados} envio(s) seu(s) recusado(s)` }, recusados));
   }
 }

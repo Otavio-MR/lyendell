@@ -30,6 +30,7 @@ const TITULOS = {
   'Mural de Atividades': ['Ajudar os grandes', 'Os grandes precisam de um monte de coisas. Se eu ajudar, fico forte que nem um soldado!'],
   'Galeria': ['As figurinhas', 'Os desenhos e retratos da cidade. Dá para olhar um montão!'],
   'Recreação': ['Hora de brincar!', 'Jogos, conversa e bagunça. O melhor lugar da cidade!'],
+  'Propostas do povo': ['Os pedidos dos grandes', 'Os grandes escrevem pedidos de regras novas, e a Senadora escolhe quais vão para a casa do falatório. Eu ainda não posso pedir nada...'],
   'Caixa de Pegadinhas': ['Minhas travessuras', 'Hihi! Aqui eu guardo as brincadeiras para fazer com os grandes. Shhh, é segredo!'],
   'Tabelionato': ['A casa dos livros gigantes', 'Livros enormes onde os grandes escrevem o nome de todo mundo. Dá para olhar, mas não pode rabiscar!'],
   'Guarda do Coelho': ['Os soldados de armadura', 'Eles cuidam da cidade e levam para a torre quem fez arte demais.'],

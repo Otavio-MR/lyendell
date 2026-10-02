@@ -35,11 +35,12 @@ const CATALOGO = [
   ] },
   { grupo: 'Congresso', itens: [
     { chave: 'congresso.ver', nome: 'Ler as leis, PECs e mudanças votadas' },
+    { chave: 'congresso.propor', nome: 'Mandar propostas do povo (leis, PECs, regras...) para a Senadora avaliar e apoiar as dos outros' },
     { chave: 'congresso.registrar', nome: 'Enviar leis e mudanças votadas (vão para aprovação, se a pessoa não aprova)' },
     { chave: 'congresso.editar', nome: 'Editar o que foi publicado' },
     { chave: 'congresso.apagar', nome: 'Apagar o que foi publicado' },
     { chave: 'congresso.configurar', nome: 'Criar livros, seções, campos e opções' },
-    { chave: 'congresso.aprovar', nome: 'Publicar direto e aprovar o que outros enviam (exclusiva: só um cargo pode ter, a Senadora)' },
+    { chave: 'congresso.aprovar', nome: 'Publicar direto, aprovar o que outros enviam e avaliar as propostas do povo (exclusiva: só um cargo pode ter, a Senadora)' },
   ] },
   { grupo: 'Galeria', itens: [
     { chave: 'galeria.ver', nome: 'Ver as fotos' },
@@ -94,7 +95,7 @@ const SO_DO_BOBO = new Set(['bobo.pegadinhas']);
 const VALIDAS = new Set(TODAS);
 
 // Todo usuário é morador: estas permissões valem para qualquer um.
-const MORADOR = ['tabelionato.ver', 'guarda.ver', 'congresso.ver', 'leis.ver', 'galeria.ver', 'anuncios.ver', 'atividades.ver', 'atividades.participar', 'recreacao.usar'];
+const MORADOR = ['tabelionato.ver', 'guarda.ver', 'congresso.ver', 'congresso.propor', 'leis.ver', 'galeria.ver', 'anuncios.ver', 'atividades.ver', 'atividades.participar', 'recreacao.usar'];
 // Quem está acima de morador publica anúncios, cria atividades e envia fotos.
 const MEMBRO = ['anuncios.publicar', 'atividades.criar', 'galeria.enviar'];
 const acoes = (modulo, ...lista) => lista.map(a => `${modulo}.${a}`);
@@ -124,6 +125,8 @@ const DESCRICOES = {
     'Pode tudo, menos adicionar usuários e aprovar registros (isso é da Tabeliã, do Comandante, do Diretor do Hospital e da Senadora).',
     'Faz as Leis da Capital com o Lorde Comandante. Pode tudo, menos adicionar usuários e aprovar registros do Tabelionato, da Guarda, do Hospital e do Congresso (isso é da Tabeliã, do Comandante, do Diretor do Hospital e da Senadora).'],
   'Faz as Leis de Lyendell com o Lorde Comandante. Pode tudo, menos adicionar usuários e aprovar registros do Tabelionato, da Guarda, do Hospital e do Congresso (isso é da Tabeliã, do Comandante, do Diretor do Hospital e da Senadora).'],
+  Senadora: [['Publica no Congresso as PECs, leis e regras votadas; aprova o que outros enviarem para lá.'],
+    'Publica no Congresso as PECs, leis e regras votadas, aprova o que outros enviarem para lá e avalia as propostas do povo (as viáveis vão para a pauta).'],
   'Lorde Comandante': [['Faz as Leis da Capital junto com a Família Nobre: escreve, publica, edita e revoga.'],
     'Faz as Leis de Lyendell junto com a Família Nobre: escreve, publica, edita e revoga.'],
 };
@@ -157,7 +160,7 @@ const CARGOS_PADRAO = [
     descricao: DESCRICOES['Lorde Comandante'][1],
     permissoes: [...MEMBRO, ...acoes('leis', 'registrar', 'editar', 'apagar', 'configurar', 'aprovar')] },
   { nome: 'Senadora', cor: '#7f93d8',
-    descricao: 'Publica no Congresso as PECs, leis e regras votadas; aprova o que outros enviarem para lá.',
+    descricao: DESCRICOES.Senadora[1],
     permissoes: [...MEMBRO, ...acoes('congresso', 'registrar', 'editar', 'apagar', 'configurar', 'aprovar')] },
   { nome: 'Bobo da Corte', cor: '#c46bd8',
     descricao: 'Alegra Lyendell: tem a Caixa de Pegadinhas (torta na cara, almofada de pum, nariz de palhaço...) e conta piadas na praça.',

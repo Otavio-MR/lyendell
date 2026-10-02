@@ -2400,3 +2400,45 @@ body.modo-crianca .tabela th { color: var(--rosa); }
 .bobo-confete { position: absolute; top: -20px; width: 9px; height: 14px; border-radius: 2px; animation-name: bobo-cair; animation-timing-function: linear; animation-fill-mode: forwards; }
 @keyframes bobo-cair { to { transform: translate(var(--vento), 110vh) rotate(var(--giro)); } }
 @media (prefers-reduced-motion: reduce) { #app.bobo-ponta { transform: none; } .bobo-coelho, .bobo-confete { animation-duration: 0.01s !important; } }
+
+/* ─── Propostas do povo (Congresso) ──────────────── */
+.propostas-passos { list-style: none; margin: 0 0 16px; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.propostas-passos li { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: var(--raio-p); background: var(--sup-2); border: 1px solid var(--borda); }
+.propostas-passos strong { display: block; font-family: var(--f-titulo); font-size: 0.86rem; color: var(--ouro-l); }
+.propostas-passos small { color: var(--suave); font-size: 0.84rem; line-height: 1.3; }
+.propostas-passo-icone { display: grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 9px; background: var(--ouro-fundo); color: var(--ouro); }
+.propostas-filtros { flex-wrap: wrap; margin-bottom: 16px; }
+.propostas-filtros .seg { display: inline-flex; align-items: center; gap: 6px; }
+.propostas-lista { display: grid; gap: 14px; }
+.proposta { display: grid; gap: 10px; border-left: 3px solid var(--borda); }
+.proposta-enviada { border-left-color: var(--ouro-d); }
+.proposta-em_pauta { border-left-color: #7f93d8; }
+.proposta-aprovada { border-left-color: var(--verde); }
+.proposta-rejeitada, .proposta-inviavel { border-left-color: #b8492f; }
+.proposta-topo { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.proposta-situacao { display: inline-flex; align-items: center; gap: 5px; font-size: 0.85rem; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--borda); color: var(--texto-2); }
+.proposta-situacao .ico { width: 14px; height: 14px; }
+.situacao-enviada { color: var(--ouro-l); border-color: rgba(216, 177, 58, 0.45); }
+.situacao-em_pauta { color: #aebcf0; border-color: rgba(127, 147, 216, 0.55); }
+.situacao-aprovada { color: #a9d394; border-color: rgba(127, 176, 105, 0.6); }
+.situacao-rejeitada, .situacao-inviavel { color: #f3a58f; border-color: rgba(216, 103, 74, 0.5); }
+.proposta-apoios { margin-left: auto; display: inline-flex; align-items: center; gap: 3px; color: var(--suave); font-size: 0.88rem; }
+.proposta-apoios .ico { width: 15px; height: 15px; color: #e48ab8; }
+.proposta-titulo { margin: 0; font-size: 1.2rem; }
+.proposta-autor { margin: 0; display: flex; align-items: center; gap: 8px; color: var(--suave); font-size: 0.9rem; }
+.proposta-autor strong { color: var(--texto-2); }
+.proposta-bloco h4 { margin: 0 0 4px; font-family: var(--f-titulo); font-size: 0.74rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ouro); }
+.proposta-bloco p { margin: 0; }
+.proposta-mais summary { cursor: pointer; color: var(--ouro-l); font-size: 0.9rem; }
+.proposta-mais p { margin: 8px 0 0; }
+.proposta-parecer, .proposta-votacao { padding: 10px 12px; border-radius: var(--raio-p); background: rgba(127, 147, 216, 0.1); border: 1px solid rgba(127, 147, 216, 0.35); }
+.proposta-parecer.ruim, .proposta-votacao.rejeitada { background: var(--vermelho-fundo); border-color: rgba(216, 103, 74, 0.45); }
+.proposta-votacao.aprovada { background: rgba(127, 176, 105, 0.12); border-color: rgba(127, 176, 105, 0.5); }
+.proposta-parecer strong, .proposta-votacao strong { display: inline-flex; align-items: center; gap: 6px; }
+.proposta-parecer p, .proposta-votacao p { margin: 6px 0 0; }
+.proposta-andamento ol { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 4px; font-size: 0.88rem; color: var(--texto-2); }
+.proposta-andamento time { color: var(--suave); }
+.proposta-andamento em { color: var(--suave); }
+.proposta-acoes { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-top: 6px; border-top: 1px solid var(--borda); }
+.propostas-livros { display: grid; gap: 8px; }
+@media (max-width: 760px) { .propostas-passos { grid-template-columns: minmax(0, 1fr); } }

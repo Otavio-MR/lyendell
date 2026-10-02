@@ -219,6 +219,37 @@ CREATE TABLE IF NOT EXISTS chat_mensagens (
   tipo TEXT NOT NULL DEFAULT ''
 );
 
+CREATE TABLE IF NOT EXISTS propostas (
+  id INTEGER PRIMARY KEY,
+  tipo TEXT NOT NULL,
+  titulo TEXT NOT NULL,
+  resumo TEXT NOT NULL,
+  texto TEXT NOT NULL DEFAULT '',
+  justificativa TEXT NOT NULL DEFAULT '',
+  autor_id INTEGER,
+  autor_nome TEXT NOT NULL,
+  situacao TEXT NOT NULL DEFAULT 'enviada',
+  parecer TEXT,
+  parecer_nome TEXT,
+  votacao TEXT,
+  a_favor INTEGER,
+  contra INTEGER,
+  abstencoes INTEGER,
+  resultado TEXT,
+  historico TEXT NOT NULL DEFAULT '[]',
+  livro_id INTEGER,
+  registro_id INTEGER,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_propostas_situacao ON propostas(situacao, id);
+
+CREATE TABLE IF NOT EXISTS proposta_apoios (
+  proposta_id INTEGER NOT NULL,
+  usuario_id INTEGER NOT NULL,
+  PRIMARY KEY (proposta_id, usuario_id)
+);
+
 CREATE TABLE IF NOT EXISTS pegadinhas (
   id INTEGER PRIMARY KEY,
   tipo TEXT NOT NULL,
@@ -379,7 +410,7 @@ CREATE TABLE IF NOT EXISTS diario (
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 18;
+const VERSAO = 19;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -453,6 +484,11 @@ async function migrar() {
   // v17: personagem criança (só olha, brinca e ajuda; o site aparece do jeito de uma criança).
   if (versao < 17 && !await colunaExiste('usuarios', 'crianca')) await db.run('ALTER TABLE usuarios ADD COLUMN crianca INTEGER NOT NULL DEFAULT 0');
   if (versao < 18) await migrarBobo();
+  // v19: propostas do povo para o Congresso (todo morador manda; a Senadora avalia).
+  if (versao < 19) {
+    await darPermissoes({ base: ['congresso.propor'] });
+    await atualizarDescricoes();
+  }
 
   await db.run("INSERT INTO meta (chave, valor) VALUES ('versao', ?) ON CONFLICT (chave) DO UPDATE SET valor = excluded.valor", String(VERSAO));
 }

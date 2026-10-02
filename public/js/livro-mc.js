@@ -576,6 +576,35 @@ export function livroDeRegistros(nomeModulo, livro, registros, autor) {
   return new LivroPronto(livro.nome, autor, paginas);
 }
 
+export function livroDaPauta(propostas, autor) {
+  const mc = new LivroMC('Pauta do Congresso', autor);
+  const hoje = new Date().toISOString().slice(0, 10);
+  mc.capa(capaPadrao('CONGRESSO', 'PAUTA', [
+    L(ORN.estrela, '8'),
+    ...texto('Propostas do povo', '0', { centro: true, negrito: true }),
+    L(ORN.estrela, '8'),
+    vazia(),
+    ...texto(`${propostas.length} ${propostas.length === 1 ? 'proposta' : 'propostas'} para votar`, '0', { centro: true }),
+    ...texto(`Lyendell, ${dataCurta(hoje)}`, '8', { centro: true }),
+  ]));
+  propostas.forEach((p, i) => {
+    mc.bloco([
+      ...texto(`${i + 1}. ${p.tipo.toUpperCase()}`, '4', { negrito: true }),
+      ...texto(p.titulo, '0', { negrito: true }),
+      ...texto(`De ${p.autor_nome} · ${p.apoios} ${p.apoios === 1 ? 'apoio' : 'apoios'}`, '8'),
+      vazia(),
+      ...texto('O que muda:', '4'),
+      ...texto(p.resumo, '0'),
+    ], { novaPagina: true });
+    if (p.texto) mc.bloco([vazia(), ...texto('Texto completo:', '4'), ...texto(p.texto, '0')], { junto: false });
+    if (p.justificativa) mc.bloco([vazia(), ...texto('Por que:', '4'), ...texto(p.justificativa, '0')], { junto: false });
+    if (p.parecer) mc.bloco([vazia(), ...texto('Parecer da Senadora:', '4'), ...texto(p.parecer, '0')], { junto: false });
+    mc.bloco([vazia(), ...texto('Votos: a favor ___ contra ___ abstenções ___', '8')]);
+  });
+  mc.bloco(assinatura([...texto('Pauta preparada por', '8'), ...texto(autor || 'a Senadora', '0')]), { novaPagina: true });
+  return mc;
+}
+
 export function livroDeAnuncio(a, autor) {
   const mc = new LivroMC(a.titulo, autor || a.autor_nome);
   const selo = a.importancia === 'urgente' ? 'URGENTE' : a.importancia === 'importante' ? 'IMPORTANTE' : '';

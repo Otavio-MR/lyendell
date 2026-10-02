@@ -71,6 +71,9 @@ async function pendencias(req) {
     const l = linhas.find(x => x.modulo === m) || {};
     out[m] = { aprovar: pode(req, `${m}.aprovar`) ? l.pendentes || 0 : 0, recusados: l.recusados || 0 };
   }
+  if (pode(req, 'congresso.aprovar')) {
+    out.congresso.propostas = Number((await db.get("SELECT COUNT(*) AS n FROM propostas WHERE situacao = 'enviada'")).n);
+  }
   return out;
 }
 

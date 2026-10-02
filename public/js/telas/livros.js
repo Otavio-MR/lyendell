@@ -135,14 +135,16 @@ function cartaoLivro(m, l) {
 
 /* ─── Abas do módulo: livros, aprovação e meus envios ─ */
 
-function abasModulo(m, atual, contagem = {}) {
+export function abasModulo(m, atual, contagem = {}) {
   const abas = [['', 'Livros', null]];
+  // Congresso: as propostas do povo (o número é o que espera a Senadora, para ela, ou o que está na pauta).
+  if (m === 'congresso') abas.push(['propostas', 'Propostas do povo', contagem.propostas || 0]);
   if (pode(`${m}.aprovar`)) abas.push(['aprovacoes', 'Aguardando aprovação', contagem.aprovacoes || 0]);
   if (contagem.envios || (pode(`${m}.registrar`) && !pode(`${m}.aprovar`))) abas.push(['envios', 'Meus envios', contagem.envios || 0]);
   if (abas.length < 2) return null;
   return h('nav', { class: 'abas', 'aria-label': 'Seções do módulo' }, abas.map(([k, nome, n]) =>
     h('a', { class: `aba ${atual === k ? 'ativa' : ''}`.trim(), href: k ? `#/${m}/${k}` : inicioDoModulo(m) },
-      nome, n != null && h('span', { class: `aba-n ${k === 'aprovacoes' && n ? 'aba-alerta' : ''}`.trim() }, n))));
+      nome, n != null && h('span', { class: `aba-n ${(k === 'aprovacoes' || (k === 'propostas' && pode('congresso.aprovar'))) && n ? 'aba-alerta' : ''}`.trim() }, n))));
 }
 
 export const aprovacoes = m => filaModulo(m, 'aprovacoes');
@@ -444,8 +446,9 @@ function recusar(r, titulo, depois) {
 
 /* ─── Formulário de registro ──────────────────────── */
 
-async function formRegistro(l, r, aoSalvar) {
-  const valores = { ...(r?.dados || {}) };
+// inicial: dados já preenchidos para um registro novo (ex.: a proposta do povo aprovada indo para o livro).
+export async function formRegistro(l, r, aoSalvar, inicial = null) {
+  const valores = { ...(r?.dados || inicial || {}) };
   // Antes de abrir, busca os nomes dos campos "Escolher de outro livro" (ex.: a lista de guardas).
   const fontes = {};
   await Promise.all([...new Set(l.campos.filter(c => c.tipo === 'referencia').map(c => c.livro))].map(async id => {

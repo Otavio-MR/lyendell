@@ -32,10 +32,10 @@ Todo usuário é morador. Os cargos somam poderes em cima disso, e uma pessoa po
 | Guarda | Ver todos os livros da Guarda e registrar em qualquer um deles; os registros vão para a aprovação do Comandante |
 | Diretor do Hospital | Tudo no Hospital, inclusive aprovar os registros dos médicos |
 | Médico | Ver o Hospital e registrar pacientes, que vão para a aprovação do Diretor do Hospital |
-| Senadora | Tudo no Congresso: publica as PECs, leis e regras votadas e aprova o que outros enviarem |
+| Senadora | Tudo no Congresso: publica as PECs, leis e regras votadas, aprova o que outros enviarem e avalia as propostas do povo |
 | Lorde Comandante | Faz as Leis de Lyendell junto com a Família Nobre: escreve, publica, edita e revoga |
 | Bobo da Corte | A Caixa de Pegadinhas, só dele: prega peças no pessoal e conta piadas na praça (veja "Bobo da Corte") |
-| Morador | Ver tudo (menos o Hospital), ajudar nas atividades e usar a Recreação |
+| Morador | Ver tudo (menos o Hospital), ajudar nas atividades, usar a Recreação e mandar propostas ao Congresso |
 
 Qualquer usuário pode ser marcado como **criança** (veja "Personagem criança" mais abaixo): mesmo com cargo, só olha, brinca e ajuda.
 
@@ -68,6 +68,7 @@ Livros que já vêm prontos:
 - **Congresso**: Leis e Mudanças (título, tipo: PEC, lei, regra, emenda, decreto..., data da
   votação, resultado, o que muda, texto completo, votos e situação). As últimas publicações
   aparecem para todo mundo na tela de início, em **Novidades do Congresso**.
+  O Congresso também tem as **Propostas do povo** (veja abaixo).
 - **Leis de Lyendell**: as leis da capital (título, tipo: lei, decreto, edital, proibição, imposto...,
   data, quem fez, o que diz, a pena para quem descumprir e a situação). Só o Lorde Comandante e a
   Família Nobre escrevem, e publicam direto, sem aprovação. As novas aparecem na tela de início, em
@@ -122,6 +123,27 @@ fica em `src/censura.js`.
 
 Para os outros, o perfil e a comunidade mostram a etiqueta "Criança". Os textos de criança ficam em
 `public/js/crianca.js`.
+
+## Propostas do povo (Congresso)
+
+Na aba **Propostas do povo** do Congresso, qualquer morador manda uma ideia para a cidade: lei, PEC,
+emenda, regra, decreto, resolução ou outra, com o título, o que muda, o texto completo (se quiser) e
+por que é uma boa ideia. Dá para ter até 3 propostas esperando ao mesmo tempo, corrigir enquanto não
+foram avaliadas e retirar. Os outros moradores podem **apoiar** as propostas, para a Senadora ver
+quais o povo mais quer.
+
+1. **A Senadora avalia**: **viável** vai para a pauta do Congresso (com um recado opcional);
+   **inviável** volta com o motivo, que todos leem. Ela pode reconsiderar uma inviável.
+2. **O Congresso vota** (na sessão do RP): ela registra o resultado, **aprovada**, **rejeitada** ou
+   **adiada** (continua na pauta), com a data e os votos a favor, contra e abstenções.
+3. **A aprovada vira lei**: o botão "Publicar no livro do Congresso" abre o formulário do livro Leis
+   e Mudanças já preenchido com a proposta, e a proposta ganha o link para o registro.
+
+Quem propôs é avisado na hora a cada passo, e a Senadora é avisada quando chega proposta nova (o
+menu do Congresso mostra quantas esperam). Cada proposta guarda o andamento (quem fez o quê e quando).
+A Senadora pode baixar a **pauta em livro (.book)** para ler na sessão dentro do jogo, e pode apagar
+propostas (ex.: repetidas). A criança vê as propostas, mas não manda nem apoia. Ter uma proposta
+aprovada dá a conquista **Voz do povo**.
 
 ## Aprovação de registros
 
@@ -417,12 +439,13 @@ Para incentivar a visita de todo dia:
   (bronze no 5, prata no 10, ouro no 15, esmeralda no 20 e coroa no 25).
 - **Sequência de dias**: entrar todo dia aumenta a sequência e o XP da visita.
 - **Missões do dia**: três por pessoa, que renovam à meia-noite: uma **da sua função** (do cargo:
-  registrar ou conferir no Tabelionato, na Guarda ou no Hospital, enviar ao Congresso, escrever leis,
+  registrar ou conferir no Tabelionato, na Guarda ou no Hospital, enviar ao Congresso ou avaliar as
+  propostas do povo, escrever leis,
   marcar pagamento, mexer no mapa, publicar anúncio, criar atividade, conferir entrega, enviar foto,
   criar pergunta do quiz, ou pregar peças e contar piadas, para o Bobo) e duas para todo mundo (chat,
   partidas, vitória, jogar em equipe, quiz, jogos sozinho, recado, entrega). Quem não trabalha no
   Tabelionato nunca recebe missão de registrar lá; o morador sem cargo recebe só as de todo mundo.
-- **Conquistas**: 33 no total (Tagarela, Sábio da Toca, Terror das Raposas, Faro afiado, Dama de ferro, Primeira travessura...).
+- **Conquistas**: 34 no total (Tagarela, Sábio da Toca, Terror das Raposas, Faro afiado, Dama de ferro, Primeira travessura, Voz do povo...).
 
 Conquistas, missões cumpridas, nível novo e recado novo aparecem na hora, em qualquer tela.
 A tela de início mostra o progresso, as missões, as conquistas recentes e os mais ativos da semana.
