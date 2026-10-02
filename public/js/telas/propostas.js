@@ -5,7 +5,7 @@
 import { estado, get, post, put, del, h, trocar, icone, botao, botaoIcone, cabecalho, vazio, avatarPessoa, modal, modalForm, confirmar,
   aviso, tentar, campo, relativo, dataCurta, hojeIso, normalizar } from '../core.js';
 import { abasModulo, formRegistro } from './livros.js';
-import { livroDaPauta } from '../livro-mc.js';
+import { livroDaPauta, livroDeProposta } from '../livro-mc.js';
 
 const SITUACAO = {
   enviada: { nome: 'Esperando a Senadora', icone: 'relogio' },
@@ -133,6 +133,11 @@ export async function propostas() {
           && await tentar(() => del(`/api/propostas/${p.id}`), 'Proposta apagada.')) carregar();
       }, 'perigo'));
     }
+    // Qualquer um baixa a proposta como livro do Minecraft (mod Scribble), no modelo da Casa.
+    acoes.push(botao('Baixar .book', {
+      icone: 'baixar', classe: 'btn-pequeno', titulo: 'Baixa a proposta como livro para o mod Scribble',
+      onclick: () => livroDeProposta(p, estado.eu.nome).baixar(),
+    }));
     if (p.publicada) acoes.push(h('a', { class: 'btn btn-pequeno', href: `#/congresso/${p.publicada.livro_id}/registro/${p.publicada.registro_id}` }, icone('livro'), h('span', null, 'Ver no livro')));
 
     return h('article', { class: `painel proposta proposta-${p.situacao}` },
@@ -159,7 +164,7 @@ export async function propostas() {
           h('time', null, dataCurta(x.em)), ' ', h('strong', null, x.por), ` ${PASSO[x.acao] || x.acao}`,
           x.votacao ? ` (votação em ${dataCurta(x.votacao)})` : '', x.votos ? `: ${x.votos[0]} a ${x.votos[1]}` : '',
           x.texto && h('em', null, ` "${x.texto}"`))))),
-      acoes.length > 0 && h('div', { class: 'proposta-acoes' }, acoes));
+      h('div', { class: 'proposta-acoes' }, acoes));
   }
 
   await carregar();

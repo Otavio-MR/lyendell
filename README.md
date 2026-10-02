@@ -142,7 +142,9 @@ quais o povo mais quer.
 
 Quem propôs é avisado na hora a cada passo, e a Senadora é avisada quando chega proposta nova (o
 menu do Congresso mostra quantas esperam). Cada proposta guarda o andamento (quem fez o quê e quando).
-A Senadora pode baixar a **pauta em livro (.book)** para ler na sessão dentro do jogo, e pode apagar
+Qualquer um baixa cada proposta como **livro (.book)** no modelo da Casa (capa do Congresso, a proposta, a
+avaliação da Senadora e a votação), e a Senadora baixa a **pauta** inteira para ler na sessão dentro do
+jogo (um livro do Minecraft vai até 100 páginas; o que passar disso fica no site). Ela também pode apagar
 propostas (ex.: repetidas). A criança vê as propostas, mas não manda nem apoia. Ter uma proposta
 aprovada dá a conquista **Voz do povo**.
 

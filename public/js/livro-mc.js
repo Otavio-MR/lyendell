@@ -605,6 +605,60 @@ export function livroDaPauta(propostas, autor) {
   return mc;
 }
 
+// Uma proposta do povo (Congresso): a proposta, a avaliação da Senadora e a votação, se já houve.
+const SITUACAO_PROPOSTA = {
+  enviada: 'Esperando a Senadora', em_pauta: 'Na pauta do Congresso', aprovada: 'Aprovada no Congresso',
+  rejeitada: 'Rejeitada no Congresso', inviavel: 'Inviável',
+};
+export function livroDeProposta(p, autor) {
+  const mc = new LivroMC(p.titulo, autor || p.autor_nome);
+  mc.capa(capaPadrao('CONGRESSO', 'PROPOSTA DO POVO', [
+    ...texto(String(p.tipo).toUpperCase(), '4', { centro: true, negrito: true }),
+    L(ORN.estrela, '8'),
+    ...texto(p.titulo, '0', { centro: true, negrito: true }),
+    L(ORN.estrela, '8'),
+    vazia(),
+    ...texto(SITUACAO_PROPOSTA[p.situacao] || p.situacao, '4', { centro: true }),
+    ...texto(`Lyendell, ${dataCurta(p.criado_em)}`, '8', { centro: true }),
+  ]));
+
+  mc.bloco(cabecalhoSecao('A proposta'), { comProximo: true });
+  mc.bloco(campoLinhas('Tipo', p.tipo));
+  mc.bloco(campoLinhas('Quem propôs', p.autor_nome || 'desconhecido'));
+  mc.bloco(campoLinhas('Enviada em', dataCurta(p.criado_em)));
+  if (p.apoios) mc.bloco(campoLinhas('Apoios', `${num(p.apoios)} ${p.apoios === 1 ? 'morador' : 'moradores'}`));
+  mc.bloco([vazia(), ...texto('O que muda:', '4'), ...texto(p.resumo, '0')]);
+
+  if (p.texto) {
+    mc.bloco(cabecalhoSecao('Texto completo'), { comProximo: true, novaPagina: true });
+    mc.bloco([vazia(), ...texto(p.texto, '0')], { junto: false });
+  }
+  if (p.justificativa) {
+    mc.bloco(cabecalhoSecao('Por que é boa'), { comProximo: true, novaPagina: true });
+    mc.bloco([vazia(), ...texto(p.justificativa, '0')], { junto: false });
+  }
+
+  if (p.situacao !== 'enviada') {
+    mc.bloco(cabecalhoSecao('A Senadora'), { comProximo: true, novaPagina: true });
+    mc.bloco(campoLinhas('Avaliação', p.situacao === 'inviavel' ? 'Inviável' : 'Viável, levada ao Congresso'));
+    if (p.parecer_nome) mc.bloco(campoLinhas('Avaliada por', p.parecer_nome));
+    if (p.parecer) mc.bloco([vazia(), ...texto(p.situacao === 'inviavel' ? 'Motivo:' : 'Parecer:', '4'), ...texto(p.parecer, '0')]);
+  }
+
+  if (p.situacao === 'aprovada' || p.situacao === 'rejeitada') {
+    mc.bloco(cabecalhoSecao('Votação'), { comProximo: true, novaPagina: true });
+    mc.bloco(campoLinhas('Resultado', p.situacao === 'aprovada' ? 'Aprovada' : 'Rejeitada'));
+    if (p.votacao) mc.bloco(campoLinhas('Data da votação', dataCurta(p.votacao)));
+    if (p.a_favor != null) mc.bloco(campoLinhas('Votos a favor', num(p.a_favor)));
+    if (p.contra != null) mc.bloco(campoLinhas('Votos contra', num(p.contra)));
+    if (p.abstencoes) mc.bloco(campoLinhas('Abstenções', num(p.abstencoes)));
+    if (p.resultado) mc.bloco([vazia(), ...texto('Observação:', '4'), ...texto(p.resultado, '0')]);
+  }
+
+  mc.bloco(assinatura([...texto('Proposta de', '8'), ...texto(p.autor_nome || 'desconhecido', '0'), ...texto(`em ${dataHora(p.criado_em)}`, '8')]));
+  return mc;
+}
+
 export function livroDeAnuncio(a, autor) {
   const mc = new LivroMC(a.titulo, autor || a.autor_nome);
   const selo = a.importancia === 'urgente' ? 'URGENTE' : a.importancia === 'importante' ? 'IMPORTANTE' : '';
