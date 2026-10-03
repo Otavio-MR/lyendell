@@ -127,12 +127,17 @@ Para os outros, o perfil e a comunidade mostram a etiqueta "Criança". Os textos
 ## Juramento da Casa Luckham
 
 A aba **Juramento** (no menu da Cidade) mostra o juramento que se repete diante da bandeira para se
-tornar morador da Capital, num pergaminho com o brasão, e logo abaixo **os que juraram**: todas as
-pessoas com registro aprovado no Tabelionato (Moradores, Nobres e Outros), na ordem em que juraram,
-com a foto do registro, o endereço (nick) e a data. A data do juramento é a "Data de chegada" do
-registro; sem ela, vale o dia em que o registro foi aprovado. Dá para filtrar por Moradores, Nobres e
-Outros, procurar pelo nome ou pelo endereço, e clicar numa pessoa abre o registro dela. Registro que
-ainda espera a Tabeliã não entra na lista.
+tornar morador da Capital, num pergaminho com o brasão, e logo abaixo **os que juraram**, na ordem em
+que juraram, com a foto do registro, o endereço (nick) e a data.
+
+Só **Moradores e Nobres** fazem o juramento: quem está no Registro de Outros nunca jura (é de outra
+casa ou presta serviço à Capital). Quem tem registro aprovado de Morador ou de Nobre já conta como
+quem jurou; a **Família Nobre e a Tabeliã** (permissão "Marcar quem já fez o Juramento") podem marcar
+"Ainda não jurou" no cartão da pessoa, e ela vai para a lista **Ainda não juraram**, que só elas veem,
+com o botão "Já jurou" para voltar. A data do juramento é a "Data de chegada" do registro; sem ela,
+o dia em que foi marcado que jurou, ou o dia em que o registro foi aprovado. Dá para filtrar por
+Moradores e Nobres, procurar pelo nome ou pelo endereço, e clicar no nome abre o registro. Registro
+que ainda espera a Tabeliã não entra na lista.
 
 Os botões **Copiar** (o juramento em texto, para colar no chat do jogo ou no Discord), **Baixar .book**
 (o juramento como livro do Minecraft, para ler diante da bandeira) e **Lista em .book** (todos que
@@ -163,6 +168,10 @@ propostas (ex.: repetidas). A criança vê as propostas, mas não manda nem apoi
 aprovada dá a conquista **Voz do povo**.
 
 ## Aprovação de registros
+
+**No Tabelionato, nem o administrador aprova o próprio registro**: tudo que ele registra lá fica
+aguardando a Tabeliã, como o de qualquer Escriba (nos outros módulos ele continua publicando direto).
+
 
 O que o Escriba registra no Tabelionato fica **aguardando a Tabeliã**; o que o Guarda registra na
 Guarda do Coelho fica **aguardando o Comandante**; o que o Médico registra no Hospital fica

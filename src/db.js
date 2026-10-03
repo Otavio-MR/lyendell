@@ -250,6 +250,14 @@ CREATE TABLE IF NOT EXISTS proposta_apoios (
   PRIMARY KEY (proposta_id, usuario_id)
 );
 
+CREATE TABLE IF NOT EXISTS juramentos (
+  registro_id INTEGER PRIMARY KEY,
+  jurou INTEGER NOT NULL,
+  em TEXT,
+  por_nome TEXT,
+  atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS segredos (
   usuario_id INTEGER NOT NULL,
   chave TEXT NOT NULL,
@@ -417,7 +425,7 @@ CREATE TABLE IF NOT EXISTS diario (
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 20;
+const VERSAO = 21;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -491,6 +499,8 @@ async function migrar() {
   // v17: personagem criança (só olha, brinca e ajuda; o site aparece do jeito de uma criança).
   if (versao < 17 && !await colunaExiste('usuarios', 'crianca')) await db.run('ALTER TABLE usuarios ADD COLUMN crianca INTEGER NOT NULL DEFAULT 0');
   if (versao < 18) await migrarBobo();
+  // v21: a Família Nobre e a Tabeliã marcam quem já fez o Juramento da Casa Luckham.
+  if (versao < 21) await darPermissoes({ 'Família Nobre': ['juramento.marcar'], 'Tabeliã': ['juramento.marcar'] });
   // v20: o campo "Nickname" vira "Endereço" em todos os livros (no RP o nick é o endereço da pessoa).
   if (versao < 20) await nickVirouEndereco();
   // v19: propostas do povo para o Congresso (todo morador manda; a Senadora avalia).

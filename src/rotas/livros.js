@@ -297,6 +297,7 @@ r.delete('/livros/:id', async (req, res) => {
   const registros = await db.all('SELECT dados FROM registros WHERE livro_id = ?', l.id);
   await db.lote([
     ['DELETE FROM pagamentos WHERE registro_id IN (SELECT id FROM registros WHERE livro_id = ?)', l.id],
+    ['DELETE FROM juramentos WHERE registro_id IN (SELECT id FROM registros WHERE livro_id = ?)', l.id],
     ['DELETE FROM registros WHERE livro_id = ?', l.id],
     ['DELETE FROM livros WHERE id = ?', l.id],
     ...registros.flatMap(reg => imagensDe(l, JSON.parse(reg.dados)).map(comandoApagarArquivo)),
@@ -341,7 +342,7 @@ r.post('/livros/:id/registros', async (req, res) => {
       : 'Você não tem permissão para registrar aqui.');
   }
   const dados = await limparDados(l, req.body?.dados);
-  const situacao = pode(req, `${l.modulo}.aprovar`) ? 'aprovado' : 'pendente';
+  const situacao = aprovaDireto(req, l.modulo) ? 'aprovado' : 'pendente';
   // Aprovado já nasce com número; pendente só ganha número quando for aprovado.
   const { id } = await comNumeroLivre(() => (situacao === 'aprovado'
     ? db.run(`INSERT INTO registros (livro_id, dados, criado_por, criado_por_nome, situacao, numero) VALUES (?, ?, ?, ?, ?, ${PROXIMO_NUMERO})`,
@@ -391,7 +392,7 @@ r.put('/registros/:id', async (req, res) => {
   if (!pode(req, `${livro.modulo}.editar`) && !doAutorSemAprovacao(req, reg)) checar(req, `${livro.modulo}.editar`);
   const dados = await limparDados(livro, req.body?.dados, reg.dados);
   const novas = new Set(imagensDe(livro, dados));
-  const situacao = reg.situacao === 'recusado' && !pode(req, `${livro.modulo}.aprovar`) ? 'pendente' : reg.situacao;
+  const situacao = reg.situacao === 'recusado' && !aprovaDireto(req, livro.modulo) ? 'pendente' : reg.situacao;
   await db.lote([
     ["UPDATE registros SET dados = ?, situacao = ?, atualizado_por_nome = ?, atualizado_em = datetime('now') WHERE id = ?", JSON.stringify(dados), situacao, req.usuario.nome, reg.id],
     ...imagensDe(livro, reg.dados).filter(u => !novas.has(u)).map(comandoApagarArquivo),
@@ -403,6 +404,7 @@ r.put('/registros/:id', async (req, res) => {
 r.delete('/registros/:id', async (req, res) => {
   const { reg, livro } = await buscarRegistro(req);
   if (!pode(req, `${livro.modulo}.apagar`) && !doAutorSemAprovacao(req, reg)) checar(req, `${livro.modulo}.apagar`);
+  await db.run('DELETE FROM juramentos WHERE registro_id = ?', reg.id); // a marca do juramento vai junto
   const descer = reg.numero ? comandosDescerNumeros(livro.id, reg.numero) : [];
   await db.lote([
     ['DELETE FROM pagamentos WHERE registro_id = ?', reg.id],
@@ -416,6 +418,10 @@ r.delete('/registros/:id', async (req, res) => {
 });
 
 /* ─── Aprovação (Tabeliã, Comandante, Diretor do Hospital, Senadora) ─ */
+
+// Quem registra já aprovado (sem fila). No Tabelionato, nem o administrador: tudo que ele registra
+// passa pela aprovação da Tabeliã (ele pediu assim).
+const aprovaDireto = (req, modulo) => pode(req, `${modulo}.aprovar`) && !(req.usuario.is_root && modulo === 'tabelionato');
 
 // Quem enviou pode corrigir ou cancelar o próprio registro enquanto ele não foi aprovado.
 const doAutorSemAprovacao = (req, reg) => reg.criado_por === req.usuario.id && reg.situacao !== 'aprovado';
@@ -465,6 +471,7 @@ async function revisar(req, situacao, motivo) {
   const { reg, livro } = await buscarRegistro(req);
   checar(req, `${livro.modulo}.aprovar`);
   if (reg.situacao !== 'pendente') throw erro(409, 'Este registro não está mais aguardando aprovação.');
+  if (!aprovaDireto(req, livro.modulo) && reg.criado_por === req.usuario.id) throw erro(403, 'O seu registro precisa ser aprovado pela Tabeliã.');
   if (situacao === 'aprovado') {
     // Ao ser aprovado, entra no livro com o menor número livre.
     await comNumeroLivre(() => db.run(`UPDATE registros SET situacao = 'aprovado', motivo = NULL, revisado_por_nome = ?,

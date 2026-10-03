@@ -133,6 +133,9 @@ function cartaoLivro(m, l) {
       !l.aberto && h('span', { class: 'etiqueta', title: 'Só quem comanda o módulo registra aqui' }, icone('cadeado'), 'Restrito')));
 }
 
+// No Tabelionato, o que o administrador registra é aprovado pela Tabeliã (nem ele aprova o próprio registro).
+const soATabeliaAprova = (m, r) => m === 'tabelionato' && estado.eu.is_root && r.criado_por === estado.eu.id;
+
 /* ─── Abas do módulo: livros, aprovação e meus envios ─ */
 
 export function abasModulo(m, atual, contagem = {}) {
@@ -205,7 +208,8 @@ function cartaoPendente(m, r, l, permissoes, recarregar, modo) {
           if (await tentar(() => del(`/api/registros/${r.id}`), 'Envio cancelado.')) { window.dispatchEvent(new Event('avisos')); recarregar(); }
         },
       }),
-      modo === 'aprovacoes' && permissoes.aprovar && [
+      modo === 'aprovacoes' && permissoes.aprovar && soATabeliaAprova(m, r) && h('small', { class: 'suave' }, 'Espera a aprovação da Tabeliã'),
+      modo === 'aprovacoes' && permissoes.aprovar && !soATabeliaAprova(m, r) && [
         botao('Recusar', { classe: 'btn-pequeno', onclick: () => recusar(r, titulo, recarregar) }),
         botao('Aprovar', { icone: 'check', classe: 'btn-pequeno btn-ouro', onclick: () => aprovar(r, recarregar) }),
       ]));
@@ -408,8 +412,8 @@ function verRegistro(m, d, r, recarregar, reabrir) {
         onclick: () => livroDeRegistro(MODULOS[m].titulo, l, r, estado.eu.nome).baixar(),
       }),
       podeEditar && botao('Editar', { icone: 'editar', onclick: () => { janela.fechar(); formRegistro(l, r, reabrir || recarregar); } }),
-      d.permissoes.aprovar && r.situacao === 'pendente' && botao('Recusar', { onclick: () => recusar(r, titulo, () => { janela.fechar(); recarregar(); }) }),
-      d.permissoes.aprovar && r.situacao === 'pendente' && botao('Aprovar', {
+      d.permissoes.aprovar && r.situacao === 'pendente' && !soATabeliaAprova(m, r) && botao('Recusar', { onclick: () => recusar(r, titulo, () => { janela.fechar(); recarregar(); }) }),
+      d.permissoes.aprovar && r.situacao === 'pendente' && !soATabeliaAprova(m, r) && botao('Aprovar', {
         icone: 'check', classe: 'btn-ouro',
         onclick: () => aprovar(r, () => { janela.fechar(); recarregar(); }),
       }),

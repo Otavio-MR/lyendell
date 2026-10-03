@@ -16,6 +16,7 @@ const CATALOGO = [
     { chave: 'tabelionato.configurar', nome: 'Criar livros, seções, campos e opções' },
     { chave: 'tabelionato.pagamentos', nome: 'Marcar pagamentos (ex.: de comerciantes) como pagos' },
     { chave: 'tabelionato.aprovar', nome: 'Aprovar ou recusar registros (exclusiva: só um cargo pode ter, a Tabeliã)' },
+    { chave: 'juramento.marcar', nome: 'Marcar quem já fez o Juramento da Casa Luckham (Família Nobre e Tabeliã)' },
   ] },
   { grupo: 'Guarda do Coelho', itens: [
     { chave: 'guarda.ver', nome: 'Ver os livros e registros' },
@@ -140,7 +141,7 @@ const CARGOS_PADRAO = [
     permissoes: TODAS.filter(p => p !== 'usuarios.criar' && p !== 'cargos.gerenciar' && !EXCLUSIVAS[p] && !SO_DO_BOBO.has(p)) },
   { nome: 'Tabeliã', cor: '#c98b4a',
     descricao: DESCRICOES['Tabeliã'][1],
-    permissoes: [...MEMBRO, ...acoes('tabelionato', 'registrar', 'editar', 'apagar', 'configurar', 'pagamentos', 'aprovar'), 'mapa.editar'] },
+    permissoes: [...MEMBRO, ...acoes('tabelionato', 'registrar', 'editar', 'apagar', 'configurar', 'pagamentos', 'aprovar'), 'mapa.editar', 'juramento.marcar'] },
   { nome: 'Escriba', cor: '#b9a27a',
     descricao: DESCRICOES.Escriba[1],
     permissoes: [...MEMBRO, 'tabelionato.registrar'] },

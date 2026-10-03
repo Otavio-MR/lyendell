@@ -1,7 +1,9 @@
 // Juramento da Casa Luckham: o texto que se repete diante da bandeira para morar na Capital,
-// e todos que já juraram (as pessoas registradas no Tabelionato: Moradores, Nobres e Outros).
+// e todos que já juraram. Só Moradores e Nobres juram (quem está em Outros é de outra casa ou presta
+// serviço à Capital). Quem tem registro conta como quem já jurou; a Família Nobre e a Tabeliã podem
+// marcar quem ainda não jurou (e desmarcar).
 
-import { h, trocar, icone, botao, cabecalho, avatar, get, aviso, pode, dataCurta, normalizar, estado } from '../core.js';
+import { h, trocar, icone, botao, cabecalho, avatar, get, put, aviso, tentar, pode, dataCurta, normalizar, estado } from '../core.js';
 import { livroDoJuramento, livroDosJuramentados } from '../livro-mc.js';
 
 export const JURAMENTO = {
@@ -24,46 +26,66 @@ const textoCorrido = () => [
   `"${[...JURAMENTO.linhas, JURAMENTO.fecho].join('\n\n')}"`,
 ].join('\n');
 
-const tipoDoLivro = nome => (/nobre/i.test(nome) ? 'Nobre' : /outro/i.test(nome) ? 'Outros' : 'Morador');
+const tipoDoLivro = nome => (/nobre/i.test(nome) ? 'Nobre' : 'Morador');
 
 export async function juramento() {
   const raiz = h('div', { class: 'pagina juramento-pagina' });
-  const { pessoas } = await get('/api/juramento');
+  let d = await get('/api/juramento');
   const verRegistro = pode('tabelionato.ver');
   let busca = '';
   let filtro = 'todos';
   const lista = h('div', { class: 'juramento-lista' });
   const contagem = h('p', { class: 'juramento-contagem' });
+  const filtros = h('div', { class: 'segmentado' });
+  const pendentes = h('section', { class: 'painel juramento-pendentes' });
 
-  function desenharLista() {
-    const escolhidos = pessoas
-      .map((p, i) => ({ ...p, ordem: i + 1 }))
-      .filter(p => filtro === 'todos' || tipoDoLivro(p.livro) === filtro)
-      .filter(p => !busca || normalizar(`${p.nome} ${p.nick || ''}`).includes(busca));
-    trocar(contagem, h('strong', null, pessoas.length), pessoas.length === 1 ? ' pessoa já deu a sua palavra à Casa Luckham.' : ' pessoas já deram a sua palavra à Casa Luckham.');
-    trocar(lista, escolhidos.length
-      ? escolhidos.map(p => {
-        const cartao = [
-          h('span', { class: 'juramento-ordem', title: 'Ordem do juramento' }, `nº ${p.ordem}`),
-          avatar(p.nome, 'avatar-g', p.foto),
-          h('strong', { class: 'juramento-nome' }, p.nome),
-          p.nick && h('small', null, 'Endereço: ', h('span', { class: 'juramento-nick' }, p.nick)),
-          h('span', { class: 'etiqueta' }, tipoDoLivro(p.livro)),
-          p.desde && h('small', { class: 'juramento-data' }, icone('bandeira'), ` Jurou em ${dataCurta(p.desde)}`),
-        ];
-        return verRegistro
-          ? h('a', { class: 'juramento-pessoa', href: `#/tabelionato/${p.livro_id}/registro/${p.registro_id}`, title: 'Ver o registro no Tabelionato' }, cartao)
-          : h('div', { class: 'juramento-pessoa' }, cartao);
-      })
-      : h('p', { class: 'painel-vazio' }, pessoas.length ? 'Ninguém com esse nome.' : 'Ninguém registrado no Tabelionato ainda.'));
+  async function marcar(p, jurou) {
+    const ok = await tentar(() => put(`/api/juramento/${p.registro_id}`, { jurou }),
+      jurou ? `${p.nome} agora está entre os que juraram.` : `${p.nome} saiu da lista: ainda não jurou.`);
+    if (!ok) return;
+    d = await get('/api/juramento');
+    desenharTudo();
   }
 
-  const contar = tipo => pessoas.filter(p => tipoDoLivro(p.livro) === tipo).length;
-  const filtros = h('div', { class: 'segmentado' });
-  const desenharFiltros = () => trocar(filtros, [['todos', 'Todos', pessoas.length], ['Morador', 'Moradores', contar('Morador')], ['Nobre', 'Nobres', contar('Nobre')], ['Outros', 'Outros', contar('Outros')]]
-    .filter(([k, , n]) => k === 'todos' || n)
-    .map(([k, nome, n]) => h('button', { type: 'button', class: `seg ${filtro === k ? 'ativo' : ''}`.trim(), onclick: () => { filtro = k; desenharFiltros(); desenharLista(); } }, `${nome} (${n})`)));
-  desenharFiltros();
+  const filtrar = lista => lista
+    .filter(p => filtro === 'todos' || tipoDoLivro(p.livro) === filtro)
+    .filter(p => !busca || normalizar(`${p.nome} ${p.nick || ''}`).includes(busca));
+
+  function cartao(p, ordem) {
+    const nome = h('strong', { class: 'juramento-nome' }, p.nome);
+    return h('div', { class: `juramento-pessoa ${p.jurou ? '' : 'nao-jurou'}`.trim() },
+      ordem && h('span', { class: 'juramento-ordem', title: 'Ordem do juramento' }, `nº ${ordem}`),
+      avatar(p.nome, 'avatar-g', p.foto),
+      verRegistro ? h('a', { href: `#/tabelionato/${p.livro_id}/registro/${p.registro_id}`, title: 'Ver o registro no Tabelionato' }, nome) : nome,
+      p.nick && h('small', null, 'Endereço: ', h('span', { class: 'juramento-nick' }, p.nick)),
+      h('span', { class: 'etiqueta' }, tipoDoLivro(p.livro)),
+      p.jurou && p.desde && h('small', { class: 'juramento-data' }, icone('bandeira'), ` Jurou em ${dataCurta(p.desde)}`),
+      !p.jurou && p.marcado_por && h('small', null, `Marcado por ${p.marcado_por}`),
+      d.podeMarcar && (p.jurou
+        ? botao('Ainda não jurou', { icone: 'x', classe: 'btn-pequeno btn-fantasma', titulo: 'Tira a pessoa da lista de quem jurou', onclick: () => marcar(p, false) })
+        : botao('Já jurou', { icone: 'check', classe: 'btn-pequeno btn-ouro', onclick: () => marcar(p, true) })));
+  }
+
+  function desenharLista() {
+    const juraram = d.juraram.map((p, i) => ({ ...p, ordem: i + 1 }));
+    const escolhidos = filtrar(juraram);
+    trocar(contagem, h('strong', null, juraram.length), juraram.length === 1 ? ' pessoa já deu a sua palavra à Casa Luckham.' : ' pessoas já deram a sua palavra à Casa Luckham.');
+    trocar(lista, escolhidos.length
+      ? escolhidos.map(p => cartao(p, p.ordem))
+      : h('p', { class: 'painel-vazio' }, juraram.length ? 'Ninguém com esse nome.' : 'Ninguém fez o juramento ainda.'));
+    // Para quem marca: os Moradores e Nobres registrados que ainda não juraram.
+    const nao = filtrar(d.naoJuraram);
+    pendentes.hidden = !d.podeMarcar || !d.naoJuraram.length;
+    trocar(pendentes,
+      h('div', { class: 'painel-cab' }, h('h2', null, icone('relogio'), `Ainda não juraram (${d.naoJuraram.length})`)),
+      h('p', { class: 'suave' }, 'Moradores e Nobres registrados que ainda não fizeram o juramento. Só a Família Nobre e a Tabeliã veem esta lista.'),
+      nao.length ? h('div', { class: 'juramento-lista' }, nao.map(p => cartao(p))) : h('p', { class: 'painel-vazio' }, 'Ninguém com esse nome.'));
+  }
+
+  const contar = tipo => d.juraram.filter(p => tipoDoLivro(p.livro) === tipo).length;
+  const desenharFiltros = () => trocar(filtros, [['todos', 'Todos', d.juraram.length], ['Morador', 'Moradores', contar('Morador')], ['Nobre', 'Nobres', contar('Nobre')]]
+    .map(([k, nome, n]) => h('button', { type: 'button', class: `seg ${filtro === k ? 'ativo' : ''}`.trim(), onclick: () => { filtro = k; desenharTudo(); } }, `${nome} (${n})`)));
+  const desenharTudo = () => { desenharFiltros(); desenharLista(); };
 
   const copiar = async () => {
     try {
@@ -92,15 +114,17 @@ export async function juramento() {
     h('section', { class: 'painel juramento-juraram' },
       h('div', { class: 'painel-cab' },
         h('h2', null, icone('usuarios'), 'Os que juraram'),
-        pessoas.length > 0 && botao('Lista em .book', {
+        botao('Lista em .book', {
           icone: 'baixar', classe: 'btn-pequeno', titulo: 'Todos que juraram, num livro para o mod Scribble',
-          onclick: () => livroDosJuramentados(pessoas, estado.eu.nome).baixar('Os que juraram'),
+          onclick: () => livroDosJuramentados(d.juraram, estado.eu.nome).baixar('Os que juraram'),
         })),
       contagem,
+      d.podeMarcar && h('p', { class: 'suave juramento-ajuda' }, 'Quem é registrado como Morador ou Nobre já conta como quem jurou. Se alguém ainda não fez o juramento, use "Ainda não jurou" no cartão da pessoa.'),
       h('div', { class: 'juramento-filtros' },
         filtros,
         h('input', { class: 'input', type: 'search', placeholder: 'Procurar pelo nome ou endereço...', oninput: e => { busca = normalizar(e.target.value.trim()); desenharLista(); } })),
-      lista));
-  desenharLista();
+      lista),
+    pendentes);
+  desenharTudo();
   return raiz;
 }

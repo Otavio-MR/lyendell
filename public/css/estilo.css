@@ -2511,3 +2511,12 @@ a.juramento-pessoa:hover { border-color: var(--ouro-d); color: var(--texto); }
 .juramento-nick { color: var(--texto-2); }
 .juramento-data { display: inline-flex; align-items: center; gap: 4px; }
 .juramento-data .ico { width: 13px; height: 13px; color: var(--ouro); }
+.juramento-pessoa > a { color: var(--texto); }
+.juramento-pessoa > a:hover { color: var(--ouro-l); }
+.juramento-pessoa > a .juramento-nome { text-decoration: underline; text-decoration-color: rgba(216, 177, 58, 0.35); text-underline-offset: 3px; }
+.juramento-pessoa .btn { margin-top: 4px; }
+.juramento-pessoa.nao-jurou { border-style: dashed; }
+.juramento-pessoa.nao-jurou > .avatar { filter: grayscale(0.7); opacity: 0.8; }
+.juramento-pendentes { margin-top: 18px; }
+.juramento-pendentes[hidden] { display: none; }
+.juramento-ajuda { margin: -6px 0 12px; font-size: 0.88rem; }
