@@ -1903,11 +1903,74 @@ button.cid-papel:disabled { cursor: default; }
 .cid-notas li { font-size: 0.92rem; line-height: 1.35; color: var(--texto); }
 .cid-notas li small { display: block; font: 600 0.6rem var(--f-titulo); letter-spacing: 0.08em; text-transform: uppercase; color: var(--suave); }
 
-/* Praça: as pessoas */
-.cid-praca { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
+/* A vila dos coelhos */
+.cid-vila { display: grid; gap: 8px; min-width: 0; }
+.cid-espera .cid-vila { grid-column: 1 / -1; }
+.vila { position: relative; border-radius: var(--raio); overflow: hidden; border: 1px solid var(--borda-2); background: #16301b; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); }
+.vila-tela { display: block; width: 100%; height: clamp(340px, 62vh, 680px); cursor: pointer; touch-action: manipulation; outline: none; }
+.vila-tela:focus-visible { box-shadow: inset 0 0 0 2px var(--ouro); }
+.vila-banner {
+  position: absolute; left: 50%; top: 16%; transform: translateX(-50%); display: grid; gap: 4px; justify-items: center; text-align: center;
+  max-width: min(520px, 90%); padding: 14px 26px; border-radius: 14px; pointer-events: none;
+  background: rgba(14, 24, 17, 0.88); border: 1px solid var(--ouro-d); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  animation: vila-banner 4.2s ease forwards;
+}
+.vila-banner strong { font: 700 1.5rem var(--f-titulo); color: var(--ouro-l); letter-spacing: 0.05em; }
+.vila-banner span { color: var(--texto); font-size: 1rem; line-height: 1.35; }
+.vila-banner.noite { background: rgba(10, 16, 40, 0.9); border-color: #3a5288; }
+.vila-banner.noite strong { color: #cfe0ff; }
+.vila-banner.manha { background: rgba(48, 26, 40, 0.88); border-color: #c98a6a; }
+.vila-banner.execucao { border-color: var(--vermelho); }
+@keyframes vila-banner { 0% { opacity: 0; transform: translate(-50%, -14px) scale(0.96); } 8%, 85% { opacity: 1; transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(-50%, -6px); } }
+.vila-dica { position: absolute; left: 10px; bottom: 10px; max-width: calc(100% - 170px); padding: 6px 10px; border-radius: 8px; background: rgba(14, 24, 17, 0.75); color: var(--texto-2); font-size: 0.86rem; pointer-events: none; }
+.vila-zoom { position: absolute; right: 10px; bottom: 10px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--borda-2); background: rgba(14, 24, 17, 0.8); color: var(--texto); font: 600 0.78rem var(--f-titulo); cursor: pointer; }
+.vila-zoom:hover { border-color: var(--ouro-d); color: var(--ouro-l); }
+.vila-menu {
+  position: absolute; z-index: 3; display: grid; gap: 6px; justify-items: start; min-width: 190px; max-width: 260px; padding: 10px;
+  border-radius: 12px; background: rgba(14, 24, 17, 0.96); border: 1px solid var(--ouro-d); box-shadow: 0 12px 34px rgba(0, 0, 0, 0.55);
+}
+.vila-menu-cab { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%; }
+.vila-menu-cab strong { font-family: var(--f-titulo); color: var(--pergaminho); }
+.vila-menu-cab small { display: inline-flex; align-items: center; gap: 3px; color: var(--suave); font-size: 0.8rem; }
+.vila-menu-cab small .ico { width: 13px; height: 13px; }
+.vila-menu-cor { width: 12px; height: 12px; border-radius: 50%; flex: none; box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.4); }
+.vila-menu-nota { display: inline-flex; align-items: center; gap: 4px; color: #f2a679; font-size: 0.84rem; }
+.vila-menu-nota .ico { width: 13px; height: 13px; }
+.vila-menu-acao {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border-radius: 8px; cursor: pointer; text-align: left;
+  border: 1px solid var(--ouro-d); background: var(--ouro-fundo); color: var(--ouro-l); font: 600 0.92rem var(--f-texto);
+}
+.vila-menu-acao:hover { background: var(--ouro); color: #1b1403; }
+.vila-menu-acao.ativa { border-color: var(--verde); color: var(--verde); background: rgba(127, 176, 105, 0.12); }
+.vila-menu-acao.suave { border-color: var(--borda-2); background: transparent; color: var(--texto-2); }
+.vila-menu-acao.suave:hover { color: var(--texto); background: var(--sup-2); }
+.vila-menu-acao .ico { width: 16px; height: 16px; flex: none; }
+.cidade.noite .vila-menu { border-color: #3a5288; background: rgba(10, 16, 40, 0.96); }
+.cidade.noite .vila-menu-acao:not(.suave):not(.ativa) { border-color: #3a5288; background: rgba(126, 159, 216, 0.14); color: #cfe0ff; }
+.cidade.noite .vila-menu-acao:not(.suave):not(.ativa):hover { background: var(--cid-noite); color: #0b1220; }
+.vila-emotes { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.vila-emote {
+  width: 42px; height: 42px; border-radius: 50%; border: 1px solid var(--borda-2); background: var(--sup); font-size: 1.3rem; cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+.vila-emote:hover { transform: translateY(-3px) scale(1.08); border-color: var(--ouro-d); }
+.vila-emote:active { transform: scale(0.94); }
+.cid-meu-coelho { display: grid; gap: 10px; }
+.cid-coelho-linha { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.cid-coelho-previa { display: grid; place-items: center; width: 120px; height: 120px; flex: none; border-radius: 50%; background: radial-gradient(circle at 50% 70%, #3e6b35, #1f3a22); border: 2px solid var(--ouro-d); }
+.vila-previa { width: 120px; height: 120px; }
+.cid-coelho-opcoes { display: grid; gap: 8px; flex: 1; min-width: 200px; }
+.cid-coelho-opcoes .cid-opcao-titulo { margin: 0; }
+.cid-pelos { display: flex; gap: 8px; flex-wrap: wrap; }
+.cid-pelo { width: 30px; height: 30px; border-radius: 50%; border: 2px solid rgba(0, 0, 0, 0.35); cursor: pointer; box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.15); }
+.cid-pelo.ativo { outline: 3px solid var(--ouro); outline-offset: 2px; }
+.cid-coelho-dica { margin: 0; font-size: 0.88rem; }
+
+/* Praça: as pessoas (uma lista compacta embaixo da vila, com a cor da toca de cada um) */
+.cid-praca { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
 .cid-pessoa {
-  position: relative; display: grid; justify-items: center; align-content: start; gap: 4px; padding: 12px 8px 10px; text-align: center;
-  border-radius: var(--raio); background: var(--sup); border: 1px solid var(--borda); color: var(--texto); font: inherit;
+  position: relative; display: grid; justify-items: center; align-content: start; gap: 4px; padding: 10px 8px 8px; text-align: center;
+  border-radius: var(--raio); background: var(--sup); border: 1px solid var(--borda); border-top: 3px solid var(--toca, var(--borda)); color: var(--texto); font: inherit;
 }
 .cid-pessoa.clicavel { cursor: pointer; }
 .cid-pessoa.clicavel:hover { border-color: var(--ouro-d); background: var(--sup-2); }
@@ -1924,7 +1987,7 @@ button.cid-papel:disabled { cursor: default; }
 .cid-pessoa .cid-papel { white-space: normal; text-align: left; max-width: 100%; line-height: 1.15; }
 .cid-pessoa strong small { color: var(--suave); font-weight: 400; }
 .cid-av { position: relative; }
-.cid-av .avatar { width: 46px; height: 46px; }
+.cid-av .avatar { width: 36px; height: 36px; }
 .cid-caveira { position: absolute; right: -6px; bottom: -4px; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #1b201b; color: #ece0bf; border: 1px solid var(--borda-2); }
 .cid-caveira .ico { width: 14px; height: 14px; }
 .cid-causa { font-size: 0.78rem; color: var(--suave); line-height: 1.2; }
@@ -1991,7 +2054,11 @@ button.cid-papel:disabled { cursor: default; }
   .cid-espera { grid-template-columns: minmax(0, 1fr); }
   .cid-grade { grid-template-columns: minmax(0, 1fr); grid-template-areas: "centro" "dir" "esq"; }
   .cid-praca { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
-  .cid-av .avatar { width: 38px; height: 38px; }
+  .cid-av .avatar { width: 32px; height: 32px; }
+  .vila-tela { height: clamp(300px, 56vh, 520px); }
+  .vila-dica { display: none; }
+  .vila-banner strong { font-size: 1.15rem; }
+  .vila-emote { width: 38px; height: 38px; font-size: 1.15rem; }
   .cid-faixa { padding: 10px 12px 14px; }
   .cid-faixa strong { font-size: 1.05rem; }
   .cid-tempo { font-size: 1.2rem; }

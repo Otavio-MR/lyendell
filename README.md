@@ -336,6 +336,26 @@ aparece e quais classes podem sair; começa quando quiser, com pelo menos 4 pess
   ou "pular" não executa ninguém.
 - Quem morre vê todas as cartas e conversa no chat dos mortos; quem assiste não vê nenhuma carta.
 
+**A vila dos coelhos.** O jogo acontece numa vila desenhada: cada pessoa tem um coelho e uma toca com
+o nome dela, numa roda em volta da praça com a fogueira. Dá para andar com as setas ou W A S D (ou
+clicando no chão), fazer emotes (teclas 1 a 6 ou os botões embaixo) e, na sala de espera, escolher a
+cor do pelo e um acessório (laço, chapéu de palha, coroa de flores, cachecol, óculos ou coroa); a
+escolha fica guardada no navegador. O que cada um fala na praça aparece num balão em cima do coelho.
+
+- Para usar o poder, clique na toca (de noite) ou no coelho (de dia) de alguém, ou chegue perto e
+  aperte E: abre um menu com o que dá para fazer ali. As tocas e os coelhos onde dá para agir brilham,
+  e o que você escolheu aparece em cima da toca (os Raposos veem as patas de cada um). Os botões de
+  sempre continuam embaixo da vila.
+- Ao anoitecer e ao amanhecer todo mundo volta para a porta da própria toca. De noite a vila escurece
+  (só a fogueira, as lanternas e a luz em volta do seu coelho) e cada um só vê o próprio coelho; os
+  Raposos se veem, como raposas. Quem assiste não vê ninguém de noite.
+- Quem morre vira fantasma: vê todo mundo, mas só os outros mortos o veem; a toca ganha uma lápide.
+- De dia aparecem os votos (uma linha de quem vota até quem foi votado e a contagem em cima do
+  coelho). O executado vai para a pedra da praça, com uma luz em cima, e todos o veem.
+- O servidor guarda onde está cada coelho e manda para cada pessoa só os coelhos que ela enxerga
+  (umas 10 vezes por segundo, só quando alguém anda). Fica em `src/cidade-mundo.js` e
+  `public/js/telas/cidade-mundo.js`.
+
 Quantos Raposos: 1 com 4 a 6 pessoas, 2 com 7 a 10 e 3 com 11 a 15. A partir de 7 pessoas entra um
 neutro (dois a partir de 12) e, a partir de 9, pode entrar o Traidor. O resto são coelhos, quase
 todos com poder. A lista das classes da partida aparece para todos (sem dizer de quem é cada uma).

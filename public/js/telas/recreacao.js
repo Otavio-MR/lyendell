@@ -930,6 +930,8 @@ export function sala(id) {
   const relogioCobras = setInterval(() => { if (quadroCobras?.fase === 'largada') avisoCobras(); }, 200);
   escutar('cobras:quadro', ({ id: sid, q }) => { if (sid === id) receberQuadroCobras(q); });
   escutar('cidade:msg', ({ id: sid, msg }) => { if (sid === id) telaCidade?.mensagem(msg); });
+  escutar('cidade:pos', m => { if (m.id === id) telaCidade?.posicoes(m); });
+  escutar('cidade:emote', m => { if (m.id === id) telaCidade?.emote(m); });
   // Mede o atraso da conexão de tempos em tempos (a sua cobra vira na tela na hora certa).
   let pingou = false;
   const pingar = () => { if (rt.partidas.get(id)?.jogo === 'cobras') enviar('ping', { t: performance.now() }, { silencioso: true }); };

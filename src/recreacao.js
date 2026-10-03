@@ -16,6 +16,7 @@ const raposa = require('./raposa');
 const { MESAS, ErroMesa } = require('./mesa');
 const desafio = require('./desafio');
 const cidade = require('./cidade');
+const mundo = require('./cidade-mundo');
 const { paraCriancas } = require('./censura');
 const bobo = require('./bobo');
 
@@ -246,6 +247,7 @@ function visaoSala(s, id) {
     motivo: s.motivo,
     revanche: [...s.revanche],
     espectadores: s.espectadores.size,
+    mundo: s.jogo === 'cidade' ? { visuais: Object.fromEntries(mundoDe(s).visuais) } : undefined,
     raposa: ehRaposa(s) ? { vezDe: s.status === 'jogando' && s.estado?.vez === 0 ? vezDoTime(s) : null, pensando: s.status === 'jogando' && s.estado?.vez === 1 } : null,
   };
 }
@@ -308,6 +310,7 @@ function finalizarRaposa(s, resultado, motivo) {
 }
 
 function enviarSala(s) {
+  if (s.jogo === 'cidade') mundoDe(s).sujo = true; // quem acabou de chegar recebe onde está cada coelho
   const ids = new Set([...s.jogadores.map(p => p.id), ...s.espectadores]);
   for (const id of ids) paraUsuario(id, 'sala', { sala: visaoSala(s, id) });
 }
@@ -769,6 +772,56 @@ function terminarDesafio(s) {
   avisarLobby();
 }
 
+/* ─── Lyendell Dorme: a vila dos coelhos ──────────── */
+
+// Onde está cada coelho (por id de usuário), o visual de cada um e o que falta mandar.
+function mundoDe(s) {
+  s.mundo ??= { pos: new Map(), visuais: new Map(), ultimo: new Map(), emote: new Map(), teleporte: new Set(), sujo: true };
+  return s.mundo;
+}
+const jogandoCidade = s => s.status === 'jogando' && !!s.estado;
+function posicaoDe(s, i) {
+  const p = s.jogadores[i];
+  return mundoDe(s).pos.get(p.id) || { ...mundo.porta(i, s.jogadores.length), d: 1 };
+}
+// Todo mundo volta para a própria toca (ao anoitecer e ao amanhecer). O executado vai para o centro.
+function mandarParaTocas(s) {
+  const m = mundoDe(s);
+  s.jogadores.forEach((p, i) => {
+    m.pos.set(p.id, { ...mundo.porta(i, s.jogadores.length), d: 1 });
+    m.teleporte.add(p.id);
+  });
+  m.sujo = true;
+}
+function mandarProCentro(s, i) {
+  const m = mundoDe(s);
+  const p = s.jogadores[i];
+  if (!p) return;
+  m.pos.set(p.id, { x: mundo.CENTRO.x, y: mundo.CENTRO.y + 92, d: 1 });
+  m.teleporte.add(p.id);
+  m.sujo = true;
+}
+// Manda para cada um só os coelhos que ele enxerga (umas 10 vezes por segundo, se alguém andou).
+function enviarMundo(s) {
+  const m = mundoDe(s);
+  m.sujo = false;
+  const e = s.estado;
+  const jogando = jogandoCidade(s);
+  const tp = [...m.teleporte];
+  m.teleporte.clear();
+  const quem = new Set([...s.jogadores.map(p => p.id), ...s.espectadores]);
+  for (const uid of quem) {
+    const eu = s.jogadores.findIndex(p => p.id === uid);
+    const lista = [];
+    s.jogadores.forEach((p, i) => {
+      if (p.saiu || !mundo.enxerga(e, eu, i, jogando)) return;
+      const q = posicaoDe(s, i);
+      lista.push([p.id, q.x, q.y, q.d]);
+    });
+    paraUsuario(uid, 'cidade:pos', { id: s.id, p: lista, tp });
+  }
+}
+
 /* ─── Lyendell Dorme ──────────────────────────────── */
 
 // As regras ficam em src/cidade.js. Aqui: começar, o relógio das fases (noite, dia...), as jogadas,
@@ -781,6 +834,7 @@ function comecarCidade(s) {
   s.estado = cidade.novo(jogadores, s.opcoes || cidade.validarOpcoes());
   Object.assign(s, { status: 'jogando', vencedor: null, empate: false, motivo: null });
   s.revanche.clear();
+  mandarParaTocas(s);
   agendarCidade(s);
   enviarSala(s);
   avisarLobby();
@@ -796,7 +850,11 @@ function agendarCidade(s, encurtar = false) {
 
 function passoCidade(s) {
   if (!salas.has(s.id) || s.status !== 'jogando' || s.jogo !== 'cidade') return;
+  const antes = s.estado.fase;
   cidade.avancar(s.estado);
+  const fase = s.estado.fase;
+  if (fase !== antes && (fase === 'noite' || fase === 'amanhecer')) mandarParaTocas(s);
+  if (fase === 'execucao' && s.estado.executado != null) mandarProCentro(s, s.estado.executado);
   if (s.estado.fase === 'fim') { terminarCidade(s); return; }
   agendarCidade(s, cidade.todosProntos(s.estado)); // ex.: o Caçador que já saiu da sala não atira
   enviarSala(s);
@@ -980,6 +1038,45 @@ const acoes = {
     avisarLobby();
   },
 
+  // Vila dos coelhos: o meu coelho andou (o servidor guarda e repassa para quem enxerga).
+  'cidade:mover'(u, { id, x, y, d }) {
+    const s = salas.get(id);
+    if (!s || s.jogo !== 'cidade') return;
+    const i = indiceNa(s, u.id);
+    if (i < 0 || s.jogadores[i].saiu) return;
+    const m = mundoDe(s);
+    const agora = Date.now();
+    if (agora - (m.ultimo.get(u.id) || 0) < 45) return; // no máximo uns 20 passos por segundo
+    m.ultimo.set(u.id, agora);
+    m.pos.set(u.id, mundo.posicaoValida({ x, y, d }));
+    m.sujo = true;
+  },
+
+  // Um emote em cima do coelho (aceno, coração, risada...), para quem enxerga o coelho.
+  'cidade:emote'(u, { id, e: emote }) {
+    const s = salas.get(id);
+    if (!s || s.jogo !== 'cidade' || !mundo.EMOTES.includes(emote)) return;
+    const i = indiceNa(s, u.id);
+    if (i < 0 || s.jogadores[i].saiu) return;
+    const m = mundoDe(s);
+    const agora = Date.now();
+    if (agora - (m.emote.get(u.id) || 0) < 700) return;
+    m.emote.set(u.id, agora);
+    const jogando = jogandoCidade(s);
+    for (const uid of new Set([...s.jogadores.map(p => p.id), ...s.espectadores])) {
+      const eu = s.jogadores.findIndex(p => p.id === uid);
+      if (mundo.enxerga(s.estado, eu, i, jogando)) paraUsuario(uid, 'cidade:emote', { id: s.id, de: u.id, e: emote });
+    }
+  },
+
+  // A cor do pelo e o acessório do meu coelho.
+  'cidade:visual'(u, { id, pelo, acessorio }) {
+    const s = salas.get(id);
+    if (!s || s.jogo !== 'cidade' || indiceNa(s, u.id) < 0) return;
+    mundoDe(s).visuais.set(u.id, mundo.validarVisual({ pelo, acessorio }));
+    enviarSala(s);
+  },
+
   // Chat do jogo: cada mensagem vai só para quem pode ler aquele canal.
   'cidade:falar'(u, { id, canal, texto }) {
     const s = salas.get(id);
@@ -1033,6 +1130,7 @@ const acoes = {
       if (dono(s)?.id !== u.id) throw new ErroJogo('Só quem abriu a sala pode começar outra rodada.');
       s.jogadores = ativos(s);
       Object.assign(s, { status: 'esperando', estado: null, vencedor: null, empate: false, motivo: null, criada: Date.now() });
+      if (s.jogo === 'cidade') mandarParaTocas(s);
       enviarSala(s);
       avisarLobby();
       return;
@@ -1227,6 +1325,10 @@ function desconectar(ws) {
 function iniciarRecreacao(servidor) {
   // Conquistas, missões e níveis chegam na hora para quem está no site.
   progresso.definirNotificador((id, notas) => paraUsuario(id, 'progresso', { notas }));
+  // Os coelhos de cada vila do Lyendell Dorme: 10 vezes por segundo, só quando alguém andou.
+  setInterval(() => {
+    for (const s of salas.values()) if (s.jogo === 'cidade' && s.mundo?.sujo) enviarMundo(s);
+  }, 100).unref();
   atualizarBobo(false);
   // O nariz de palhaço some sozinho depois de 30 minutos; os cargos podem mudar (quem é Bobo).
   setInterval(() => atualizarBobo(), 60_000).unref();
