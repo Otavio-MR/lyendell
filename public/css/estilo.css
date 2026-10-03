@@ -2514,9 +2514,22 @@ a.juramento-pessoa:hover { border-color: var(--ouro-d); color: var(--texto); }
 .juramento-pessoa > a { color: var(--texto); }
 .juramento-pessoa > a:hover { color: var(--ouro-l); }
 .juramento-pessoa > a .juramento-nome { text-decoration: underline; text-decoration-color: rgba(216, 177, 58, 0.35); text-underline-offset: 3px; }
-.juramento-pessoa .btn { margin-top: 4px; }
-.juramento-pessoa.nao-jurou { border-style: dashed; }
-.juramento-pessoa.nao-jurou > .avatar { filter: grayscale(0.7); opacity: 0.8; }
-.juramento-pendentes { margin-top: 18px; }
-.juramento-pendentes[hidden] { display: none; }
-.juramento-ajuda { margin: -6px 0 12px; font-size: 0.88rem; }
+.juramento-botoes { display: flex; gap: 8px; flex-wrap: wrap; }
+.jura-gerenciar { display: grid; gap: 18px; }
+.jura-gerenciar > p { margin: 0; }
+.jura-gerenciar h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 1rem; }
+.jura-sugestoes { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; margin-top: 10px; }
+.jura-sugestoes > p { grid-column: 1 / -1; margin: 0; }
+.jura-sugestao { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; text-align: left; padding: 8px 10px; border-radius: var(--raio-p); background: var(--sup-2); border: 1px solid var(--borda); color: var(--texto); cursor: pointer; font: inherit; }
+.jura-sugestao:hover { border-color: var(--ouro-d); }
+.jura-sugestao span { display: grid; min-width: 0; }
+.jura-sugestao small { color: var(--suave); font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jura-colocar { display: inline-flex !important; align-items: center; gap: 4px; color: var(--ouro-l); font-family: var(--f-titulo); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; }
+.jura-colocar .ico { width: 14px; height: 14px; }
+.jura-tabela-caixa { max-height: 46vh; overflow: auto; border: 1px solid var(--borda); border-radius: var(--raio-p); }
+.jura-tabela { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+.jura-tabela th { position: sticky; top: 0; background: var(--sup-2); text-align: left; padding: 8px 10px; font-family: var(--f-titulo); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ouro); }
+.jura-tabela td { padding: 7px 10px; border-top: 1px solid var(--borda); }
+.jura-tabela tr:hover td { background: rgba(26, 43, 31, 0.5); }
+.jura-num { color: var(--suave); width: 2.5em; }
+.jura-acao { text-align: right; white-space: nowrap; }

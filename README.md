@@ -132,9 +132,10 @@ que juraram, com a foto do registro, o endereço (nick) e a data.
 
 Só **Moradores e Nobres** fazem o juramento: quem está no Registro de Outros nunca jura (é de outra
 casa ou presta serviço à Capital). Quem tem registro aprovado de Morador ou de Nobre já conta como
-quem jurou; a **Família Nobre e a Tabeliã** (permissão "Marcar quem já fez o Juramento") podem marcar
-"Ainda não jurou" no cartão da pessoa, e ela vai para a lista **Ainda não juraram**, que só elas veem,
-com o botão "Já jurou" para voltar. A data do juramento é a "Data de chegada" do registro; sem ela,
+quem jurou; a **Família Nobre e a Tabeliã** (permissão "Marcar quem já fez o Juramento") têm o botão
+**Colocar ou retirar**, que abre uma telinha: em cima, colocar na lista procurando pelo nome ou endereço
+(os Moradores e Nobres do Tabelionato que estão fora da lista); embaixo, a tabela de quem está na
+lista, com o botão Retirar em cada linha. A data do juramento é a "Data de chegada" do registro; sem ela,
 o dia em que foi marcado que jurou, ou o dia em que o registro foi aprovado. Dá para filtrar por
 Moradores e Nobres, procurar pelo nome ou pelo endereço, e clicar no nome abre o registro. Registro
 que ainda espera a Tabeliã não entra na lista.

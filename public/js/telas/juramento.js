@@ -1,9 +1,9 @@
 // Juramento da Casa Luckham: o texto que se repete diante da bandeira para morar na Capital,
 // e todos que já juraram. Só Moradores e Nobres juram (quem está em Outros é de outra casa ou presta
-// serviço à Capital). Quem tem registro conta como quem já jurou; a Família Nobre e a Tabeliã podem
-// marcar quem ainda não jurou (e desmarcar).
+// serviço à Capital). Quem tem registro conta como quem já jurou; a Família Nobre e a Tabeliã cuidam da
+// lista numa telinha própria: colocam pelo nome (puxado do Tabelionato) e retiram.
 
-import { h, trocar, icone, botao, cabecalho, avatar, get, put, aviso, tentar, pode, dataCurta, normalizar, estado } from '../core.js';
+import { h, trocar, icone, botao, cabecalho, avatar, get, put, aviso, tentar, modal, pode, dataCurta, normalizar, estado } from '../core.js';
 import { livroDoJuramento, livroDosJuramentados } from '../livro-mc.js';
 
 export const JURAMENTO = {
@@ -37,12 +37,8 @@ export async function juramento() {
   const lista = h('div', { class: 'juramento-lista' });
   const contagem = h('p', { class: 'juramento-contagem' });
   const filtros = h('div', { class: 'segmentado' });
-  const pendentes = h('section', { class: 'painel juramento-pendentes' });
 
-  async function marcar(p, jurou) {
-    const ok = await tentar(() => put(`/api/juramento/${p.registro_id}`, { jurou }),
-      jurou ? `${p.nome} agora está entre os que juraram.` : `${p.nome} saiu da lista: ainda não jurou.`);
-    if (!ok) return;
+  async function recarregar() {
     d = await get('/api/juramento');
     desenharTudo();
   }
@@ -53,17 +49,13 @@ export async function juramento() {
 
   function cartao(p, ordem) {
     const nome = h('strong', { class: 'juramento-nome' }, p.nome);
-    return h('div', { class: `juramento-pessoa ${p.jurou ? '' : 'nao-jurou'}`.trim() },
-      ordem && h('span', { class: 'juramento-ordem', title: 'Ordem do juramento' }, `nº ${ordem}`),
+    return h('div', { class: 'juramento-pessoa' },
+      h('span', { class: 'juramento-ordem', title: 'Ordem do juramento' }, `nº ${ordem}`),
       avatar(p.nome, 'avatar-g', p.foto),
       verRegistro ? h('a', { href: `#/tabelionato/${p.livro_id}/registro/${p.registro_id}`, title: 'Ver o registro no Tabelionato' }, nome) : nome,
       p.nick && h('small', null, 'Endereço: ', h('span', { class: 'juramento-nick' }, p.nick)),
       h('span', { class: 'etiqueta' }, tipoDoLivro(p.livro)),
-      p.jurou && p.desde && h('small', { class: 'juramento-data' }, icone('bandeira'), ` Jurou em ${dataCurta(p.desde)}`),
-      !p.jurou && p.marcado_por && h('small', null, `Marcado por ${p.marcado_por}`),
-      d.podeMarcar && (p.jurou
-        ? botao('Ainda não jurou', { icone: 'x', classe: 'btn-pequeno btn-fantasma', titulo: 'Tira a pessoa da lista de quem jurou', onclick: () => marcar(p, false) })
-        : botao('Já jurou', { icone: 'check', classe: 'btn-pequeno btn-ouro', onclick: () => marcar(p, true) })));
+      p.desde && h('small', { class: 'juramento-data' }, icone('bandeira'), ` Jurou em ${dataCurta(p.desde)}`));
   }
 
   function desenharLista() {
@@ -73,13 +65,73 @@ export async function juramento() {
     trocar(lista, escolhidos.length
       ? escolhidos.map(p => cartao(p, p.ordem))
       : h('p', { class: 'painel-vazio' }, juraram.length ? 'Ninguém com esse nome.' : 'Ninguém fez o juramento ainda.'));
-    // Para quem marca: os Moradores e Nobres registrados que ainda não juraram.
-    const nao = filtrar(d.naoJuraram);
-    pendentes.hidden = !d.podeMarcar || !d.naoJuraram.length;
-    trocar(pendentes,
-      h('div', { class: 'painel-cab' }, h('h2', null, icone('relogio'), `Ainda não juraram (${d.naoJuraram.length})`)),
-      h('p', { class: 'suave' }, 'Moradores e Nobres registrados que ainda não fizeram o juramento. Só a Família Nobre e a Tabeliã veem esta lista.'),
-      nao.length ? h('div', { class: 'juramento-lista' }, nao.map(p => cartao(p))) : h('p', { class: 'painel-vazio' }, 'Ninguém com esse nome.'));
+  }
+
+  // A telinha da Família Nobre e da Tabeliã: colocar na lista pelo nome do Tabelionato e retirar.
+  function gerenciar() {
+    let procura = '';
+    const sugestoes = h('div', { class: 'jura-sugestoes' });
+    const tabela = h('tbody');
+    const titulo = h('span');
+    const campo = h('input', {
+      class: 'input', type: 'search', placeholder: 'Digite o nome ou o endereço (Moradores e Nobres do Tabelionato)...',
+      oninput: e => { procura = normalizar(e.target.value.trim()); desenharSugestoes(); },
+    });
+
+    async function mudar(p, jurou) {
+      const ok = await tentar(() => put(`/api/juramento/${p.registro_id}`, { jurou }),
+        jurou ? `${p.nome} foi colocado na lista.` : `${p.nome} foi retirado da lista.`);
+      if (!ok) return;
+      await recarregar();
+      desenharSugestoes();
+      desenharTabela();
+    }
+
+    function desenharSugestoes() {
+      const fora = d.naoJuraram;
+      if (!fora.length) {
+        trocar(sugestoes, h('p', { class: 'suave' }, 'Todos os Moradores e Nobres registrados já estão na lista.'));
+        return;
+      }
+      const achados = fora.filter(p => !procura || normalizar(`${p.nome} ${p.nick || ''}`).includes(procura)).slice(0, 12);
+      trocar(sugestoes, achados.length
+        ? achados.map(p => h('button', { type: 'button', class: 'jura-sugestao', onclick: () => mudar(p, true) },
+          avatar(p.nome, 'avatar-p', p.foto),
+          h('span', null, h('strong', null, p.nome), h('small', null, [tipoDoLivro(p.livro), p.nick && `Endereço: ${p.nick}`].filter(Boolean).join(' · '))),
+          h('span', { class: 'jura-colocar' }, icone('mais'), 'Colocar')))
+        : h('p', { class: 'suave' }, 'Ninguém fora da lista com esse nome.'));
+    }
+
+    function desenharTabela() {
+      titulo.textContent = `Na lista (${d.juraram.length})`;
+      trocar(tabela, d.juraram.length
+        ? d.juraram.map((p, i) => h('tr', null,
+          h('td', { class: 'jura-num' }, i + 1),
+          h('td', null, h('strong', null, p.nome)),
+          h('td', null, p.nick || ''),
+          h('td', null, tipoDoLivro(p.livro)),
+          h('td', null, p.desde ? dataCurta(p.desde) : ''),
+          h('td', { class: 'jura-acao' }, botao('Retirar', { icone: 'x', classe: 'btn-pequeno btn-perigo-texto', onclick: () => mudar(p, false) }))))
+        : h('tr', null, h('td', { colspan: '6', class: 'painel-vazio' }, 'Ninguém na lista.')));
+    }
+
+    desenharSugestoes();
+    desenharTabela();
+    modal({
+      titulo: 'Quem fez o juramento', tamanho: 'grande',
+      corpo: h('div', { class: 'jura-gerenciar' },
+        h('p', { class: 'suave' }, 'Quem tem registro de Morador ou de Nobre já entra na lista. Retire quem ainda não jurou, e coloque de volta quando jurar.'),
+        h('section', null,
+          h('h3', null, icone('mais'), 'Colocar na lista'),
+          campo, sugestoes),
+        h('section', null,
+          h('h3', null, icone('usuarios'), titulo),
+          h('div', { class: 'jura-tabela-caixa' },
+            h('table', { class: 'jura-tabela' },
+              h('thead', null, h('tr', null, h('th', null, 'nº'), h('th', null, 'Nome'), h('th', null, 'Endereço'), h('th', null, 'Registro'), h('th', null, 'Jurou em'), h('th', null, ''))),
+              tabela)))),
+    });
+    setTimeout(() => campo.focus(), 50);
   }
 
   const contar = tipo => d.juraram.filter(p => tipoDoLivro(p.livro) === tipo).length;
@@ -114,17 +166,17 @@ export async function juramento() {
     h('section', { class: 'painel juramento-juraram' },
       h('div', { class: 'painel-cab' },
         h('h2', null, icone('usuarios'), 'Os que juraram'),
-        botao('Lista em .book', {
-          icone: 'baixar', classe: 'btn-pequeno', titulo: 'Todos que juraram, num livro para o mod Scribble',
-          onclick: () => livroDosJuramentados(d.juraram, estado.eu.nome).baixar('Os que juraram'),
-        })),
+        h('div', { class: 'juramento-botoes' },
+          d.podeMarcar && botao('Colocar ou retirar', { icone: 'editar', classe: 'btn-pequeno btn-ouro', titulo: 'Quem fez o juramento (Família Nobre e Tabeliã)', onclick: gerenciar }),
+          botao('Lista em .book', {
+            icone: 'baixar', classe: 'btn-pequeno', titulo: 'Todos que juraram, num livro para o mod Scribble',
+            onclick: () => livroDosJuramentados(d.juraram, estado.eu.nome).baixar('Os que juraram'),
+          }))),
       contagem,
-      d.podeMarcar && h('p', { class: 'suave juramento-ajuda' }, 'Quem é registrado como Morador ou Nobre já conta como quem jurou. Se alguém ainda não fez o juramento, use "Ainda não jurou" no cartão da pessoa.'),
       h('div', { class: 'juramento-filtros' },
         filtros,
         h('input', { class: 'input', type: 'search', placeholder: 'Procurar pelo nome ou endereço...', oninput: e => { busca = normalizar(e.target.value.trim()); desenharLista(); } })),
-      lista),
-    pendentes);
+      lista));
   desenharTudo();
   return raiz;
 }
