@@ -16,6 +16,9 @@ export const JOGOS_DESAFIO = {
   pacman: { nome: 'Pac-Coelho', icone: 'coelho', rota: '#/recreacao/pac-coelho', minutos: 3, meta: 3000, coop: true, unidade: n => `${num(n)} pts` },
   cobrinha: { nome: 'Cobrinha', icone: 'cobra', rota: '#/recreacao/cobrinha', minutos: 3, meta: 15, coop: true, unidade: n => `${n} ${n === 1 ? 'cenoura' : 'cenouras'}` },
   2048: { nome: '2048', icone: 'blocos', rota: '#/recreacao/2048', minutos: 3, meta: 2500, coop: true, unidade: n => `${num(n)} pts` },
+  barris: { nome: 'Barris do Raposo', icone: 'barril', rota: '#/recreacao/barris', minutos: 3, meta: 4000, coop: true, unidade: n => `${num(n)} pts` },
+  supercoelho: { nome: 'Super Coelho', icone: 'cenoura', rota: '#/recreacao/super-coelho', minutos: 4, meta: 5000, coop: true, unidade: n => `${num(n)} pts` },
+  travessia: { nome: 'Travessia', icone: 'estrada', rota: '#/recreacao/travessia', minutos: 3, meta: 60, coop: true, unidade: n => `${n} ${n === 1 ? 'fileira' : 'fileiras'}` },
   minado: { nome: 'Campo Minado', icone: 'minado', rota: '#/recreacao/campo-minado', minutos: 6, coop: false, unidade: n => `${n} casas abertas` },
   quebra: { nome: 'Quebra-cabeça', icone: 'peca', rota: '#/recreacao/quebra-cabeca', minutos: 5, coop: false, unidade: n => `${n} peças no lugar` },
 };

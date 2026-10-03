@@ -1059,6 +1059,120 @@ a.jogo-cartao:hover { border-color: var(--ouro-d); color: var(--texto); }
 .pac-bola { display: inline-block; width: var(--tam); height: var(--tam); border-radius: 50%; background: var(--cor); box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.25); }
 .pac-cenoura { font-size: 1rem; line-height: 1; }
 
+/* Fliperama (Barris do Raposo, Super Coelho, Travessia): public/js/arcade.js */
+.arcade-area { --tam-jogo: 100%; width: 100%; margin: 0 auto; }
+.arcade-tela { display: block; width: 100%; border-radius: var(--raio); border: 1px solid var(--borda-2); touch-action: none; outline: none; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); }
+.arcade-tela:focus-visible { box-shadow: 0 0 0 2px var(--ouro); }
+.arcade-som { margin-left: auto; }
+.arcade-lateral { display: grid; gap: 18px; }
+.arcade-lateral .painel + .painel { margin-top: 0; }
+.jogo-solo.arcade-largo { grid-template-columns: minmax(0, 1fr); }
+.arcade-largo .arcade-lateral { position: static; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); align-items: start; }
+.arcade-legenda li { grid-template-columns: 26px 1fr; }
+.arcade-emoji { font-size: 1.1rem; line-height: 1.2; text-align: center; }
+.arcade-cenouras { margin: 0; color: #f0a35a; font-weight: 600; }
+.arcade-controles { display: none; width: 100%; justify-content: space-between; align-items: center; gap: 12px; user-select: none; -webkit-user-select: none; }
+.arcade-cruz { display: grid; grid-template-columns: repeat(2, 64px); grid-template-areas: 'esq dir'; gap: 8px; }
+.arcade-cruz.com-cima { grid-template-columns: repeat(3, 58px); grid-template-rows: repeat(3, 50px); grid-template-areas: '. cima .' 'esq . dir' '. baixo .'; }
+.arcade-acoes { display: flex; gap: 12px; align-items: center; }
+.arcade-botao {
+  display: grid; place-items: center; min-height: 56px; border-radius: 16px; border: 1px solid var(--borda-2); background: var(--sup-2);
+  color: var(--texto-2); cursor: pointer; touch-action: none; font: 700 0.8rem var(--f-titulo); letter-spacing: 0.04em;
+}
+.arcade-botao .ico { width: 26px; height: 26px; }
+.arcade-botao.apertado { background: var(--ouro-fundo); color: var(--ouro-l); border-color: var(--ouro-d); }
+.arcade-botao.b-cima { grid-area: cima; } .arcade-botao.b-baixo { grid-area: baixo; }
+.arcade-botao.b-esq { grid-area: esq; } .arcade-botao.b-dir { grid-area: dir; }
+.arcade-botao.b-pular, .arcade-botao.b-acao { width: 74px; height: 74px; border-radius: 50%; }
+.arcade-botao.b-pular { background: rgba(216, 177, 58, 0.16); border-color: var(--ouro-d); color: var(--ouro-l); }
+@media (pointer: coarse) { .arcade-controles { display: flex; } }
+/* Club Coelho */
+.clube-convite {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px 14px; align-items: center; padding: 14px 16px; margin-bottom: 6px;
+  border-radius: var(--raio); text-decoration: none; color: var(--texto); border: 1px solid var(--ouro-d);
+  background: radial-gradient(400px 120px at 0% 0%, rgba(216, 177, 58, 0.18), transparent), linear-gradient(120deg, rgba(90, 160, 216, 0.12), rgba(228, 138, 184, 0.1)), var(--sup);
+}
+.clube-convite:hover { border-color: var(--ouro); }
+.clube-convite > .btn { grid-column: 2; justify-self: start; }
+.clube-convite-icone { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; background: var(--ouro-fundo); color: var(--ouro-l); }
+.clube-convite-icone .ico { width: 30px; height: 30px; }
+.clube-convite-texto { display: grid; gap: 2px; }
+.clube-convite-texto strong { font-family: var(--f-titulo); color: var(--pergaminho); font-size: 1.1rem; }
+.clube-convite-texto small { color: var(--texto-2); }
+.clube-moedas { display: inline-flex; align-items: center; gap: 4px; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--ouro-d); background: var(--ouro-fundo); color: var(--texto); font-size: 1.05rem; }
+.clube-moedas strong { color: var(--ouro-l); font-family: var(--f-titulo); }
+.clube-palco { width: 100%; max-width: min(1200px, calc((100vh - 250px) * 5 / 3)); margin: 0 auto; }
+.clube-tela { display: block; width: 100%; aspect-ratio: 5 / 3; border-radius: var(--raio); border: 1px solid var(--borda-2); background: #0e1811; touch-action: manipulation; outline: none; box-shadow: 0 12px 34px rgba(0, 0, 0, 0.4); }
+.clube-barra { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; max-width: 1200px; margin: 12px auto 0; }
+.clube-falar { display: flex; gap: 6px; flex: 1 1 280px; max-width: 420px; }
+.clube-falar .input { flex: 1; min-width: 0; }
+.clube-emotes { display: flex; gap: 4px; flex-wrap: wrap; }
+.clube-emote { min-width: 38px; height: 38px; padding: 0 6px; border-radius: 10px; border: 1px solid var(--borda-2); background: var(--sup); font-size: 1.15rem; cursor: pointer; color: var(--texto); transition: transform 0.12s ease; }
+.clube-emote.largo { font: 600 0.82rem var(--f-titulo); padding: 0 10px; }
+.clube-emote:hover { transform: translateY(-2px); border-color: var(--ouro-d); }
+.clube-acoes { display: flex; gap: 6px; flex-wrap: wrap; }
+.clube-conversa-painel { max-width: 1200px; margin: 14px auto 0; }
+.clube-conversa { list-style: none; margin: 0; padding: 0; max-height: 150px; overflow-y: auto; display: grid; gap: 3px; scrollbar-width: thin; }
+.clube-conversa li { color: var(--texto-2); font-size: 0.95rem; }
+.clube-conversa li strong { color: var(--ouro); }
+.clube-conversa li.minha strong { color: var(--ouro-l); }
+.clube-conversa li em { color: var(--suave); }
+.clube-decorar { max-width: 1200px; margin: 14px auto 0; display: grid; gap: 10px; }
+.clube-decorar-botoes { display: flex; gap: 6px; }
+.clube-decorar-sel { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 8px 10px; border-radius: var(--raio-p); background: var(--ouro-fundo); border: 1px solid var(--ouro-d); }
+.clube-decorar-opcoes { display: flex; gap: 14px; flex-wrap: wrap; align-items: end; }
+.clube-decorar-opcoes .campo { min-width: 180px; }
+.clube-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; max-height: 420px; overflow-y: auto; padding: 2px; scrollbar-width: thin; }
+.clube-grade.loja { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+.clube-grade.moveis { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); max-height: 260px; }
+.clube-item {
+  display: grid; justify-items: center; gap: 4px; padding: 8px; border-radius: var(--raio-p); border: 1px solid var(--borda-2);
+  background: var(--sup-2); color: var(--texto); font: inherit; font-size: 0.86rem; text-align: center; cursor: pointer;
+}
+.clube-item:hover:not(:disabled) { border-color: var(--ouro-d); }
+.clube-item.ativo { border-color: var(--ouro); box-shadow: 0 0 0 2px rgba(216, 177, 58, 0.35); }
+.clube-item:disabled { opacity: 0.45; cursor: default; }
+.clube-item.loja { cursor: default; }
+.clube-item small { color: var(--suave); font-size: 0.75rem; }
+.clube-item-nada { display: grid; place-items: center; width: 70px; height: 70px; color: var(--suave); }
+.clube-preco { color: var(--ouro-l); font-weight: 700; }
+.clube-previa { display: block; border-radius: 10px; background: radial-gradient(circle at 50% 75%, rgba(127, 176, 105, 0.35), transparent 70%); }
+.clube-guarda { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 16px; align-items: start; }
+.clube-guarda-previa { display: grid; place-items: center; border-radius: var(--raio); background: radial-gradient(circle at 50% 70%, #3e6b35, #1a2f1d); border: 1px solid var(--borda-2); padding: 8px; }
+.clube-abas { margin-bottom: 10px; flex-wrap: wrap; }
+.clube-saldo { margin: 0 0 10px; color: var(--texto-2); }
+.clube-cartao { display: grid; justify-items: center; gap: 12px; }
+.clube-cartao-botoes { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.clube-mapa { display: grid; gap: 12px; }
+.clube-salas { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+.clube-sala-cartao { position: relative; display: grid; gap: 4px; text-align: left; padding: 12px; border-radius: var(--raio-p); border: 1px solid var(--borda-2); background: var(--sup-2); color: var(--texto); font: inherit; cursor: pointer; }
+.clube-sala-cartao:hover { border-color: var(--ouro-d); }
+.clube-sala-cartao.aqui { border-color: var(--ouro); }
+.clube-sala-cartao strong { font-family: var(--f-titulo); color: var(--pergaminho); }
+.clube-sala-cartao small { color: var(--texto-2); }
+.clube-sala-n { position: absolute; top: 10px; right: 10px; display: inline-flex; align-items: center; gap: 2px; color: var(--ouro-l); font-size: 0.85rem; }
+.clube-sala-n .ico { width: 14px; height: 14px; }
+.clube-subtitulo { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; font-family: var(--f-titulo); color: var(--ouro); font-size: 1rem; }
+.clube-tocas { display: grid; gap: 6px; max-height: 300px; overflow-y: auto; scrollbar-width: thin; }
+.clube-toca-linha { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: var(--raio-p); background: var(--sup-2); border: 1px solid var(--borda); }
+.clube-toca-linha div { display: grid; }
+.clube-toca-linha small { color: var(--suave); }
+.clube-toca-icone { color: var(--ouro); }
+/* Minijogos do clube */
+.minijogo .modal-corpo { padding-top: 6px; }
+.minijogo-corpo { display: grid; gap: 10px; }
+.minijogo-moldura { position: relative; }
+.minijogo-tela { display: block; width: 100%; border-radius: var(--raio); border: 1px solid var(--borda-2); background: #0e1811; touch-action: none; outline: none; }
+.minijogo-botoes { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.danca-botoes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.danca-botao { height: 58px; border-radius: 14px; border: 2px solid var(--cor); background: rgba(255, 255, 255, 0.04); color: var(--cor); font: 700 1.6rem sans-serif; cursor: pointer; touch-action: none; }
+.danca-botao:active { background: var(--cor); color: #120a22; }
+@media (pointer: fine) { .danca-botoes { display: none; } }
+@media (max-width: 760px) {
+  .clube-guarda { grid-template-columns: minmax(0, 1fr); }
+}
+.jogo-novo { margin-left: 8px; font-family: var(--f-titulo); font-size: 0.58rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ouro-l); border: 1px solid var(--ouro-d); padding: 1px 6px; border-radius: 999px; vertical-align: middle; }
+
 /* Aviso de versão nova do site */
 .nova-versao {
   position: fixed; top: 12px; left: 50%; translate: -50% 0; z-index: 300; display: flex; align-items: center; gap: 10px;

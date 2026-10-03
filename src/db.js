@@ -258,6 +258,19 @@ CREATE TABLE IF NOT EXISTS juramentos (
   atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS clube (
+  usuario_id INTEGER PRIMARY KEY,
+  moedas INTEGER NOT NULL DEFAULT 300,
+  visual TEXT NOT NULL DEFAULT '{}',
+  itens TEXT NOT NULL DEFAULT '{}',
+  toca TEXT NOT NULL DEFAULT '{}',
+  presente TEXT,
+  ganhos_dia TEXT,
+  ganhos INTEGER NOT NULL DEFAULT 0,
+  peixes INTEGER NOT NULL DEFAULT 0,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS segredos (
   usuario_id INTEGER NOT NULL,
   chave TEXT NOT NULL,

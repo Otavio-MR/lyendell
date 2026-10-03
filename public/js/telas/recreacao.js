@@ -15,6 +15,8 @@ import { efeito } from '../bobo-efeitos.js';
 // Seta [x, y] do jogo virando o nome que os códigos secretos usam.
 const nomeDir = ([x, y]) => (x ? (x > 0 ? 'direita' : 'esquerda') : y > 0 ? 'baixo' : 'cima');
 import { assistirMinado, assistir2048 } from './jogos-sozinho.js';
+import { visorArcade } from '../arcade.js';
+import { ARCADE } from '../jogos/lista.js';
 
 // Cada jogo e os modos que ele tem (os botões do cartão). Versus: uns contra os outros. Co-op: todos do mesmo lado.
 const raposa = id => ({ nome: 'Contra a Raposa', dica: 'Co-op: sozinho ou em dupla contra o computador', abrir: () => criarPartida(id, { modo: 'raposa' }) });
@@ -30,6 +32,7 @@ const AO_VIVO = [
 const corrida = jogo => ({ nome: 'Versus', dica: 'Corrida: a mesma partida para todos, ao mesmo tempo', abrir: () => abrirDesafio(jogo, 'versus') });
 const meta = jogo => ({ nome: 'Co-op', dica: 'Meta da equipe: os pontos de todos somam', abrir: () => abrirDesafio(jogo, 'coop') });
 const SOZINHO = [
+  ...Object.entries(ARCADE).map(([id, j]) => ({ href: j.rota, nome: j.nome, icone: j.icone, texto: j.texto, novo: true, modos: [corrida(id), meta(id)] })),
   { href: '#/recreacao/pac-coelho', nome: 'Pac-Coelho', icone: 'coelho', texto: 'Coma as moedas, fuja das raposas e pegue a cenoura.', modos: [corrida('pacman'), meta('pacman')] },
   { href: '#/recreacao/cobrinha', nome: 'Cobrinha', icone: 'cobra', texto: 'Coma as cenouras sem bater nas bordas nem em si mesma.', modos: [corrida('cobrinha'), meta('cobrinha')] },
   { href: '#/recreacao/2048', nome: '2048', icone: 'blocos', texto: 'Deslize e junte os blocos iguais até chegar no 2048.', modos: [corrida('2048'), meta('2048')] },
@@ -42,7 +45,7 @@ const SOZINHO = [
 ];
 const ICONE_JOGO = { velha: 'velha', ppt: 'tesoura', quiz: 'pergunta', lig4: 'lig4', cobras: 'cobra', damas: 'damas', cidade: 'lua', minado: 'minado', quebra: 'peca', memoria: 'cartas' };
 const MESAS_TELA = new Set(['minado', 'quebra', 'memoria']);
-const ICONE_SOLO = { pacman: 'coelho', cobrinha: 'cobra', quebra: 'peca', memoria: 'cartas', minado: 'minado', 2048: 'blocos' };
+const ICONE_SOLO = { pacman: 'coelho', cobrinha: 'cobra', quebra: 'peca', memoria: 'cartas', minado: 'minado', 2048: 'blocos', ...Object.fromEntries(Object.entries(ARCADE).map(([id, j]) => [id, j.icone])) };
 // Jogos de dois em que cada um joga na sua vez (no pedra, papel e tesoura, os dois escolhem ao mesmo tempo).
 const POR_VEZ = new Set(['velha', 'lig4', 'damas']);
 const MAOS = { pedra: 'Pedra', papel: 'Papel', tesoura: 'Tesoura' };
@@ -107,6 +110,11 @@ export function recreacao() {
       minha && h('a', { class: 'nota nota-ouro nota-link', href: `#/recreacao/sala/${minha.id}` },
         icone('jogos'), h('span', null, textoMinhaSala(minha)),
         h('strong', null, 'Voltar')),
+      h('a', { class: 'clube-convite', href: '#/clube' },
+        h('span', { class: 'clube-convite-icone' }, icone('balao')),
+        h('span', { class: 'clube-convite-texto' }, h('strong', null, 'Club Coelho', h('span', { class: 'jogo-novo' }, 'novo')),
+          h('small', null, 'Passeie com o seu coelho, converse, dance, pesque e decore a sua toca com as cenouras que ganha nos jogos.')),
+        h('span', { class: 'btn btn-ouro btn-pequeno' }, 'Entrar no clube')),
       h('h3', { class: 'jogos-titulo' }, 'Ao vivo'),
       AO_VIVO.map(j => h('div', { class: 'jogo-cartao' },
         h('span', { class: 'jogo-icone' }, icone(j.icone)),
@@ -117,7 +125,7 @@ export function recreacao() {
       h('h3', { class: 'jogos-titulo' }, 'Sozinho ou com mais gente'),
       SOZINHO.map(j => h('div', { class: 'jogo-cartao' },
         h('span', { class: 'jogo-icone' }, icone(j.icone)),
-        h('div', { class: 'jogo-texto' }, h('strong', null, j.nome), h('small', null, j.texto)),
+        h('div', { class: 'jogo-texto' }, h('strong', null, j.nome, j.novo && h('span', { class: 'jogo-novo' }, 'novo')), h('small', null, j.texto)),
         h('div', { class: 'jogo-botoes' },
           h('a', { class: 'btn btn-ouro btn-pequeno', href: j.href }, 'Sozinho'),
           j.modos.map(m => modoBotao(m, false, minha))))));
@@ -331,7 +339,7 @@ function painelRanking() {
   let dificuldade = 'facil';
   const ABAS = [['quiz', 'Quiz'], ['cidade', 'Lyendell Dorme'], ['cobras', 'Cobrinha ao vivo'], ['velha', 'Jogo da Velha'], ['ppt', 'Pedra, Papel e Tesoura'], ['lig4', 'Lig 4'],
     ['damas', 'Damas'], ['pacman', 'Pac-Coelho'], ['cobrinha', 'Cobrinha'], ['quebra', 'Quebra-cabeça'], ['memoria', 'Memória'],
-    ['minado', 'Campo Minado'], ['2048', '2048']];
+    ['minado', 'Campo Minado'], ['2048', '2048'], ...Object.entries(ARCADE).map(([id, j]) => [id, j.nome])];
   const eu = estado.eu.nome;
 
   function tabela(cols, linhas) {
@@ -354,8 +362,8 @@ function painelRanking() {
         tabela([['Vitórias', l => l.vitorias], ['Acertos', l => l.acertos], ['Partidas', l => l.partidas], ['Melhor', l => num(l.melhor)]], dados.quiz),
         h('p', { class: 'suave ranking-nota' }, 'Vitória conta só em partida com pelo menos duas pessoas.'),
       ];
-    } else if (aba === 'pacman' || aba === '2048') {
-      conteudo = tabela([['Pontos', l => num(l.pontos)]], dados[aba] || []);
+    } else if (aba === 'pacman' || aba === '2048' || ARCADE[aba]) {
+      conteudo = tabela([[ARCADE[aba]?.unidade || 'Pontos', l => num(l.pontos)]], dados[aba] || []);
     } else if (aba === 'minado') {
       conteudo = [
         h('div', { class: 'segmentado ranking-tamanhos' }, Object.entries(DIFICULDADES_MINADO).map(([k, nome]) =>
@@ -1956,9 +1964,13 @@ function assistirQuebra(t) {
 const TELA_DO_JOGO = {
   pacman: '#/recreacao/pac-coelho', cobrinha: '#/recreacao/cobrinha', quebra: '#/recreacao/quebra-cabeca', memoria: '#/recreacao/memoria',
   minado: '#/recreacao/campo-minado', 2048: '#/recreacao/2048',
+  ...Object.fromEntries(Object.entries(ARCADE).map(([id, j]) => [id, j.rota])),
 };
 // Quem assiste: um visor para cada jogo (quadro(q) recebe o que quem joga transmite).
-const VISORES = { pacman: () => assistirPac(), cobrinha: () => assistirCobrinha(), memoria: () => assistirMemoria(), minado: () => assistirMinado(), 2048: () => assistir2048() };
+const VISORES = {
+  pacman: () => assistirPac(), cobrinha: () => assistirCobrinha(), memoria: () => assistirMemoria(), minado: () => assistirMinado(), 2048: () => assistir2048(),
+  ...Object.fromEntries(Object.entries(ARCADE).map(([id, j]) => [id, () => visorArcade(j.carregar)])),
+};
 
 export function assistir(id) {
   exigirAcesso();

@@ -19,6 +19,9 @@ import { perguntasQuiz } from './telas/quiz.js';
 import { caixaDePegadinhas } from './telas/bobo.js';
 import { propostas } from './telas/propostas.js';
 import { juramento } from './telas/juramento.js';
+import { telaArcade } from './arcade.js';
+import { clube } from './telas/clube.js';
+import { ARCADE } from './jogos/lista.js';
 
 const app = document.getElementById('app');
 
@@ -34,6 +37,7 @@ const MENU = [
     { rota: '/atividades', nome: 'Mural de Atividades', icone: 'tarefas', perm: ['atividades.ver'] },
     { rota: '/galeria', nome: 'Galeria', icone: 'imagem', perm: ['galeria.ver'] },
     { rota: '/recreacao', nome: 'Recreação', icone: 'jogos', perm: ['recreacao.usar'] },
+    { rota: '/clube', nome: 'Club Coelho', icone: 'balao', perm: ['recreacao.usar'] },
     { rota: '/bobo', nome: 'Caixa de Pegadinhas', icone: 'bobo', perm: ['bobo.pegadinhas'] },
   ] },
   { secao: 'Registros', itens: [
@@ -68,10 +72,12 @@ const ROTAS = [
   [/^\/recreacao\/memoria$/, () => memoria()],
   [/^\/recreacao\/campo-minado$/, () => campoMinado()],
   [/^\/recreacao\/2048$/, () => jogo2048()],
+  ...Object.values(ARCADE).map(j => [new RegExp(`^${j.rota.slice(1)}$`), async () => telaArcade((await j.carregar()).default)]),
   [/^\/admin\/usuarios$/, () => usuarios()],
   [/^\/admin\/cargos$/, () => cargos()],
   [/^\/admin\/diario$/, () => diario()],
   [/^\/recreacao$/, () => recreacao()],
+  [/^\/clube$/, () => clube()],
   [/^\/bobo$/, () => caixaDePegadinhas()],
   [/^\/juramento$/, () => juramento()],
   [/^\/recreacao\/cobrinha$/, () => cobrinha()],

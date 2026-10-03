@@ -16,6 +16,7 @@ const raposa = require('./raposa');
 const { MESAS, ErroMesa } = require('./mesa');
 const desafio = require('./desafio');
 const cidade = require('./cidade');
+const clube = require('./clube');
 const mundo = require('./cidade-mundo');
 const { paraCriancas } = require('./censura');
 const bobo = require('./bobo');
@@ -894,7 +895,10 @@ function terminarCidade(s) {
 
 // Quem joga Pac-Coelho, Cobrinha ou Quebra-cabeça manda o estado do jogo algumas vezes por segundo,
 // e o servidor repassa para quem está assistindo. Nada disso vai para o banco.
-const SOLO = { pacman: 'Pac-Coelho', cobrinha: 'Cobrinha', quebra: 'Quebra-cabeça', memoria: 'Jogo da Memória', minado: 'Campo Minado', 2048: '2048' };
+const SOLO = {
+  pacman: 'Pac-Coelho', cobrinha: 'Cobrinha', quebra: 'Quebra-cabeça', memoria: 'Jogo da Memória', minado: 'Campo Minado', 2048: '2048',
+  barris: 'Barris do Raposo', supercoelho: 'Super Coelho', travessia: 'Travessia',
+};
 const transmissoes = new Map(); // id de quem joga -> transmissão
 
 const resumoTransmissoes = () => [...transmissoes.values()].map(t => ({
@@ -1267,7 +1271,7 @@ function conectar(ws, usuario, token) {
     try {
       await acao(usuario, msg.dados && typeof msg.dados === 'object' ? msg.dados : {}, ws);
     } catch (e) {
-      const conhecido = e instanceof ErroJogo || e instanceof quiz.ErroQuiz;
+      const conhecido = e instanceof ErroJogo || e instanceof quiz.ErroQuiz || e instanceof clube.ErroClube;
       if (!conhecido) console.error('Erro na recreação:', e);
       enviar(ws, 'erro', { mensagem: conhecido ? e.message : 'Algo deu errado. Tente de novo.' });
     }
@@ -1301,6 +1305,7 @@ function desconectar(ws) {
   const lista = conexoes.get(id);
   if (!lista) return;
   lista.delete(ws);
+  clube.fechou(id, ws); // a aba que estava no Club Coelho fechou
   if (lista.size) return; // ainda tem outra aba aberta
   conexoes.delete(id);
   paraTodos('online', { online: online() });
@@ -1325,6 +1330,9 @@ function desconectar(ws) {
 function iniciarRecreacao(servidor) {
   // Conquistas, missões e níveis chegam na hora para quem está no site.
   progresso.definirNotificador((id, notas) => paraUsuario(id, 'progresso', { notas }));
+  // O Club Coelho usa a mesma conexão (as ações 'clube:*' ficam em src/clube.js).
+  clube.iniciar({ paraUsuario, ehCrianca, limpar: paraCriancas });
+  Object.assign(acoes, clube.acoes);
   // Os coelhos de cada vila do Lyendell Dorme: 10 vezes por segundo, só quando alguém andou.
   setInterval(() => {
     for (const s of salas.values()) if (s.jogo === 'cidade' && s.mundo?.sujo) enviarMundo(s);

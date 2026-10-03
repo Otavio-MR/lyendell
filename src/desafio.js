@@ -1,4 +1,5 @@
-// Desafio: os jogos de uma pessoa só (Pac-Coelho, Cobrinha, 2048, Campo Minado e Quebra-cabeça) jogados
+// Desafio: os jogos de uma pessoa só (Pac-Coelho, Cobrinha, 2048, Barris do Raposo, Super Coelho, Travessia,
+// Campo Minado e Quebra-cabeça) jogados
 // ao mesmo tempo por várias pessoas, cada uma no seu navegador, com a MESMA semente (mesmo campo, mesmas
 // cenouras, mesmo embaralhado). O servidor só marca o tempo, guarda os pontos que cada um manda e decide quem venceu.
 //  - Versus (corrida): Pac-Coelho, Cobrinha e 2048, quem fizer mais pontos; Campo Minado e Quebra-cabeça, quem terminar primeiro.
@@ -14,6 +15,9 @@ const JOGOS = {
   pacman: { nome: 'Pac-Coelho', tipo: 'pontos', minutos: 3, metaPorPessoa: 3000, coop: true },
   cobrinha: { nome: 'Cobrinha', tipo: 'pontos', minutos: 3, metaPorPessoa: 15, coop: true },
   2048: { nome: '2048', tipo: 'pontos', minutos: 3, metaPorPessoa: 2500, coop: true },
+  barris: { nome: 'Barris do Raposo', tipo: 'pontos', minutos: 3, metaPorPessoa: 4000, coop: true },
+  supercoelho: { nome: 'Super Coelho', tipo: 'pontos', minutos: 4, metaPorPessoa: 5000, coop: true },
+  travessia: { nome: 'Travessia', tipo: 'pontos', minutos: 3, metaPorPessoa: 60, coop: true },
   minado: { nome: 'Campo Minado', tipo: 'corrida', minutos: 6, coop: false },
   quebra: { nome: 'Quebra-cabeça', tipo: 'corrida', minutos: 5, coop: false },
 };

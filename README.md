@@ -270,6 +270,19 @@ Um salão com **chat ao vivo**, a lista de quem está online e os jogos:
   primeiro clique nunca explode; botão direito (ou segurar o dedo, ou o botão "Tocar põe bandeira" no
   celular) põe bandeira; clicar num número com as bandeiras certas em volta abre o resto. Vale o tempo.
 - **2048**: deslize com as setas, W A S D ou o dedo; os blocos iguais viram um só. Vale a pontuação.
+- **Barris do Raposo** (no estilo do Donkey Kong): lá do alto da torre o Raposo joga barris pelas vigas;
+  o coelho sobe as escadas, pula os barris (+100) e resgata a Princesa Cenoura. Marretas quebram os
+  barris por alguns segundos, as fagulhas saem do tonel de piche, e o bônus cai com o tempo. A cada
+  resgate o nível fica mais rápido (e a torre muda de lado).
+- **Super Coelho** (no estilo do Super Mario): quatro fases (Campos de Lyendell, Tocas Subterrâneas,
+  Copas das Árvores e o Castelo do Raposo) para salvar a Princesa Cenoura. Cenoura faz crescer, Flor de
+  Fogo atira, Estrela deixa invencível; Raposinhos se pisam, Tatus viram bola e Ouriços não se pisam.
+- **Travessia** (no estilo do Crossy Road): pulinhos por campos, estradas de carroças, rios com troncos
+  e trilhos de trem, até onde o coelho aguentar. Ficar parado demais chama o gavião. Vale a fileira mais
+  longe.
+
+Os três de fliperama (`public/js/arcade.js` com cada jogo em `public/js/jogos/`) têm som (dá para
+desligar no alto-falante), botões na tela para o celular, ranking, desafio versus e co-op e quem assiste.
 
 Os jogos novos (Damas, Campo Minado e 2048) são por vez ou rodam inteiros no navegador: nada fica
 indo e vindo pela internet o tempo todo, então não travam mesmo com a conexão ruim.
@@ -283,7 +296,7 @@ Cada jogo tem os modos que fazem sentido, nos botões do cartão do jogo no sal�
 | Quiz | todos contra todos, ou dois times | em equipe: a sala inteira contra a meta de 60% de acertos |
 | Cobrinha ao vivo | todos contra todos, ou 2 contra 2 | Colheita: juntos, comer as cenouras da meta antes do tempo (quem bate renasce) |
 | Velha, Lig 4 e Damas | um contra o outro | contra a Raposa (o computador), sozinho ou em dupla, um lance cada |
-| Pac-Coelho, Cobrinha e 2048 | desafio: todos jogam a mesma partida (a mesma sorte) ao mesmo tempo; vence quem fizer mais em 3 minutos | desafio: os pontos de todos somam para a meta da equipe; quem perde joga de novo e continua somando |
+| Pac-Coelho, Cobrinha, 2048, Barris, Super Coelho e Travessia | desafio: todos jogam a mesma partida (a mesma sorte) ao mesmo tempo; vence quem fizer mais em 3 minutos | desafio: os pontos de todos somam para a meta da equipe; quem perde joga de novo e continua somando |
 | Campo Minado | corrida no mesmo campo (com a casa do meio já aberta): vence quem limpar primeiro, e quem explode está fora | todos abrem o mesmo campo; se alguém pisar numa armadilha, a equipe perde |
 | Quebra-cabeça | corrida com a mesma foto e o mesmo embaralhado | todos montam a mesma imagem, trocando as peças |
 | Jogo da Memória | cada um na sua vez (achou o par, joga de novo); vence quem achar mais pares | a equipe, um de cada vez, acha todos os pares sem passar da meta de jogadas |
@@ -315,11 +328,44 @@ valem. No desafio (versus e co-op) os códigos não funcionam, para todos jogare
 | Quebra-cabeça | escrever "numeros" | cada peça mostra o número do lugar dela |
 | Quebra-cabeça | escrever "ima" | as peças no lugar certo brilham |
 | Minado, Memória, Quebra | escrever "festa" | chuva de confete quando ganha (vale recorde) |
+| Barris do Raposo | escrever "marreta" | uma marreta na hora, uma vez por partida |
+| Barris do Raposo | escrever "devagar" | barris e fagulhas na metade da velocidade |
+| Barris do Raposo | escrever "luckham" | o coelho sobe de coroa (vale recorde) |
+| Super Coelho | ↑ ↑ ↓ ↓ ← → ← → | mais 5 vidas, uma vez por partida |
+| Super Coelho | escrever "lua" | pouca gravidade, pulos de astronauta |
+| Super Coelho | escrever "fogo" | vira o Coelho de Fogo na hora |
+| Travessia | escrever "fantasma" | carroças e trem passam através do coelho (a água ainda pega) |
+| Travessia | escrever "ouro" | coelho dourado de coroa, com rastro de brilho (vale recorde) |
+| Travessia | escrever "noite" | tudo escuro, só lanternas iluminam (mais difícil, vale recorde) |
 
 Cada código descoberto fica no **livro de segredos**, no salão da Recreação: os descobertos aparecem
 com o código, e os que faltam aparecem como "???" com uma dica. Descobrir dá conquistas (Curioso,
-Caçador de segredos e Mestre dos segredos). As palavras precisam de teclado; as setas funcionam
+Caçador de segredos, Mestre dos segredos e, com os 23, Lenda do fliperama). As palavras precisam de teclado; as setas funcionam
 também no celular.
+
+### Club Coelho
+
+Um clube social no estilo do Club Penguin (`#/clube`, no menu e no alto do salão da Recreação).
+Cada morador tem um coelho que passeia pelas salas: clique no chão para andar e nas portas para entrar.
+
+- **Salas**: a Praça (com a fonte e as portas), o Café da Cenoura (clique no balcão e o coelho segura um
+  café), o Armarinho da Dona Felpuda (a loja, e o provador), o Salão de Dança (pista que muda de cor) e
+  o Lago Cintilante (pescaria). Quem está na mesma sala se vê andando ao vivo.
+- **Conversa** em balões em cima do coelho (com o mesmo anti-spam do chat, e a criança recebe sem
+  palavrão), emotes (aceno, coração, risada...), **dançar** e **sentar**.
+- **Cenouras** são a moeda do clube: 300 para começar, 50 de presente por dia, e mais jogando: a
+  **Pescaria** (3 por peixe), a **Dança da Toca** (setas no ritmo da música) e cada partida dos
+  joguinhos da Recreação (até 40 por partida). O que se ganha jogando tem teto de 400 por dia.
+- **Loja**: 14 cores de pelo, 41 roupas e acessórios (cabeça, rosto, pescoço, costas, roupa e o que vai
+  na mão) e 20 móveis, além de chão e parede para a toca. Roupa e pelo se compram uma vez; móveis, vários.
+- **Minha toca**: cada um tem a sua. Em **Decorar**, os móveis entram com um clique e se arrastam pela
+  sala; dá para virar, guardar, trocar o chão e a parede e fechar a toca para visitas. O **Mapa** leva
+  para qualquer sala e lista as tocas abertas, com quantas pessoas estão em cada uma.
+
+O servidor guarda o perfil de cada um na tabela `clube` (cenouras, roupa, itens e toca) e quem está em
+cada sala na memória (`src/clube.js`, rotas em `src/rotas/clube.js`). Os desenhos ficam em
+`public/js/roupas-coelho.js` (as roupas), `public/js/clube-salas.js` (salas e móveis),
+`public/js/clube-minijogos.js` e `public/js/telas/clube.js`.
 
 ### Lyendell Dorme
 

@@ -85,6 +85,60 @@ export const SEGREDOS = {
     efeito: 'As peças que já estão no lugar certo brilham.',
     dica: 'Quebra-cabeça: escreva o objeto que puxa as coisas para perto.',
   },
+  'barris-marreta': {
+    jogos: ['barris'], nome: 'Marreta de bolso', recorde: false, instantaneo: true,
+    texto: 'marreta',
+    efeito: 'O coelho ganha uma marreta na hora (uma vez por partida).',
+    dica: 'Barris do Raposo: escreva a ferramenta que quebra os barris.',
+  },
+  'barris-lento': {
+    jogos: ['barris'], nome: 'Barris preguiçosos', recorde: false,
+    texto: 'devagar',
+    efeito: 'Os barris e as fagulhas andam na metade da velocidade.',
+    dica: 'Barris do Raposo: peça para os barris irem com calma.',
+  },
+  'barris-coroa': {
+    jogos: ['barris'], nome: 'Coelho da realeza', recorde: true,
+    texto: 'luckham',
+    efeito: 'O coelho sobe a torre de coroa, como manda a Casa.',
+    dica: 'Barris do Raposo: escreva o nome da Casa.',
+  },
+  'super-vidas': {
+    jogos: ['supercoelho'], nome: 'Código Konami', recorde: false, instantaneo: true,
+    seq: ['cima', 'cima', 'baixo', 'baixo', 'esquerda', 'direita', 'esquerda', 'direita'],
+    efeito: 'Mais 5 vidas para o Super Coelho (uma vez por partida).',
+    dica: 'Super Coelho: o código mais famoso dos videogames, com as setas.',
+  },
+  'super-lua': {
+    jogos: ['supercoelho'], nome: 'Pulo lunar', recorde: false,
+    texto: 'lua',
+    efeito: 'Pouca gravidade: os pulos ficam altos e flutuantes.',
+    dica: 'Super Coelho: escreva onde a gravidade é fraquinha.',
+  },
+  'super-fogo': {
+    jogos: ['supercoelho'], nome: 'Coelho de fogo', recorde: false, instantaneo: true,
+    texto: 'fogo',
+    efeito: 'O coelho vira o Coelho de Fogo na hora.',
+    dica: 'Super Coelho: escreva o que a Flor de Fogo dá.',
+  },
+  'travessia-fantasma': {
+    jogos: ['travessia'], nome: 'Coelho fantasma', recorde: false,
+    texto: 'fantasma',
+    efeito: 'As carroças e o trem passam através do coelho (a água ainda molha).',
+    dica: 'Travessia: escreva o que atravessa paredes.',
+  },
+  'travessia-ouro': {
+    jogos: ['travessia'], nome: 'Coelho dourado', recorde: true,
+    texto: 'ouro',
+    efeito: 'O coelho fica dourado, de coroa, e deixa um rastro de brilho.',
+    dica: 'Travessia: escreva o metal mais precioso.',
+  },
+  'travessia-noite': {
+    jogos: ['travessia'], nome: 'Travessia noturna', recorde: true,
+    texto: 'noite',
+    efeito: 'Escurece tudo: só as lanternas e a luz do coelho iluminam. Mais difícil, vale recorde!',
+    dica: 'Travessia: escreva a hora em que a Lua aparece.',
+  },
   festa: {
     jogos: ['minado', 'memoria', 'quebra'], nome: 'Modo festa', recorde: true,
     texto: 'festa',
@@ -92,7 +146,10 @@ export const SEGREDOS = {
     dica: 'Campo Minado, Memória ou Quebra-cabeça: escreva o que dá vontade de fazer quando ganha.',
   },
 };
-export const NOME_JOGO = { cobrinha: 'Cobrinha', pacman: 'Pac-Coelho', 2048: '2048', minado: 'Campo Minado', memoria: 'Memória', quebra: 'Quebra-cabeça' };
+export const NOME_JOGO = {
+  cobrinha: 'Cobrinha', pacman: 'Pac-Coelho', 2048: '2048', minado: 'Campo Minado', memoria: 'Memória', quebra: 'Quebra-cabeça',
+  barris: 'Barris do Raposo', supercoelho: 'Super Coelho', travessia: 'Travessia',
+};
 const SETA = { cima: '↑', baixo: '↓', esquerda: '←', direita: '→' };
 const TECLAS = {
   ArrowUp: 'cima', ArrowDown: 'baixo', ArrowLeft: 'esquerda', ArrowRight: 'direita',
