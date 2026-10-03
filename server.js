@@ -80,6 +80,7 @@ app.use('/api/casas', require('./src/rotas/casas'));
 app.use('/api/predios', require('./src/rotas/predios'));
 app.use('/api/bobo', require('./src/rotas/bobo'));
 app.use('/api/propostas', require('./src/rotas/propostas'));
+app.use('/api/juramento', require('./src/rotas/juramento'));
 app.use('/api', require('./src/rotas/livros'));
 app.use('/api', require('./src/rotas/geral'));
 app.use('/api', (req, res, next) => next(erro(404, 'Rota não encontrada.')));

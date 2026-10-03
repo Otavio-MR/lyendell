@@ -660,6 +660,43 @@ export function livroDeProposta(p, autor) {
   return mc;
 }
 
+// O juramento da Casa Luckham, para ler diante da bandeira dentro do jogo.
+export function livroDoJuramento(j, autor) {
+  const mc = new LivroMC(j.titulo, autor);
+  mc.capa(capaPadrao('CASA', 'LUCKHAM', [
+    ...texto('JURAMENTO', '4', { centro: true, negrito: true }),
+    L(ORN.estrela, '8'),
+    ...texto('Honra e servidão', '0', { centro: true }),
+    ...texto('à Casa Luckham', '0', { centro: true }),
+    L(ORN.estrela, '8'),
+  ]));
+  mc.bloco(texto(j.intro, '8'), { junto: false });
+  mc.bloco([vazia(), ...texto(j.chamada.toUpperCase(), '4', { negrito: true })], { novaPagina: true });
+  j.linhas.forEach(l => mc.bloco([vazia(), ...texto(l, '0')]));
+  mc.bloco([vazia(), ...texto(j.fecho, '4', { negrito: true })]);
+  mc.bloco(assinatura(texto('Lyendell, Capital da Casa Luckham', '8', { centro: true })), { novaPagina: true });
+  return mc;
+}
+
+// Todos que já juraram (os registrados no Tabelionato), na ordem do juramento.
+export function livroDosJuramentados(pessoas, autor) {
+  const mc = new LivroMC('Os que juraram', autor);
+  mc.capa(capaPadrao('CASA', 'LUCKHAM', [
+    ...texto('OS QUE JURARAM', '4', { centro: true, negrito: true }),
+    L(ORN.estrela, '8'),
+    ...texto(`${pessoas.length} ${pessoas.length === 1 ? 'pessoa deu' : 'pessoas deram'} a sua palavra à Casa`, '0', { centro: true }),
+    L(ORN.estrela, '8'),
+  ]));
+  pessoas.forEach((p, i) => mc.bloco([
+    ...texto(`${i + 1}. ${p.nome}`, '0', { negrito: true }),
+    ...(p.nick ? texto(`Endereço: ${p.nick}`, '8') : []),
+    ...(p.desde ? texto(`Jurou em ${dataCurta(p.desde)}`, '8') : []),
+    vazia(),
+  ]));
+  mc.bloco(assinatura(texto('Pela honra. Pela lealdade. Pela Casa Luckham.', '4', { centro: true })));
+  return mc;
+}
+
 export function livroDeAnuncio(a, autor) {
   const mc = new LivroMC(a.titulo, autor || a.autor_nome);
   const selo = a.importancia === 'urgente' ? 'URGENTE' : a.importancia === 'importante' ? 'IMPORTANTE' : '';

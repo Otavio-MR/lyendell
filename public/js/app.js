@@ -18,6 +18,7 @@ import { campoMinado, jogo2048 } from './telas/jogos-sozinho.js';
 import { perguntasQuiz } from './telas/quiz.js';
 import { caixaDePegadinhas } from './telas/bobo.js';
 import { propostas } from './telas/propostas.js';
+import { juramento } from './telas/juramento.js';
 
 const app = document.getElementById('app');
 
@@ -28,6 +29,7 @@ const MENU = [
     { rota: '/mapa', nome: 'Mapa de Lyendell', icone: 'mapa' },
     { rota: '/anuncios', nome: 'Mural de Anúncios', icone: 'megafone', perm: ['anuncios.ver'] },
     { rota: '/congresso', nome: 'Congresso', icone: 'coluna', perm: ['congresso.ver'] },
+    { rota: '/juramento', nome: 'Juramento', icone: 'bandeira', perm: ['tabelionato.ver'] },
     { rota: '/leis', nome: 'Leis de Lyendell', icone: 'balanca', perm: ['leis.ver'] },
     { rota: '/atividades', nome: 'Mural de Atividades', icone: 'tarefas', perm: ['atividades.ver'] },
     { rota: '/galeria', nome: 'Galeria', icone: 'imagem', perm: ['galeria.ver'] },
@@ -71,6 +73,7 @@ const ROTAS = [
   [/^\/admin\/diario$/, () => diario()],
   [/^\/recreacao$/, () => recreacao()],
   [/^\/bobo$/, () => caixaDePegadinhas()],
+  [/^\/juramento$/, () => juramento()],
   [/^\/recreacao\/cobrinha$/, () => cobrinha()],
   [/^\/recreacao\/quebra-cabeca$/, () => quebraCabeca()],
   [/^\/recreacao\/pac-coelho$/, () => pacCoelho()],

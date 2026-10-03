@@ -7,8 +7,11 @@ const LIVRO_DE_PESSOAS = /morador|nobre|outro/;
 // Dados mostrados no mapa, nesta ordem, quando o registro tiver (pelo nome do campo, sem acento).
 const DADOS_MOSTRADOS = [
   ['idade'], ['profissao', 'oficio'], ['cargo'], ['titulo'], ['estado civil'], ['a qual familia pertence', 'familia'],
-  ['cargo na familia'], ['casa'], ['genero'], ['nickname', 'nick', 'nick do minecraft'],
+  ['cargo na familia'], ['casa'], ['genero'], ['endereco', 'nickname', 'nick', 'nick do minecraft'],
 ];
+// Em Lyendell o nick do jogador se chama "Endereço" (a rua e o número são a "Residência").
+const ehNick = c => c.tipo === 'texto' && (c.id === 'nickname' || /^nick/.test(nomeDoCampo(c)) || nomeDoCampo(c) === 'endereco');
+const ehDataDeChegada = c => c.tipo === 'data' && /chegada|juramento/.test(nomeDoCampo(c));
 const nomeDoCampo = c => chaveNome(c.nome).replace(/:$/, '').trim();
 
 async function pessoasRegistradas() {
@@ -18,10 +21,11 @@ async function pessoasRegistradas() {
   for (const l of livros) {
     const campos = JSON.parse(l.campos);
     const campoNome = campos.find(c => c.tipo === 'texto' && /^nome\b/.test(nomeDoCampo(c)));
-    const campoNick = campos.find(c => c.tipo === 'texto' && /^nick/.test(nomeDoCampo(c)));
+    const campoNick = campos.find(ehNick);
+    const campoChegada = campos.find(ehDataDeChegada);
     const primeiro = campos.find(c => c.tipo === 'texto' || c.tipo === 'selecao');
     const fotos = campos.filter(c => c.tipo === 'imagem');
-    const registros = await db.all("SELECT id, numero, dados FROM registros WHERE livro_id = ? AND situacao = 'aprovado' ORDER BY numero", l.id);
+    const registros = await db.all("SELECT id, numero, dados, criado_em, revisado_em FROM registros WHERE livro_id = ? AND situacao = 'aprovado' ORDER BY numero", l.id);
     for (const reg of registros) {
       const d = JSON.parse(reg.dados);
       const nome = String(d[campoNome?.id] || d[campoNick?.id] || d[primeiro?.id] || '').trim();
@@ -36,6 +40,9 @@ async function pessoasRegistradas() {
       pessoas.push({
         nome, chave: chaveNome(nome), livro: l.nome, livro_id: l.id, registro_id: reg.id, numero: reg.numero,
         foto: fotos.map(c => d[c.id]).find(Boolean) || null,
+        nick: campoNick && campoNick !== campoNome ? String(d[campoNick.id] || '').trim() || null : null,
+        // Quando entrou para a Casa: a data de chegada do registro, ou o dia em que o registro foi aprovado.
+        desde: (campoChegada && d[campoChegada.id]) || reg.revisado_em || reg.criado_em || null,
         detalhes: detalhes.slice(0, 6).map(({ rotulo, valor }) => ({ rotulo, valor })),
       });
     }

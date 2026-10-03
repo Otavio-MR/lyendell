@@ -124,6 +124,20 @@ fica em `src/censura.js`.
 Para os outros, o perfil e a comunidade mostram a etiqueta "Criança". Os textos de criança ficam em
 `public/js/crianca.js`.
 
+## Juramento da Casa Luckham
+
+A aba **Juramento** (no menu da Cidade) mostra o juramento que se repete diante da bandeira para se
+tornar morador da Capital, num pergaminho com o brasão, e logo abaixo **os que juraram**: todas as
+pessoas com registro aprovado no Tabelionato (Moradores, Nobres e Outros), na ordem em que juraram,
+com a foto do registro, o endereço (nick) e a data. A data do juramento é a "Data de chegada" do
+registro; sem ela, vale o dia em que o registro foi aprovado. Dá para filtrar por Moradores, Nobres e
+Outros, procurar pelo nome ou pelo endereço, e clicar numa pessoa abre o registro dela. Registro que
+ainda espera a Tabeliã não entra na lista.
+
+Os botões **Copiar** (o juramento em texto, para colar no chat do jogo ou no Discord), **Baixar .book**
+(o juramento como livro do Minecraft, para ler diante da bandeira) e **Lista em .book** (todos que
+juraram, num livro) ficam na própria página.
+
 ## Propostas do povo (Congresso)
 
 Na aba **Propostas do povo** do Congresso, qualquer morador manda uma ideia para a cidade: lei, PEC,
