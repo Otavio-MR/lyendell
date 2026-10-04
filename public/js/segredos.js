@@ -161,7 +161,7 @@ const semAcento = t => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 // Os códigos que esta pessoa já descobriu (para o Livro de segredos).
 export const segredosDescobertos = () => get('/api/recreacao/segredos');
 
-// Liga o detector numa tela de jogo. bloqueado: no desafio os códigos não funcionam (todos jogam igual).
+// Liga o detector numa tela de jogo. bloqueado: nos jogos juntos os códigos não funcionam (todos jogam igual).
 // aoMudar(chave, ligado): um modo foi ligado ou desligado. aoUsar(chave): código de uma vez só (devolve
 // false se não deu para usar agora, ex.: já usado nesta partida).
 export function segredosDoJogo(jogo, { bloqueado = false, aoMudar, aoUsar } = {}) {

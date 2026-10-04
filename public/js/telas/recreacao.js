@@ -174,7 +174,7 @@ export function recreacao() {
         else if (s.status === 'esperando') acao = botao('Entrar', { classe: 'btn-ouro btn-pequeno', desativado: !!rt.minhaSala || s.jogadores.length >= s.max, onclick: () => entrarNaPartida(s.id) });
         else acao = h('a', { class: 'btn btn-pequeno', href: `#/recreacao/sala/${s.id}` }, icone('olho'), h('span', null, 'Assistir'));
         return h('div', { class: 'sala-linha' },
-          h('span', { class: 'jogo-icone pequeno' }, icone(ICONE_JOGO[s.jogo] || (s.jogo === 'junto' ? JOGOS_JUNTO[s.opcoes?.jogo]?.icone : JOGOS_DESAFIO[s.opcoes?.jogo]?.icone) || 'jogos')),
+          h('span', { class: 'jogo-icone pequeno' }, icone(ICONE_JOGO[s.jogo] || (s.jogo === 'junto' ? JOGOS_JUNTO[s.opcoes?.jogo]?.icone : null) || 'jogos')),
           h('div', { class: 'sala-texto' },
             h('strong', null, s.nomeJogo),
             h('small', null, descricaoSala(s), s.espectadores ? ` · ${s.espectadores} assistindo` : '')),
