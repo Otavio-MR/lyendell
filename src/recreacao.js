@@ -178,7 +178,7 @@ const JOGOS = {
   // Jogos juntos: todos no mesmo jogo, ao mesmo tempo (veja junto.js). O máximo depende do jogo.
   junto: { nome: 'Juntos', max: 6, min: 1, grupo: true },
   // Festa na Toca: o tabuleiro com minijogos (veja festa.js). Os lugares vazios podem ser coelhos da casa.
-  festa: { nome: 'Festa na Toca', max: 4, min: 1, grupo: true },
+  festa: { nome: 'Festa na Toca', max: 10, min: 1, grupo: true },
 };
 const maxDa = s => (s.jogo === 'junto' ? junto.maximo(s.opcoes) : JOGOS[s.jogo].max);
 const ehMesa = s => !!JOGOS[s.jogo]?.mesa;

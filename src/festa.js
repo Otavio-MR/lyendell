@@ -1,6 +1,6 @@
 // Festa na Toca: o jogo de tabuleiro no estilo do Mario Party.
 //
-// De 2 a 4 coelhos (os lugares vazios podem ser completados com "coelhos da casa", o computador) andam
+// De 2 a 10 coelhos (os lugares vazios podem ser completados com "coelhos da casa", o computador) andam
 // por um jardim jogando o dado (1 a 10). As casas azuis dão 3 cenouras, as vermelhas tiram 3, as de sorte
 // sorteiam um acontecimento, as do Raposo aprontam, e nas lojas dá para comprar dados especiais. Quem passa
 // pela cenoura dourada pode comprá-la por 20 cenouras (aí ela muda de lugar). Depois que todos jogam, vem um
@@ -283,6 +283,9 @@ function fecharOrdem(e, agora) {
   return true;
 }
 
+// Com mais de 5 coelhos as pausas encurtam, para a rodada não ficar longa demais.
+const ritmo = e => (e.j.length > 7 ? 0.6 : e.j.length > 5 ? 0.75 : 1);
+
 function comecarVez(e, agora) {
   const p = daVez(e);
   e.passo = 'decidir';
@@ -290,8 +293,8 @@ function comecarVez(e, agora) {
   e.andar = null;
   e.pausa = null;
   e.dadosExtras = 0;
-  e.prazo = agora + ms(p.cpu || p.saiu ? 1400 : 20000);
-  e.cpuEm = agora + ms(1100);
+  e.prazo = agora + ms(p.cpu || p.saiu ? 1400 * ritmo(e) : 20000);
+  e.cpuEm = agora + ms(1100 * ritmo(e));
 }
 
 function passoDoTurno(e, agora) {
@@ -393,7 +396,7 @@ function cairNaCasa(e, k, agora) {
   }
   p.ultimaCor = cor;
   e.passo = 'efeito';
-  e.prazo = agora + ms(2600);
+  e.prazo = agora + ms(2600 * ritmo(e));
 }
 
 // As casas de sorte: um acontecimento sorteado.
@@ -548,7 +551,10 @@ function fecharMinijogo(e, agora) {
     const media = cor => {
       const ks = e.j.map((_, k) => k).filter(k => m.times[k] === cor);
       if (!ks.length) return -1;
-      return m.tipo === 'pontos' ? ks.reduce((s, k) => s + notas[k], 0) / ks.length : Math.max(...ks.map(k => notas[k]));
+      // Média do time (times de tamanhos diferentes ficam justos): sobrevivência = segundos de pé,
+      // corrida = 100 + o tempo que sobrou para quem chegou, ou o quanto andou para quem não chegou.
+      const notaTime = r => (m.tipo === 'sobrevivencia' ? (r.vivo ? m.duracao : r.tempo) : m.tipo === 'corrida' ? (r.vivo ? 100 + (m.duracao - r.tempo) : r.pontos) : r.pontos);
+      return ks.reduce((s, k) => s + notaTime(res[k]), 0) / ks.length;
     };
     const a = media('azul');
     const v = media('vermelho');

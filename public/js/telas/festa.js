@@ -146,7 +146,12 @@ export function criarTelaFesta(id, { sair, sairJa }) {
     const c = e.tab[p.pos];
     const juntos = e.j.map((q, x) => (q.pos === p.pos ? x : -1)).filter(x => x >= 0);
     const lugar = juntos.indexOf(k);
-    const alvo = { x: c.x + (lugar - (juntos.length - 1) / 2) * 26, y: c.y - 6 };
+    const n = juntos.length;
+    const porFila = n <= 4 ? n : Math.ceil(n / 2);
+    const fila = Math.floor(lugar / porFila);
+    const naFila = fila ? n - porFila : porFila;
+    const passo = n <= 4 ? 26 : 24;
+    const alvo = { x: c.x + ((lugar % porFila) - (naFila - 1) / 2) * passo + (fila ? passo / 2 : 0), y: c.y - 6 + (n > 4 ? (fila ? 10 : -10) : 0) };
     let m = mostrados.get(k);
     if (!m) { m = { x: alvo.x, y: alvo.y, de: alvo, para: alvo, desde: 0 }; mostrados.set(k, m); }
     if (Math.abs(m.para.x - alvo.x) > 0.5 || Math.abs(m.para.y - alvo.y) > 0.5) {
@@ -181,18 +186,30 @@ export function criarTelaFesta(id, { sair, sairJa }) {
         g.beginPath(); g.ellipse(c.x, c.y - 3, 30, 22, 0, 0, Math.PI * 2); g.stroke();
       }
     }
-    const ordem = e.j.map((_, k) => k).sort((a, b) => e.tab[e.j[a].pos].y - e.tab[e.j[b].pos].y);
+    const pos = new Map(e.j.map((_, k) => [k, posicaoDe(k, agoraMs)]));
+    const ordem = e.j.map((_, k) => k).sort((a, b) => (pos.get(a).y - pos.get(b).y) || a - b);
+    // Casa cheia: o nome só aparece para quem está na vez e para mim (os outros ficam com uma bolinha da cor).
+    const lotada = k => e.j.filter(q => q.pos === e.j[k].pos).length > 4;
     for (const k of ordem) {
       const p = e.j[k];
-      const { x, y, pulando } = posicaoDe(k, agoraMs);
+      const { x, y, pulando } = pos.get(k);
       if (k === e.vez && e.fase === 'turno') {
         elipse(g, x, y + 8, 26 + Math.sin(t * 5) * 3, 9, 'rgba(255,240,150,0.55)');
       }
       g.save();
       g.translate(x, y + 6);
-      g.scale(1.1, 1.1);
+      g.scale(lotada(k) ? 0.85 : 1.1, lotada(k) ? 0.85 : 1.1);
       desenharCoelho(g, 0, 0, { pelo: p.visual?.pelo || ['#e9dcc3', '#9aa3ad', '#c99a6b', '#f7f3ea'][k % 4], roupa: p.visual?.roupa || null, andando: pulando, passo: t, t: t + k, dir: 1 });
       g.restore();
+    }
+    // Os nomes vêm depois de todos os coelhos (para nenhum coelho tapar o nome de quem está na frente).
+    for (const k of [...ordem.filter(k => k !== e.vez && k !== s.eu), ...[s.eu, e.vez].filter(k => k != null && k >= 0 && e.j[k])]) {
+      const p = e.j[k];
+      const { x, y } = pos.get(k);
+      if (lotada(k) && k !== e.vez && k !== s.eu) {
+        elipse(g, x, y + 14, 4.5, 4.5, cor(k));
+        continue;
+      }
       g.font = '700 13px "EB Garamond", Georgia, serif';
       g.textAlign = 'center';
       g.textBaseline = 'middle';
@@ -482,7 +499,7 @@ export function criarTelaFesta(id, { sair, sairJa }) {
     const basta = o.cpus ? n >= 1 : n >= 2;
     return h('div', { class: 'cid-espera' },
       h('section', { class: 'painel' },
-        h('div', { class: 'painel-cab' }, h('h2', null, icone('usuarios'), `Na festa: ${n} de 4`)),
+        h('div', { class: 'painel-cab' }, h('h2', null, icone('usuarios'), `Na festa: ${n} de 10`)),
         h('div', { class: 'quiz-na-sala' }, s.jogadores.map(p => h('div', { class: `quiz-pessoa ${p.conectado ? '' : 'ausente'}`.trim() },
           avatar(p.nome, '', p.foto), h('span', null, p.nome),
           p.id === s.dono && h('span', { class: 'quiz-dono', title: 'Abriu a sala' }, icone('coroa'))))),
@@ -492,7 +509,7 @@ export function criarTelaFesta(id, { sair, sairJa }) {
             ? [botao(basta ? 'Começar a festa' : 'Esperando mais gente...', { classe: 'btn-ouro btn-grande', icone: 'estrela', desativado: !basta, onclick: () => enviar('sala:comecar', { id }) })]
             : jogador
               ? h('p', { class: 'quiz-aguarde' }, h('span', { class: 'giro giro-p' }), ' Esperando quem abriu a sala começar...')
-              : [n < 4 && !rt.minhaSala && botao('Entrar nesta festa', { classe: 'btn-ouro', onclick: () => entrarNaPartida(id) }), h('p', { class: 'suave' }, 'Você está assistindo.')])),
+              : [n < 10 && !rt.minhaSala && botao('Entrar nesta festa', { classe: 'btn-ouro', onclick: () => entrarNaPartida(id) }), h('p', { class: 'suave' }, 'Você está assistindo.')])),
       h('section', { class: 'painel cid-opcoes' },
         h('div', { class: 'painel-cab' }, h('h2', null, icone('ajustes'), 'Opções'), !souDono && h('small', { class: 'suave' }, 'Só quem abriu a sala muda')),
         h('div', { class: 'cid-opcao' }, h('span', null, 'Rodadas'),
@@ -523,7 +540,7 @@ export function criarTelaFesta(id, { sair, sairJa }) {
     else if (jogador && s.status === 'jogando' && !eu.saiu) {
       botoes.push(botao('Sair da festa', { icone: 'bandeira', classe: 'btn-perigo-texto', onclick: async () => { if (await confirmar('Um coelho da casa joga no seu lugar até o fim.', { titulo: 'Sair da festa?', ok: 'Sair', perigo: true })) sairJa(); } }));
     } else if (!jogador) botoes.push(h('a', { class: 'btn', href: '#/recreacao' }, icone('voltar'), h('span', null, 'Parar de assistir')));
-    trocar(topo, cabecalho({ titulo: 'Festa na Toca', icone: 'estrela', voltar: { href: '#/recreacao', texto: 'Recreação' }, acoes: botoes, sub: 'Tabuleiro com minijogos: junte cenouras douradas pelo Jardim da Toca. De 1 a 4 pessoas.' }));
+    trocar(topo, cabecalho({ titulo: 'Festa na Toca', icone: 'estrela', voltar: { href: '#/recreacao', texto: 'Recreação' }, acoes: botoes, sub: 'Tabuleiro com minijogos: junte cenouras douradas pelo Jardim da Toca. De 1 a 10 pessoas.' }));
     e = s.estado;
     if (s.status === 'esperando' || !e) {
       minijogo?.parar();

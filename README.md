@@ -313,8 +313,9 @@ aparece com o visual do Club Coelho.
 
 ### Festa na Toca
 
-Um tabuleiro com minijogos, no estilo do Mario Party, de 1 a 4 pessoas (os lugares vazios podem ser
-coelhos da casa, que jogam sozinhos). Todo mundo joga o dado para ver a ordem; em cada rodada cada um
+Um tabuleiro com minijogos, no estilo do Mario Party, de 1 a 10 pessoas (com menos de 4, os lugares
+vazios podem ser coelhos da casa, que jogam sozinhos). Com mais de 5 coelhos as pausas entre as jogadas
+encurtam, e nos minijogos em times vale a média de cada time (times de tamanhos diferentes ficam justos). Todo mundo joga o dado para ver a ordem; em cada rodada cada um
 joga o dado e anda pelo Jardim da Toca:
 
 - **Casa azul** dá 3 cenouras, **vermelha** tira 3, **sorte** sorteia algo bom ou ruim, **Raposo**

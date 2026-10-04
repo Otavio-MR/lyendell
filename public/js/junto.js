@@ -19,7 +19,7 @@
 import { h, trocar, icone, aoSair } from './core.js';
 import { rt, ouvir, enviar } from './tempo-real.js';
 
-export const CORES_JUNTO = ['#e8c24a', '#5aa0d8', '#e05a8a', '#7fb069', '#b77be6', '#e0884a'];
+export const CORES_JUNTO = ['#e8c24a', '#5aa0d8', '#e05a8a', '#7fb069', '#b77be6', '#e0884a', '#4fc1b8', '#d8d8d8', '#a0783c', '#9db3f0'];
 const relogio = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const nada = () => {};
 

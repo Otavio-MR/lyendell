@@ -12,8 +12,11 @@ const FPS = 60;
 const FONTE = '"Fredoka", "Trebuchet MS", system-ui, sans-serif';
 const COR_TIME = { azul: '#3b82f6', vermelho: '#ef4444' };
 const NOME_TIME = { azul: 'Azul', vermelho: 'Vermelho' };
-const PELOS = ['#e9dcc3', '#c99a6b', '#8a6a4f', '#f7f3ea'];
-const CORES = ['#f59e0b', '#22c55e', '#3b82f6', '#ec4899'];
+const PELOS = ['#e9dcc3', '#c99a6b', '#8a6a4f', '#f7f3ea', '#5b4a3f', '#d9b48a', '#9aa3ad', '#e2b3a3', '#b9875a', '#ede4d3'];
+// 10 cores bem diferentes (as 4 primeiras são as de sempre)
+const CORES = ['#f59e0b', '#22c55e', '#3b82f6', '#ec4899', '#14b8a6', '#a855f7', '#be123c', '#84cc16', '#64748b', '#8b5a2b'];
+// Para trocar uma cor repetida, estas vêm primeiro (longe das cores da sala).
+const CORES_TROCA = ['#14b8a6', '#64748b', '#84cc16', '#8b5a2b', '#be123c', '#0ea5e9', '#f8fafc', '#facc15', ...CORES];
 const CONFETES = ['#ff5d8f', '#ffd166', '#06d6a0', '#4cc9f0', '#b388ff', '#ff9f1c'];
 const SETAS = ['cima', 'baixo', 'esq', 'dir'];
 const SEM_TECLAS = new Set();
@@ -58,6 +61,14 @@ function seno(x) {
 const resSobrev = (vivo, tempo) => ({ pontos: 0, vivo: !!vivo, tempo: red(Math.max(0, tempo)) });
 const resCorrida = (chegou, tempo, prog) => ({ pontos: chegou ? 100 : limitar(Math.floor(prog), 0, 99), vivo: !!chegou, tempo: red(Math.max(0, tempo)) });
 const resPontos = p => ({ pontos: Math.max(0, Math.round(p)), vivo: true, tempo: 0 });
+
+// Corta o texto até caber na largura (com a fonte já escolhida em g).
+function caber(g, s, max) {
+  if (g.measureText(s).width <= max) return s;
+  let t = s;
+  while (t.length > 1 && g.measureText(`${t}…`).width > max) t = t.slice(0, -1);
+  return `${t}…`;
+}
 
 function curto(nome, n = 11) {
   const s = String(nome ?? '?');
@@ -170,10 +181,27 @@ function criarMoldura(ctx, def) {
   };
   M.ehCpu = i => i !== eu && !!jog[i]?.cpu;
   M.humano = i => !M.ehCpu(i);
-  M.cor = i => (typeof jog[i]?.cor === 'string' && jog[i].cor ? jog[i].cor : CORES[i % CORES.length]);
+  // Cor de cada um; se vier repetida (a sala recicla as cores), troca por uma livre.
+  const cores = [];
+  const usadas = new Set(jog.map(j => (typeof j?.cor === 'string' ? j.cor.toLowerCase() : '')).filter(Boolean));
+  for (let i = 0; i < N; i++) {
+    let c = typeof jog[i]?.cor === 'string' && jog[i].cor ? jog[i].cor : null;
+    if (c && cores.some(o => o.toLowerCase() === c.toLowerCase())) c = null;
+    if (!c) {
+      c = CORES[i % CORES.length];
+      if (usadas.has(c) || cores.includes(c)) c = CORES_TROCA.find(o => !usadas.has(o) && !cores.includes(o)) ?? c;
+    }
+    usadas.add(c.toLowerCase());
+    cores.push(c);
+  }
+  M.cor = i => cores[i] ?? CORES[i % CORES.length];
+  // Com 6 ou mais, as fichas vão em duas linhas e as plaquinhas ficam mais curtas.
+  M.cheio = N >= 6;
+  M.baseCena = A - (M.cheio ? 46 : 30);
   M.pelo = i => (hexOk(jog[i]?.visual?.pelo) ? jog[i].visual.pelo : PELOS[i % PELOS.length]);
   M.roupa = i => (jog[i]?.visual?.roupa && typeof jog[i].visual.roupa === 'object' ? jog[i].visual.roupa : null);
   M.nome = i => curto(jog[i]?.nome ?? `Coelho ${i + 1}`);
+  M.nomeTag = i => curto(jog[i]?.nome ?? `Coelho ${i + 1}`, M.cheio ? 9 : 11);
   M.time = i => (M.times && COR_TIME[jog[i]?.time] ? jog[i].time : null);
   M.rng = sal => fluxo(M.sem, sal);
   M.Tm = () => (M.T < 0 ? 0 : M.fim ? M.tFim : Math.min(M.T, M.dur));
@@ -293,11 +321,12 @@ function criarMoldura(ctx, def) {
         estrela(g, x + Math.cos(a) * 14 * s, y - 50 * s + Math.sin(a) * 4 * s, 4.5, '#ffd166', a);
       }
     }
-    if (o.etiqueta !== false) M.etiqueta(g, i, x, y - (o.altEtiqueta ?? 64) * s, o.alfa);
+    const degrau = M.cheio && o.escalonar !== false ? (i % 2) * 14 : 0;
+    if (o.etiqueta !== false) M.etiqueta(g, i, x, y - (o.altEtiqueta ?? 64) * s - degrau, o.alfa);
   };
 
   M.etiqueta = (g, i, x, y, alfa) => {
-    const nome = M.nome(i);
+    const nome = M.nomeTag(i);
     g.save();
     if (alfa != null) g.globalAlpha = alfa;
     g.font = `700 11px ${FONTE}`;
@@ -351,9 +380,8 @@ function montar(ctx, def, fabrica) {
       const v = tot[t];
       if (!v.length) return '0';
       if (def.tipo === 'pontos') return decimal(red(v.reduce((s, p) => s + p.pontos, 0) / v.length, 10));
-      if (def.tipo === 'sobrevivencia') return `${v.filter(p => p.vivo).length} de pé`;
-      const c = v.filter(p => p.vivo);
-      return c.length ? `${decimal(Math.min(...c.map(p => p.tempo)).toFixed(1))} s` : `${Math.max(...v.map(p => p.pontos))}%`;
+      if (def.tipo === 'sobrevivencia') return `${v.filter(p => p.vivo).length}/${v.length} de pé`;
+      return `${Math.round(v.reduce((s, p) => s + (p.vivo ? 100 : p.pontos), 0) / v.length)}%`;
     };
     return [lado('azul'), lado('vermelho')];
   }
@@ -403,18 +431,41 @@ function montar(ctx, def, fabrica) {
     }
     // fichas dos jogadores
     if (J.semFichas) return;
-    const w = (L - 16 - (M.N - 1) * 6) / Math.max(1, M.N);
+    if (!M.cheio) {
+      // até 5: uma linha, como sempre
+      const w = (L - 16 - (M.N - 1) * 6) / Math.max(1, M.N);
+      for (let i = 0; i < M.N; i++) {
+        const x = 8 + i * (w + 6);
+        const y = A - 27;
+        const p = J.placar(i, Tm);
+        ret(g, x, y, w, 22, 'rgba(25,18,48,0.74)', 11);
+        if (i === M.eu) borda(g, x, y, w, 22, M.cor(i), 2, 11);
+        const tm = M.time(i);
+        elipse(g, x + 12, y + 11, 7, 7, M.cor(i));
+        if (tm) { g.strokeStyle = COR_TIME[tm]; g.lineWidth = 2.5; g.beginPath(); g.arc(x + 12, y + 11, 8.5, 0, TAU); g.stroke(); }
+        g.font = `700 11px ${FONTE}`;
+        const ws = g.measureText(p.status).width;
+        texto(g, caber(g, M.nome(i), w - 40 - ws), x + 24, y + 11.5, { tam: 11, alinhar: 'left', contorno: null, cor: p.fora ? 'rgba(255,255,255,0.55)' : '#fff' });
+        texto(g, p.status, x + w - 8, y + 11.5, { tam: 11, alinhar: 'right', contorno: null, cor: p.fora ? '#fca5a5' : '#ffd166' });
+      }
+      return;
+    }
+    // 6 ou mais: duas linhas de fichas menores
+    const porLinha = Math.ceil(M.N / 2);
+    const w = (L - 16 - (porLinha - 1) * 6) / porLinha;
     for (let i = 0; i < M.N; i++) {
-      const x = 8 + i * (w + 6);
-      const y = A - 27;
+      const x = 8 + (i % porLinha) * (w + 6);
+      const y = A - 44 + Math.floor(i / porLinha) * 22;
       const p = J.placar(i, Tm);
-      ret(g, x, y, w, 22, 'rgba(25,18,48,0.74)', 11);
-      if (i === M.eu) borda(g, x, y, w, 22, M.cor(i), 2, 11);
+      ret(g, x, y, w, 19, 'rgba(25,18,48,0.74)', 9.5);
+      if (i === M.eu) borda(g, x, y, w, 19, M.cor(i), 2, 9.5);
       const tm = M.time(i);
-      elipse(g, x + 12, y + 11, 7, 7, M.cor(i));
-      if (tm) { g.strokeStyle = COR_TIME[tm]; g.lineWidth = 2.5; g.beginPath(); g.arc(x + 12, y + 11, 8.5, 0, TAU); g.stroke(); }
-      texto(g, M.nome(i), x + 24, y + 11.5, { tam: 11, alinhar: 'left', contorno: null, cor: p.fora ? 'rgba(255,255,255,0.55)' : '#fff' });
-      texto(g, p.status, x + w - 8, y + 11.5, { tam: 11, alinhar: 'right', contorno: null, cor: p.fora ? '#fca5a5' : '#ffd166' });
+      elipse(g, x + 11, y + 9.5, 5.5, 5.5, M.cor(i));
+      if (tm) { g.strokeStyle = COR_TIME[tm]; g.lineWidth = 2.2; g.beginPath(); g.arc(x + 11, y + 9.5, 7.2, 0, TAU); g.stroke(); }
+      g.font = `700 10px ${FONTE}`;
+      const ws = g.measureText(p.status).width;
+      texto(g, caber(g, M.nome(i), w - 34 - ws), x + 21, y + 10, { tam: 10, alinhar: 'left', contorno: null, cor: p.fora ? 'rgba(255,255,255,0.55)' : '#fff' });
+      texto(g, p.status, x + w - 7, y + 10, { tam: 10, alinhar: 'right', contorno: null, cor: p.fora ? '#fca5a5' : '#ffd166' });
     }
   }
 
@@ -612,7 +663,7 @@ function jogoChuva(M) {
   const { N, eu } = M;
   const dur = M.dur;
   const nP = Math.round(dur * FPS) + 1;
-  const xIni = i => 320 + (i - (N - 1) / 2) * 110;
+  const xIni = i => 320 + (i - (N - 1) / 2) * Math.min(110, 580 / Math.max(1, N - 1));
   const { deco, copa } = enfeitesChuva(M);
 
   // A agenda de tudo o que cai (igual em todas as telas).
@@ -930,15 +981,17 @@ function jogoCorrida(M) {
   const { N, eu } = M;
   const dur = M.dur;
   const nP = Math.round(dur * FPS) + 1;
-  const INI = 100;
+  const compacto = N >= 6; // raias finas: nome na raia, coelho menor, sem plaquinha
+  const INI = compacto ? 112 : 100;
   const META = 585;
   const VMAX = 9;
   const GANHO = 1.15;
   const ATRITO = 1.5;
   const TOPO = M.times ? 66 : 46;
-  const BASE = 366;
+  const BASE = compacto ? M.baseCena - 2 : 366;
   const faixa = (BASE - TOPO) / Math.max(1, N);
-  const esc = limitar(faixa / 76, 0.8, 1.3);
+  const esc = compacto ? limitar(faixa / 60, 0.45, 0.8) : limitar(faixa / 76, 0.8, 1.3);
+  const rRaia = compacto ? Math.min(12, faixa * 0.36) : 12;
 
   const cpu = [];
   for (let i = 0; i < N; i++) if (M.ehCpu(i)) cpu[i] = planoCpu(i);
@@ -1118,17 +1171,25 @@ function jogoCorrida(M) {
           g.fillRect(META + c * lado, y0 + 5 + k * lado, lado, lado);
         }
         // número da raia
-        elipse(g, 20, y0 + faixa / 2, 12, 12, M.cor(i));
+        elipse(g, 20, y0 + faixa / 2, rRaia, rRaia, M.cor(i));
         const tm = M.time(i);
-        if (tm) { g.strokeStyle = COR_TIME[tm]; g.lineWidth = 3; g.beginPath(); g.arc(20, y0 + faixa / 2, 13.5, 0, TAU); g.stroke(); }
-        texto(g, String(i + 1), 20, y0 + faixa / 2 + 1, { tam: 13, contorno: 'rgba(0,0,0,0.4)' });
+        if (tm) { g.strokeStyle = COR_TIME[tm]; g.lineWidth = compacto ? 2 : 3; g.beginPath(); g.arc(20, y0 + faixa / 2, rRaia + 1.5, 0, TAU); g.stroke(); }
+        texto(g, String(i + 1), 20, y0 + faixa / 2 + 1, { tam: compacto ? Math.min(13, rRaia * 1.1) : 13, contorno: 'rgba(0,0,0,0.4)' });
+        if (compacto) {
+          // na raia fina o nome fica no começo da pista; a minha ganha borda e as teclas
+          if (i === eu) borda(g, 35, y0 + 2, L - 42, faixa - 4, M.cor(i), 2.5, 6);
+          else {
+            g.font = `700 10px ${FONTE}`;
+            texto(g, caber(g, M.nome(i), INI - 42), 36, y0 + faixa / 2 + 0.5, { tam: 10, alinhar: 'left', contorno: 'rgba(0,0,0,0.55)' });
+          }
+        }
       }
       bandeirolas(g, TOPO - 26, rel);
       for (let i = 0; i < N; i++) {
         const s = est(i, T);
         const y0 = TOPO + i * faixa;
         const x = INI + (s.p / 100) * (META - INI);
-        const pe = y0 + faixa * 0.82;
+        const pe = y0 + faixa * (compacto ? 0.86 : 0.82);
         passoAnim[i] += dtv * (0.4 + s.v * 0.12);
         if (s.v > 3.5 && !s.fin && Math.random() < s.v / 30) M.particula(x - 12, pe - 2, { vx: -40 - Math.random() * 40, vy: -30, gr: 80, vida: 0.4, cor: 'rgba(240,200,160,0.8)', tam: 2.5 + Math.random() * 2 });
         if (s.tonto && !tropVisto[i] && i !== eu) { tropVisto[i] = true; M.popup(x, pe - 60 * esc, 'Opa!', '#ff5d8f', 14); }
@@ -1138,12 +1199,12 @@ function jogoCorrida(M) {
           M.estouro(META + 8, pe - 30, CONFETES, 18, 180, { forma: 'papel' });
           M.popup(META - 10, pe - 50 * esc, `${colocacao(i, T)}º!`, '#ffd166', 20);
         }
-        M.coelho(g, i, x, pe, { escala: esc, dir: 1, passo: passoAnim[i], andando: s.v > 0.4 && !s.fin, tonto: s.tonto, pose: s.fin ? 'dancando' : null, altEtiqueta: 60 });
+        M.coelho(g, i, x, pe, { escala: esc, dir: 1, passo: passoAnim[i], andando: s.v > 0.4 && !s.fin, tonto: s.tonto, pose: s.fin ? 'dancando' : null, altEtiqueta: 60, etiqueta: !compacto });
         if (s.fin) {
           const pos = colocacao(i, T);
           const cor = pos === 1 ? '#ffd166' : pos === 2 ? '#d1d5db' : pos === 3 ? '#e8a46a' : '#a7f3d0';
-          elipse(g, META + 36, y0 + faixa / 2, 12, 12, cor);
-          texto(g, `${pos}º`, META + 36, y0 + faixa / 2 + 1, { tam: 11, cor: '#3b2a1a', contorno: null });
+          elipse(g, META + 36, y0 + faixa / 2, rRaia, rRaia, cor);
+          texto(g, `${pos}º`, META + 36, y0 + faixa / 2 + 1, { tam: compacto ? Math.min(11, rRaia) : 11, cor: '#3b2a1a', contorno: null });
         } else {
           texto(g, `${Math.floor(s.p)}%`, META + 36, y0 + faixa / 2, { tam: 11, contorno: 'rgba(0,0,0,0.5)' });
         }
@@ -1151,11 +1212,12 @@ function jogoCorrida(M) {
         if (i === eu && !s.fin) {
           const prox = me.ultimo === 'esq' ? 'dir' : me.ultimo === 'dir' ? 'esq' : null;
           for (const [k, dir] of [[0, 'esq'], [1, 'dir']]) {
-            const kx = 46 + k * 24;
-            const ky = y0 + faixa - 20;
+            const kx = (compacto ? 38 : 46) + k * 24;
+            const kh = compacto ? Math.min(14, faixa - 10) : 14;
+            const ky = compacto ? y0 + faixa / 2 - kh / 2 : y0 + faixa - 20;
             const acesa = prox === null || prox === dir;
-            ret(g, kx, ky, 20, 14, acesa ? '#fff' : 'rgba(255,255,255,0.35)', 4);
-            seta(g, kx + 10, ky + 7, 5, dir, acesa ? '#3b2a6b' : 'rgba(59,42,107,0.4)', null);
+            ret(g, kx, ky, 20, kh, acesa ? '#fff' : 'rgba(255,255,255,0.35)', 4);
+            seta(g, kx + 10, ky + kh / 2, Math.min(5, kh * 0.36), dir, acesa ? '#3b2a6b' : 'rgba(59,42,107,0.4)', null);
           }
         }
       }
@@ -1205,6 +1267,18 @@ function desenharCenoura(g, x, y, esc, ouro, rel, alfa = 1) {
   g.globalAlpha = 1;
 }
 
+// Onde cada um começa: uma fileira até 5; com 6 ou mais, duas fileiras.
+function largada(N, i, yMeio, sep, passoMax) {
+  if (N <= 5) return { x: 320 + (i - (N - 1) / 2) * Math.min(passoMax, 560 / Math.max(1, N - 1)), y: yMeio };
+  const cols = Math.ceil(N / 2);
+  const col = Math.floor(i / 2);
+  const p = Math.min(passoMax, 520 / Math.max(1, cols - 1));
+  return { x: 320 + (col - (cols - 1) / 2) * p, y: yMeio + (i % 2 ? sep : -sep) };
+}
+
+// Mais jogadores, mais coisas para pegar (igual em todas as telas: depende só da semente e de N).
+const fatorItens = N => (N > 4 ? 4 / N : 1);
+
 function jogoCacada(M) {
   const { N, eu } = M;
   const dur = M.dur;
@@ -1215,8 +1289,8 @@ function jogoCacada(M) {
   const Y1 = 352;
   const VEL = 200;
   const RAIO = 24;
-  const xIni = i => 320 + (i - (N - 1) / 2) * 120;
-  const yIni = () => (Y0 + Y1) / 2 + 20;
+  const xIni = i => largada(N, i, (Y0 + Y1) / 2 + 20, 42, 120).x;
+  const yIni = i => largada(N, i, (Y0 + Y1) / 2 + 20, 42, 120).y;
   const flores = enfeitesCacada(M);
 
   const r = M.rng('cacada-cenouras');
@@ -1225,7 +1299,7 @@ function jogoCacada(M) {
   while (t < dur - 1.2) {
     const p = t / dur;
     cen.push({ k: cen.length, x: red(entre(r, X0 + 12, X1 - 12), 10), y: red(entre(r, Y0 + 14, Y1 - 6), 10), t0: red(t, 1000), tf: red(t + 5.5 - 1.5 * p, 1000), ouro: r() < 0.12 });
-    t += entre(r, 0.42, 0.85) - 0.12 * p;
+    t += (entre(r, 0.42, 0.85) - 0.12 * p) * fatorItens(N);
   }
   const valor = c => (c.ouro ? 3 : 1);
 
@@ -1238,7 +1312,7 @@ function jogoCacada(M) {
     const reservadas = new Set();
     const est = cpus.map(i => {
       const rc = M.rng(`cacada-cpu-${i}`);
-      return { i, rc, x: xIni(i), y: yIni(), vel: entre(rc, 130, 165), reacao: entre(rc, 0.2, 0.5), alvo: null, pausa: 0, wx: xIni(i), wy: yIni(), ticks: [], xs: new Float32Array(nP), ys: new Float32Array(nP) };
+      return { i, rc, x: xIni(i), y: yIni(i), vel: entre(rc, 130, 165), reacao: entre(rc, 0.2, 0.5), alvo: null, pausa: 0, wx: xIni(i), wy: yIni(i), ticks: [], xs: new Float32Array(nP), ys: new Float32Array(nP) };
     });
     for (let s = 0; s < nP; s++) {
       const T = s / FPS;
@@ -1287,8 +1361,8 @@ function jogoCacada(M) {
     for (const st of est) cpu[st.i] = { xs: st.xs, ys: st.ys, ticks: st.ticks, total: st.ticks.reduce((a, b) => a + b.v, 0), mostrados: 0 };
   }
 
-  const me = { x: eu >= 0 ? xIni(eu) : 0, y: yIni(), dir: 1, passo: 0, andando: false };
-  const rem = Array.from({ length: N }, (_, i) => ({ x: xIni(i), y: yIni(), ax: xIni(i), ay: yIni(), dir: 1, passo: 0, andando: false }));
+  const me = { x: eu >= 0 ? xIni(eu) : 0, y: eu >= 0 ? yIni(eu) : 0, dir: 1, passo: 0, andando: false };
+  const rem = Array.from({ length: N }, (_, i) => ({ x: xIni(i), y: yIni(i), ax: xIni(i), ay: yIni(i), dir: 1, passo: 0, andando: false }));
   const tomada = new Map();
   const pend = new Set();
   const pts = Array(N).fill(0);
@@ -1528,7 +1602,17 @@ function jogoMemoria(M) {
     return prog[i].r === R.r ? prog[i].n : 0;
   }
 
-  const xJog = i => (N <= 1 ? 400 : 230 + (i * 370) / (N - 1));
+  // Lugar no palco: uma fileira até 5; com 6 ou mais, duas fileiras desencontradas.
+  function lugar(i) {
+    if (!M.cheio) return { x: N <= 1 ? 400 : 230 + (i * 370) / (N - 1), y: 332, s: 1 };
+    const atras = i % 2 === 0;
+    const k = Math.floor(i / 2);
+    const n = atras ? Math.ceil(N / 2) : Math.floor(N / 2);
+    const passo = Math.min(140, 280 / Math.max(1, Math.ceil(N / 2) - 1));
+    const x0 = 190 + (atras ? 0 : passo / 2);
+    return { x: x0 + Math.min(k, n - 1) * passo, y: atras ? 314 : 346, s: 0.75 };
+  }
+  const xJog = i => lugar(i).x;
   const PADX = 548;
   const PADY = 186;
   const posPad = { cima: [0, -44], baixo: [0, 44], esq: [-44, 0], dir: [44, 0] };
@@ -1561,7 +1645,7 @@ function jogoMemoria(M) {
                 pts[eu] = R.r + 1;
                 M.som('moeda');
                 M.evento({ tipo: 'acertou', r: R.r });
-                M.popup(xJog(eu), 250, 'Boa!', '#06d6a0', 20);
+                M.popup(xJog(eu), lugar(eu).y - 82 * lugar(eu).s, 'Boa!', '#06d6a0', 20);
                 break;
               }
             } else {
@@ -1722,22 +1806,31 @@ function jogoMemoria(M) {
         seta(g, PADX + dx, PADY + dy, 13, s, aceso ? '#fff' : 'rgba(255,255,255,0.75)', null);
       }
       // coelhos no palco
-      for (let i = 0; i < N; i++) {
-        const x = xJog(i);
+      const ordem = [];
+      for (let i = 0; i < N; i++) ordem.push(i);
+      if (M.cheio) ordem.sort((a, b) => lugar(a).y - lugar(b).y || a - b); // fileira de trás primeiro
+      for (const i of ordem) {
+        const { x, y, s } = lugar(i);
         const f = estaFora(i, T);
-        if (f && !foraVisto[i]) { foraVisto[i] = true; M.popup(x, 236, 'Errou!', '#ff5d8f', 16); M.estouro(x, 270, '#ffd166', 8, 130, { forma: 'estrela' }); }
-        ret(g, x - 26, 330, 52, 10, '#5b3a20', 4);
+        // até 5: as alturas de sempre; com 6 ou mais: tudo relativo à plaquinha
+        const yTag = y - 64 * s;
+        const yPontos = M.cheio ? yTag - 13 : 274;
+        const ySeta = M.cheio ? yTag - 26 : 252;
+        if (f && !foraVisto[i]) { foraVisto[i] = true; M.popup(x, M.cheio ? yTag - 20 : 236, 'Errou!', '#ff5d8f', 16); M.estouro(x, M.cheio ? y - 46 * s : 270, '#ffd166', 8, 130, { forma: 'estrela' }); }
+        ret(g, x - 26 * s, y - 2, 52 * s, 10 * s, '#5b3a20', 4);
         const feliz = R && T >= R.mostraFim && T < R.respFim + 0.5 && progresso(i, T, R) >= R.L;
-        M.coelho(g, i, x, 332, { dir: x < 400 ? 1 : -1, tonto: f, pose: f ? 'sentado' : feliz ? 'dancando' : null, alfa: f ? 0.75 : 1 });
+        M.coelho(g, i, x, y, { escala: s, escalonar: false, dir: x < 400 ? 1 : -1, tonto: f, pose: f ? 'sentado' : feliz ? 'dancando' : null, alfa: f ? 0.75 : 1 });
         if (cpu[i]) {
           const c = cpu[i];
           let ult = null;
           for (const q of c.toques) { if (q.t > T) break; ult = q; }
-          if (ult && T - ult.t < 0.3) seta(g, x, 252, 9, ult.tecla, ult.certo ? COR_SETA[ult.tecla] : '#ef4444', 'rgba(0,0,0,0.4)');
+          if (ult && T - ult.t < 0.3) seta(g, x, ySeta, M.cheio ? 7 : 9, ult.tecla, ult.certo ? COR_SETA[ult.tecla] : '#ef4444', 'rgba(0,0,0,0.4)');
         }
         if (R && !f && T >= R.mostraFim && T < R.respFim) {
           const n = progresso(i, T, R);
-          for (let j = 0; j < R.L; j++) elipse(g, x + (j - (R.L - 1) / 2) * 6, 274, 2.4, 2.4, j < n ? '#06d6a0' : 'rgba(255,255,255,0.4)');
+          const passoP = M.cheio ? 5 : 6;
+          const rp = M.cheio ? 2.1 : 2.4;
+          for (let j = 0; j < R.L; j++) elipse(g, x + (j - (R.L - 1) / 2) * passoP, yPontos, rp, rp, j < n ? '#06d6a0' : 'rgba(255,255,255,0.4)');
         }
       }
     },
@@ -1808,8 +1901,8 @@ function jogoAlvo(M) {
   const TOPO = M.times ? 78 : 60;
   const BALCAO = 336;
   const VEL = 320;
-  const xIni = i => 320 + (i - (N - 1) / 2) * 120;
-  const yIni = () => 220;
+  const xIni = i => largada(N, i, 220, 40, 120).x;
+  const yIni = i => largada(N, i, 220, 40, 120).y;
 
   const r = M.rng('alvo-itens');
   const itens = [];
@@ -1826,7 +1919,7 @@ function jogoAlvo(M) {
       const vy = ouro ? entre(r, 125, 150) : entre(r, 55, 90) * (1 + 0.3 * p);
       itens.push({ k: itens.length, tipo: 'balao', x0: red(entre(r, 50, 590), 10), y0: BALCAO + 22, vx: 0, vy: red(vy, 10), amp: red(entre(r, 6, 16), 10), fase: red(r() * 6.28, 100), t0: red(t, 1000), tf: red(t + (BALCAO + 22 - (TOPO - 30)) / vy, 1000), r: ouro ? 13 : 17, ouro, cor: CORES_BALAO[Math.floor(r() * CORES_BALAO.length)] });
     }
-    t += entre(r, 0.32, 0.7) - 0.12 * p;
+    t += (entre(r, 0.32, 0.7) - 0.12 * p) * fatorItens(N);
   }
   const valor = b => (b.ouro ? 3 : 1);
   const posItem = (b, T) => {
@@ -1844,7 +1937,7 @@ function jogoAlvo(M) {
     const reservados = new Set();
     const est = cpus.map(i => {
       const rc = M.rng(`alvo-cpu-${i}`);
-      return { i, rc, x: xIni(i), y: yIni(), vel: entre(rc, 230, 300), mira: entre(rc, 0.12, 0.3), prec: entre(rc, 0.72, 0.9), alvo: null, mirando: 0, pausa: 0.4, ticks: [], tiros: [], xs: new Float32Array(nP), ys: new Float32Array(nP) };
+      return { i, rc, x: xIni(i), y: yIni(i), vel: entre(rc, 230, 300), mira: entre(rc, 0.12, 0.3), prec: entre(rc, 0.72, 0.9), alvo: null, mirando: 0, pausa: 0.4, ticks: [], tiros: [], xs: new Float32Array(nP), ys: new Float32Array(nP) };
     });
     const vale = (b, T) => T >= b.t0 && T < b.tf && !popCpu.has(b.k);
     for (let s = 0; s < nP; s++) {
@@ -1899,8 +1992,8 @@ function jogoAlvo(M) {
     for (const st of est) cpu[st.i] = { xs: st.xs, ys: st.ys, ticks: st.ticks, tiros: st.tiros, total: st.ticks.reduce((a, b) => a + b.v, 0), mostrados: 0 };
   }
 
-  const me = { x: eu >= 0 ? xIni(eu) : 0, y: yIni(), recarga: 0, tiros: 0, flash: 0 };
-  const rem = Array.from({ length: N }, (_, i) => ({ x: xIni(i), y: yIni(), ax: xIni(i), ay: yIni(), s: 0, flash: 0 }));
+  const me = { x: eu >= 0 ? xIni(eu) : 0, y: eu >= 0 ? yIni(eu) : 0, recarga: 0, tiros: 0, flash: 0 };
+  const rem = Array.from({ length: N }, (_, i) => ({ x: xIni(i), y: yIni(i), ax: xIni(i), ay: yIni(i), s: 0, flash: 0 }));
   const estourado = new Map();
   const pend = new Set();
   const pts = Array(N).fill(0);
@@ -2059,12 +2152,12 @@ function jogoAlvo(M) {
         mira(g, x, y, M.cor(i), i === eu, flash);
         const tm = M.time(i);
         if (tm) { g.strokeStyle = COR_TIME[tm]; g.lineWidth = 2; g.beginPath(); g.arc(x, y, i === eu ? 22 : 19, 0, TAU); g.stroke(); }
-        texto(g, i === eu ? 'Você' : M.nome(i), x, y + 30, { tam: 10, cor: M.cor(i), contorno: 'rgba(0,0,0,0.6)' });
+        texto(g, i === eu ? 'Você' : M.nomeTag(i), x, y + (M.cheio && i % 2 ? 40 : 30), { tam: 10, cor: M.cor(i), contorno: M.cheio ? 'rgba(0,0,0,0.75)' : 'rgba(0,0,0,0.6)' });
       }
       // coelhos atrás do balcão
       for (let i = 0; i < N; i++) {
         const x = 80 + (i * (L - 160)) / Math.max(1, N - 1);
-        M.coelho(g, i, x, A - 34, { dir: 1, escala: 0.85, etiqueta: false });
+        M.coelho(g, i, x, M.cheio ? M.baseCena + 2 : A - 34, { dir: 1, escala: M.cheio ? 0.7 : 0.85, etiqueta: false });
       }
     },
   };
@@ -2076,15 +2169,19 @@ function jogoCorda(M) {
   const { N, eu } = M;
   const dur = M.dur;
   const CHAO = 334;
-  const MAO = CHAO - 40;
-  const XE = 112;
-  const XD = 528;
+  const largo = N >= 5;
+  const XE = N >= 7 ? 40 : largo ? 70 : 112;
+  const XD = L - XE;
+  const MAO = largo ? CHAO - 34 : CHAO - 40;
   const ALTO = 165;
-  const BAIXO = 40;
+  const passoJog = largo ? Math.min(62, (XD - XE - 110) / Math.max(1, N - 1)) : 62;
   const GRAV = 1700;
   const PULO = 380;
   const AR = (2 * PULO) / GRAV;
-  const xJog = i => 320 + (i - (N - 1) / 2) * 62;
+  const xJog = i => 320 + (i - (N - 1) / 2) * passoJog;
+  // A corda desce até passar rente ao chão até nos pés de quem está na ponta (o que sobra fica arrastando no chão).
+  const tPonta = (xJog(0) - XE) / (XD - XE);
+  const BAIXO = largo ? Math.max(40, ((CHAO - MAO) / (4 * tPonta * (1 - tPonta))) * 1.08) : 40;
 
   // A agenda das voltas da corda (com pausas e fintas).
   const r = M.rng('corda-giros');
@@ -2169,12 +2266,28 @@ function jogoCorda(M) {
     g.strokeStyle = frente ? '#ff5d8f' : '#b23a64';
     g.lineWidth = frente ? 4 : 3;
     g.lineCap = 'round';
+    g.save();
+    g.beginPath();
+    g.rect(0, 0, L, CHAO + 1);
+    g.clip();
     g.beginPath();
     g.moveTo(maoE[0], maoE[1]);
     g.quadraticCurveTo(320, cy, maoD[0], maoD[1]);
     g.stroke();
+    g.restore();
+    // o pedaço que passaria do chão fica arrastando no chão
+    const fundo = yMeio - MAO;
+    if (fundo > CHAO - MAO) {
+      const tc = (1 - Math.sqrt(1 - (CHAO - MAO) / fundo)) / 2;
+      g.beginPath();
+      g.moveTo(XE + tc * (XD - XE), CHAO);
+      g.lineTo(XD - tc * (XD - XE), CHAO);
+      g.stroke();
+    }
     if (yMeio > CHAO - 6) {
-      for (let k = 0; k < 2; k++) M.particula(220 + Math.random() * 200, CHAO, { vx: (Math.random() - 0.5) * 60, vy: -40 - Math.random() * 30, gr: 200, vida: 0.35, cor: 'rgba(200,170,120,0.8)', tam: 2 });
+      const x0 = largo ? xJog(0) - 40 : 220;
+      const x1 = largo ? xJog(N - 1) + 40 : 420;
+      for (let k = 0; k < (largo ? 3 : 2); k++) M.particula(x0 + Math.random() * (x1 - x0), CHAO, { vx: (Math.random() - 0.5) * 60, vy: -40 - Math.random() * 30, gr: 200, vida: 0.35, cor: 'rgba(200,170,120,0.8)', tam: 2 });
     }
     for (const [x, y] of [maoE, maoD]) elipse(g, x, y, 4, 4, '#7a4e2a');
   }
