@@ -80,7 +80,7 @@ async function pendencias(req) {
 r.get('/pendencias', async (req, res) => res.json(await pendencias(req)));
 
 // Envio avulso de imagem (retratos nos registros, imagens de anúncios).
-const PODE_ENVIAR = ['galeria.enviar', 'anuncios.publicar', 'mapa.editar', ...Object.keys(MODULOS).flatMap(m => [`${m}.registrar`, `${m}.editar`])];
+const PODE_ENVIAR = ['galeria.enviar', 'anuncios.publicar', 'mapa.editar', 'sprites.editar', ...Object.keys(MODULOS).flatMap(m => [`${m}.registrar`, `${m}.editar`])];
 r.post('/upload', (req, res, next) => {
   if (!PODE_ENVIAR.some(p => pode(req, p))) return next(erro(403, 'Você não tem permissão para enviar imagens.'));
   next();

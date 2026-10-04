@@ -4,6 +4,7 @@
 // e do relógio compartilhado; as simulações das CPUs usam só aritmética simples (sem seno/exp do motor).
 
 import { desenharCoelho, desenharRaposa, elipse, sombrear, sorte as semente } from './desenho-coelho.js';
+import { registrarPecas, desenharSprite, spriteDe } from './sprites.js';
 
 const L = 640;
 const A = 400;
@@ -947,9 +948,11 @@ function jogoChuva(M) {
           g.lineTo(o.x, TOPO - o.r + 2);
           g.stroke();
         }
-        if (o.tipo === 'pedra') desenharPedra(g, c.x, c.y, o.r, c.rot);
-        else if (o.tipo === 'pinha') desenharPinha(g, c.x, c.y, o.r, balanco);
-        else desenharBolota(g, c.x, c.y, o.r, balanco);
+        if (o.tipo === 'pedra') {
+          if (!desenharSprite(g, 'festa-mini.pedra', 'rolando', c.x, c.y, { t: rel, rot: c.rot, escala: o.r / 24 })) desenharPedra(g, c.x, c.y, o.r, c.rot);
+        } else if (o.tipo === 'pinha') {
+          if (!desenharSprite(g, 'festa-mini.pinha', 'caindo', c.x, c.y, { t: rel, rot: balanco, escala: o.r / 11 })) desenharPinha(g, c.x, c.y, o.r, balanco);
+        } else if (!desenharSprite(g, 'festa-mini.bolota', 'caindo', c.x, c.y, { t: rel, rot: balanco, escala: o.r / 9 })) desenharBolota(g, c.x, c.y, o.r, balanco);
       }
       // coelhos
       for (let i = 0; i < N; i++) {
@@ -1227,17 +1230,13 @@ function jogoCorrida(M) {
 
 /* ─── 3. Caça às Cenouras ────────────────────────── */
 
-function desenharCenoura(g, x, y, esc, ouro, rel, alfa = 1) {
-  g.save();
-  g.globalAlpha = alfa;
-  elipse(g, x, y + 2, 12 * esc, 4.5 * esc, 'rgba(70,40,20,0.5)');
-  g.translate(x, y);
-  g.scale(esc, esc);
+// A cenoura (sem a sombra) com a raiz em (0, 0); xMundo só muda o balanço das folhas.
+function pintarCenouraMini(g, ouro, rel, xMundo) {
   const verde = ouro ? '#b9c43a' : '#3fa34d';
   for (const [a, l] of [[-0.55, 12], [0, 16], [0.55, 12]]) {
     g.save();
     g.translate(0, -9);
-    g.rotate(a + Math.sin(rel * 3 + x) * 0.08);
+    g.rotate(a + Math.sin(rel * 3 + xMundo) * 0.08);
     elipse(g, 0, -l / 2, 3, l / 2, verde);
     g.restore();
   }
@@ -1257,6 +1256,17 @@ function desenharCenoura(g, x, y, esc, ouro, rel, alfa = 1) {
   g.moveTo(1, -1);
   g.lineTo(5, -1);
   g.stroke();
+}
+
+function desenharCenoura(g, x, y, esc, ouro, rel, alfa = 1) {
+  g.save();
+  g.globalAlpha = alfa;
+  elipse(g, x, y + 2, 12 * esc, 4.5 * esc, 'rgba(70,40,20,0.5)');
+  if (!desenharSprite(g, ouro ? 'festa-mini.cenoura-dourada' : 'festa-mini.cenoura', 'brotando', x, y + 2, { t: rel, escala: esc })) {
+    g.translate(x, y);
+    g.scale(esc, esc);
+    pintarCenouraMini(g, ouro, rel, x);
+  }
   g.restore();
   if (ouro) {
     for (let k = 0; k < 2; k++) {
@@ -1512,6 +1522,32 @@ function enfeitesCacada(M) {
 
 const COR_SETA = { cima: '#22c55e', baixo: '#facc15', esq: '#3b82f6', dir: '#ec4899' };
 
+// O Raposo do palco: a raposa grande de cartola, com os pés em (x, y).
+function pintarRaposo(g, x, y, rel, fala, semSprite = false) {
+  g.save();
+  g.translate(x, y);
+  g.scale(2.1, 2.1);
+  desenharRaposa(g, 0, 0, { dir: 1, t: rel, andando: !!fala, passo: rel * 0.4, semSprite });
+  g.restore();
+  // cartola do Raposo
+  ret(g, x + 13, y - 86, 26, 22, '#1f1b2e', 3);
+  ret(g, x + 5, y - 67, 42, 6, '#1f1b2e', 3);
+  g.fillStyle = '#ff5d8f';
+  g.fillRect(x + 13, y - 72, 26, 4);
+}
+
+// Um botão de seta do controle (aceso quando o Raposo mostra ou eu aperto, vermelho quando errei).
+function pintarBotaoSeta(g, x, y, s, aceso, errado) {
+  const cor = errado ? '#ef4444' : COR_SETA[s];
+  ret(g, x - 20, y - 20, 40, 40, aceso || errado ? cor : sombrear(COR_SETA[s], -0.35), 10);
+  seta(g, x, y, 13, s, aceso ? '#fff' : 'rgba(255,255,255,0.75)', null);
+}
+
+// Uma seta colorida (a do painel e as das CPUs): o sprite apontando para a direita, girado e pintado.
+function setaColorida(g, x, y, tam, dir, cor, contorno, rel) {
+  if (!desenharSprite(g, 'festa-mini.seta', 'mostrando', x, y, { t: rel, rot: ANG_SETA[dir] ?? 0, escala: tam / 40, cor })) seta(g, x, y, tam, dir, cor, contorno);
+}
+
 function jogoMemoria(M) {
   const { N, eu } = M;
   const r = M.rng('memoria-sequencia');
@@ -1750,16 +1786,7 @@ function jogoMemoria(M) {
       g.fillRect(0, 296, L, 8);
       // o Raposo
       const fala = R && T >= R.mostraIni && T < R.mostraFim;
-      g.save();
-      g.translate(105, 300);
-      g.scale(2.1, 2.1);
-      desenharRaposa(g, 0, 0, { dir: 1, t: rel, andando: !!fala, passo: rel * 0.4 });
-      g.restore();
-      // cartola do Raposo
-      ret(g, 118, 214, 26, 22, '#1f1b2e', 3);
-      ret(g, 110, 233, 42, 6, '#1f1b2e', 3);
-      g.fillStyle = '#ff5d8f';
-      g.fillRect(118, 228, 26, 4);
+      if (!desenharSprite(g, 'festa-mini.raposo', fala ? 'falando' : 'parado', 105, 300, { t: rel })) pintarRaposo(g, 105, 300, rel, fala);
       // placa central
       ret(g, 205, 78, 230, 150, '#7a4e2a', 14);
       ret(g, 213, 86, 214, 134, '#fdf2d8', 10);
@@ -1772,7 +1799,7 @@ function jogoMemoria(M) {
         const f = (T - R.mostraIni) / R.passo - j;
         if (f < 0.72 && j < R.L) {
           const pop = f < 0.12 ? 0.6 + (f / 0.12) * 0.5 : 1.1 - Math.min(0.1, f * 0.3);
-          seta(g, 320, 140, 40 * pop, seq[j], COR_SETA[seq[j]], 'rgba(59,42,107,0.6)');
+          setaColorida(g, 320, 140, 40 * pop, seq[j], COR_SETA[seq[j]], 'rgba(59,42,107,0.6)', rel);
         }
         sub = 'Observe!';
       } else if (T < R.respFim) {
@@ -1800,10 +1827,9 @@ function jogoMemoria(M) {
         const [dx, dy] = posPad[s];
         const aceso = mostrandoSeta === s || T - luz[s] < 0.18;
         const errado = errouLuz.tecla === s && T - errouLuz.t < 0.5;
-        const cor = errado ? '#ef4444' : COR_SETA[s];
         if (aceso || errado) elipse(g, PADX + dx, PADY + dy, 26, 26, 'rgba(255,255,255,0.45)');
-        ret(g, PADX + dx - 20, PADY + dy - 20, 40, 40, aceso || errado ? cor : sombrear(COR_SETA[s], -0.35), 10);
-        seta(g, PADX + dx, PADY + dy, 13, s, aceso ? '#fff' : 'rgba(255,255,255,0.75)', null);
+        const comoEsta = errado ? 'errado' : aceso ? 'aceso' : 'apagado';
+        if (!desenharSprite(g, 'festa-mini.botao-seta', comoEsta, PADX + dx, PADY + dy, { t: rel, rot: ANG_SETA[s], cor: errado ? '#ef4444' : COR_SETA[s] })) pintarBotaoSeta(g, PADX + dx, PADY + dy, s, aceso, errado);
       }
       // coelhos no palco
       const ordem = [];
@@ -1824,7 +1850,7 @@ function jogoMemoria(M) {
           const c = cpu[i];
           let ult = null;
           for (const q of c.toques) { if (q.t > T) break; ult = q; }
-          if (ult && T - ult.t < 0.3) seta(g, x, ySeta, M.cheio ? 7 : 9, ult.tecla, ult.certo ? COR_SETA[ult.tecla] : '#ef4444', 'rgba(0,0,0,0.4)');
+          if (ult && T - ult.t < 0.3) setaColorida(g, x, ySeta, M.cheio ? 7 : 9, ult.tecla, ult.certo ? COR_SETA[ult.tecla] : '#ef4444', 'rgba(0,0,0,0.4)', rel);
         }
         if (R && !f && T >= R.mostraFim && T < R.respFim) {
           const n = progresso(i, T, R);
@@ -1848,6 +1874,12 @@ function desenharBalao(g, x, y, r, cor, ouro, rel) {
   g.moveTo(x, y + r * 1.15);
   g.quadraticCurveTo(x + Math.sin(rel * 3 + x) * 6, y + r * 1.8, x, y + r * 2.6);
   g.stroke();
+  if (!desenharSprite(g, ouro ? 'festa-mini.balao-dourado' : 'festa-mini.balao', 'subindo', x, y, { t: rel, escala: r / (ouro ? 13 : 17), cor })) pintarBalao(g, x, y, r, cor, ouro);
+  if (ouro) estrela(g, x + r * 0.9, y - r * 0.9, 4 + Math.sin(rel * 8) * 1.2, '#fffbe0', rel * 2);
+}
+
+// O balão sem o barbante (o meio do balão em x, y).
+function pintarBalao(g, x, y, r, cor, ouro) {
   elipse(g, x, y, r, r * 1.15, ouro ? '#f5c518' : cor);
   elipse(g, x + r * 0.12, y + r * 0.18, r * 0.82, r * 0.92, ouro ? '#e0a800' : sombrear(cor, -0.12));
   elipse(g, x - r * 0.35, y - r * 0.4, r * 0.25, r * 0.38, 'rgba(255,255,255,0.55)', -0.4);
@@ -1858,7 +1890,6 @@ function desenharBalao(g, x, y, r, cor, ouro, rel) {
   g.lineTo(x, y + r * 1.08);
   g.closePath();
   g.fill();
-  if (ouro) estrela(g, x + r * 0.9, y - r * 0.9, 4 + Math.sin(rel * 8) * 1.2, '#fffbe0', rel * 2);
 }
 
 function desenharAlvo(g, x, y, r) {
@@ -1867,7 +1898,8 @@ function desenharAlvo(g, x, y, r) {
   for (const [k, cor] of [[1, '#ef4444'], [0.72, '#fff'], [0.46, '#ef4444'], [0.2, '#fff']]) elipse(g, x, y, r * k, r * k, cor);
 }
 
-function mira(g, x, y, cor, grande, flash) {
+// A mira sem o clarão do tiro.
+function pintarMira(g, x, y, cor, grande) {
   const r = grande ? 15 : 12;
   for (const [c, lw] of [['rgba(20,10,30,0.7)', grande ? 5 : 4], [cor, grande ? 2.5 : 2]]) {
     g.strokeStyle = c;
@@ -1885,6 +1917,11 @@ function mira(g, x, y, cor, grande, flash) {
     g.stroke();
   }
   elipse(g, x, y, 2, 2, cor);
+}
+
+function mira(g, x, y, cor, grande, flash) {
+  const r = grande ? 15 : 12;
+  if (!desenharSprite(g, 'festa-mini.mira', 'mirando', x, y, { escala: grande ? 1.25 : 1, cor })) pintarMira(g, x, y, cor, grande);
   if (flash > 0) {
     g.strokeStyle = `rgba(255,255,255,${flash})`;
     g.lineWidth = 3;
@@ -2114,7 +2151,7 @@ function jogoAlvo(M) {
           if (T - cpuT < 0.5) M.estouro(q.x, q.y, b.ouro ? ['#f5c518', '#fffbe0'] : [b.cor, '#fff'], 12, 160);
         }
         if (!visivel(b, T)) continue;
-        if (b.tipo === 'alvo') desenharAlvo(g, q.x, q.y, b.r);
+        if (b.tipo === 'alvo') { if (!desenharSprite(g, 'festa-mini.alvo', 'deslizando', q.x, q.y - b.r, { t: rel, escala: b.r / 19 })) desenharAlvo(g, q.x, q.y, b.r); }
         else desenharBalao(g, q.x, q.y, b.r, b.cor, b.ouro, rel);
       }
       // toldo listrado
@@ -2164,6 +2201,31 @@ function jogoAlvo(M) {
 }
 
 /* ─── 6. Pula-Corda ──────────────────────────────── */
+
+// A corda com sprite: o pedaço enviado repetido ao longo da linha (pontos), cada um virado no sentido da corda.
+const GROSSURA_CORDA = 6;
+function cordaDeSprite(g, pontos, anim, t) {
+  const sp = spriteDe('festa-mini.corda', anim);
+  if (!sp) return;
+  const fw = sp.img.naturalWidth / Math.max(1, sp.quadros || 1);
+  const fh = sp.img.naturalHeight || 1;
+  const passo = Math.max(2, (GROSSURA_CORDA * fw) / fh);
+  const acum = [0];
+  for (let k = 1; k < pontos.length; k++) acum.push(acum[k - 1] + Math.hypot(pontos[k][0] - pontos[k - 1][0], pontos[k][1] - pontos[k - 1][1]));
+  const total = acum[acum.length - 1];
+  if (!(total > 0)) return;
+  const n = Math.max(1, Math.ceil(total / passo));
+  const largura = total / n;
+  let k = 1;
+  for (let j = 0; j < n; j++) {
+    const d = (j + 0.5) * largura;
+    while (k < pontos.length - 1 && acum[k] < d) k++;
+    const [x0, y0] = pontos[k - 1];
+    const [x1, y1] = pontos[k];
+    const f = (d - acum[k - 1]) / (acum[k] - acum[k - 1] || 1);
+    desenharSprite(g, 'festa-mini.corda', anim, x0 + (x1 - x0) * f, y0 + (y1 - y0) * f, { t, rot: Math.atan2(y1 - y0, x1 - x0), largura: largura + 0.6, altura: GROSSURA_CORDA });
+  }
+}
 
 function jogoCorda(M) {
   const { N, eu } = M;
@@ -2266,23 +2328,39 @@ function jogoCorda(M) {
     g.strokeStyle = frente ? '#ff5d8f' : '#b23a64';
     g.lineWidth = frente ? 4 : 3;
     g.lineCap = 'round';
+    const anim = frente ? 'frente' : 'atras';
+    const comSprite = !!spriteDe('festa-mini.corda', anim);
     g.save();
     g.beginPath();
     g.rect(0, 0, L, CHAO + 1);
     g.clip();
-    g.beginPath();
-    g.moveTo(maoE[0], maoE[1]);
-    g.quadraticCurveTo(320, cy, maoD[0], maoD[1]);
-    g.stroke();
+    if (comSprite) {
+      const pontos = [];
+      for (let k = 0; k <= 32; k++) {
+        const u = k / 32;
+        const a = (1 - u) * (1 - u);
+        const b = 2 * u * (1 - u);
+        pontos.push([a * maoE[0] + b * 320 + u * u * maoD[0], a * maoE[1] + b * cy + u * u * maoD[1]]);
+      }
+      cordaDeSprite(g, pontos, anim, T);
+    } else {
+      g.beginPath();
+      g.moveTo(maoE[0], maoE[1]);
+      g.quadraticCurveTo(320, cy, maoD[0], maoD[1]);
+      g.stroke();
+    }
     g.restore();
     // o pedaço que passaria do chão fica arrastando no chão
     const fundo = yMeio - MAO;
     if (fundo > CHAO - MAO) {
       const tc = (1 - Math.sqrt(1 - (CHAO - MAO) / fundo)) / 2;
-      g.beginPath();
-      g.moveTo(XE + tc * (XD - XE), CHAO);
-      g.lineTo(XD - tc * (XD - XE), CHAO);
-      g.stroke();
+      if (comSprite) cordaDeSprite(g, [[XE + tc * (XD - XE), CHAO], [XD - tc * (XD - XE), CHAO]], anim, T);
+      else {
+        g.beginPath();
+        g.moveTo(XE + tc * (XD - XE), CHAO);
+        g.lineTo(XD - tc * (XD - XE), CHAO);
+        g.stroke();
+      }
     }
     if (yMeio > CHAO - 6) {
       const x0 = largo ? xJog(0) - 40 : 220;
@@ -2384,6 +2462,115 @@ function jogoCorda(M) {
     },
   };
 }
+
+/* ─── sprites (veja sprites.js): as peças dos minijogos que podem virar imagem ─── */
+
+const JOGO_SPRITES = 'Festa: minijogos';
+export const SPRITES = [
+  {
+    chave: 'festa-mini.bolota', jogo: JOGO_SPRITES, nome: 'Bolota (Chuva de Bolotas)',
+    desc: 'A bolota que cai das árvores, com o cabinho para cima. O jogo faz ela balançar antes de cair.',
+    largura: 18, altura: 22, ancora: 'centro',
+    animacoes: [{ id: 'caindo', nome: 'Caindo', quadros: 1, fps: 8 }],
+    previa: g => desenharBolota(g, 0, 0, 9, 0),
+  },
+  {
+    chave: 'festa-mini.pinha', jogo: JOGO_SPRITES, nome: 'Pinha (Chuva de Bolotas)',
+    desc: 'A pinha que cai das árvores, em pé. O jogo faz ela balançar antes de cair.',
+    largura: 22, altura: 26, ancora: 'centro',
+    animacoes: [{ id: 'caindo', nome: 'Caindo', quadros: 1, fps: 8 }],
+    previa: g => desenharPinha(g, 0, 0, 11, 0),
+  },
+  {
+    chave: 'festa-mini.pedra', jogo: JOGO_SPRITES, nome: 'Pedregulho (Chuva de Bolotas)',
+    desc: 'O pedregulho que cai e desce rolando pelo chão. O jogo gira o desenho enquanto ele rola.',
+    largura: 48, altura: 48, ancora: 'centro',
+    animacoes: [{ id: 'rolando', nome: 'Rolando', quadros: 1, fps: 8 }],
+    previa: g => desenharPedra(g, 0, 0, 24, 0),
+  },
+  {
+    chave: 'festa-mini.cenoura', jogo: JOGO_SPRITES, nome: 'Cenoura (Caça às Cenouras)',
+    desc: 'A cenoura brotando na horta, com a raiz na base do quadro (a sombra o jogo faz). O jogo faz ela crescer ao brotar e piscar antes de sumir.',
+    largura: 22, altura: 28, ancora: 'pe',
+    animacoes: [{ id: 'brotando', nome: 'Na horta', quadros: 4, fps: 2 }],
+    previa: (g, anim, t) => { g.save(); g.translate(0, -2); pintarCenouraMini(g, false, t, 0); g.restore(); },
+  },
+  {
+    chave: 'festa-mini.cenoura-dourada', jogo: JOGO_SPRITES, nome: 'Cenoura dourada (Caça às Cenouras)',
+    desc: 'A cenoura dourada da horta (vale 3), com a raiz na base do quadro. As estrelinhas em volta o jogo continua fazendo.',
+    largura: 22, altura: 28, ancora: 'pe',
+    animacoes: [{ id: 'brotando', nome: 'Na horta', quadros: 4, fps: 2 }],
+    previa: (g, anim, t) => { g.save(); g.translate(0, -2); pintarCenouraMini(g, true, t, 0); g.restore(); },
+  },
+  {
+    chave: 'festa-mini.raposo', jogo: JOGO_SPRITES, nome: 'Raposo do palco (Memória)',
+    desc: 'O Raposo de cartola que mostra as setas, olhando para a direita, com os pés na base do quadro. "Mostrando" é quando ele está mostrando a sequência. Sem este sprite, vale o da "Raposa da noite" (com a cartola por cima).',
+    largura: 132, altura: 90, ancora: 'pe',
+    animacoes: [{ id: 'parado', nome: 'Parado', quadros: 2, fps: 3 }, { id: 'falando', nome: 'Mostrando', quadros: 4, fps: 4 }],
+    previa: (g, anim, t) => pintarRaposo(g, 0, 0, t, anim === 'falando', true),
+  },
+  {
+    chave: 'festa-mini.seta', jogo: JOGO_SPRITES, nome: 'Seta mostrada (Memória)',
+    desc: 'A seta grande que o Raposo mostra no painel (e a setinha em cima das CPUs), apontando para a direita: o jogo gira para as outras direções. Marque "pintar com a cor" e desenhe em tons claros de cinza para cada direção ficar com a sua cor.',
+    largura: 80, altura: 68, ancora: 'centro', tingir: true,
+    animacoes: [{ id: 'mostrando', nome: 'Mostrando', quadros: 1, fps: 8 }],
+    previa: g => seta(g, 0, 0, 40, 'dir', COR_SETA.dir, 'rgba(59,42,107,0.6)'),
+  },
+  {
+    chave: 'festa-mini.botao-seta', jogo: JOGO_SPRITES, nome: 'Botão de seta (Memória)',
+    desc: 'Os quatro botões do controle, desenhados apontando para a direita (o jogo gira para cima, baixo e esquerda). Aceso quando o Raposo mostra ou você aperta; errado quando você erra. Com "pintar com a cor", cada direção pega a sua cor.',
+    largura: 40, altura: 40, ancora: 'centro', tingir: true,
+    animacoes: [
+      { id: 'apagado', nome: 'Apagado', quadros: 1, fps: 8 },
+      { id: 'aceso', nome: 'Aceso', quadros: 1, fps: 8 },
+      { id: 'errado', nome: 'Errado', quadros: 1, fps: 8 },
+    ],
+    previa: (g, anim) => pintarBotaoSeta(g, 0, 0, 'dir', anim === 'aceso', anim === 'errado'),
+  },
+  {
+    chave: 'festa-mini.balao', jogo: JOGO_SPRITES, nome: 'Balão (Tiro ao Alvo)',
+    desc: 'O balão que sobe atrás do balcão, sem o barbante (o jogo faz). Os balões têm cores diferentes: marque "pintar com a cor" e desenhe em tons claros de cinza.',
+    largura: 36, altura: 42, ancora: 'centro', tingir: true,
+    animacoes: [{ id: 'subindo', nome: 'Subindo', quadros: 1, fps: 8 }],
+    previa: g => pintarBalao(g, 0, 0, 17, CORES_BALAO[0], false),
+  },
+  {
+    chave: 'festa-mini.balao-dourado', jogo: JOGO_SPRITES, nome: 'Balão dourado (Tiro ao Alvo)',
+    desc: 'O balão dourado, menor e mais rápido (vale 3), sem o barbante. A estrelinha brilhando o jogo continua fazendo.',
+    largura: 28, altura: 32, ancora: 'centro',
+    animacoes: [{ id: 'subindo', nome: 'Subindo', quadros: 1, fps: 8 }],
+    previa: g => pintarBalao(g, 0, 0, 13, '#f5c518', true),
+  },
+  {
+    chave: 'festa-mini.alvo', jogo: JOGO_SPRITES, nome: 'Alvo (Tiro ao Alvo)',
+    desc: 'O alvo que passa deslizando no trilho, com o pauzinho embaixo. O topo do alvo fica no topo do quadro.',
+    largura: 40, altura: 58, ancora: 'topo',
+    animacoes: [{ id: 'deslizando', nome: 'Deslizando', quadros: 1, fps: 8 }],
+    previa: g => desenharAlvo(g, 0, 19, 19),
+  },
+  {
+    chave: 'festa-mini.mira', jogo: JOGO_SPRITES, nome: 'Mira (Tiro ao Alvo)',
+    desc: 'A mira de cada jogador. Marque "pintar com a cor" e desenhe em tons claros de cinza para cada um ter a sua cor. O clarão do tiro o jogo faz.',
+    largura: 40, altura: 40, ancora: 'centro', tingir: true,
+    animacoes: [{ id: 'mirando', nome: 'Mirando', quadros: 1, fps: 8 }],
+    previa: g => pintarMira(g, 0, 0, CORES[0], false),
+  },
+  {
+    chave: 'festa-mini.corda', jogo: JOGO_SPRITES, nome: 'Pedaço da corda (Pula-Corda)',
+    desc: 'Um pedacinho da corda, deitado (da esquerda para a direita). O jogo repete o pedaço ao longo da corda toda, virando na curva, então as pontas precisam emendar. "Atrás" é a corda passando por trás dos coelhos; sem ele, vale "Na frente".',
+    largura: 16, altura: 6, ancora: 'centro',
+    animacoes: [{ id: 'frente', nome: 'Na frente', quadros: 1, fps: 8 }, { id: 'atras', nome: 'Atrás', quadros: 1, fps: 8 }],
+    previa: (g, anim) => {
+      g.strokeStyle = anim === 'atras' ? '#b23a64' : '#ff5d8f';
+      g.lineWidth = anim === 'atras' ? 3 : 4;
+      g.beginPath();
+      g.moveTo(-8, 0);
+      g.lineTo(8, 0);
+      g.stroke();
+    },
+  },
+];
+registrarPecas(SPRITES);
 
 /* ─── a lista para a tela da festa ───────────────── */
 

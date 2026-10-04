@@ -5,6 +5,8 @@ import { rt, ouvir, enviar, lendoChat, criarPartida, entrarNaPartida, transmitir
 import { assistirPac } from './pac-coelho.js';
 import { abrirSalaQuiz, telaQuiz, teclaQuiz } from './quiz.js';
 import { SuavizadorCobras } from '../cobras-suave.js';
+import { N_COBRA, LADO_COBRA, desenharCenoura, desenharCobrinha, desenharCobraAoVivo, casaComSprite, versaoSprites } from '../desenho-cobra.js';
+import { temSprite } from '../sprites.js';
 import { tabuleiroDamas, nomeCor } from './damas.js';
 import { criarTelaCidade } from './cidade.js';
 import { criarTelaFesta } from './festa.js';
@@ -122,6 +124,7 @@ export function recreacao() {
         h('span', { class: 'clube-convite-texto' }, h('strong', null, 'Club Coelho', h('span', { class: 'jogo-novo' }, 'novo')),
           h('small', null, 'Passeie com o seu coelho, converse, dance, pesque e decore a sua toca com as cenouras que ganha nos jogos.')),
         h('span', { class: 'btn btn-ouro btn-pequeno' }, 'Entrar no clube')),
+      pode('sprites.editar') && h('a', { class: 'btn btn-pequeno sprites-atalho', href: '#/recreacao/sprites' }, icone('imagem'), h('span', null, 'Sprites dos jogos')),
       h('h3', { class: 'jogos-titulo' }, 'Ao vivo'),
       AO_VIVO.map(j => h('div', { class: 'jogo-cartao' },
         h('span', { class: 'jogo-icone' }, icone(j.icone)),
@@ -1018,70 +1021,6 @@ const DIRECOES = {
   ArrowLeft: [-1, 0], KeyA: [-1, 0], ArrowRight: [1, 0], KeyD: [1, 0],
 };
 
-const N_COBRA = 20;
-const LADO_COBRA = 600;
-const C_COBRA = LADO_COBRA / N_COBRA;
-
-// Cenoura numa casa do tabuleiro (x, y em casas; C = tamanho da casa).
-function desenharCenoura(g, x, y, C) {
-  const cx = x * C + C / 2;
-  const cy = y * C + C / 2;
-  g.fillStyle = '#5b8c3e';
-  g.beginPath();
-  g.ellipse(cx - C * 0.1, cy - C * 0.3, C * 0.08, C * 0.18, -0.5, 0, Math.PI * 2);
-  g.ellipse(cx + C * 0.1, cy - C * 0.3, C * 0.08, C * 0.18, 0.5, 0, Math.PI * 2);
-  g.fill();
-  g.fillStyle = '#e8812f';
-  g.beginPath();
-  g.moveTo(cx - C * 0.24, cy - C * 0.16);
-  g.quadraticCurveTo(cx, cy - C * 0.28, cx + C * 0.24, cy - C * 0.16);
-  g.lineTo(cx, cy + C * 0.42);
-  g.closePath();
-  g.fill();
-  g.strokeStyle = 'rgba(120, 50, 10, 0.6)';
-  g.lineWidth = 1.5;
-  g.beginPath();
-  g.moveTo(cx - C * 0.12, cy);
-  g.lineTo(cx - C * 0.02, cy);
-  g.moveTo(cx + C * 0.04, cy + C * 0.14);
-  g.lineTo(cx + C * 0.12, cy + C * 0.14);
-  g.stroke();
-}
-
-// Desenha o tabuleiro da cobrinha: e = { cobra: [{x, y}], comida: {x, y} | null, direcao: [dx, dy], bateu }.
-function desenharCobrinha(g, { cobra, comida, direcao, bateu, arcoIris = false }) {
-  const C = C_COBRA;
-  for (let y = 0; y < N_COBRA; y++) {
-    for (let x = 0; x < N_COBRA; x++) {
-      g.fillStyle = (x + y) % 2 ? '#0c170f' : '#0f1c12';
-      g.fillRect(x * C, y * C, C, C);
-    }
-  }
-  if (comida) desenharCenoura(g, comida.x, comida.y, C);
-  cobra.forEach((p, i) => {
-    const t = i / Math.max(1, cobra.length - 1);
-    g.fillStyle = arcoIris && !(i === 0 && bateu) ? `hsl(${Math.round((i * 26 + performance.now() / 12) % 360)} 78% ${i === 0 ? 62 : 56}%)`
-      : i === 0 ? (bateu ? '#d8674a' : '#d8b13a') : `rgb(${Math.round(127 - 50 * t)}, ${Math.round(176 - 60 * t)}, ${Math.round(105 - 40 * t)})`;
-    const m = i === 0 ? 1.5 : 3;
-    g.beginPath();
-    if (g.roundRect) g.roundRect(p.x * C + m, p.y * C + m, C - m * 2, C - m * 2, i === 0 ? 9 : 7);
-    else g.rect(p.x * C + m, p.y * C + m, C - m * 2, C - m * 2);
-    g.fill();
-  });
-  // Olhinhos na direção em que a cobra anda.
-  const cab = cobra[0];
-  if (!cab) return;
-  const [dx, dy] = direcao;
-  g.fillStyle = '#1b1403';
-  for (const lado of [-1, 1]) {
-    const ex = cab.x * C + C / 2 + dx * C * 0.18 + dy * lado * C * 0.2;
-    const ey = cab.y * C + C / 2 + dy * C * 0.18 + dx * lado * C * 0.2;
-    g.beginPath();
-    g.arc(ex, ey, C * 0.09, 0, Math.PI * 2);
-    g.fill();
-  }
-}
-
 /* ─── Cobrinha ao vivo: o desenho ─────────────────── */
 
 // Cor de cada cobra (a ordem de quem entrou na sala): dourada, vermelha, azul e roxa.
@@ -1100,23 +1039,19 @@ const MODOS_COBRAS = {
   colheita: { nome: 'Colheita (co-op)', texto: 'As cobras passam umas pelas outras e quem bate renasce. Juntem 15 cenouras por cobra em 1 min e meio!' },
   duplas: { nome: '2 contra 2 (versus)', texto: 'A dupla dourada (cantos da esquerda) contra a azul (cantos da direita). Vence a dupla que sobrar. Precisa de 4.' },
 };
-const escurecer = (hex, t) => {
-  const n = parseInt(hex.slice(1), 16);
-  const c = [n >> 16, (n >> 8) & 255, n & 255].map(v => Math.round(v * (1 - t)));
-  return `rgb(${c.join(', ')})`;
-};
-
 // O fundo quadriculado e a cenoura ficam prontos numa imagem guardada (desenhar 768 casas a cada
 // quadro de tela, 60 vezes por segundo, é trabalho à toa).
+// Quando alguém troca um sprite (versaoSprites muda), a imagem guardada é desenhada de novo.
 function prepararArena(visor, q) {
   const C = visor.tela.width / q.l;
-  if (visor.fundo?.l === q.l && visor.fundo?.a === q.a) return C;
+  if (visor.fundo?.l === q.l && visor.fundo?.a === q.a && visor.fundo?.v === versaoSprites()) return C;
   const fundo = document.createElement('canvas');
   fundo.width = visor.tela.width;
   fundo.height = visor.tela.height;
   const g = fundo.getContext('2d');
   for (let y = 0; y < q.a; y++) {
     for (let x = 0; x < q.l; x++) {
+      if (casaComSprite(g, x, y, C)) continue;
       g.fillStyle = (x + y) % 2 ? '#0c170f' : '#0f1c12';
       g.fillRect(x * C, y * C, C, C);
     }
@@ -1124,8 +1059,8 @@ function prepararArena(visor, q) {
   const cenoura = document.createElement('canvas');
   cenoura.width = Math.ceil(C);
   cenoura.height = Math.ceil(C);
-  desenharCenoura(cenoura.getContext('2d'), 0, 0, C);
-  visor.fundo = { l: q.l, a: q.a, img: fundo, cenoura };
+  desenharCenoura(cenoura.getContext('2d'), 0, 0, C, true); // a de sempre; o sprite (se houver) vai direto na tela
+  visor.fundo = { l: q.l, a: q.a, v: versaoSprites(), img: fundo, cenoura };
   return C;
 }
 
@@ -1135,45 +1070,17 @@ function desenharArena(visor, q, cobras, eu) {
   const g = visor.g;
   const C = prepararArena(visor, q);
   g.drawImage(visor.fundo.img, 0, 0);
-  for (let k = 0; k + 1 < q.f.length; k += 2) g.drawImage(visor.fundo.cenoura, q.f[k] * C, q.f[k + 1] * C);
+  const cenouraSprite = temSprite('cobrinha.cenoura');
+  for (let k = 0; k + 1 < q.f.length; k += 2) {
+    if (cenouraSprite) desenharCenoura(g, q.f[k], q.f[k + 1], C);
+    else g.drawImage(visor.fundo.cenoura, q.f[k] * C, q.f[k + 1] * C);
+  }
   g.lineCap = 'round';
   g.lineJoin = 'round';
   for (const c of cobras) {
     if (!c || !c.pontos.length) continue;
-    const cor = corDaCobra(q, c.i);
     const pts = c.pontos.map(([x, y]) => [x * C + C / 2, y * C + C / 2]);
-    const linha = () => {
-      g.beginPath();
-      pts.forEach(([x, y], k) => (k ? g.lineTo(x, y) : g.moveTo(x, y)));
-      if (pts.length === 1) g.lineTo(pts[0][0] + 0.01, pts[0][1]);
-    };
-    // Corpo: uma linha grossa passando pelo meio das casas, com um brilho no meio.
-    g.strokeStyle = escurecer(cor, 0.42);
-    g.lineWidth = C * 0.74;
-    linha();
-    g.stroke();
-    g.strokeStyle = escurecer(cor, 0.18);
-    g.lineWidth = C * 0.38;
-    linha();
-    g.stroke();
-    // Cabeça
-    const [hx, hy] = pts[0];
-    g.fillStyle = cor;
-    g.beginPath();
-    g.arc(hx, hy, C * 0.47, 0, Math.PI * 2);
-    g.fill();
-    if (c.i === eu) {
-      g.strokeStyle = '#ffffff';
-      g.lineWidth = 2;
-      g.stroke();
-    }
-    const [dx, dy] = c.dir;
-    g.fillStyle = '#1b1403';
-    for (const lado of [-1, 1]) {
-      g.beginPath();
-      g.arc(hx + dx * C * 0.18 + dy * lado * C * 0.2, hy + dy * C * 0.18 + dx * lado * C * 0.2, C * 0.1, 0, Math.PI * 2);
-      g.fill();
-    }
+    desenharCobraAoVivo(g, pts, corDaCobra(q, c.i), C, c.i === eu, c.dir);
   }
 }
 

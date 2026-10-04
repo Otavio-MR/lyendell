@@ -7,6 +7,7 @@ import { enviar, entrarNaPartida, rt, ouvir } from '../tempo-real.js';
 import { desenharCoelho, elipse, sombrear } from '../desenho-coelho.js';
 import { CORES_JUNTO, sorteJunto } from '../junto.js';
 import { som } from '../arcade.js';
+import { registrarPecas, desenharSprite, aoMudarSprites } from '../sprites.js';
 
 const L = 1200;
 const A = 800;
@@ -17,6 +18,202 @@ const TECLAS = {
   Space: 'pular', KeyZ: 'pular', KeyK: 'pular', KeyX: 'acao', KeyJ: 'acao', Enter: 'acao',
 };
 const cor = k => CORES_JUNTO[k % CORES_JUNTO.length];
+
+/* ─── Desenhos do tabuleiro (em qualquer canvas: o jogo e a prévia da tela de sprites) ─── */
+
+// Uma casa do caminho, com o ícone do tipo.
+function pintarCasa(g, x, y, tipo) {
+  const corCasa = COR_CASA[tipo] || COR_CASA.azul;
+  elipse(g, x, y + 4, 24, 10, 'rgba(0,0,0,0.25)');
+  elipse(g, x, y, 24, 17, sombrear(corCasa, -0.25));
+  elipse(g, x, y - 3, 22, 15, corCasa);
+  elipse(g, x - 6, y - 8, 8, 4, 'rgba(255,255,255,0.3)');
+  const ic = ICONE_CASA[tipo];
+  if (ic) {
+    g.font = '700 18px "Cinzel", Georgia, serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillStyle = '#fff';
+    g.fillText(ic, x, y - 3);
+  }
+}
+
+// A cenoura dourada, com o meio em (0, 0) e já inclinada.
+function pintarDourada(g) {
+  g.save();
+  g.rotate(0.5);
+  g.fillStyle = '#e8c24a';
+  g.beginPath(); g.moveTo(-8, -16); g.lineTo(8, -16); g.lineTo(0, 22); g.closePath(); g.fill();
+  g.fillStyle = '#5aa04a';
+  for (const r of [-0.4, 0, 0.4]) { g.save(); g.translate(0, -16); g.rotate(r); elipse(g, 0, -8, 3.5, 9, '#5aa04a'); g.restore(); }
+  g.restore();
+}
+
+// O cubo do dado (sem o número), com o meio em (0, 0).
+function pintarDado(g) {
+  g.fillStyle = '#fbf6ee';
+  g.strokeStyle = '#8a6a44';
+  g.lineWidth = 3;
+  g.beginPath();
+  if (g.roundRect) g.roundRect(-22, -22, 44, 44, 9); else g.rect(-22, -22, 44, 44);
+  g.fill(); g.stroke();
+}
+
+// Uma árvore da borda (sem a sombra), com o tronco começando em (x, y).
+function pintarArvore(f, x, y) {
+  f.fillStyle = '#6b4a2b'; f.fillRect(x - 4, y, 8, 18);
+  elipse(f, x, y - 8, 26, 24, '#3a7a3c');
+  elipse(f, x - 8, y - 14, 12, 10, 'rgba(255,255,255,0.12)');
+}
+
+// Um canteiro da horta (x, y = canto de cima do canteiro).
+function pintarCanteiro(f, x, y) {
+  f.fillStyle = '#7a5434';
+  f.fillRect(x, y, 30, 12);
+  elipse(f, x + 15, y + 3, 4, 3, '#e07a2a');
+  elipse(f, x + 15, y - 3, 3, 5, '#5aa04a');
+}
+
+// O fundo do tabuleiro (desenhado uma vez num canvas guardado): jardim, lago, horta, toca, caminhos e árvores.
+function pintarFundoFesta(f, tab) {
+  const gr = f.createRadialGradient(L / 2, A / 2, 100, L / 2, A / 2, 760);
+  gr.addColorStop(0, '#8fc46a');
+  gr.addColorStop(1, '#4f8a3c');
+  f.fillStyle = gr;
+  f.fillRect(0, 0, L, A);
+  // Lago, horta e flores
+  elipse(f, 600, 300, 150, 70, '#3d7ea6');
+  elipse(f, 600, 296, 136, 60, '#5aa0c8');
+  for (const [x, y] of [[540, 290], [650, 310], [610, 280]]) { elipse(f, x, y, 12, 7, '#4f8f45'); elipse(f, x + 3, y - 2, 3, 3, '#f0c0d8'); }
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 7; c++) {
+    const x = 470 + c * 38;
+    const y = 500 + r * 26;
+    if (!desenharSprite(f, 'festa.canteiro', 'parado', x + 15, y + 2, { quadro: r * 7 + c })) pintarCanteiro(f, x, y);
+  }
+  // A toca no meio
+  elipse(f, 600, 420, 90, 40, 'rgba(0,0,0,0.2)');
+  f.fillStyle = '#6fa055';
+  f.beginPath(); f.ellipse(600, 410, 84, 60, 0, Math.PI, 0); f.fill();
+  elipse(f, 600, 410, 26, 22, '#3a2414');
+  f.font = '700 18px "Cinzel", Georgia, serif';
+  f.textAlign = 'center';
+  f.fillStyle = '#1b1403';
+  f.fillText('Toca', 600, 372);
+  let semente = 7;
+  const rnd = () => ((semente = (semente * 9301 + 49297) % 233280) / 233280);
+  for (let k = 0; k < 70; k++) elipse(f, rnd() * L, rnd() * A, 2.5, 2.5, ['#f0a0c0', '#f4dd80', '#ffffff', '#b0a0f0'][k % 4]);
+  // Caminhos entre as casas
+  f.lineCap = 'round';
+  for (const c of tab) for (const p of c.prox) {
+    const d = tab[p];
+    f.strokeStyle = '#c9b07a';
+    f.lineWidth = 16;
+    f.beginPath(); f.moveTo(c.x, c.y); f.lineTo(d.x, d.y); f.stroke();
+  }
+  for (const c of tab) for (const p of c.prox) {
+    const d = tab[p];
+    f.strokeStyle = '#dcc79a';
+    f.lineWidth = 8;
+    f.beginPath(); f.moveTo(c.x, c.y); f.lineTo(d.x, d.y); f.stroke();
+  }
+  // Árvores nas bordas
+  for (let k = 0; k < 26; k++) {
+    const a = (k / 26) * Math.PI * 2;
+    const x = 600 + Math.cos(a) * 580;
+    const y = 400 + Math.sin(a) * 380;
+    elipse(f, x, y + 18, 26, 8, 'rgba(0,0,0,0.2)');
+    if (!desenharSprite(f, 'festa.arvore', 'parada', x, y + 18, { quadro: k })) pintarArvore(f, x, y);
+  }
+}
+
+// Uma casa no tabuleiro (sprite enviado ou o desenho de sempre) e, se for a dela, a cenoura dourada brilhando.
+function desenharCasaFesta(g, c, t, dourada) {
+  if (!desenharSprite(g, `festa.casa-${c.tipo}`, 'parada', c.x, c.y, { t })) pintarCasa(g, c.x, c.y, c.tipo);
+  // A cenoura dourada brilha na casa dela
+  if (c.id === dourada) {
+    const pulso = 1 + Math.sin(t * 4) * 0.08;
+    const brilho = g.createRadialGradient(c.x, c.y - 40, 0, c.x, c.y - 40, 60);
+    brilho.addColorStop(0, 'rgba(255,230,120,0.75)');
+    brilho.addColorStop(1, 'rgba(255,230,120,0)');
+    g.fillStyle = brilho;
+    g.beginPath(); g.arc(c.x, c.y - 40, 60, 0, Math.PI * 2); g.fill();
+    const yy = c.y - 40 + Math.sin(t * 2) * 4;
+    if (!desenharSprite(g, 'festa.cenoura-dourada', 'brilhando', c.x, yy, { t, escala: pulso })) {
+      g.save();
+      g.translate(c.x, yy);
+      g.scale(pulso, pulso);
+      pintarDourada(g);
+      g.restore();
+    }
+  }
+}
+
+// Um dado já no lugar (g transladado e girado): o cubo e o número por cima.
+function desenharDadoFesta(g, v, t, girando) {
+  if (!desenharSprite(g, 'festa.dado', girando ? 'girando' : 'parado', 0, 0, { t })) pintarDado(g);
+  g.font = '700 24px "Cinzel", Georgia, serif';
+  g.fillStyle = '#1b1403';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText(String(v), 0, 1);
+}
+
+/* ─── Sprites (veja ../sprites.js) ─── */
+
+const NOME_CASA = { azul: 'Casa azul', vermelha: 'Casa vermelha', sorte: 'Casa da sorte (?)', raposo: 'Casa do Raposo', loja: 'Casa da lojinha', inicio: 'Casa do começo' };
+const DESC_CASA = {
+  azul: 'Dá 3 cenouras para quem para nela.',
+  vermelha: 'Tira 3 cenouras de quem para nela.',
+  sorte: 'Sorteia uma surpresa. Inclua o ponto de interrogação no desenho.',
+  raposo: 'O Raposo apronta. Inclua o símbolo da raposa no desenho.',
+  loja: 'A lojinha dos dados especiais. Inclua o símbolo da loja no desenho.',
+  inicio: 'Onde todos começam. Inclua a estrela no desenho.',
+};
+export const SPRITES = [
+  ...Object.keys(COR_CASA).map(tipo => ({
+    chave: `festa.casa-${tipo}`, jogo: 'Festa na Toca', nome: NOME_CASA[tipo],
+    desc: `${DESC_CASA[tipo]} Vista de cima, um pouco inclinada, como as outras casas do Jardim da Toca (o coelho fica em pé no meio).`,
+    largura: 52, altura: 40, ancora: 'centro',
+    animacoes: [{ id: 'parada', nome: 'Parada', quadros: 1, fps: 4 }],
+    previa: g => pintarCasa(g, 0, 0, tipo),
+  })),
+  {
+    chave: 'festa.cenoura-dourada', jogo: 'Festa na Toca', nome: 'Cenoura dourada',
+    desc: 'A cenoura dourada que flutua em cima da casa dela. O jogo faz ela subir, descer e pulsar, com o brilho por trás.',
+    largura: 44, altura: 56, ancora: 'centro',
+    animacoes: [{ id: 'brilhando', nome: 'Brilhando', quadros: 1, fps: 6 }],
+    previa: g => pintarDourada(g),
+  },
+  {
+    chave: 'festa.dado', jogo: 'Festa na Toca', nome: 'Dado',
+    desc: 'O dado que aparece em cima de quem jogou. Só o cubo, sem número: o jogo escreve o número por cima. Girando, o jogo ainda balança o desenho.',
+    largura: 48, altura: 48, ancora: 'centro',
+    animacoes: [{ id: 'parado', nome: 'Parado', quadros: 1, fps: 4 }, { id: 'girando', nome: 'Girando', quadros: 4, fps: 12 }],
+    previa: g => pintarDado(g),
+  },
+  {
+    chave: 'festa.arvore', jogo: 'Festa na Toca', nome: 'Árvore da borda',
+    desc: 'As 26 árvores em volta do jardim, com o pé do tronco na base do quadro (a sombra o jogo faz). Com vários quadros, cada árvore usa um (para variar).',
+    largura: 54, altura: 52, ancora: 'pe',
+    animacoes: [{ id: 'parada', nome: 'Parada', quadros: 1, fps: 1 }],
+    previa: g => pintarArvore(g, 0, -18),
+  },
+  {
+    chave: 'festa.canteiro', jogo: 'Festa na Toca', nome: 'Canteiro da horta',
+    desc: 'Cada canteiro da horta perto da toca (são 21). Com vários quadros, cada canteiro usa um (para variar).',
+    largura: 32, altura: 22, ancora: 'centro',
+    animacoes: [{ id: 'parado', nome: 'Parado', quadros: 1, fps: 1 }],
+    previa: g => pintarCanteiro(g, -15, -2),
+  },
+];
+registrarPecas(SPRITES);
+
+// Sprite trocado: o fundo já desenhado do tabuleiro é refeito na próxima vez.
+let versaoSprites = 0;
+aoMudarSprites(() => { versaoSprites++; });
+
+// Só para os testes no Node (os desenhos sem a tela).
+export const _festaDeTeste = { pintarFundoFesta, desenharCasaFesta, desenharDadoFesta };
 
 export function criarTelaFesta(id, { sair, sairJa }) {
   const el = h('div', { class: 'festa' });
@@ -47,97 +244,18 @@ export function criarTelaFesta(id, { sair, sairJa }) {
 
   /* ─── Desenho do tabuleiro ─── */
 
+  let versaoFundo = -1;
   function prepararFundo() {
-    if (fundo || !e) return;
+    if ((fundo && versaoFundo === versaoSprites) || !e) return;
+    versaoFundo = versaoSprites;
     fundo = document.createElement('canvas');
     fundo.width = L;
     fundo.height = A;
-    const f = fundo.getContext('2d');
-    const gr = f.createRadialGradient(L / 2, A / 2, 100, L / 2, A / 2, 760);
-    gr.addColorStop(0, '#8fc46a');
-    gr.addColorStop(1, '#4f8a3c');
-    f.fillStyle = gr;
-    f.fillRect(0, 0, L, A);
-    // Lago, horta e flores
-    elipse(f, 600, 300, 150, 70, '#3d7ea6');
-    elipse(f, 600, 296, 136, 60, '#5aa0c8');
-    for (const [x, y] of [[540, 290], [650, 310], [610, 280]]) { elipse(f, x, y, 12, 7, '#4f8f45'); elipse(f, x + 3, y - 2, 3, 3, '#f0c0d8'); }
-    for (let r = 0; r < 3; r++) for (let c = 0; c < 7; c++) {
-      f.fillStyle = '#7a5434';
-      f.fillRect(470 + c * 38, 500 + r * 26, 30, 12);
-      elipse(f, 485 + c * 38, 503 + r * 26, 4, 3, '#e07a2a');
-      elipse(f, 485 + c * 38, 497 + r * 26, 3, 5, '#5aa04a');
-    }
-    // A toca no meio
-    elipse(f, 600, 420, 90, 40, 'rgba(0,0,0,0.2)');
-    f.fillStyle = '#6fa055';
-    f.beginPath(); f.ellipse(600, 410, 84, 60, 0, Math.PI, 0); f.fill();
-    elipse(f, 600, 410, 26, 22, '#3a2414');
-    f.font = '700 18px "Cinzel", Georgia, serif';
-    f.textAlign = 'center';
-    f.fillStyle = '#1b1403';
-    f.fillText('Toca', 600, 372);
-    let semente = 7;
-    const rnd = () => ((semente = (semente * 9301 + 49297) % 233280) / 233280);
-    for (let k = 0; k < 70; k++) elipse(f, rnd() * L, rnd() * A, 2.5, 2.5, ['#f0a0c0', '#f4dd80', '#ffffff', '#b0a0f0'][k % 4]);
-    // Caminhos entre as casas
-    f.lineCap = 'round';
-    for (const c of e.tab) for (const p of c.prox) {
-      const d = e.tab[p];
-      f.strokeStyle = '#c9b07a';
-      f.lineWidth = 16;
-      f.beginPath(); f.moveTo(c.x, c.y); f.lineTo(d.x, d.y); f.stroke();
-    }
-    for (const c of e.tab) for (const p of c.prox) {
-      const d = e.tab[p];
-      f.strokeStyle = '#dcc79a';
-      f.lineWidth = 8;
-      f.beginPath(); f.moveTo(c.x, c.y); f.lineTo(d.x, d.y); f.stroke();
-    }
-    // Árvores nas bordas
-    for (let k = 0; k < 26; k++) {
-      const a = (k / 26) * Math.PI * 2;
-      const x = 600 + Math.cos(a) * 580;
-      const y = 400 + Math.sin(a) * 380;
-      elipse(f, x, y + 18, 26, 8, 'rgba(0,0,0,0.2)');
-      f.fillStyle = '#6b4a2b'; f.fillRect(x - 4, y, 8, 18);
-      elipse(f, x, y - 8, 26, 24, '#3a7a3c');
-      elipse(f, x - 8, y - 14, 12, 10, 'rgba(255,255,255,0.12)');
-    }
+    pintarFundoFesta(fundo.getContext('2d'), e.tab);
   }
 
   function desenharCasa(c, t) {
-    const corCasa = COR_CASA[c.tipo] || COR_CASA.azul;
-    elipse(g, c.x, c.y + 4, 24, 10, 'rgba(0,0,0,0.25)');
-    elipse(g, c.x, c.y, 24, 17, sombrear(corCasa, -0.25));
-    elipse(g, c.x, c.y - 3, 22, 15, corCasa);
-    elipse(g, c.x - 6, c.y - 8, 8, 4, 'rgba(255,255,255,0.3)');
-    const ic = ICONE_CASA[c.tipo];
-    if (ic) {
-      g.font = '700 18px "Cinzel", Georgia, serif';
-      g.textAlign = 'center';
-      g.textBaseline = 'middle';
-      g.fillStyle = '#fff';
-      g.fillText(ic, c.x, c.y - 3);
-    }
-    // A cenoura dourada brilha na casa dela
-    if (c.id === e.dourada) {
-      const pulso = 1 + Math.sin(t * 4) * 0.08;
-      const brilho = g.createRadialGradient(c.x, c.y - 40, 0, c.x, c.y - 40, 60);
-      brilho.addColorStop(0, 'rgba(255,230,120,0.75)');
-      brilho.addColorStop(1, 'rgba(255,230,120,0)');
-      g.fillStyle = brilho;
-      g.beginPath(); g.arc(c.x, c.y - 40, 60, 0, Math.PI * 2); g.fill();
-      g.save();
-      g.translate(c.x, c.y - 40 + Math.sin(t * 2) * 4);
-      g.scale(pulso, pulso);
-      g.rotate(0.5);
-      g.fillStyle = '#e8c24a';
-      g.beginPath(); g.moveTo(-8, -16); g.lineTo(8, -16); g.lineTo(0, 22); g.closePath(); g.fill();
-      g.fillStyle = '#5aa04a';
-      for (const r of [-0.4, 0, 0.4]) { g.save(); g.translate(0, -16); g.rotate(r); elipse(g, 0, -8, 3.5, 9, '#5aa04a'); g.restore(); }
-      g.restore();
-    }
+    desenharCasaFesta(g, c, t, e.dourada);
   }
 
   // Onde cada coelho aparece (vários na mesma casa ficam lado a lado) e o pulinho entre as casas.
@@ -234,17 +352,7 @@ export function criarTelaFesta(id, { sair, sairJa }) {
           g.save();
           g.translate(dx, dy);
           if (girando) g.rotate(Math.sin(t * 18 + x) * 0.3);
-          g.fillStyle = '#fbf6ee';
-          g.strokeStyle = '#8a6a44';
-          g.lineWidth = 3;
-          g.beginPath();
-          if (g.roundRect) g.roundRect(-22, -22, 44, 44, 9); else g.rect(-22, -22, 44, 44);
-          g.fill(); g.stroke();
-          g.font = '700 24px "Cinzel", Georgia, serif';
-          g.fillStyle = '#1b1403';
-          g.textAlign = 'center';
-          g.textBaseline = 'middle';
-          g.fillText(String(v), 0, 1);
+          desenharDadoFesta(g, v, t, girando);
           g.restore();
         });
         if (e.andar?.restam > 0 && !girando) {

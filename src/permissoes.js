@@ -63,6 +63,7 @@ const CATALOGO = [
     { chave: 'recreacao.usar', nome: 'Usar o chat e os jogos' },
     { chave: 'recreacao.moderar', nome: 'Apagar mensagens de outros no chat' },
     { chave: 'recreacao.perguntas', nome: 'Criar e editar as perguntas do quiz' },
+    { chave: 'sprites.editar', nome: 'Trocar os desenhos dos joguinhos pelos próprios sprites (imagens em tira de quadros)' },
   ] },
   { grupo: 'Leis de Lyendell', itens: [
     { chave: 'leis.ver', nome: 'Ler as Leis de Lyendell' },

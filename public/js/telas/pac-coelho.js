@@ -7,6 +7,7 @@ import { juntoNoJogo } from '../junto.js';
 import { segredosDoJogo } from '../segredos.js';
 import { desenharParte } from '../roupas-coelho.js';
 import { sombrear } from '../desenho-coelho.js';
+import { registrarPecas, desenharSprite, temSprite, aoMudarSprites } from '../sprites.js';
 
 const MAPA = [
   '############################',
@@ -66,6 +67,7 @@ const RAPOSAS = [
   { nome: 'Cinzenta', cor: '#8a95a8', canto: [27, 31], casa: [11.5, 14], solta: 5, jeito: 'Cerca junto com a Rubra.' },
   { nome: 'Fenec', cor: '#e3a84c', canto: [0, 31], casa: [15.5, 14], solta: 9, jeito: 'Chega perto e depois foge.' },
 ];
+const COR_BRASA = '#b8361f'; // a 5ª raposa, só no junto com 3 ou mais
 // Alternância entre espalhar (cada uma vai para o seu canto) e perseguir, em segundos.
 const FASES = [[7, 'dispersar'], [20, 'perseguir'], [7, 'dispersar'], [20, 'perseguir'], [5, 'dispersar'], [20, 'perseguir'], [5, 'dispersar'], [Infinity, 'perseguir']];
 const VALOR_CENOURA = [100, 300, 500, 500, 700, 700, 1000, 1000, 2000, 2000, 3000, 3000, 5000];
@@ -86,6 +88,287 @@ const contraria = (a, b) => a[0] === -b[0] && a[1] === -b[1];
 
 /* ─── Desenho (o mesmo para quem joga e para quem assiste) ─── */
 
+// As peças desenhadas à mão, em qualquer canvas (o jogo e a prévia da tela de sprites).
+
+function pintarLirio(g, cx, cy, grande) {
+  if (!grande) {
+    g.fillStyle = '#d8b13a';
+    g.beginPath();
+    g.arc(cx, cy, T * 0.13, 0, Math.PI * 2);
+    g.fill();
+    return;
+  }
+  // Lírio grande: moeda com brilho
+  g.fillStyle = '#e8c24a';
+  g.beginPath();
+  g.arc(cx, cy, T * 0.34, 0, Math.PI * 2);
+  g.fill();
+  g.strokeStyle = '#8c6d15';
+  g.lineWidth = 1.5;
+  g.beginPath();
+  g.arc(cx, cy, T * 0.22, 0, Math.PI * 2);
+  g.stroke();
+  g.fillStyle = 'rgba(255, 250, 225, 0.8)';
+  g.beginPath();
+  g.arc(cx - T * 0.1, cy - T * 0.1, T * 0.07, 0, Math.PI * 2);
+  g.fill();
+}
+
+function pintarCenouraPac(g, cx, cy) {
+  const C = T * 1.3;
+  g.fillStyle = '#5b8c3e';
+  g.beginPath();
+  g.ellipse(cx - C * 0.1, cy - C * 0.3, C * 0.08, C * 0.2, -0.5, 0, Math.PI * 2);
+  g.ellipse(cx + C * 0.1, cy - C * 0.3, C * 0.08, C * 0.2, 0.5, 0, Math.PI * 2);
+  g.fill();
+  g.fillStyle = '#e8812f';
+  g.beginPath();
+  g.moveTo(cx - C * 0.22, cy - C * 0.16);
+  g.quadraticCurveTo(cx, cy - C * 0.28, cx + C * 0.22, cy - C * 0.16);
+  g.lineTo(cx, cy + C * 0.42);
+  g.closePath();
+  g.fill();
+  g.strokeStyle = 'rgba(120, 50, 10, 0.6)';
+  g.lineWidth = 1.5;
+  g.beginPath();
+  g.moveTo(cx - C * 0.11, cy);
+  g.lineTo(cx - C * 0.01, cy);
+  g.moveTo(cx + C * 0.03, cy + C * 0.14);
+  g.lineTo(cx + C * 0.1, cy + C * 0.14);
+  g.stroke();
+}
+
+// cores (junto): { orelha, claro, escuro, contorno } no lugar das cores do coelho dourado. paleta 'neve': o coelho branquinho.
+function pintarCoelhoPac(g, cx, cy, dir, abertura, tamanho = 1, giro = 0, cores = null, paleta = null) {
+  const r = T * 0.62 * tamanho;
+  if (r <= 0.5) return;
+  g.save();
+  g.translate(cx, cy);
+  if (giro) g.rotate(giro);
+  if (mesma(dir, ESQ)) g.scale(-1, 1);
+  else if (mesma(dir, CIMA)) g.rotate(-Math.PI / 2);
+  else if (mesma(dir, BAIXO)) g.rotate(Math.PI / 2);
+  // Orelhas para trás, como quem corre.
+  for (const [ox, oy, rot] of [[-r * 0.55, -r * 0.7, -0.95], [-r * 0.15, -r * 0.9, -0.45]]) {
+    g.save();
+    g.translate(ox, oy);
+    g.rotate(rot);
+    g.fillStyle = cores ? cores.orelha : paleta === 'neve' ? '#dfe7ef' : '#d4a52c';
+    g.beginPath();
+    g.ellipse(0, -r * 0.45, r * 0.26, r * 0.62, 0, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = '#e9a7a0';
+    g.beginPath();
+    g.ellipse(0, -r * 0.45, r * 0.11, r * 0.42, 0, 0, Math.PI * 2);
+    g.fill();
+    g.restore();
+  }
+  const brilho = g.createRadialGradient(-r * 0.35, -r * 0.35, r * 0.1, 0, 0, r);
+  brilho.addColorStop(0, cores ? cores.claro : paleta === 'neve' ? '#ffffff' : '#f8e79a');
+  brilho.addColorStop(1, cores ? cores.escuro : paleta === 'neve' ? '#a9b8c8' : '#c99a22');
+  g.fillStyle = brilho;
+  g.beginPath();
+  g.moveTo(0, 0);
+  g.arc(0, 0, r, abertura, Math.PI * 2 - abertura);
+  g.closePath();
+  g.fill();
+  if (cores?.contorno) {
+    g.strokeStyle = cores.contorno;
+    g.lineWidth = 2.4;
+    g.stroke();
+  }
+  g.fillStyle = '#1b1403';
+  g.beginPath();
+  g.arc(r * 0.12, -r * 0.5, r * 0.13, 0, Math.PI * 2);
+  g.fill();
+  g.fillStyle = 'rgba(232, 130, 120, 0.5)';
+  g.beginPath();
+  g.arc(-r * 0.12, r * 0.28, r * 0.16, 0, Math.PI * 2);
+  g.fill();
+  g.restore();
+}
+
+// r = { dir, modo, assustada, cor }; susto = segundos de medo que faltam (pisca nos 2 últimos).
+function pintarRaposaPac(g, r, cx, cy, susto, t) {
+  const s = T * 0.62;
+  const assustada = r.assustada;
+  const piscando = assustada && susto < 2 && Math.floor(t * 5) % 2 === 0;
+  g.save();
+  g.translate(cx, cy);
+  const soOlhos = r.modo === 'olhos' || r.modo === 'entrando'; // comida: só os olhos voltam para a toca
+  if (!soOlhos) {
+    g.fillStyle = assustada ? (piscando ? '#efe6d0' : '#2b4687') : r.cor;
+    // Orelhas pontudas
+    g.beginPath();
+    g.moveTo(-s * 0.95, -s * 0.15); g.lineTo(-s * 0.78, -s * 1.3); g.lineTo(-s * 0.15, -s * 0.78); g.closePath();
+    g.moveTo(s * 0.95, -s * 0.15); g.lineTo(s * 0.78, -s * 1.3); g.lineTo(s * 0.15, -s * 0.78); g.closePath();
+    g.fill();
+    // Corpo com a barra ondulando
+    g.beginPath();
+    g.moveTo(-s, s * 0.95);
+    g.lineTo(-s, 0);
+    g.arc(0, 0, s, Math.PI, 0);
+    g.lineTo(s, s * 0.95);
+    const onda = Math.floor(t * 8) % 2 ? 0.62 : 0.74;
+    for (let i = 0; i < 4; i++) {
+      g.lineTo(s - (s / 2) * (i + 0.5), s * onda);
+      g.lineTo(s - (s / 2) * (i + 1), s * 0.95);
+    }
+    g.closePath();
+    g.fill();
+    if (!assustada) {
+      g.fillStyle = 'rgba(40, 20, 10, 0.35)';
+      g.beginPath();
+      g.moveTo(-s * 0.72, -s * 0.35); g.lineTo(-s * 0.66, -s * 1.02); g.lineTo(-s * 0.35, -s * 0.72); g.closePath();
+      g.moveTo(s * 0.72, -s * 0.35); g.lineTo(s * 0.66, -s * 1.02); g.lineTo(s * 0.35, -s * 0.72); g.closePath();
+      g.fill();
+      // Focinho claro e nariz
+      g.fillStyle = '#f7f0e2';
+      g.beginPath();
+      g.ellipse(r.dir[0] * s * 0.12, s * 0.4, s * 0.5, s * 0.3, 0, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = '#1b1403';
+      g.beginPath();
+      g.arc(r.dir[0] * s * 0.3, s * 0.3 + r.dir[1] * s * 0.06, s * 0.12, 0, Math.PI * 2);
+      g.fill();
+    } else {
+      g.fillStyle = piscando ? '#c0392b' : '#f4dd80';
+      g.fillRect(-s * 0.42, -s * 0.3, s * 0.2, s * 0.2);
+      g.fillRect(s * 0.22, -s * 0.3, s * 0.2, s * 0.2);
+      g.strokeStyle = g.fillStyle;
+      g.lineWidth = 1.6;
+      g.beginPath();
+      g.moveTo(-s * 0.6, s * 0.35);
+      for (let i = 1; i <= 6; i++) g.lineTo(-s * 0.6 + i * s * 0.2, s * (i % 2 ? 0.2 : 0.35));
+      g.stroke();
+    }
+  }
+  if (!assustada) {
+    for (const lado of [-1, 1]) {
+      g.fillStyle = '#ffffff';
+      g.strokeStyle = 'rgba(0, 0, 0, 0.35)';
+      g.lineWidth = 1;
+      g.beginPath();
+      g.ellipse(lado * s * 0.36, -s * 0.2, s * 0.22, s * 0.28, 0, 0, Math.PI * 2);
+      g.fill();
+      g.stroke();
+      g.fillStyle = '#1d2a55';
+      g.beginPath();
+      g.arc(lado * s * 0.36 + r.dir[0] * s * 0.1, -s * 0.2 + r.dir[1] * s * 0.12, s * 0.11, 0, Math.PI * 2);
+      g.fill();
+    }
+  }
+  g.restore();
+}
+
+// Um bloco de parede (ou de chão) do labirinto, sozinho, para a prévia.
+function pintarCasaLabirinto(g, parede) {
+  g.fillStyle = parede ? '#10251a' : '#060b07';
+  g.fillRect(-T / 2, -T / 2, T, T);
+  if (!parede) return;
+  g.strokeStyle = '#b8921f';
+  g.lineWidth = 2;
+  g.strokeRect(-T / 2 + 1, -T / 2 + 1, T - 2, T - 2);
+}
+
+/* ─── Sprites (veja ../sprites.js): cada peça do labirinto pode virar uma imagem enviada ─── */
+
+// A raposa i (na ordem de RAPOSAS, e a Brasa por último) e o sprite que vale agora.
+const CHAVES_RAPOSAS = ['pacman.raposa-rubra', 'pacman.raposa-artica', 'pacman.raposa-cinzenta', 'pacman.raposa-fenec', 'pacman.raposa-brasa'];
+function spriteDaRaposa(r, i, susto, t) {
+  if (r.modo === 'olhos' || r.modo === 'entrando') return ['pacman.raposa-olhos', 'voltando'];
+  if (r.assustada) return ['pacman.raposa-assustada', susto < 2 && Math.floor(t * 5) % 2 === 0 ? 'piscando' : 'assustada'];
+  return [CHAVES_RAPOSAS[i] || null, r.dir[1] < 0 ? 'cima' : r.dir[1] > 0 ? 'baixo' : 'andando'];
+}
+
+const pecaRaposa = (chave, nome, cor, jeito) => ({
+  chave, jogo: 'Pac-Coelho', nome: `Raposa ${nome}`,
+  desc: `${jeito} De frente, como os fantasmas do Pac-Man: em "Andando" ela olha para a direita (o jogo espelha para a esquerda). "Subindo" e "Descendo" são opcionais; sem eles, vale o "Andando".`,
+  largura: 32, altura: 40, ancora: 'centro',
+  animacoes: [
+    { id: 'andando', nome: 'Andando', quadros: 2, fps: 8 },
+    { id: 'cima', nome: 'Subindo', quadros: 2, fps: 8 },
+    { id: 'baixo', nome: 'Descendo', quadros: 2, fps: 8 },
+  ],
+  previa: (g, anim, t) => pintarRaposaPac(g, { dir: anim === 'cima' ? CIMA : anim === 'baixo' ? BAIXO : DIR, modo: 'normal', assustada: false, cor }, 0, 0, 9, t),
+});
+
+export const SPRITES = [
+  {
+    chave: 'pacman.coelho', jogo: 'Pac-Coelho', nome: 'Coelho comilão',
+    desc: 'O coelho dourado do labirinto, de boca aberta para a direita (o jogo gira para cima e para baixo e espelha para a esquerda). Em "Pego" o jogo ainda encolhe e gira o desenho. No junto, marque "pintar com a cor do jogador" para cada um ter o seu pelo.',
+    largura: 44, altura: 58, ancora: 'centro', tingir: false,
+    animacoes: [
+      { id: 'andando', nome: 'Andando (comendo)', quadros: 4, fps: 20 },
+      { id: 'parado', nome: 'Parado', quadros: 1, fps: 1 },
+      { id: 'morrendo', nome: 'Pego', quadros: 8, fps: 8 },
+    ],
+    previa: (g, anim, t) => pintarCoelhoPac(g, 0, 0, DIR, anim === 'morrendo' ? 0.2 + (t % 1) * 2.6 : anim === 'parado' ? 0.3 : 0.06 + 0.36 * Math.abs(Math.sin(t * 16))),
+  },
+  pecaRaposa('pacman.raposa-rubra', 'Rubra', RAPOSAS[0].cor, 'A Rubra, que vai direto atrás do coelho.'),
+  pecaRaposa('pacman.raposa-artica', 'Ártica', RAPOSAS[1].cor, 'A Ártica, que tenta chegar na frente do coelho.'),
+  pecaRaposa('pacman.raposa-cinzenta', 'Cinzenta', RAPOSAS[2].cor, 'A Cinzenta, que cerca junto com a Rubra.'),
+  pecaRaposa('pacman.raposa-fenec', 'Fenec', RAPOSAS[3].cor, 'A Fenec, que chega perto e depois foge.'),
+  pecaRaposa('pacman.raposa-brasa', 'Brasa', COR_BRASA, 'A Brasa, a quinta raposa do junto com 3 ou mais jogadores.'),
+  {
+    chave: 'pacman.raposa-assustada', jogo: 'Pac-Coelho', nome: 'Raposa com medo',
+    desc: 'Todas as raposas ficam assim depois do Lírio grande (dá para comê-las). "Piscando" é o aviso de que o medo vai acabar; sem ele, vale "Com medo".',
+    largura: 32, altura: 40, ancora: 'centro',
+    animacoes: [
+      { id: 'assustada', nome: 'Com medo', quadros: 2, fps: 8 },
+      { id: 'piscando', nome: 'Piscando', quadros: 2, fps: 5 },
+    ],
+    previa: (g, anim, t) => pintarRaposaPac(g, { dir: DIR, modo: 'normal', assustada: true, cor: '#e2572f' }, 0, 0, anim === 'piscando' ? 1 : 9, t),
+  },
+  {
+    chave: 'pacman.raposa-olhos', jogo: 'Pac-Coelho', nome: 'Olhos voltando para a toca',
+    desc: 'Raposa comida: só os olhos voltam correndo para a toca. Olhando para a direita (o jogo espelha para a esquerda).',
+    largura: 32, altura: 40, ancora: 'centro',
+    animacoes: [{ id: 'voltando', nome: 'Voltando', quadros: 1, fps: 4 }],
+    previa: (g, anim, t) => pintarRaposaPac(g, { dir: DIR, modo: 'olhos', assustada: false, cor: '#e2572f' }, 0, 0, 9, t),
+  },
+  {
+    chave: 'pacman.lirio', jogo: 'Pac-Coelho', nome: 'Lírio',
+    desc: 'A moedinha que o coelho come (10 pontos). Bem pequena: cada casa do labirinto tem 24 de lado.',
+    largura: 8, altura: 8, ancora: 'centro',
+    animacoes: [{ id: 'parado', nome: 'Parado', quadros: 1, fps: 4 }],
+    previa: g => pintarLirio(g, 0, 0, false),
+  },
+  {
+    chave: 'pacman.lirio-grande', jogo: 'Pac-Coelho', nome: 'Lírio grande',
+    desc: 'A moeda grande dos cantos, que deixa as raposas com medo. O jogo continua fazendo ela piscar.',
+    largura: 18, altura: 18, ancora: 'centro',
+    animacoes: [{ id: 'brilhando', nome: 'Brilhando', quadros: 1, fps: 4 }],
+    previa: g => pintarLirio(g, 0, 0, true),
+  },
+  {
+    chave: 'pacman.cenoura', jogo: 'Pac-Coelho', nome: 'Cenoura bônus',
+    desc: 'A cenoura que aparece embaixo da toca duas vezes por nível.',
+    largura: 20, altura: 32, ancora: 'centro',
+    animacoes: [{ id: 'parada', nome: 'Parada', quadros: 1, fps: 4 }],
+    previa: g => pintarCenouraPac(g, 0, 0),
+  },
+  {
+    chave: 'pacman.parede', jogo: 'Pac-Coelho', nome: 'Bloco de parede',
+    desc: 'Uma casa de parede do labirinto (24 x 24), repetida em todas. O contorno dourado entre a parede e o caminho continua por cima. Com vários quadros, cada bloco usa um (para variar).',
+    largura: 24, altura: 24, ancora: 'centro',
+    animacoes: [{ id: 'parado', nome: 'Parado', quadros: 1, fps: 1 }],
+    previa: g => pintarCasaLabirinto(g, true),
+  },
+  {
+    chave: 'pacman.chao', jogo: 'Pac-Coelho', nome: 'Chão do caminho',
+    desc: 'Uma casa do caminho do labirinto (24 x 24), por baixo dos Lírios. Com vários quadros, cada casa usa um (para variar).',
+    largura: 24, altura: 24, ancora: 'centro',
+    animacoes: [{ id: 'parado', nome: 'Parado', quadros: 1, fps: 1 }],
+    previa: g => pintarCasaLabirinto(g, false),
+  },
+];
+registrarPecas(SPRITES);
+
+// Sprite trocado: o labirinto já desenhado (fundo) é refeito na próxima vez.
+let versaoSprites = 0;
+aoMudarSprites(() => { versaoSprites++; });
+
 // Estado que o desenho usa: e = { moedas, pac: { x, y, dir, parado }, raposas: [{ x, y, dir, modo, assustada, cor }],
 // situacao, relogio, susto, cenoura, popups, nivel, pontos, congelado }. t = tempo em segundos (animações).
 function criarDesenhoPac() {
@@ -95,7 +378,8 @@ function criarDesenhoPac() {
   const g = tela.getContext('2d');
   g.scale(escala, escala);
 
-  function desenharLabirinto(corBorda, corParede) {
+  // claro: o labirinto piscando quando o nível acaba (com sprite de parede ou chão, um véu claro por cima).
+  function desenharLabirinto(corBorda, corParede, claro = false) {
     const c = document.createElement('canvas');
     c.width = W * escala;
     c.height = H * escala;
@@ -103,8 +387,23 @@ function criarDesenhoPac() {
     x2.scale(escala, escala);
     x2.fillStyle = '#060b07';
     x2.fillRect(0, 0, W, H);
+    const comChao = temSprite('pacman.chao');
+    const comParede = temSprite('pacman.parede');
+    if (comChao) {
+      for (let y = 0; y < LINHAS; y++) {
+        for (let x = 0; x < COLS; x++) {
+          const fora = MAPA[y][x] === ' ' && (x < 5 || x > 22) && y !== 14; // os cantos de fora do labirinto
+          if (MAPA[y][x] !== '#' && !fora) desenharSprite(x2, 'pacman.chao', 'parado', x * T + T / 2, y * T + T / 2, { quadro: x * 7 + y * 13 });
+        }
+      }
+    }
     x2.fillStyle = corParede;
-    for (let y = 0; y < LINHAS; y++) for (let x = 0; x < COLS; x++) if (MAPA[y][x] === '#') x2.fillRect(x * T, y * T, T, T);
+    for (let y = 0; y < LINHAS; y++) {
+      for (let x = 0; x < COLS; x++) {
+        if (MAPA[y][x] !== '#') continue;
+        if (!(comParede && desenharSprite(x2, 'pacman.parede', 'parado', x * T + T / 2, y * T + T / 2, { quadro: x * 7 + y * 13 }))) x2.fillRect(x * T, y * T, T, T);
+      }
+    }
     // Contorno dourado onde a parede encontra o caminho.
     x2.strokeStyle = corBorda;
     x2.lineWidth = 2;
@@ -125,10 +424,22 @@ function criarDesenhoPac() {
     // Porta da toca das raposas.
     x2.fillStyle = '#e8a3a0';
     x2.fillRect(13 * T, 12 * T + T * 0.42, 2 * T, T * 0.16);
+    if (claro && (comChao || comParede)) {
+      x2.fillStyle = 'rgba(251, 241, 199, 0.35)';
+      x2.fillRect(0, 0, W, H);
+    }
     return c;
   }
-  const fundo = desenharLabirinto('#b8921f', '#10251a');
-  const fundoClaro = desenharLabirinto('#fbf1c7', '#3d6b3f');
+  let fundo = null;
+  let fundoClaro = null;
+  let versaoFundo = -1;
+  function prepararFundos() {
+    if (versaoFundo === versaoSprites) return;
+    versaoFundo = versaoSprites;
+    fundo = desenharLabirinto('#b8921f', '#10251a');
+    fundoClaro = desenharLabirinto('#fbf1c7', '#3d6b3f', true);
+  }
+  prepararFundos();
 
   const px = x => x * T + T / 2;
 
@@ -141,174 +452,46 @@ function criarDesenhoPac() {
         const cx = px(x);
         const cy = px(y);
         if (m === 1) {
-          g.fillStyle = '#d8b13a';
-          g.beginPath();
-          g.arc(cx, cy, T * 0.13, 0, Math.PI * 2);
-          g.fill();
+          if (!desenharSprite(g, 'pacman.lirio', 'parado', cx, cy, { t })) pintarLirio(g, cx, cy, false);
         } else if (!piscar) {
-          // Lírio grande: moeda com brilho
-          g.fillStyle = '#e8c24a';
-          g.beginPath();
-          g.arc(cx, cy, T * 0.34, 0, Math.PI * 2);
-          g.fill();
-          g.strokeStyle = '#8c6d15';
-          g.lineWidth = 1.5;
-          g.beginPath();
-          g.arc(cx, cy, T * 0.22, 0, Math.PI * 2);
-          g.stroke();
-          g.fillStyle = 'rgba(255, 250, 225, 0.8)';
-          g.beginPath();
-          g.arc(cx - T * 0.1, cy - T * 0.1, T * 0.07, 0, Math.PI * 2);
-          g.fill();
+          if (!desenharSprite(g, 'pacman.lirio-grande', 'brilhando', cx, cy, { t })) pintarLirio(g, cx, cy, true);
         }
       }
     }
   }
 
-  function desenharCenoura(cx, cy) {
-    const C = T * 1.3;
-    g.fillStyle = '#5b8c3e';
-    g.beginPath();
-    g.ellipse(cx - C * 0.1, cy - C * 0.3, C * 0.08, C * 0.2, -0.5, 0, Math.PI * 2);
-    g.ellipse(cx + C * 0.1, cy - C * 0.3, C * 0.08, C * 0.2, 0.5, 0, Math.PI * 2);
-    g.fill();
-    g.fillStyle = '#e8812f';
-    g.beginPath();
-    g.moveTo(cx - C * 0.22, cy - C * 0.16);
-    g.quadraticCurveTo(cx, cy - C * 0.28, cx + C * 0.22, cy - C * 0.16);
-    g.lineTo(cx, cy + C * 0.42);
-    g.closePath();
-    g.fill();
-    g.strokeStyle = 'rgba(120, 50, 10, 0.6)';
-    g.lineWidth = 1.5;
-    g.beginPath();
-    g.moveTo(cx - C * 0.11, cy);
-    g.lineTo(cx - C * 0.01, cy);
-    g.moveTo(cx + C * 0.03, cy + C * 0.14);
-    g.lineTo(cx + C * 0.1, cy + C * 0.14);
-    g.stroke();
+  function desenharCenoura(cx, cy, t) {
+    if (!desenharSprite(g, 'pacman.cenoura', 'parada', cx, cy, { t })) pintarCenouraPac(g, cx, cy);
   }
 
   // cores (junto): { orelha, claro, escuro, contorno } no lugar das cores do coelho dourado.
-  function desenharCoelho(cx, cy, dir, abertura, tamanho = 1, giro = 0, cores = null) {
-    const r = T * 0.62 * tamanho;
-    if (r <= 0.5) return;
-    g.save();
-    g.translate(cx, cy);
-    if (giro) g.rotate(giro);
-    if (mesma(dir, ESQ)) g.scale(-1, 1);
-    else if (mesma(dir, CIMA)) g.rotate(-Math.PI / 2);
-    else if (mesma(dir, BAIXO)) g.rotate(Math.PI / 2);
-    // Orelhas para trás, como quem corre.
-    for (const [ox, oy, rot] of [[-r * 0.55, -r * 0.7, -0.95], [-r * 0.15, -r * 0.9, -0.45]]) {
-      g.save();
-      g.translate(ox, oy);
-      g.rotate(rot);
-      g.fillStyle = cores ? cores.orelha : paleta === 'neve' ? '#dfe7ef' : '#d4a52c';
-      g.beginPath();
-      g.ellipse(0, -r * 0.45, r * 0.26, r * 0.62, 0, 0, Math.PI * 2);
-      g.fill();
-      g.fillStyle = '#e9a7a0';
-      g.beginPath();
-      g.ellipse(0, -r * 0.45, r * 0.11, r * 0.42, 0, 0, Math.PI * 2);
-      g.fill();
-      g.restore();
+  // sp: { anim, t, progresso } quando pode usar o sprite enviado (girado para cima e para baixo, espelhado para a esquerda).
+  function desenharCoelho(cx, cy, dir, abertura, tamanho = 1, giro = 0, cores = null, sp = null) {
+    if (sp && temSprite('pacman.coelho')) {
+      const r = T * 0.62 * tamanho;
+      if (r <= 0.5) return;
+      if (cores?.contorno) {
+        g.strokeStyle = cores.contorno;
+        g.lineWidth = 2.4;
+        g.beginPath();
+        g.arc(cx, cy, r + 1, 0, Math.PI * 2);
+        g.stroke();
+      }
+      const rot = giro + (mesma(dir, CIMA) ? -Math.PI / 2 : mesma(dir, BAIXO) ? Math.PI / 2 : 0);
+      desenharSprite(g, 'pacman.coelho', sp.anim, cx, cy, {
+        t: sp.t, progresso: sp.progresso, rot, dir: mesma(dir, ESQ) ? -1 : 1, escala: tamanho,
+        cor: cores ? cores.orelha : paleta === 'neve' ? '#eef3f8' : '#d4a52c',
+      });
+      return;
     }
-    const brilho = g.createRadialGradient(-r * 0.35, -r * 0.35, r * 0.1, 0, 0, r);
-    brilho.addColorStop(0, cores ? cores.claro : paleta === 'neve' ? '#ffffff' : '#f8e79a');
-    brilho.addColorStop(1, cores ? cores.escuro : paleta === 'neve' ? '#a9b8c8' : '#c99a22');
-    g.fillStyle = brilho;
-    g.beginPath();
-    g.moveTo(0, 0);
-    g.arc(0, 0, r, abertura, Math.PI * 2 - abertura);
-    g.closePath();
-    g.fill();
-    if (cores?.contorno) {
-      g.strokeStyle = cores.contorno;
-      g.lineWidth = 2.4;
-      g.stroke();
-    }
-    g.fillStyle = '#1b1403';
-    g.beginPath();
-    g.arc(r * 0.12, -r * 0.5, r * 0.13, 0, Math.PI * 2);
-    g.fill();
-    g.fillStyle = 'rgba(232, 130, 120, 0.5)';
-    g.beginPath();
-    g.arc(-r * 0.12, r * 0.28, r * 0.16, 0, Math.PI * 2);
-    g.fill();
-    g.restore();
+    pintarCoelhoPac(g, cx, cy, dir, abertura, tamanho, giro, cores, paleta);
   }
 
-  function desenharRaposa(r, cx, cy, e, t) {
-    const s = T * 0.62;
-    const assustada = r.assustada;
-    const piscando = assustada && e.susto < 2 && Math.floor(t * 5) % 2 === 0;
-    g.save();
-    g.translate(cx, cy);
-    const soOlhos = r.modo === 'olhos' || r.modo === 'entrando'; // comida: só os olhos voltam para a toca
-    if (!soOlhos) {
-      g.fillStyle = assustada ? (piscando ? '#efe6d0' : '#2b4687') : r.cor;
-      // Orelhas pontudas
-      g.beginPath();
-      g.moveTo(-s * 0.95, -s * 0.15); g.lineTo(-s * 0.78, -s * 1.3); g.lineTo(-s * 0.15, -s * 0.78); g.closePath();
-      g.moveTo(s * 0.95, -s * 0.15); g.lineTo(s * 0.78, -s * 1.3); g.lineTo(s * 0.15, -s * 0.78); g.closePath();
-      g.fill();
-      // Corpo com a barra ondulando
-      g.beginPath();
-      g.moveTo(-s, s * 0.95);
-      g.lineTo(-s, 0);
-      g.arc(0, 0, s, Math.PI, 0);
-      g.lineTo(s, s * 0.95);
-      const onda = Math.floor(t * 8) % 2 ? 0.62 : 0.74;
-      for (let i = 0; i < 4; i++) {
-        g.lineTo(s - (s / 2) * (i + 0.5), s * onda);
-        g.lineTo(s - (s / 2) * (i + 1), s * 0.95);
-      }
-      g.closePath();
-      g.fill();
-      if (!assustada) {
-        g.fillStyle = 'rgba(40, 20, 10, 0.35)';
-        g.beginPath();
-        g.moveTo(-s * 0.72, -s * 0.35); g.lineTo(-s * 0.66, -s * 1.02); g.lineTo(-s * 0.35, -s * 0.72); g.closePath();
-        g.moveTo(s * 0.72, -s * 0.35); g.lineTo(s * 0.66, -s * 1.02); g.lineTo(s * 0.35, -s * 0.72); g.closePath();
-        g.fill();
-        // Focinho claro e nariz
-        g.fillStyle = '#f7f0e2';
-        g.beginPath();
-        g.ellipse(r.dir[0] * s * 0.12, s * 0.4, s * 0.5, s * 0.3, 0, 0, Math.PI * 2);
-        g.fill();
-        g.fillStyle = '#1b1403';
-        g.beginPath();
-        g.arc(r.dir[0] * s * 0.3, s * 0.3 + r.dir[1] * s * 0.06, s * 0.12, 0, Math.PI * 2);
-        g.fill();
-      } else {
-        g.fillStyle = piscando ? '#c0392b' : '#f4dd80';
-        g.fillRect(-s * 0.42, -s * 0.3, s * 0.2, s * 0.2);
-        g.fillRect(s * 0.22, -s * 0.3, s * 0.2, s * 0.2);
-        g.strokeStyle = g.fillStyle;
-        g.lineWidth = 1.6;
-        g.beginPath();
-        g.moveTo(-s * 0.6, s * 0.35);
-        for (let i = 1; i <= 6; i++) g.lineTo(-s * 0.6 + i * s * 0.2, s * (i % 2 ? 0.2 : 0.35));
-        g.stroke();
-      }
-    }
-    if (!assustada) {
-      for (const lado of [-1, 1]) {
-        g.fillStyle = '#ffffff';
-        g.strokeStyle = 'rgba(0, 0, 0, 0.35)';
-        g.lineWidth = 1;
-        g.beginPath();
-        g.ellipse(lado * s * 0.36, -s * 0.2, s * 0.22, s * 0.28, 0, 0, Math.PI * 2);
-        g.fill();
-        g.stroke();
-        g.fillStyle = '#1d2a55';
-        g.beginPath();
-        g.arc(lado * s * 0.36 + r.dir[0] * s * 0.1, -s * 0.2 + r.dir[1] * s * 0.12, s * 0.11, 0, Math.PI * 2);
-        g.fill();
-      }
-    }
-    g.restore();
+  // i: a posição na lista (Rubra, Ártica, Cinzenta, Fenec, Brasa), para achar o sprite de cada uma.
+  function desenharRaposa(r, i, cx, cy, e, t) {
+    const [chave, anim] = spriteDaRaposa(r, i, e.susto, t);
+    if (chave && desenharSprite(g, chave, anim, cx, cy, { t, dir: r.dir[0] < 0 ? -1 : 1 })) return;
+    pintarRaposaPac(g, r, cx, cy, e.susto, t);
   }
 
   // Desenha perto das pontas também do outro lado, para o túnel não "pular".
@@ -319,20 +502,21 @@ function criarDesenhoPac() {
   }
 
   function desenhar(e, t) {
+    prepararFundos();
     g.drawImage(e.situacao === 'passou' && e.relogio < 1.8 && Math.floor(t * 5) % 2 ? fundoClaro : fundo, 0, 0, W, H);
     desenharMoedas(e, t);
-    if (e.cenoura) desenharCenoura(px(13.5), px(17));
+    if (e.cenoura) desenharCenoura(px(13.5), px(17), t);
     const { x: pxp, y: pyp } = e.pac;
     if (e.situacao !== 'morrendo' && e.situacao !== 'passou') {
-      for (const r of e.raposas) emVolta(r.x, x => desenharRaposa(r, px(x), px(r.y), e, t));
+      e.raposas.forEach((r, i) => emVolta(r.x, x => desenharRaposa(r, i, px(x), px(r.y), e, t)));
     }
     if (e.situacao === 'morrendo') {
       const k = Math.max(0, Math.min(1, (1.8 - e.relogio - 0.4) / 1.2)); // primeiro para, depois some girando
-      emVolta(pxp, x => desenharCoelho(px(x), px(pyp), e.pac.dir, 0.2 + k * 2.6, 1 - k, k * Math.PI * 2));
+      emVolta(pxp, x => desenharCoelho(px(x), px(pyp), e.pac.dir, 0.2 + k * 2.6, 1 - k, k * Math.PI * 2, null, { anim: 'morrendo', progresso: k }));
     } else {
       const andando = e.situacao === 'jogando' && !e.pac.parado && !(e.congelado > 0);
       const boca = andando ? 0.06 + 0.36 * Math.abs(Math.sin(t * 16)) : 0.3;
-      emVolta(pxp, x => desenharCoelho(px(x), px(pyp), e.pac.dir, boca));
+      emVolta(pxp, x => desenharCoelho(px(x), px(pyp), e.pac.dir, boca, 1, 0, null, { anim: andando ? 'andando' : 'parado', t }));
     }
     g.textAlign = 'center';
     g.textBaseline = 'middle';
@@ -416,7 +600,7 @@ function criarDesenhoPac() {
       g.globalAlpha = 0.45 + 0.35 * Math.abs(Math.sin(t * 9)); // protegido: meio transparente
     }
     emVolta(c.x, x => {
-      desenharCoelho(px(x), px(c.y), c.dir, abertura, 1, giro, cores);
+      desenharCoelho(px(x), px(c.y), c.dir, abertura, 1, giro, cores, { anim: c.andando && !pego ? 'andando' : 'parado', t });
       if (c.chapeu && !pego) desenharChapeu(px(x), px(c.y), c.dir, c.chapeu, pelo, t);
     });
     g.restore();
@@ -425,10 +609,11 @@ function criarDesenhoPac() {
 
   // e = { moedas, situacao, susto, cenoura, raposas, coelhos: [c | null], popups: [{ x, y, texto, cor }], piscar }
   function desenharJunto(e, t) {
+    prepararFundos();
     g.drawImage(e.piscar && Math.floor(t * 5) % 2 ? fundoClaro : fundo, 0, 0, W, H);
     desenharMoedas(e, t);
-    if (e.cenoura) desenharCenoura(px(13.5), px(17));
-    for (const r of e.raposas) emVolta(r.x, x => desenharRaposa(r, px(x), px(r.y), e, t));
+    if (e.cenoura) desenharCenoura(px(13.5), px(17), t);
+    e.raposas.forEach((r, i) => emVolta(r.x, x => desenharRaposa(r, i, px(x), px(r.y), e, t)));
     // O meu coelho por último (por cima dos outros).
     const vistos = e.coelhos.filter(c => c && c.estado !== 3 && c.estado !== 4);
     const ordem = [...vistos.filter(c => !c.eu), ...vistos.filter(c => c.eu)];
@@ -448,6 +633,9 @@ function criarDesenhoPac() {
 
   return { tela, desenhar, desenharJunto, definirPaleta: p => { paleta = p; } };
 }
+
+// Só para os testes no Node (o desenho sem o resto da tela).
+export const _criarDesenhoPac = criarDesenhoPac;
 
 /* ─── Transmissão (quem assiste recebe o estado resumido) ─── */
 
@@ -1059,7 +1247,7 @@ function moedasCheias() {
   return moedas;
 }
 const DIR_DO_NOME = { cima: CIMA, esquerda: ESQ, baixo: BAIXO, direita: DIR };
-const CORES_RAPOSAS = [...RAPOSAS.map(r => r.cor), '#b8361f']; // a 5ª (Brasa) vem com 3 ou mais
+const CORES_RAPOSAS = [...RAPOSAS.map(r => r.cor), COR_BRASA]; // a 5ª (Brasa) vem com 3 ou mais
 const ATRASO_MS = 90; // desenha um pouquinho no passado para ter sempre dois quadros entre os quais andar
 
 // Mistura duas posições (o túnel conta; um salto grande, como voltar para o começo, não é misturado).

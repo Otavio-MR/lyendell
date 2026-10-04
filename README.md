@@ -333,6 +333,26 @@ As cenouras da festa viram cenouras do Club Coelho (um quinto delas, até 40), e
 ranking (vitórias, festas e douradas). O código está em `src/festa.js` (as regras),
 `public/js/telas/festa.js` (o tabuleiro) e `public/js/festa-minijogos.js` (os minijogos).
 
+### Sprites dos jogos
+
+Os joguinhos são desenhados por código, mas cada peça (o coelho, o Raposo, os barris, as cenouras, os
+blocos, os móveis do Club Coelho...) pode virar um sprite feito à mão. Quem tem a permissão
+`sprites.editar` (a Família Nobre) abre **Recreação > Sprites dos jogos** (`#/recreacao/sprites`):
+
+- Cada jogo tem a lista das suas peças, e cada peça as suas animações (parado, andando, pulando...),
+  com o desenho de sempre animado ao lado do sprite enviado.
+- **Baixar molde** gera um PNG com os quadros da animação lado a lado, já com o desenho de sempre em
+  cada quadro, no tamanho escolhido (1x a 4x). É só pintar por cima no Aseprite, no Piskel ou onde quiser.
+- **Enviar PNG**: uma tira de quadros do mesmo tamanho, da esquerda para a direita, fundo transparente,
+  personagem olhando para a direita e com o pé na base do quadro. O site conta os quadros sozinho; dá
+  para mudar os quadros, a velocidade, "pintar com a cor do jogador" (as partes claras pegam a cor do
+  pelo de cada um) e "suavizar" (desligado = pixel art nítida).
+- O sprite vale na hora para todo mundo. Sem sprite, ou com "Voltar ao desenho de sempre", o jogo
+  desenha como antes. Os sprites só mudam o desenho: nunca o tamanho das colisões nem as regras.
+
+O código: `public/js/sprites.js` (carrega e desenha), `public/js/telas/sprites.js` (a página),
+`src/rotas/sprites.js` e a tabela `sprites`. Cada jogo exporta a lista `SPRITES` das suas peças.
+
 ### Códigos secretos
 
 Os jogos de uma pessoa só escondem códigos: uma sequência de setas (no teclado, deslizando o dedo ou

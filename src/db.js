@@ -271,6 +271,18 @@ CREATE TABLE IF NOT EXISTS clube (
   criado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Sprites dos jogos: cada peça (ex.: "barris.barril.rolando") pode ter uma imagem em tira de quadros.
+CREATE TABLE IF NOT EXISTS sprites (
+  chave TEXT PRIMARY KEY,
+  src TEXT NOT NULL,
+  quadros INTEGER NOT NULL DEFAULT 1,
+  fps INTEGER NOT NULL DEFAULT 8,
+  tingir INTEGER NOT NULL DEFAULT 0,
+  suave INTEGER NOT NULL DEFAULT 0,
+  por_nome TEXT,
+  atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS segredos (
   usuario_id INTEGER NOT NULL,
   chave TEXT NOT NULL,
@@ -438,7 +450,7 @@ CREATE TABLE IF NOT EXISTS diario (
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 21;
+const VERSAO = 22;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -514,6 +526,8 @@ async function migrar() {
   if (versao < 18) await migrarBobo();
   // v21: a Família Nobre e a Tabeliã marcam quem já fez o Juramento da Casa Luckham.
   if (versao < 21) await darPermissoes({ 'Família Nobre': ['juramento.marcar'], 'Tabeliã': ['juramento.marcar'] });
+  // v22: a Família Nobre troca os desenhos dos jogos pelos sprites que fizer (#/recreacao/sprites).
+  if (versao < 22) await darPermissoes({ 'Família Nobre': ['sprites.editar'] });
   // v20: o campo "Nickname" vira "Endereço" em todos os livros (no RP o nick é o endereço da pessoa).
   if (versao < 20) await nickVirouEndereco();
   // v19: propostas do povo para o Congresso (todo morador manda; a Senadora avalia).

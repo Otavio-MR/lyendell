@@ -1534,4 +1534,4 @@ function iniciarRecreacao(servidor) {
   }, 60_000).unref();
 }
 
-module.exports = { iniciarRecreacao, entregarPegadinha, publicarNoChat, estaOnline, paraUsuario, atualizarBobo };
+module.exports = { iniciarRecreacao, entregarPegadinha, publicarNoChat, estaOnline, paraUsuario, atualizarBobo, paraTodos };

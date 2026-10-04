@@ -3,6 +3,38 @@
 // Não usa nada da página (DOM): dá para importar de qualquer jogo e testar no Node.
 
 import { desenharParte, roupaDoAcessorio } from './roupas-coelho.js';
+import { registrarPecas, desenharSprite, temSprite } from './sprites.js';
+
+// As peças daqui que podem virar sprite (veja sprites.js). O coelho vale para todos os jogos que usam este desenho.
+export const SPRITES = [
+  {
+    chave: 'coelho', jogo: 'Todos os jogos', nome: 'Coelho do jogador',
+    desc: 'O coelho de cada pessoa em quase todos os jogos (Travessia, Barris, Pac-Coelho, Festa, Club Coelho, vila). Olhando para a direita; as roupas do Club Coelho continuam por cima. Marque "pintar com a cor do pelo" para cada um ter a sua cor (desenhe em tons claros de cinza).',
+    largura: 44, altura: 56, ancora: 'pe', tingir: true,
+    animacoes: [
+      { id: 'parado', nome: 'Parado', quadros: 2, fps: 3 },
+      { id: 'andando', nome: 'Andando', quadros: 4, fps: 10 },
+      { id: 'dancando', nome: 'Dançando', quadros: 4, fps: 8 },
+      { id: 'sentado', nome: 'Sentado', quadros: 1, fps: 1 },
+    ],
+    previa: (g, anim, t) => desenharCoelho(g, 0, 0, { andando: anim === 'andando', passo: t, t, pose: anim === 'dancando' ? 'dancando' : anim === 'sentado' ? 'sentado' : null, semSprite: true }),
+  },
+  {
+    chave: 'raposa', jogo: 'Lyendell Dorme', nome: 'Raposa da noite',
+    desc: 'Como os Raposos aparecem de noite na vila do Lyendell Dorme. Olhando para a direita.',
+    largura: 60, altura: 44, ancora: 'pe',
+    animacoes: [{ id: 'parado', nome: 'Parada', quadros: 2, fps: 3 }, { id: 'andando', nome: 'Andando', quadros: 4, fps: 10 }],
+    previa: (g, anim, t) => desenharRaposa(g, 0, 0, { andando: anim === 'andando', passo: t, t, semSprite: true }),
+  },
+  {
+    chave: 'fantasma', jogo: 'Lyendell Dorme', nome: 'Fantasma',
+    desc: 'Quem morreu no Lyendell Dorme vira fantasma (só os mortos veem). O jogo já deixa meio transparente.',
+    largura: 32, altura: 56, ancora: 'pe',
+    animacoes: [{ id: 'flutuando', nome: 'Flutuando', quadros: 4, fps: 6 }],
+    previa: (g, anim, t) => desenharFantasma(g, 0, 0, { t, semSprite: true }),
+  },
+];
+registrarPecas(SPRITES);
 
 export const PELOS = ['#e9dcc3', '#c99a6b', '#8a6a4f', '#f7f3ea', '#5b4a3f', '#d9b48a', '#9aa3ad', '#e2b3a3'];
 
@@ -28,8 +60,21 @@ export function elipse(g, x, y, rx, ry, cor, rot = 0) {
 // Um coelho de pé, de lado (dir 1 = olhando para a direita). (x, y) é onde ficam os pés.
 // roupa: { cabeca, rosto, pescoco, costas, corpo, mao } (veja roupas-coelho.js); sem roupa, vale o acessório
 // antigo (um só). pose: 'dancando' ou 'sentado'.
-export function desenharCoelho(g, x, y, { pelo = PELOS[0], acessorio = 'nenhum', roupa = null, dir = 1, passo = 0, andando = false, t = 0, pose = null } = {}) {
+export function desenharCoelho(g, x, y, { pelo = PELOS[0], acessorio = 'nenhum', roupa = null, dir = 1, passo = 0, andando = false, t = 0, pose = null, semSprite = false } = {}) {
   const r = roupa || roupaDoAcessorio(acessorio);
+  // Sprite enviado: a imagem no lugar do corpo, e as roupas do Club Coelho por cima, como sempre.
+  const anim = pose === 'dancando' ? 'dancando' : pose === 'sentado' ? 'sentado' : andando ? 'andando' : 'parado';
+  if (!semSprite && temSprite('coelho')) {
+    elipse(g, x, y + 1, 15, 4.5, 'rgba(0,0,0,0.28)');
+    g.save();
+    g.translate(x, y);
+    g.scale(dir, 1);
+    desenharParte(g, 'costas', r.costas, t, pelo);
+    desenharSprite(g, 'coelho', anim, 0, 0, { t: andando ? passo : t, cor: pelo });
+    for (const parte of ['corpo', 'pescoco', 'rosto', 'cabeca', 'mao']) desenharParte(g, parte, r[parte], t, pelo);
+    g.restore();
+    return;
+  }
   let pulo = andando ? Math.abs(Math.sin(passo * 9)) * 6 : Math.sin(t * 2) * 0.6;
   if (pose === 'dancando') pulo = Math.abs(Math.sin(t * 7)) * 8;
   if (pose === 'sentado') pulo = 0;
@@ -72,7 +117,12 @@ export function desenharAcessorio(g, a, t = 0) {
 }
 
 // De noite o Raposo vira raposa (só os outros Raposos veem).
-export function desenharRaposa(g, x, y, { dir = 1, passo = 0, andando = false, t = 0 } = {}) {
+export function desenharRaposa(g, x, y, { dir = 1, passo = 0, andando = false, t = 0, semSprite = false } = {}) {
+  if (!semSprite && temSprite('raposa')) {
+    elipse(g, x, y + 1, 18, 4.5, 'rgba(0,0,0,0.3)');
+    desenharSprite(g, 'raposa', andando ? 'andando' : 'parado', x, y, { t: andando ? passo : t, dir });
+    return;
+  }
   const pulo = andando ? Math.abs(Math.sin(passo * 8)) * 4 : Math.sin(t * 2) * 0.5;
   g.save();
   elipse(g, x, y + 1, 18, 4.5, 'rgba(0,0,0,0.3)');
@@ -104,8 +154,12 @@ export function desenharRaposa(g, x, y, { dir = 1, passo = 0, andando = false, t
 }
 
 // Quem morreu vira fantasma (só os mortos veem).
-export function desenharFantasma(g, x, y, { dir = 1, t = 0 } = {}) {
+export function desenharFantasma(g, x, y, { dir = 1, t = 0, semSprite = false } = {}) {
   const flutua = Math.sin(t * 2.4) * 3;
+  if (!semSprite && temSprite('fantasma')) {
+    desenharSprite(g, 'fantasma', 'flutuando', x, y + flutua, { t, dir, alpha: 0.65 });
+    return;
+  }
   g.save();
   g.globalAlpha = 0.6;
   elipse(g, x, y + 1, 12, 3, 'rgba(120,160,255,0.25)');

@@ -6,8 +6,12 @@
 import { h, trocar } from '../core.js';
 import { enviar } from '../tempo-real.js';
 import { PELOS, sorte, elipse, sombrear, desenharCoelho, desenharRaposa, desenharFantasma, desenharArvore, quebrarTexto } from '../desenho-coelho.js';
+import { registrarPecas, desenharSprite, temSprite, aoMudarSprites } from '../sprites.js';
 
 export { desenharCoelho };
+
+// Sprite enviado em #/recreacao/sprites para uma peça da vila (false sem sprite: desenha o de sempre).
+const sp = (g, peca, anim, x, y, o) => desenharSprite(g, `vila.${peca}`, anim, x, y, o);
 
 // As mesmas medidas de src/cidade-mundo.js.
 export const W = 1600;
@@ -38,6 +42,19 @@ const ICONE_ACAO = { atacar: '🐾', farejar: '👃', investigar: '👁', proteg
 function desenharToca(g, i, n, nome, cor, morto) {
   const { x, y } = toca(i, n);
   elipse(g, x, y + 22, 60, 16, 'rgba(0,0,0,0.22)');
+  // Com sprite, a bandeirinha da cor do dono continua por cima (ela diz de quem é a toca).
+  if (sp(g, 'toca', morto ? 'morto' : 'normal', x, y + 30, { quadro: 0 })) bandeirinha(g, x, y, cor);
+  else corpoDaToca(g, x, y, i, cor, morto);
+  placaDaToca(g, x, y, nome, cor);
+  // Quem morreu: uma lápide com flores na porta
+  if (morto && !sp(g, 'lapide', 'parado', x + 22, y + 34, { quadro: 0 })) lapide(g, x, y);
+}
+function bandeirinha(g, x, y, cor) {
+  g.fillStyle = cor;
+  g.beginPath(); g.moveTo(x + 41, y - 14); g.lineTo(x + 54, y - 9); g.lineTo(x + 41, y - 4); g.closePath(); g.fill();
+}
+// O morro com a porta redonda e a lanterna (x, y: o meio da toca).
+function corpoDaToca(g, x, y, i, cor, morto) {
   const morro = g.createRadialGradient(x - 14, y - 16, 6, x, y, 60);
   morro.addColorStop(0, morto ? '#6f7a62' : '#6fa055');
   morro.addColorStop(1, morto ? '#465040' : '#3e6b35');
@@ -58,10 +75,11 @@ function desenharToca(g, i, n, nome, cor, morto) {
   // Lanterna com a bandeirinha da cor do dono
   g.fillStyle = '#4a3420';
   g.fillRect(x + 38, y - 14, 3, 34);
-  g.fillStyle = cor;
-  g.beginPath(); g.moveTo(x + 41, y - 14); g.lineTo(x + 54, y - 9); g.lineTo(x + 41, y - 4); g.closePath(); g.fill();
+  if (cor) bandeirinha(g, x, y, cor);
   elipse(g, x + 39.5, y - 17, 4.5, 5, '#f4dd80');
-  // Placa com o nome, em cima do morro
+}
+// Placa com o nome, em cima do morro
+function placaDaToca(g, x, y, nome, cor) {
   const texto = nome.length > 16 ? `${nome.slice(0, 15)}…` : nome;
   g.font = '700 13px "EB Garamond", Georgia, serif';
   const lw = Math.max(50, g.measureText(texto).width + 16);
@@ -81,18 +99,17 @@ function desenharToca(g, i, n, nome, cor, morto) {
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   g.fillText(texto, x + 2, y - 53.5);
-  // Quem morreu: uma lápide com flores na porta
-  if (morto) {
-    g.fillStyle = '#9aa0a6';
-    g.beginPath();
-    g.moveTo(x + 14, y + 30); g.lineTo(x + 14, y + 12); g.quadraticCurveTo(x + 22, y + 2, x + 30, y + 12); g.lineTo(x + 30, y + 30);
-    g.closePath(); g.fill();
-    g.fillStyle = '#6b7178';
-    g.fillRect(x + 18, y + 16, 8, 1.6);
-    g.fillRect(x + 18, y + 20, 8, 1.6);
-    elipse(g, x + 12, y + 31, 2.2, 2.2, '#f0a0c0');
-    elipse(g, x + 33, y + 31, 2.2, 2.2, '#f4dd80');
-  }
+}
+function lapide(g, x, y) {
+  g.fillStyle = '#9aa0a6';
+  g.beginPath();
+  g.moveTo(x + 14, y + 30); g.lineTo(x + 14, y + 12); g.quadraticCurveTo(x + 22, y + 2, x + 30, y + 12); g.lineTo(x + 30, y + 30);
+  g.closePath(); g.fill();
+  g.fillStyle = '#6b7178';
+  g.fillRect(x + 18, y + 16, 8, 1.6);
+  g.fillRect(x + 18, y + 20, 8, 1.6);
+  elipse(g, x + 12, y + 31, 2.2, 2.2, '#f0a0c0');
+  elipse(g, x + 33, y + 31, 2.2, 2.2, '#f4dd80');
 }
 
 // O chão da vila: grama, caminhos, praça, lago, horta e árvores (desenhado uma vez e guardado).
@@ -113,22 +130,8 @@ function desenharCenario(g, jogadores, e) {
     const y = rnd() * H;
     g.beginPath(); g.moveTo(x, y); g.lineTo(x + (rnd() - 0.5) * 4, y - 4 - rnd() * 4); g.stroke();
   }
-  // Lago com vitórias-régias, embaixo à esquerda
-  elipse(g, 250, 830, 150, 78, '#2e5f7a');
-  elipse(g, 250, 826, 138, 68, '#3b7896');
-  for (const [lx, ly] of [[200, 810], [290, 840], [240, 860], [320, 805]]) {
-    elipse(g, lx, ly, 13, 8, '#4f8f45');
-    elipse(g, lx + 3, ly - 2, 2.5, 2.5, '#f0c0d8');
-  }
-  // Horta de cenouras, em cima à direita
-  for (let r = 0; r < 4; r++) {
-    g.fillStyle = '#6b4f33';
-    g.fillRect(1240, 120 + r * 26, 200, 14);
-    for (let c = 0; c < 9; c++) {
-      elipse(g, 1252 + c * 22, 126 + r * 26, 4, 3, '#e07a2a');
-      elipse(g, 1252 + c * 22, 119 + r * 26, 3, 5, '#5aa04a');
-    }
-  }
+  if (!sp(g, 'lago', 'parado', 250, 830, { quadro: 0 })) lago(g);
+  if (!sp(g, 'horta', 'parado', 1340, 212, { quadro: 0 })) horta(g);
   // Canteiros de flores
   for (let k = 0; k < 40; k++) {
     const x = 80 + rnd() * (W - 160);
@@ -164,24 +167,11 @@ function desenharCenario(g, jogadores, e) {
     g.beginPath(); g.moveTo(CENTRO.x + Math.cos(a) * 46, CENTRO.y + Math.sin(a) * 32); g.lineTo(CENTRO.x + Math.cos(a) * 140, CENTRO.y + Math.sin(a) * 96); g.stroke();
   }
   elipse(g, CENTRO.x, CENTRO.y, 46, 32, '#a9a08d');
-  elipse(g, CENTRO.x, CENTRO.y + 96, 34, 12, '#6f685c');
-  elipse(g, CENTRO.x, CENTRO.y + 93, 32, 10, '#8c8475');
+  if (!sp(g, 'pedra-conselho', 'parado', CENTRO.x, CENTRO.y + 96, { quadro: 0 })) pedraDoConselho(g, CENTRO.x, CENTRO.y);
   for (const [bx, by] of [[-110, -50], [110, -50], [-120, 40], [120, 40]]) {
-    g.fillStyle = '#6b4f33';
-    g.fillRect(CENTRO.x + bx - 22, CENTRO.y + by, 44, 8);
-    g.fillStyle = '#4a3420';
-    g.fillRect(CENTRO.x + bx - 18, CENTRO.y + by + 8, 4, 6);
-    g.fillRect(CENTRO.x + bx + 14, CENTRO.y + by + 8, 4, 6);
+    if (!sp(g, 'banco', 'parado', CENTRO.x + bx, CENTRO.y + by + 14, { quadro: 0 })) banco(g, CENTRO.x + bx, CENTRO.y + by);
   }
-  g.fillStyle = '#4a3420';
-  g.fillRect(CENTRO.x + 150, CENTRO.y - 150, 4, 110);
-  g.fillStyle = '#1f4a2a';
-  g.beginPath(); g.moveTo(CENTRO.x + 154, CENTRO.y - 148); g.lineTo(CENTRO.x + 214, CENTRO.y - 140); g.lineTo(CENTRO.x + 204, CENTRO.y - 124); g.lineTo(CENTRO.x + 214, CENTRO.y - 108); g.lineTo(CENTRO.x + 154, CENTRO.y - 112); g.closePath(); g.fill();
-  g.font = '700 22px serif';
-  g.fillStyle = '#e8c24a';
-  g.textAlign = 'center';
-  g.textBaseline = 'middle';
-  g.fillText('🐇', CENTRO.x + 182, CENTRO.y - 129);
+  if (!sp(g, 'bandeira', 'parado', CENTRO.x + 182, CENTRO.y - 40, { quadro: 0 })) bandeira(g, CENTRO.x, CENTRO.y);
   // As tocas
   jogadores.forEach((p, i) => desenharToca(g, i, n, p.nome, corDoJogador(i), !!e && e.jogadores[i] && !e.jogadores[i].vivo && e.fase !== 'papeis'));
   // A floresta em volta (longe das tocas)
@@ -196,12 +186,79 @@ function desenharCenario(g, jogadores, e) {
     for (let i = 0; i < n && ok; i++) { const tc = toca(i, n); ok = longe(tc.x, tc.y, 120); }
     if (ok && longe(250, 830, 180) && longe(1340, 160, 140)) arvores.push([x, y, 26 + rnd() * 22]);
   }
-  arvores.sort((a, b) => a[1] - b[1]).forEach(([x, y, r]) => desenharArvore(g, x, y, r, rnd));
+  arvores.sort((a, b) => a[1] - b[1]).forEach(([x, y, r]) => {
+    if (!temSprite('vila.arvore')) { desenharArvore(g, x, y, r, rnd); return; }
+    rnd(); // a cor que a árvore de sempre sortearia (para o resto do sorteio continuar igual)
+    elipse(g, x, y + r * 0.55, r * 0.9, r * 0.28, 'rgba(0,0,0,0.25)');
+    sp(g, 'arvore', 'parado', x, y + r * 0.55, { quadro: 0, escala: r / 36 });
+  });
+}
+
+// As partes do cenário (nas coordenadas da vila).
+function lago(g) {
+  // Lago com vitórias-régias, embaixo à esquerda
+  elipse(g, 250, 830, 150, 78, '#2e5f7a');
+  elipse(g, 250, 826, 138, 68, '#3b7896');
+  for (const [lx, ly] of [[200, 810], [290, 840], [240, 860], [320, 805]]) {
+    elipse(g, lx, ly, 13, 8, '#4f8f45');
+    elipse(g, lx + 3, ly - 2, 2.5, 2.5, '#f0c0d8');
+  }
+}
+function horta(g) {
+  // Horta de cenouras, em cima à direita
+  for (let r = 0; r < 4; r++) {
+    g.fillStyle = '#6b4f33';
+    g.fillRect(1240, 120 + r * 26, 200, 14);
+    for (let c = 0; c < 9; c++) {
+      elipse(g, 1252 + c * 22, 126 + r * 26, 4, 3, '#e07a2a');
+      elipse(g, 1252 + c * 22, 119 + r * 26, 3, 5, '#5aa04a');
+    }
+  }
+}
+// cx, cy: o meio da praça.
+function pedraDoConselho(g, cx, cy) {
+  elipse(g, cx, cy + 96, 34, 12, '#6f685c');
+  elipse(g, cx, cy + 93, 32, 10, '#8c8475');
+}
+// x, y: o meio do assento.
+function banco(g, x, y) {
+  g.fillStyle = '#6b4f33';
+  g.fillRect(x - 22, y, 44, 8);
+  g.fillStyle = '#4a3420';
+  g.fillRect(x - 18, y + 8, 4, 6);
+  g.fillRect(x + 14, y + 8, 4, 6);
+}
+// A bandeira da Casa Luckham, ao lado da praça (cx, cy: o meio da praça).
+function bandeira(g, cx, cy) {
+  g.fillStyle = '#4a3420';
+  g.fillRect(cx + 150, cy - 150, 4, 110);
+  g.fillStyle = '#1f4a2a';
+  g.beginPath(); g.moveTo(cx + 154, cy - 148); g.lineTo(cx + 214, cy - 140); g.lineTo(cx + 204, cy - 124); g.lineTo(cx + 214, cy - 108); g.lineTo(cx + 154, cy - 112); g.closePath(); g.fill();
+  g.font = '700 22px serif';
+  g.fillStyle = '#e8c24a';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText('🐇', cx + 182, cy - 129);
+}
+// A árvore de sempre (de desenho-coelho.js) sem a sombra, para a prévia. x, y: o pé do tronco.
+function arvoreSemSombra(g, x, y, r) {
+  g.fillStyle = '#5b3c22';
+  g.fillRect(x - r * 0.13, y - r * 0.55, r * 0.26, r * 0.55);
+  const verde = '#2f6b34';
+  const meio = y - r * 0.55;
+  elipse(g, x, meio - r * 0.15, r, r * 0.85, verde);
+  elipse(g, x - r * 0.35, meio - r * 0.35, r * 0.55, r * 0.5, sombrear(verde, 0.12));
+  elipse(g, x + r * 0.3, meio - r * 0.5, r * 0.4, r * 0.36, sombrear(verde, 0.2));
 }
 
 function desenharFogueira(g, t, forca = 1) {
   const { x, y } = CENTRO;
   elipse(g, x, y + 6, 26, 8, 'rgba(0,0,0,0.3)');
+  if (forca > 0 && sp(g, 'fogueira', 'acesa', x, y + 12, { t })) return;
+  corpoDaFogueira(g, x, y, t, forca);
+}
+// A lenha e o fogo (x, y: o meio da fogueira).
+function corpoDaFogueira(g, x, y, t, forca) {
   for (const [dx, rot] of [[-8, 0.5], [8, -0.5], [0, 0]]) {
     g.save(); g.translate(x + dx, y + 2); g.rotate(rot);
     g.fillStyle = '#5b3c22'; g.fillRect(-16, -3, 32, 6);
@@ -507,6 +564,7 @@ export function criarMundo(id, { aoClicar, nomeDoPapel = p => p }) {
       const x = v.x + Math.sin(tt * 0.6 + v.f) * 40;
       const y = v.y + Math.cos(tt * 0.5 + v.f * 1.3) * 26;
       const a = (Math.sin(tt * 3 + v.f) + 1) / 2;
+      if (sp(g, 'vagalume', 'voando', x, y, { t: tt + v.f, alpha: a * luz })) continue;
       elipse(g, x, y, 6, 6, `rgba(244,230,120,${0.12 * a * luz})`);
       elipse(g, x, y, 1.8, 1.8, `rgba(250,240,150,${0.9 * a * luz})`);
     }
@@ -744,12 +802,15 @@ export function criarMundo(id, { aoClicar, nomeDoPapel = p => p }) {
   }
 
   quadro = requestAnimationFrame(desenhar);
+  // Chegou ou mudou um sprite: o chão guardado da vila (tocas, árvores...) é desenhado de novo.
+  const tirarSprites = aoMudarSprites(() => { chaveCenario = ''; });
 
   return {
     el, atualizar, receberPos, receberEmote, balao, andarAte, emotar,
     porta: k => porta(k, s.jogadores.length),
     pertoDe: k => { const c = posicaoDoCoelho(s.jogadores[k]?.id); return c ? { x: c.x - 34, y: c.y + 6 } : null; },
     parar() {
+      tirarSprites();
       cancelAnimationFrame(quadro);
       document.removeEventListener('keydown', aoApertar);
       document.removeEventListener('keyup', aoSoltar);
@@ -766,3 +827,42 @@ export function previaDoCoelho(visual) {
   desenharCoelho(g, 30, 52, { ...visual, dir: 1 });
   return c;
 }
+
+/* ─── Sprites (veja sprites.js) ───────────────────── */
+// A raposa e o fantasma estão em desenho-coelho.js. Cada prévia é o desenho de sempre, sem sprite, com a
+// âncora da peça em (0, 0).
+const NO_CHAO = ' Faz parte do chão da vila, então fica parado (vale só o primeiro quadro).';
+const PARADA = [{ id: 'parado', nome: 'Parado', quadros: 1, fps: 1 }];
+const vila = (chave, nome, desc, largura, altura, animacoes, previa, extra = {}) => ({
+  chave: `vila.${chave}`, jogo: 'Lyendell Dorme', nome, desc, largura, altura, ancora: 'pe', animacoes, previa, ...extra,
+});
+const naOrigem = (g, x, y, f) => { g.save(); g.translate(-x, -y); f(); g.restore(); };
+
+export const SPRITES = [
+  vila('toca', 'Toca do jogador', `A toca de cada jogador: o morro com a porta redonda e a lanterna. A placa com o nome e a bandeirinha da cor do dono continuam por cima, feitas pelo jogo. "Toca de quem morreu" é a de quem já morreu (o jogo põe a lápide na porta).${NO_CHAO}`,
+    112, 64, [{ id: 'normal', nome: 'Toca', quadros: 1, fps: 1 }, { id: 'morto', nome: 'Toca de quem morreu', quadros: 1, fps: 1 }],
+    (g, anim) => corpoDaToca(g, 0, -30, 0, null, anim === 'morto')),
+  vila('lapide', 'Lápide', `A lápide com flores na porta da toca de quem morreu.${NO_CHAO}`,
+    28, 28, PARADA, g => lapide(g, -22, -34)),
+  vila('arvore', 'Árvore', `As árvores da floresta em volta da vila (o jogo muda o tamanho de cada uma). A sombra continua feita pelo jogo.${NO_CHAO}`,
+    72, 56, PARADA, g => arvoreSemSombra(g, 0, 0, 36)),
+  vila('fogueira', 'Fogueira', 'A fogueira no meio da praça. A sombra e a luz em volta, de noite, continuam feitas pelo jogo.',
+    52, 84, [{ id: 'acesa', nome: 'Acesa', quadros: 4, fps: 8 }], (g, anim, t) => corpoDaFogueira(g, 0, -12, t, 1)),
+  vila('bandeira', 'Bandeira da Casa Luckham', `O mastro com a bandeira verde ao lado da praça.${NO_CHAO}`,
+    64, 110, PARADA, g => bandeira(g, -182, 40)),
+  vila('banco', 'Banco da praça', `Os quatro banquinhos em volta da fogueira.${NO_CHAO}`,
+    44, 14, PARADA, g => banco(g, 0, -14)),
+  vila('pedra-conselho', 'Pedra do conselho', `A pedra chata na frente da fogueira.${NO_CHAO}`,
+    68, 26, PARADA, g => pedraDoConselho(g, 0, -96), { ancora: 'centro' }),
+  vila('horta', 'Horta de cenouras', `A horta com quatro fileiras de cenouras, lá em cima à direita.${NO_CHAO}`,
+    200, 100, PARADA, g => naOrigem(g, 1340, 212, () => horta(g))),
+  vila('lago', 'Lago', `O lago com vitórias-régias, embaixo à esquerda (visto de cima).${NO_CHAO}`,
+    300, 156, PARADA, g => naOrigem(g, 250, 830, () => lago(g)), { ancora: 'centro' }),
+  vila('vagalume', 'Vaga-lume', 'Os vaga-lumes que voam de noite. O jogo acende e apaga cada um (deixando mais ou menos transparente).',
+    12, 12, [{ id: 'voando', nome: 'Voando', quadros: 1, fps: 4 }],
+    g => { elipse(g, 0, 0, 6, 6, 'rgba(244,230,120,0.12)'); elipse(g, 0, 0, 1.8, 1.8, 'rgba(250,240,150,0.9)'); }, { ancora: 'centro' }),
+];
+registrarPecas(SPRITES);
+
+// Para os testes: os desenhos que não dependem da tela.
+export const _desenhos = { desenharCenario, desenharToca, desenharFogueira };

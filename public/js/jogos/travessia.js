@@ -8,6 +8,10 @@
 // sobra vivo vence. Co-op: vidas da equipe e uma linha de chegada que todos os vivos precisam cruzar.
 
 import { desenharCoelho, elipse, sombrear, PELOS } from '../desenho-coelho.js';
+import { registrarPecas, desenharSprite, spriteDe } from '../sprites.js';
+
+// Só o sprite daquela animação (sem trocar por outra animação da peça).
+const temExato = (chave, anim) => !!spriteDe(`${chave}.${anim}`);
 
 const LARGURA = 432;
 const ALTURA = 576;
@@ -330,7 +334,32 @@ const sombra = (g, x, y, w, h) => ret(g, 'rgba(30,40,10,0.2)', x, y, w, h);
 const topoFaixa = (r, cam) => ALTURA - (r - cam + 1) * CEL;
 const peloDe = m => (m & 2 ? OURO_PELO : PELO);
 
-function chao(g, fx, y0, t, acima) {
+// Sprites do chão: uma casinha (CEL x CEL) repetida pela fileira; o rio corre para o lado da correnteza.
+const CHAVE_CHAO = ['travessia.campo', 'travessia.estrada', 'travessia.rio', 'travessia.rio', 'travessia.trilho'];
+function chaoComSprite(g, fx, y0, t, acima) {
+  const r = fx[0];
+  const tipo = fx[1];
+  const chave = CHAVE_CHAO[tipo];
+  const anim = tipo === 0 ? (r & 1 ? 'claro' : 'escuro') : tipo === 1 ? 'terra' : tipo === 4 ? 'trilho' : 'agua';
+  if (!spriteDe(chave, anim)) return false;
+  const lado = { t, largura: CEL + 1, altura: CEL + 1 };
+  if (tipo === 2 || tipo === 3) {
+    const dir = tipo === 2 ? fx[2] : r & 1 ? 1 : -1;
+    const desloc = (((t * 16 * dir) % CEL) + CEL) % CEL;
+    for (let c = -1; c <= COLUNAS; c++) desenharSprite(g, chave, anim, c * CEL + 24 + desloc, y0 + CEL / 2, lado);
+    if (acima && acima[1] !== 2 && acima[1] !== 3) ret(g, 'rgba(16,60,110,0.22)', 0, y0, LARGURA, 7);
+    return true;
+  }
+  for (let c = 0; c < COLUNAS; c++) desenharSprite(g, chave, anim, c * CEL + 24, y0 + CEL / 2, lado);
+  if (tipo === 1 && acima && acima[1] === 1) {
+    g.fillStyle = 'rgba(255,244,220,0.55)';
+    for (let x = 6; x < LARGURA; x += 40) g.fillRect(x, y0 - 1, 20, 2);
+  }
+  return true;
+}
+
+function chao(g, fx, y0, t, acima, semSprite = false) {
+  if (!semSprite && chaoComSprite(g, fx, y0, t, acima)) return;
   const r = fx[0];
   const tipo = fx[1];
   if (tipo === 0) { // campo: tufos e florzinhas
@@ -385,40 +414,51 @@ function chao(g, fx, y0, t, acima) {
 }
 
 // O campo é mais alto: onde ele acaba aparece a frente do barranco.
-function barranco(g, y0, tipoAbaixo) {
+function barranco(g, y0, tipoAbaixo, x0 = 0, w = LARGURA, semSprite = false) {
   const y = y0 + CEL;
   const agua = tipoAbaixo === 2 || tipoAbaixo === 3;
-  ret(g, '#74ad4f', 0, y, LARGURA, 3);
-  ret(g, agua ? '#7d5b3a' : '#8f6a45', 0, y + 3, LARGURA, 7);
-  if (agua) ret(g, 'rgba(255,255,255,0.45)', 0, y + 10, LARGURA, 2);
+  if (!semSprite && spriteDe('travessia.barranco', agua ? 'rio' : 'terra')) {
+    for (let c = 0; c < COLUNAS; c++) desenharSprite(g, 'travessia.barranco', agua ? 'rio' : 'terra', c * CEL + 24, y, { largura: CEL + 1 });
+    return;
+  }
+  ret(g, '#74ad4f', x0, y, w, 3);
+  ret(g, agua ? '#7d5b3a' : '#8f6a45', x0, y + 3, w, 7);
+  if (agua) ret(g, 'rgba(255,255,255,0.45)', x0, y + 10, w, 2);
 }
 
+// Os obstáculos do campo (k = 1 a 5) e o sprite de cada um.
+const CHAVE_OBST = [null, 'travessia.arvore', 'travessia.pedra', 'travessia.arbusto', 'travessia.poste', 'travessia.fardo'];
 function obstaculo(g, k, cx, y0, v) {
+  if (k === 1) sombra(g, cx - 14, y0 + 30, 40, 12);
+  else if (k === 2) sombra(g, cx - 12, y0 + 30, 32, 9);
+  else if (k === 3) sombra(g, cx - 14, y0 + 30, 36, 10);
+  else if (k === 4) sombra(g, cx - 2, y0 + 33, 16, 5);
+  else sombra(g, cx - 14, y0 + 30, 38, 10);
+  if (k === 4) luz(cx, y0 + 4, 85, 0);
+  if (desenharSprite(g, CHAVE_OBST[k] || 'travessia.fardo', k === 1 ? (v > 0.5 ? 'alta' : 'baixa') : 'parado', cx, y0 + 38, {})) return;
+  corpoObstaculo(g, k, cx, y0, v);
+}
+// O desenho de sempre de um obstáculo, sem a sombra (o pé fica em cx, y0 + 38).
+function corpoObstaculo(g, k, cx, y0, v) {
   if (k === 1) { // árvore: tronco e copa em dois andares
     const c = VERDES[Math.floor(v * VERDES.length)];
-    sombra(g, cx - 14, y0 + 30, 40, 12);
     bloco(g, cx - 5, y0 + 30, 10, 8, 16, '#9a6a3c', '#6e4526');
     bloco(g, cx - 19, y0 + 12, 38, 28, 24, c.t, c.f, 12);
     if (v > 0.5) bloco(g, cx - 13, y0 + 17, 26, 18, 16, c.c, c.b, 36);
   } else if (k === 2) { // pedra com musgo
-    sombra(g, cx - 12, y0 + 30, 32, 9);
     bloco(g, cx - 15, y0 + 18, 30, 20, 13, '#b5b2aa', '#85817a');
     bloco(g, cx - 8 + v * 6, y0 + 20, 14, 12, 6, '#c9c6bf', '#9a968e', 13);
     ret(g, '#7fae5a', cx - 15, y0 + 5, 9, 3);
   } else if (k === 3) { // arbusto com frutinhas
-    sombra(g, cx - 14, y0 + 30, 36, 10);
     bloco(g, cx - 17, y0 + 14, 34, 24, 15, '#5fb04a', '#3e8a33');
     elipse(g, cx - 8, y0 + 6, 2.2, 2.2, '#d6333f');
     elipse(g, cx + 5, y0 + 12, 2.2, 2.2, '#d6333f');
     elipse(g, cx + 10, y0 + 2, 2.2, 2.2, '#d6333f');
   } else if (k === 4) { // poste com lanterna
-    sombra(g, cx - 2, y0 + 33, 16, 5);
     bloco(g, cx - 3, y0 + 30, 6, 6, 32, '#6b4a2e', '#4e3420');
     bloco(g, cx - 7, y0 + 27, 14, 12, 12, '#ffe7a3', '#f4b942', 26);
     bloco(g, cx - 9, y0 + 26, 18, 14, 3, '#3d2b1d', '#2a1d13', 38);
-    luz(cx, y0 + 4, 85, 0);
   } else { // fardo de feno
-    sombra(g, cx - 14, y0 + 30, 38, 10);
     bloco(g, cx - 18, y0 + 14, 36, 24, 18, FENO.t, FENO.f);
     ret(g, '#b88d35', cx - 18, y0 + 30, 36, 2);
     g.fillRect(cx - 7, y0 - 4, 2, 24);
@@ -449,11 +489,19 @@ function formaCenoura(g, x, y, esc) {
 function cenoura(g, cx, y0, t) {
   const y = y0 + 14 + Math.sin(t * 3 + cx) * 2.5;
   elipse(g, cx, y0 + 31, 8, 3, 'rgba(0,0,0,0.18)');
-  formaCenoura(g, cx, y, 1);
-  const b = (Math.sin(t * 5 + cx) + 1) / 2;
-  ret(g, b > 0.5 ? 'rgba(255,255,225,0.95)' : 'rgba(255,255,225,0.5)', cx + 8, y - 10 - b * 2, 2, 6);
-  g.fillRect(cx + 6, y - 8 - b * 2, 6, 2);
+  if (!desenharSprite(g, 'travessia.cenoura', 'brilhando', cx, y, { t })) corpoCenoura(g, cx, y, t, cx);
   luz(cx, y, 36, 3);
+}
+// A cenoura com o brilho piscando (fase: para cada uma piscar num tempo).
+function corpoCenoura(g, x, y, t, fase) {
+  formaCenoura(g, x, y, 1);
+  const b = (Math.sin(t * 5 + fase) + 1) / 2;
+  ret(g, b > 0.5 ? 'rgba(255,255,225,0.95)' : 'rgba(255,255,225,0.5)', x + 8, y - 10 - b * 2, 2, 6);
+  g.fillRect(x + 6, y - 8 - b * 2, 6, 2);
+}
+// A cenoura do placar (o primeiro quadro do sprite, se houver).
+function cenouraPlacar(g) {
+  if (!desenharSprite(g, 'travessia.cenoura', 'brilhando', 22, 30, { quadro: 0, escala: 0.95 })) formaCenoura(g, 22, 30, 0.95);
 }
 
 function roda(g, x, y, r) {
@@ -474,14 +522,24 @@ function cavalo(g, hx, y0, dir, c, t) {
 }
 
 // cod = tipo + 4 * variante (a variante escolhe as cores)
+const CHAVE_CARROCA = ['travessia.carroca-leiteiro', 'travessia.carroca-barris', 'travessia.carroca-mercador', 'travessia.carroca-feno'];
 function carroca(g, cod, x, y0, dir, r, t) {
+  const tipo = cod & 3;
+  const comp = COMP_VEIC[tipo];
+  sombra(g, x + 4, y0 + 30, comp, 10);
+  if (!desenharSprite(g, CHAVE_CARROCA[tipo], 'andando', x + comp / 2, y0 + 40, { t, dir })) corpoCarroca(g, cod, x, y0, dir, r, t);
+  const cx = dir > 0 ? x : x + 34;
+  const lx = dir > 0 ? cx + comp - 34 - 5 : cx + 1; // lanterna da carroça
+  luz(lx + 2, y0 - 16, 62, 0);
+}
+// A carroça e o cavalo, sem a sombra (o pé fica em x + comp / 2, y0 + 40).
+function corpoCarroca(g, cod, x, y0, dir, r, t) {
   const tipo = cod & 3;
   const v = hash(r, (cod >> 2) + 200);
   const comp = COMP_VEIC[tipo];
   const w = comp - 34;
   const cx = dir > 0 ? x : x + 34;
   const hx = dir > 0 ? x + comp - 32 : x;
-  sombra(g, x + 4, y0 + 30, comp, 10);
   ret(g, '#6b4325', dir > 0 ? cx + w - 2 : hx + 26, y0 + 22, 10, 2); // varais
   bloco(g, cx, y0 + 10, w, 24, 12, MADEIRA.t, MADEIRA.f, 8);
   roda(g, cx + 10, y0 + 32, 6.5);
@@ -509,11 +567,18 @@ function carroca(g, cod, x, y0, dir, r, t) {
   cavalo(g, hx, y0, dir, CAVALOS[Math.floor(v * 7919) % CAVALOS.length], t);
   const lx = dir > 0 ? cx + w - 5 : cx + 1; // lanterna da carroça
   bloco(g, lx, y0 + 8, 4, 4, 6, '#ffe39a', '#f2b84b', 20);
-  luz(lx + 2, y0 - 16, 62, 0);
 }
 
-function tronco(g, x, y0, c) {
+// Troncos de 2, 3 e 4 casinhas (c = comprimento em pixels).
+const CHAVE_TRONCO = { 2: 'travessia.tronco-curto', 3: 'travessia.tronco-medio', 4: 'travessia.tronco-longo' };
+function tronco(g, x, y0, c, t = 0) {
   ret(g, 'rgba(15,60,100,0.28)', x + 3, y0 + 30, c, 9);
+  const chave = CHAVE_TRONCO[Math.round((c + 6) / CEL)];
+  if (chave && desenharSprite(g, chave, 'boiando', x + c / 2, y0 + 37, { t })) return;
+  corpoTronco(g, x, y0, c);
+}
+// O tronco sem a sombra na água (o pé fica em x + c / 2, y0 + 37).
+function corpoTronco(g, x, y0, c) {
   bloco(g, x, y0 + 12, c, 24, 9, '#b98250', '#8a5a31');
   g.fillStyle = '#a06d3e';
   for (let i = 12; i < c - 14; i += 30) g.fillRect(x + i, y0 + 9 + (i % 60 ? 8 : 0), 14, 2);
@@ -523,7 +588,20 @@ function tronco(g, x, y0, c) {
   g.fillRect(x + c - 1, y0 + 34, 5, 2);
 }
 
-function nenufar(g, cx, y0, estado, t, r, c) {
+// Vitória-régia com sprite: cada estado só com o seu (afundada nunca vira folha firme).
+const NENUFAR = 'travessia.vitoria-regia';
+function nenufarComSprite(g, cx, y0, estado, t, c) {
+  if (estado === 3) return temExato(NENUFAR, 'afundada') && desenharSprite(g, NENUFAR, 'afundada', cx, y0 + 26, { t: t + c * 0.13 });
+  if (estado === 2) {
+    const x = cx + Math.sin(t * 22 + c) * 1.6;
+    if (temExato(NENUFAR, 'balancando')) return desenharSprite(g, NENUFAR, 'balancando', x, y0 + 26, { t });
+    return temExato(NENUFAR, 'firme') && desenharSprite(g, NENUFAR, 'firme', x, y0 + 26, { t, escala: 0.86 });
+  }
+  return temExato(NENUFAR, 'firme') && desenharSprite(g, NENUFAR, 'firme', cx, y0 + 26, { t });
+}
+
+function nenufar(g, cx, y0, estado, t, r, c, semSprite = false) {
+  if (!semSprite && nenufarComSprite(g, cx, y0, estado, t, c)) return;
   if (estado === 3) { // afundada: só bolhinhas
     for (let i = 0; i < 3; i++) {
       const k = (t * 1.6 + i / 3 + c * 0.13) % 1;
@@ -542,8 +620,21 @@ function nenufar(g, cx, y0, estado, t, r, c) {
   }
 }
 
-function sinal(g, y0, alerta, t) {
+function sinal(g, y0, alerta, t, semSprite = false) {
   const x = LARGURA - 22;
+  if (!semSprite && (temExato('travessia.sinal', 'apagado') || temExato('travessia.sinal', 'piscando'))) {
+    const aceso = alerta && Math.floor(t * 5) % 2 === 0;
+    if (alerta && temExato('travessia.sinal', 'piscando')) desenharSprite(g, 'travessia.sinal', 'piscando', x + 3, y0 + 8, { t });
+    else if (temExato('travessia.sinal', 'apagado')) {
+      desenharSprite(g, 'travessia.sinal', 'apagado', x + 3, y0 + 8, { t });
+      if (aceso) { // sem o sprite piscando, a luz vermelha de sempre por cima
+        elipse(g, x + 3, y0 - 20, 4.5, 4.5, '#ff3b30');
+        elipse(g, x + 3, y0 - 20, 10, 10, 'rgba(255,60,48,0.35)');
+      }
+    } else desenharSprite(g, 'travessia.sinal', 'piscando', x + 3, y0 + 8, { quadro: 1 }); // só o piscando: o 2º quadro é o apagado
+    if (aceso) luz(x + 3, y0 - 20, 75, 2);
+    return;
+  }
   bloco(g, x, y0 + 2, 6, 6, 34, '#5a5f66', '#3b3f45');
   ret(g, '#f2f2f2', x - 7, y0 - 33, 20, 4);
   ret(g, '#c0392b', x - 3, y0 - 33, 4, 4);
@@ -564,14 +655,32 @@ function trem(g, x, y0, dir, nv, r, t) {
   for (let i = 0; i < nv; i++) {
     const wx = dir > 0 ? x + i * 66 : x + 78 + i * 66;
     const c = VAGOES[Math.floor(hash(r, i + 50) * VAGOES.length)];
-    roda(g, wx + 12, y0 + 36, 5);
-    roda(g, wx + 50, y0 + 36, 5);
-    bloco(g, wx, y0 + 8, 62, 28, 22, c.t, c.f, 6);
-    g.fillStyle = 'rgba(255,240,200,0.75)';
-    for (let k = 0; k < 3; k++) g.fillRect(wx + 8 + k * 18, y0 + 16, 10, 6);
-    ret(g, c.c, wx, y0 - 20, 62, 3);
-    ret(g, '#2a2a2e', dir > 0 ? wx + 62 : wx - 4, y0 + 24, 4, 3);
+    if (!desenharSprite(g, 'travessia.vagao', 'andando', wx + 31 + dir * 2, y0 + 41, { t, dir })) vagao(g, wx, y0, dir, c);
   }
+  if (!desenharSprite(g, 'travessia.locomotiva', 'andando', lx + 37 + dir * 4.5, y0 + 42, { t, dir })) locomotiva(g, lx, y0, dir);
+  const ch = dir > 0 ? lx + 52 : lx + 12;
+  const frente = dir > 0 ? lx + 74 : lx;
+  for (let i = 0; i < 3; i++) { // fumaça
+    const k = (t * 1.5 + i / 3) % 1;
+    const fx = ch + 5 - dir * k * 46;
+    const fy = y0 - 32 - k * 18;
+    if (!desenharSprite(g, 'travessia.fumaca', 'subindo', fx, fy, { progresso: k })) fumaca(g, fx, fy, k);
+  }
+  luz(frente + dir * 46, y0 + 18, 135, 1);
+}
+const fumaca = (g, x, y, k) => elipse(g, x, y, 5 + k * 8, 4 + k * 6, k < 0.45 ? 'rgba(240,240,240,0.5)' : 'rgba(240,240,240,0.25)');
+// Um vagão (o pé fica em wx + 31 + dir * 2, y0 + 41).
+function vagao(g, wx, y0, dir, c) {
+  roda(g, wx + 12, y0 + 36, 5);
+  roda(g, wx + 50, y0 + 36, 5);
+  bloco(g, wx, y0 + 8, 62, 28, 22, c.t, c.f, 6);
+  g.fillStyle = 'rgba(255,240,200,0.75)';
+  for (let k = 0; k < 3; k++) g.fillRect(wx + 8 + k * 18, y0 + 16, 10, 6);
+  ret(g, c.c, wx, y0 - 20, 62, 3);
+  ret(g, '#2a2a2e', dir > 0 ? wx + 62 : wx - 4, y0 + 24, 4, 3);
+}
+// A locomotiva sem a fumaça (o pé fica em lx + 37 + dir * 4.5, y0 + 42).
+function locomotiva(g, lx, y0, dir) {
   for (const rx of [14, 38, 60]) roda(g, lx + rx, y0 + 36, 6);
   bloco(g, lx, y0 + 8, 74, 28, 18, LOCO.t, LOCO.f, 6);
   const cab = dir > 0 ? lx : lx + 50;
@@ -583,11 +692,6 @@ function trem(g, x, y0, dir, nv, r, t) {
   const frente = dir > 0 ? lx + 74 : lx;
   poligono(g, '#b03a2e', frente, y0 + 24, frente + dir * 9, y0 + 36, frente, y0 + 36);
   elipse(g, frente - dir * 4, y0 + 18, 3.5, 4, '#fff3b0');
-  for (let i = 0; i < 3; i++) { // fumaça
-    const k = (t * 1.5 + i / 3) % 1;
-    elipse(g, ch + 5 - dir * k * 46, y0 - 32 - k * 18, 5 + k * 8, 4 + k * 6, k < 0.45 ? 'rgba(240,240,240,0.5)' : 'rgba(240,240,240,0.25)');
-  }
-  luz(frente + dir * 46, y0 + 18, 135, 1);
 }
 
 function objetos(g, fx, y0, t) {
@@ -605,7 +709,7 @@ function objetos(g, fx, y0, t) {
   } else if (tipo === 1) {
     for (let i = 3; i + 1 < fx.length; i += 2) carroca(g, fx[i + 1], fx[i], y0, fx[2], r, t);
   } else if (tipo === 2) {
-    for (let i = 3; i + 1 < fx.length; i += 2) tronco(g, fx[i], y0, fx[i + 1]);
+    for (let i = 3; i + 1 < fx.length; i += 2) tronco(g, fx[i], y0, fx[i + 1], t);
   } else {
     sinal(g, y0, fx[3], t);
     if (fx[4] != null) trem(g, fx[4], y0, fx[2], fx[5], r, t);
@@ -624,6 +728,12 @@ function coelho(g, x, yPes, s, esmaga, olhar, m, t, vis = null) {
   if (arco > 1) elipse(g, x, yPes + 1, 12 - arco * 0.25, 3.6, 'rgba(0,0,0,0.22)');
   g.save();
   if (m & 1) g.globalAlpha = 0.45;
+  // No meio do pulo, o sprite "pulando" (se houver); fora dele, o coelho de sempre (que já usa o sprite do coelho).
+  if (s > 0 && temExato('travessia.coelho', 'pulando')) {
+    desenharSprite(g, 'travessia.coelho', 'pulando', x, yPes - arco, { progresso: s, dir: olhar < 0 ? -1 : 1, cor: vis ? vis.pelo : peloDe(m) });
+    g.restore();
+    return;
+  }
   g.translate(x, yPes - arco);
   g.scale(ESCALA * sx, ESCALA * sy);
   desenharCoelho(g, 0, 0, vis
@@ -632,11 +742,15 @@ function coelho(g, x, yPes, s, esmaga, olhar, m, t, vis = null) {
   g.restore();
 }
 
-function amassado(g, x, yPes, olhar, m, t, vis = null) {
+function amassado(g, x, yPes, olhar, m, t, vis = null, semSprite = false) {
+  if (!semSprite && temExato('travessia.coelho', 'amassado')) {
+    desenharSprite(g, 'travessia.coelho', 'amassado', x, yPes, { t, dir: olhar < 0 ? -1 : 1, cor: vis ? vis.pelo : peloDe(m) });
+    return;
+  }
   g.save();
   g.translate(x, yPes);
   g.scale(ESCALA * 1.5, ESCALA * 0.22);
-  desenharCoelho(g, 0, 0, { pelo: vis ? vis.pelo : peloDe(m), acessorio: 'nenhum', dir: olhar < 0 ? -1 : 1, t: 0 });
+  desenharCoelho(g, 0, 0, { pelo: vis ? vis.pelo : peloDe(m), acessorio: 'nenhum', dir: olhar < 0 ? -1 : 1, t: 0, semSprite });
   g.restore();
   for (let i = 0; i < 3; i++) {
     const a = t * 4 + i * 2.1;
@@ -644,7 +758,8 @@ function amassado(g, x, yPes, olhar, m, t, vis = null) {
   }
 }
 
-function respingo(g, x, yPes, q, m, vis = null) {
+function respingo(g, x, yPes, q, m, vis = null, semSprite = false) {
+  if (!semSprite && desenharSprite(g, 'travessia.respingo', 'afundando', x, yPes + 10, { progresso: q })) return;
   const y = yPes - 4;
   const pelo = vis ? vis.pelo : peloDe(m);
   g.save();
@@ -674,7 +789,8 @@ function respingo(g, x, yPes, q, m, vis = null) {
   g.restore();
 }
 
-function gaviao(g, x, y, bate, esc) {
+function gaviao(g, x, y, bate, esc, semSprite = false) {
+  if (!semSprite && desenharSprite(g, 'travessia.gaviao', 'voando', x, y, { t: bate / 18, escala: esc })) return;
   g.save();
   g.translate(x, y);
   g.scale(esc, esc);
@@ -728,9 +844,7 @@ function sombraGaviao(g, x, yPes, o, t) {
   const sy = yPes - 12 + Math.sin(t * 1.7) * 22;
   g.save();
   g.globalAlpha = 0.1 + o * 0.25;
-  elipse(g, sx, sy, 8, 5, '#000');
-  elipse(g, sx - 14, sy - 1, 13, 3, '#000', -0.15);
-  elipse(g, sx + 14, sy - 1, 13, 3, '#000', 0.15);
+  if (!desenharSprite(g, 'travessia.sombra-gaviao', 'rodeando', sx, sy, { t })) corpoSombraGaviao(g, sx, sy);
   g.globalAlpha = 1;
   if (o > 0.5) {
     g.textAlign = 'center';
@@ -738,6 +852,12 @@ function sombraGaviao(g, x, yPes, o, t) {
     texto(g, '!', x, yPes - 44, FONTE_MEDIA, '#ffdf6b', 'rgba(60,20,10,0.7)', 4);
   }
   g.restore();
+}
+
+function corpoSombraGaviao(g, sx, sy) {
+  elipse(g, sx, sy, 8, 5, '#000');
+  elipse(g, sx - 14, sy - 1, 13, 3, '#000', -0.15);
+  elipse(g, sx + 14, sy - 1, 13, 3, '#000', 0.15);
 }
 
 // Noite: tudo escuro, com luz em volta do coelho, das lanternas, do farol do trem e do sinal.
@@ -769,7 +889,7 @@ function hud(g, v, t) {
   g.lineJoin = 'round';
   g.textAlign = 'center';
   texto(g, String(v.p || 0), LARGURA / 2, 8, FONTE_PONTOS, '#fffdf4', 'rgba(38,28,16,0.55)', 7);
-  formaCenoura(g, 22, 30, 0.95);
+  cenouraPlacar(g);
   g.textAlign = 'left';
   texto(g, String(v.k || 0), 36, 18, FONTE_MEDIA, '#ffe08a', 'rgba(38,28,16,0.55)', 5);
   g.textAlign = 'right';
@@ -808,7 +928,8 @@ function faixaChegada(g, y0) {
 }
 
 // O bandeirão da chegada: dois postes, corda com bandeirinhas e a placa dourada da Casa Luckham.
-function bandeirao(g, y0, t) {
+function bandeirao(g, y0, t, semSprite = false) {
+  if (!semSprite && desenharSprite(g, 'travessia.chegada', 'balancando', LARGURA / 2, y0 + 39, { t })) return;
   for (const x of [4, LARGURA - 12]) {
     sombra(g, x - 2, y0 + 34, 14, 5);
     bloco(g, x, y0 + 30, 8, 8, 66, '#9a6a3c', '#6e4526');
@@ -883,7 +1004,7 @@ function hudJunto(g, v, t, info) {
   g.lineJoin = 'round';
   g.textAlign = 'center';
   texto(g, String(v.p || 0), LARGURA / 2, 8, FONTE_PONTOS, '#fffdf4', contorno, 7);
-  formaCenoura(g, 22, 30, 0.95);
+  cenouraPlacar(g);
   g.textAlign = 'left';
   texto(g, String(v.k || 0), 36, 18, FONTE_MEDIA, '#ffe08a', contorno, 5);
   if (info.vidas != null) { // versus: um coração; co-op: as vidas da equipe
@@ -984,6 +1105,160 @@ function descreverFaixa(fx, tempo, rd) {
   const x = posTrem(fx, tempo);
   return [fx.r, 4, fx.dir, alertaTrem(fx, tempo) ? 1 : 0, x === null ? null : rd(x), fx.nv];
 }
+
+/* ─── Sprites: o que pode trocar de desenho (veja ../sprites.js) ─── */
+
+// Para as prévias: em que ponto (0 a 1) de uma animação de "quadros" a "fps" está o tempo t.
+const fasePrevia = (t, quadros, fps) => ((t * fps) / quadros) % 1;
+// Uma casinha do chão de sempre (a coluna do meio da fileira), com o centro em 0, 0.
+function previaChao(g, fx, t) {
+  g.save();
+  g.beginPath();
+  g.rect(-CEL / 2, -CEL / 2, CEL, CEL);
+  g.clip();
+  g.translate(-CEL / 2 - 4 * CEL, 0);
+  chao(g, fx, -CEL / 2, t, null, true);
+  g.restore();
+}
+const NOME_JOGO = 'Travessia';
+const PARADO = [{ id: 'parado', nome: 'Parado', quadros: 1, fps: 1 }];
+const carrocaPeca = (tipo, nome, desc) => ({
+  chave: CHAVE_CARROCA[tipo], jogo: NOME_JOGO, nome, desc: `${desc} Olhando para a DIREITA (o cavalo na frente, à direita); o jogo vira quando ela vai para a esquerda. A sombra no chão o jogo desenha.`,
+  largura: COMP_VEIC[tipo] + 4, altura: 70, ancora: 'pe',
+  animacoes: [{ id: 'andando', nome: 'Andando', quadros: 4, fps: 10 }],
+  previa: (g, anim, t) => corpoCarroca(g, tipo, -COMP_VEIC[tipo] / 2, -40, 1, 0, t),
+});
+const troncoPeca = (n, nome) => ({
+  chave: CHAVE_TRONCO[n], jogo: NOME_JOGO, nome, desc: `Tronco de ${n} casinhas boiando no rio, visto do alto como o resto do jogo. A sombra na água o jogo desenha.`,
+  largura: n * CEL - 6 + 10, altura: 34, ancora: 'pe',
+  animacoes: [{ id: 'boiando', nome: 'Boiando', quadros: 1, fps: 4 }],
+  previa: g => corpoTronco(g, -(n * CEL - 6) / 2, -37, n * CEL - 6),
+});
+const obstaculoPeca = (k, nome, desc, largura, altura, animacoes, v = () => 0) => ({
+  chave: CHAVE_OBST[k], jogo: NOME_JOGO, nome, desc: `${desc} A sombra no chão o jogo desenha.`, largura, altura, ancora: 'pe', animacoes,
+  previa: (g, anim) => corpoObstaculo(g, k, 0, -38, v(anim)),
+});
+const chaoPeca = (chave, nome, desc, animacoes, fx) => ({
+  chave, jogo: NOME_JOGO, nome, desc: `${desc} É uma casinha que o jogo repete pela fileira inteira: desenhe até a borda, sem folga.`,
+  largura: CEL, altura: CEL, ancora: 'centro', animacoes,
+  previa: (g, anim, t) => previaChao(g, fx(anim), t),
+});
+
+export const SPRITES = [
+  {
+    chave: 'travessia.coelho', jogo: NOME_JOGO, nome: 'Coelho pulando e amassado',
+    desc: 'Só os momentos especiais do coelho na Travessia: no meio do pulo e amassado pela carroça (com as estrelinhas). Parado, vale o sprite do "Coelho do jogador". Olhando para a DIREITA; a altura do pulo o jogo faz. Desenhe em cinza claro e marque "pintar com a cor do jogador" para cada um ter o seu pelo.',
+    largura: 54, altura: 52, ancora: 'pe', tingir: true,
+    animacoes: [{ id: 'pulando', nome: 'Pulando', quadros: 4, fps: 12 }, { id: 'amassado', nome: 'Amassado', quadros: 6, fps: 4 }],
+    previa: (g, anim, t) => {
+      if (anim === 'amassado') { amassado(g, 0, 0, 1, 0, t, null, true); return; }
+      const s = fasePrevia(t, 4, 12);
+      g.save();
+      g.scale(ESCALA * (1 - 0.08 * Math.sin(Math.PI * s)), ESCALA * (1 + 0.16 * Math.sin(Math.PI * s)));
+      desenharCoelho(g, 0, 0, { pelo: PELO, acessorio: ACESSORIO, dir: 1, t: 0, semSprite: true });
+      g.restore();
+    },
+  },
+  {
+    chave: 'travessia.respingo', jogo: NOME_JOGO, nome: 'Splash no rio',
+    desc: 'Quando o coelho cai na água: os anéis, as gotas e as orelhas afundando. Acontece uma vez (1 segundo), do primeiro ao último quadro.',
+    largura: 76, altura: 52, ancora: 'pe',
+    animacoes: [{ id: 'afundando', nome: 'Afundando', quadros: 8, fps: 8 }],
+    previa: (g, anim, t) => respingo(g, 0, -10, fasePrevia(t, 8, 8), 0, null, true),
+  },
+  {
+    chave: 'travessia.gaviao', jogo: NOME_JOGO, nome: 'Gavião',
+    desc: 'O gavião que pega quem fica parado ou para trás. Visto de frente, de asas abertas, batendo as asas.',
+    largura: 90, altura: 46, ancora: 'centro',
+    animacoes: [{ id: 'voando', nome: 'Voando', quadros: 4, fps: 12 }],
+    previa: (g, anim, t) => gaviao(g, 0, 0, t * 18, 1, true),
+  },
+  {
+    chave: 'travessia.sombra-gaviao', jogo: NOME_JOGO, nome: 'Sombra do gavião',
+    desc: 'A sombra que rodeia o coelho parado demais. Desenhe em preto: o jogo deixa quase transparente.',
+    largura: 56, altura: 12, ancora: 'centro',
+    animacoes: [{ id: 'rodeando', nome: 'Rodeando', quadros: 1, fps: 1 }],
+    previa: g => corpoSombraGaviao(g, 0, 0),
+  },
+  carrocaPeca(0, 'Carroça do leiteiro', 'A carroça pequena com os latões de leite e o cavalo.'),
+  carrocaPeca(1, 'Carroça de barris', 'A carroça média com três barris e o cavalo.'),
+  carrocaPeca(2, 'Carroça do mercador', 'A carroça comprida com a lona listrada do mercador e o cavalo.'),
+  carrocaPeca(3, 'Carroça de feno', 'A carroça mais comprida, com o monte de feno e o cavalo.'),
+  {
+    chave: 'travessia.locomotiva', jogo: NOME_JOGO, nome: 'Locomotiva',
+    desc: 'A frente do trem, com a cabine e a chaminé. Olhando para a DIREITA (o limpa-trilhos à direita, a cabine atrás). A fumaça é outra peça.',
+    largura: 84, altura: 72, ancora: 'pe',
+    animacoes: [{ id: 'andando', nome: 'Andando', quadros: 2, fps: 8 }],
+    previa: g => locomotiva(g, -41.5, -42, 1),
+  },
+  {
+    chave: 'travessia.vagao', jogo: NOME_JOGO, nome: 'Vagão',
+    desc: 'Um vagão do trem (o jogo junta de 2 a 6 atrás da locomotiva). Indo para a DIREITA, com o engate à direita.',
+    largura: 68, altura: 62, ancora: 'pe',
+    animacoes: [{ id: 'andando', nome: 'Andando', quadros: 2, fps: 8 }],
+    previa: g => vagao(g, -33, -41, 1, VAGOES[0]),
+  },
+  {
+    chave: 'travessia.fumaca', jogo: NOME_JOGO, nome: 'Fumaça do trem',
+    desc: 'Uma nuvenzinha que sai da chaminé, cresce e some (do primeiro ao último quadro). O jogo solta três de cada vez.',
+    largura: 28, altura: 22, ancora: 'centro',
+    animacoes: [{ id: 'subindo', nome: 'Subindo', quadros: 6, fps: 8 }],
+    previa: (g, anim, t) => fumaca(g, 0, 0, fasePrevia(t, 6, 8)),
+  },
+  {
+    chave: 'travessia.sinal', jogo: NOME_JOGO, nome: 'Sinal do trem',
+    desc: 'O sinal na beira do trilho. "Piscando" é quando o trem vem: 2 quadros, o 1º aceso e o 2º apagado (o jogo pisca no ritmo do sino).',
+    largura: 22, altura: 42, ancora: 'pe',
+    animacoes: [{ id: 'apagado', nome: 'Apagado', quadros: 1, fps: 1 }, { id: 'piscando', nome: 'Piscando', quadros: 2, fps: 5 }],
+    previa: (g, anim, t) => { g.save(); g.translate(-(LARGURA - 22) - 3, -8); sinal(g, 0, anim === 'piscando', t, true); g.restore(); },
+  },
+  troncoPeca(2, 'Tronco curto'),
+  troncoPeca(3, 'Tronco médio'),
+  troncoPeca(4, 'Tronco comprido'),
+  {
+    chave: 'travessia.vitoria-regia', jogo: NOME_JOGO, nome: 'Vitória-régia',
+    desc: 'A folha no rio onde o coelho pula. "Balançando" avisa que vai afundar; "Afundada" são só as bolhinhas (sem folha!). Sem o "Balançando", o jogo usa a firme um pouco menor, tremendo.',
+    largura: 40, altura: 28, ancora: 'centro',
+    animacoes: [{ id: 'firme', nome: 'Firme', quadros: 1, fps: 1 }, { id: 'balancando', nome: 'Balançando', quadros: 4, fps: 14 }, { id: 'afundada', nome: 'Afundada', quadros: 5, fps: 8 }],
+    previa: (g, anim, t) => nenufar(g, 0, -26, anim === 'afundada' ? 3 : anim === 'balancando' ? 2 : 1, t, 0, 0, true),
+  },
+  {
+    chave: 'travessia.cenoura', jogo: NOME_JOGO, nome: 'Cenoura dourada',
+    desc: 'A cenoura que aparece nos campos, com o brilhinho piscando. O jogo faz ela subir e descer; o primeiro quadro também vai no placar.',
+    largura: 28, altura: 32, ancora: 'centro',
+    animacoes: [{ id: 'brilhando', nome: 'Brilhando', quadros: 6, fps: 5 }],
+    previa: (g, anim, t) => corpoCenoura(g, 0, 0, t, 0),
+  },
+  obstaculoPeca(1, 'Árvore', 'Árvore do campo, vista do alto e de frente como os bloquinhos do jogo. "Alta" tem a copa em dois andares.', 40, 74,
+    [{ id: 'alta', nome: 'Alta', quadros: 1, fps: 1 }, { id: 'baixa', nome: 'Baixa', quadros: 1, fps: 1 }], a => (a === 'baixa' ? 0.25 : 0.75)),
+  obstaculoPeca(2, 'Pedra', 'Pedra com musgo no campo.', 32, 38, PARADO, () => 0.5),
+  obstaculoPeca(3, 'Arbusto', 'Arbusto com frutinhas vermelhas.', 36, 40, PARADO),
+  obstaculoPeca(4, 'Poste com lanterna', 'O poste com a lanterna acesa (de noite o jogo põe a luz em volta).', 20, 54, PARADO),
+  obstaculoPeca(5, 'Fardo de feno', 'Fardo de feno amarrado.', 38, 42, PARADO),
+  chaoPeca('travessia.campo', 'Grama do campo', 'O chão dos campos. As fileiras alternam a clara e a escura (pode enviar só uma).',
+    [{ id: 'claro', nome: 'Clara', quadros: 1, fps: 1 }, { id: 'escuro', nome: 'Escura', quadros: 1, fps: 1 }], a => [a === 'claro' ? 1 : 2, 0, '000000000', -1]),
+  chaoPeca('travessia.estrada', 'Estrada de terra', 'O chão das estradas das carroças, com os sulcos das rodas na horizontal.',
+    [{ id: 'terra', nome: 'Terra', quadros: 1, fps: 1 }], () => [3, 1, 1]),
+  chaoPeca('travessia.rio', 'Água do rio', 'A água do rio. O jogo já faz a água correr para o lado da correnteza.',
+    [{ id: 'agua', nome: 'Água', quadros: 4, fps: 4 }], () => [5, 2, 1]),
+  chaoPeca('travessia.trilho', 'Trilho do trem', 'Brita, dormentes e os dois trilhos, na horizontal.',
+    [{ id: 'trilho', nome: 'Trilho', quadros: 1, fps: 1 }], () => [7, 4, 1]),
+  {
+    chave: 'travessia.barranco', jogo: NOME_JOGO, nome: 'Beira do campo',
+    desc: 'A frente do barranco onde o campo acaba (logo abaixo da grama). O jogo repete pela fileira inteira: desenhe até a borda.',
+    largura: CEL, altura: 12, ancora: 'topo',
+    animacoes: [{ id: 'terra', nome: 'Antes da estrada ou do trilho', quadros: 1, fps: 1 }, { id: 'rio', nome: 'Antes do rio', quadros: 1, fps: 1 }],
+    previa: (g, anim) => barranco(g, -CEL, anim === 'rio' ? 2 : 1, -CEL / 2, CEL, true),
+  },
+  {
+    chave: 'travessia.chegada', jogo: NOME_JOGO, nome: 'Bandeirão da chegada',
+    desc: 'No co-op do jogo junto: os dois postes, a corda com bandeirinhas e a placa "CHEGADA", de um lado ao outro da tela.',
+    largura: LARGURA, altura: 84, ancora: 'pe',
+    animacoes: [{ id: 'balancando', nome: 'Balançando', quadros: 6, fps: 4 }],
+    previa: (g, anim, t) => { g.save(); g.translate(-LARGURA / 2, -39); bandeirao(g, 0, t, true); g.restore(); },
+  },
+];
+registrarPecas(SPRITES);
 
 /* ─── O jogo ─── */
 

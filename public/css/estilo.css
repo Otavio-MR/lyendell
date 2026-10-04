@@ -2788,3 +2788,27 @@ a.juramento-pessoa:hover { border-color: var(--ouro-d); color: var(--texto); }
   .festa-cruz { grid-template-columns: repeat(4, 1fr); flex: 1; }
   .festa-times { grid-template-columns: 1fr; }
 }
+/* Sprites dos jogos */
+.sprites-atalho { justify-self: start; margin-top: 4px; }
+.sprites-como ol { margin: 0 0 12px; padding-left: 20px; display: grid; gap: 6px; }
+.sprites-escala { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.sprites-abas { flex-wrap: wrap; margin: 16px 0 12px; }
+.sprites-conta { margin-left: 6px; font-size: 0.7rem; padding: 0 6px; border-radius: 999px; background: var(--ouro-fundo); color: var(--ouro-l); }
+.sprites-lista { display: grid; gap: 14px; }
+.sprites-peca .painel-cab { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.sprites-desc { margin: 0 0 12px; }
+.sprites-anims { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px; }
+.sprites-anim { display: grid; gap: 10px; padding: 12px; border-radius: var(--raio-p); border: 1px solid var(--borda-2); background: var(--sup-2); }
+.sprites-anim-cab { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px; }
+.sprites-anim-cab small { color: var(--texto-2); }
+.sprites-previas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.sprites-previas figure { margin: 0; display: grid; gap: 4px; justify-items: center; }
+.sprites-previas figcaption { font-size: 0.78rem; color: var(--texto-2); }
+.sprites-previa { width: 100%; max-width: 160px; aspect-ratio: 1; border-radius: var(--raio-p); border: 1px solid var(--borda-2);
+  background: repeating-conic-gradient(#1d2a20 0% 25%, #243327 0% 50%) 50% / 16px 16px; image-rendering: pixelated; }
+.sprites-botoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.sprites-ajustes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; align-items: center; }
+.sprites-ajustes .interruptor, .sprites-ajustes > small { grid-column: 1 / -1; }
+.sprites-num { display: grid; gap: 2px; font-size: 0.8rem; color: var(--texto-2); }
+.sprites-num input { width: 100%; }
+@media (max-width: 480px) { .sprites-anims { grid-template-columns: 1fr; } }

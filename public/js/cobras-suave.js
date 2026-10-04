@@ -3,7 +3,7 @@
 // que chega, cada cobra sai de onde está desenhada e desliza até a casa seguinte (prevista).
 // A sua cobra já vira na hora em que você aperta, quando ainda dá tempo de o servidor aplicar a
 // virada no próximo passo (depende do atraso da conexão, medido com "ping").
-// Aqui não tem nada de tela: só as contas (dá para testar sem navegador).
+// Aqui não tem nada de tela: só as contas (dá para testar sem navegador). O desenho fica em desenho-cobra.js.
 
 const mesmaDirecao = (a, b) => !!a && !!b && a[0] === b[0] && a[1] === b[1];
 const contraria = (a, b) => !!a && !!b && a[0] === -b[0] && a[1] === -b[1];

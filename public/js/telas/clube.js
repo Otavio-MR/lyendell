@@ -9,6 +9,7 @@ import { desenharCoelho, quebrarTexto } from '../desenho-coelho.js';
 import { SALAS, W, H, fundoToca, desenharMovel, MOVEIS } from '../clube-salas.js';
 import { abrirPescaria, abrirDanca } from '../clube-minijogos.js';
 import { PARTES } from '../roupas-coelho.js';
+import { aoMudarSprites } from '../sprites.js';
 
 const VEL = 170; // o mesmo do servidor
 const EMOTES = [
@@ -678,7 +679,10 @@ export async function clube() {
   if (dados.presente) setTimeout(() => aviso(`Presente do dia: +${dados.presente} cenouras!`), 600);
   if (rt.conectado) enviar('clube:entrar', { sala: querSala });
   quadro = requestAnimationFrame(desenhar);
+  // Chegou ou mudou um sprite (veja clube-salas.js): o fundo guardado da sala é desenhado de novo.
+  const tirarSprites = aoMudarSprites(() => { chaveCenario = ''; });
   aoSair(() => {
+    tirarSprites();
     cancelAnimationFrame(quadro);
     clearTimeout(salvarVisual);
     document.removeEventListener('keydown', aoTeclar);

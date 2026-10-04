@@ -3,6 +3,10 @@
 // Aqui ficam só as regras e o desenho; a moldura (teclado, toque, som, pausa, ranking) é o ../arcade.js.
 
 import { desenharCoelho, desenharRaposa, elipse, sombrear, sorte as semente, PELOS } from '../desenho-coelho.js';
+import { registrarPecas, desenharSprite, spriteDe, temSprite, aoMudarSprites } from '../sprites.js';
+
+// Só o sprite daquela animação (sem trocar por outra animação da peça).
+const temExato = (chave, anim) => !!spriteDe(`${chave}.${anim}`);
 
 const W = 448;
 const H = 512;
@@ -207,8 +211,12 @@ function balao(g, x, y, txt) {
 }
 
 // Barril visto de frente, rolando (aro, ripas girando e a tampinha).
-function barrilRolando(g, x, y, ang) {
-  elipse(g, x, y + R - 0.5, R * 0.85, 2, 'rgba(0,0,0,0.25)'); elipse(g, x, y, R, R, '#5e3518');
+// O sprite do barril rolando anda um quadro a cada pedaço da volta (anda para os dois lados).
+const voltaDe = ang => (((ang / (Math.PI * 2)) % 1) + 1) % 1;
+function barrilRolando(g, x, y, ang, previa = false) {
+  if (!previa) elipse(g, x, y + R - 0.5, R * 0.85, 2, 'rgba(0,0,0,0.25)');
+  if (!previa && desenharSprite(g, 'barris.barril', 'rolando', x, y, { progresso: voltaDe(ang) })) return;
+  elipse(g, x, y, R, R, '#5e3518');
   elipse(g, x, y, R - 1.8, R - 1.8, '#b9773a');
   g.save(); g.translate(x, y); g.rotate(ang); g.strokeStyle = '#7d4a22'; g.lineWidth = 1.1; g.beginPath(); g.moveTo(-3.3, -6.3);
   g.lineTo(-3.3, 6.3); g.moveTo(0, -7.1); g.lineTo(0, 7.1); g.moveTo(3.3, -6.3); g.lineTo(3.3, 6.3); g.stroke();
@@ -218,7 +226,8 @@ function barrilRolando(g, x, y, ang) {
 }
 
 // Barril deitado visto de lado (descendo escada ou nas mãos do Raposo).
-function barrilDeLado(g, x, y, fase) {
+function barrilDeLado(g, x, y, fase, previa = false) {
+  if (!previa && desenharSprite(g, 'barris.barril-escada', 'descendo', x, y, { progresso: ((((fase * 8) % 15) + 15) % 15) / 15 })) return;
   g.fillStyle = '#b9773a'; g.beginPath(); g.moveTo(x - 11, y - 6.5); g.quadraticCurveTo(x, y - 11, x + 11, y - 6.5);
   g.lineTo(x + 11, y + 6.5); g.quadraticCurveTo(x, y + 11, x - 11, y + 6.5); g.closePath(); g.fill();
   g.strokeStyle = '#7a4520'; g.lineWidth = 1; g.beginPath();
@@ -232,7 +241,8 @@ function barrilDeLado(g, x, y, fase) {
   elipse(g, x - 2, y - 5.5, 6, 1.4, 'rgba(255,232,190,0.3)');
 }
 
-function barrilEmPe(g, x, y) {
+function barrilEmPe(g, x, y, previa = false) {
+  if (!previa && desenharSprite(g, 'barris.barril-em-pe', 'parado', x, y, {})) return;
   g.fillStyle = '#a8692f'; g.beginPath(); g.moveTo(x - 7, y); g.quadraticCurveTo(x - 10.5, y - 10, x - 7, y - 20);
   g.lineTo(x + 7, y - 20); g.quadraticCurveTo(x + 10.5, y - 10, x + 7, y); g.closePath(); g.fill();
   g.strokeStyle = '#76451f'; g.lineWidth = 1; g.beginPath(); g.moveTo(x - 3, y - 19); g.lineTo(x - 3.6, y - 1);
@@ -241,13 +251,19 @@ function barrilEmPe(g, x, y) {
   elipse(g, x, y - 20, 7, 2, '#c58a4a');
 }
 
-function martelo(g, x, y, ang, piscar) {
-  g.save(); g.translate(x, y); g.rotate(ang); g.fillStyle = '#7a4d24'; g.fillRect(0, -1.3, 17, 2.6);
-  g.fillStyle = piscar ? '#fff2c0' : '#b8783a'; g.fillRect(14, -6.5, 10, 13);
-  g.fillStyle = piscar ? '#ffffff' : OURO; g.fillRect(15.2, -6.5, 1.8, 13); g.fillRect(21, -6.5, 1.8, 13); g.restore();
+// A marreta deitada: o cabo sai de (x, y) e a cabeça fica na ponta, girada de "ang".
+function martelo(g, x, y, ang, piscar, previa = false) {
+  g.save(); g.translate(x, y); g.rotate(ang);
+  if (previa || !desenharSprite(g, 'barris.marreta', piscar && temExato('barris.marreta', 'piscando') ? 'piscando' : 'normal', 12, 0, {})) {
+    g.fillStyle = '#7a4d24'; g.fillRect(0, -1.3, 17, 2.6);
+    g.fillStyle = piscar ? '#fff2c0' : '#b8783a'; g.fillRect(14, -6.5, 10, 13);
+    g.fillStyle = piscar ? '#ffffff' : OURO; g.fillRect(15.2, -6.5, 1.8, 13); g.fillRect(21, -6.5, 1.8, 13);
+  }
+  g.restore();
 }
 
-function desenharFagulha(g, x, y, t, k) {
+function desenharFagulha(g, x, y, t, k, previa = false) {
+  if (!previa && desenharSprite(g, 'barris.fagulha', 'andando', x, y + 3, { t: t + k * 0.16 })) return;
   const f = Math.sin(t * 13 + k * 2.1);
   elipse(g, x, y - 8, 12, 11, 'rgba(255,140,40,0.16)');
   g.fillStyle = '#ff7a1f'; g.beginPath(); g.moveTo(x - 7, y - 5); g.quadraticCurveTo(x - 8, y - 13, x + f * 2.5, y - 21 - f);
@@ -259,8 +275,10 @@ function desenharFagulha(g, x, y, t, k) {
 
 const CENOURINHAS = [-4.5, 0, 4.5];
 const VARETAS = [-11, -4, 4, 11];
-function desenharItem(g, tipo, x, y, t) {
-  elipse(g, x, y, 13, 13, `rgba(232,194,74,${0.1 + 0.06 * Math.sin(t * 4)})`);
+const CHAVE_ITEM = { cesta: 'barris.cesta', chapeu: 'barris.chapeu', guardachuva: 'barris.guarda-chuva' };
+function desenharItem(g, tipo, x, y, t, previa = false) {
+  if (!previa) elipse(g, x, y, 13, 13, `rgba(232,194,74,${0.1 + 0.06 * Math.sin(t * 4)})`);
+  if (!previa && desenharSprite(g, CHAVE_ITEM[tipo] || 'barris.guarda-chuva', 'parado', x, y, { t })) return;
   if (tipo === 'cesta') {
     for (const k of CENOURINHAS) {
       elipse(g, x + k, y - 9, 1.6, 4, '#4caf50', k * 0.08); elipse(g, x + k, y - 3.5, 2.6, 3, '#f08a2c');
@@ -289,8 +307,13 @@ function desenharItem(g, tipo, x, y, t) {
 }
 
 // A Princesa Cenoura: uma cenoura de vestido rosa, folhinhas no cabelo e coroa.
-function desenharPrincesa(g, x, y, t, susto) {
-  g.save(); g.translate(x, y); g.scale(0.8, 0.8); elipse(g, 0, 1, 11, 3, 'rgba(0,0,0,0.3)');
+function desenharPrincesa(g, x, y, t, susto, previa = false) {
+  if (!previa && temSprite('barris.princesa')) {
+    elipse(g, x, y + 0.8, 8.8, 2.4, 'rgba(0,0,0,0.3)');
+    desenharSprite(g, 'barris.princesa', susto ? 'assustada' : 'acenando', x, y, { t });
+    return;
+  }
+  g.save(); g.translate(x, y); g.scale(0.8, 0.8); if (!previa) elipse(g, 0, 1, 11, 3, 'rgba(0,0,0,0.3)');
   elipse(g, -4, -1.5, 3.2, 2, '#7a3b12'); elipse(g, 4, -1.5, 3.2, 2, '#7a3b12');
   for (let i = 0; i < 3; i++) {
     const ox = (i - 1) * 4.5;
@@ -384,15 +407,29 @@ function desenharCastelo(g, x, base, cor) {
   for (const [ox, oy] of [[-46, 90], [46, 84], [0, 128], [-14, 52], [14, 52]]) g.fillRect(x + ox - 1.5, base - oy, 3, 5);
 }
 
-function desenharEscada(g, x, y1, y2, trilho, degrau) {
+// Escada (de y1 em cima até y2 embaixo). Com sprite: um degrau de 8 de altura repetido de baixo para cima.
+function desenharEscada(g, x, y1, y2, trilho, degrau, anim = 'normal', previa = false) {
+  if (!previa && temExato('barris.escada', anim)) {
+    g.save(); g.beginPath(); g.rect(x - 10, y1, 20, y2 - y1); g.clip();
+    for (let y = y2 - 8; y > y1 - 8; y -= 8) desenharSprite(g, 'barris.escada', anim, x, y, {});
+    g.restore();
+    return;
+  }
   g.fillStyle = trilho; g.fillRect(x - 8, y1, 2.6, y2 - y1); g.fillRect(x + 5.4, y1, 2.6, y2 - y1);
   g.fillStyle = degrau;
   for (let y = y2 - 5; y > y1 + 1; y -= 8) g.fillRect(x - 5.4, y, 10.8, 2.2);
 }
 
-function desenharViga(g, v) {
+// Viga inclinada. Com sprite: um pedaço de 16 de largura repetido ao longo dela, cada um na sua altura.
+function desenharViga(g, v, previa = false) {
   const y1 = alturaViga(v, v.xa);
   const y2 = alturaViga(v, v.xb);
+  if (!previa && temSprite('barris.viga')) {
+    g.save(); g.beginPath(); g.rect(v.xa, Math.min(y1, y2) - 4, v.xb - v.xa, Math.abs(y2 - y1) + ESPESSURA + 8); g.clip();
+    for (let x = v.xa; x < v.xb; x += 16) desenharSprite(g, 'barris.viga', 'normal', x + 8, alturaViga(v, x + 8), {});
+    g.restore();
+    return;
+  }
   g.fillStyle = '#2b110b'; g.beginPath(); g.moveTo(v.xa, y1); g.lineTo(v.xb, y2); g.lineTo(v.xb, y2 + ESPESSURA);
   g.lineTo(v.xa, y1 + ESPESSURA); g.closePath(); g.fill();
   // Treliça em zigue-zague
@@ -414,7 +451,8 @@ function desenharViga(g, v) {
   g.fillStyle = '#7d2c1b'; g.fillRect(v.xa, y1, 2, ESPESSURA); g.fillRect(v.xb - 2, y2, 2, ESPESSURA);
 }
 
-function desenharTonel(g, x, y) {
+function desenharTonel(g, x, y, previa = false) {
+  if (!previa && desenharSprite(g, 'barris.tonel', 'parado', x, y, {})) return;
   g.fillStyle = '#1c2533'; g.fillRect(x - 15, y - 34, 30, 34);
   g.fillStyle = '#2a3648'; g.fillRect(x - 11, y - 34, 6, 34);
   g.fillStyle = '#4b5a73'; g.fillRect(x - 16, y - 31, 32, 3); g.fillRect(x - 16, y - 6, 32, 3);
@@ -422,6 +460,21 @@ function desenharTonel(g, x, y) {
 }
 
 function desenharFundo(g, L) {
+  if (!desenharSprite(g, 'barris.fundo', 'noite', W / 2, 0, {})) desenharCeu(g, L);
+  // Escadas compridas por onde o Raposo foge
+  const yR = alturaViga(L.vigas[5], L.saidaX);
+  for (const x of L.escadasRaposo) desenharEscada(g, x, -4, yR, '#6d5524', '#56421b', temExato('barris.escada', 'raposo') ? 'raposo' : 'normal');
+  for (const l of L.escadas) desenharEscada(g, l.x, l.yTopo, l.yBaixo, '#c09a42', '#97762c');
+  for (const v of L.vigas) desenharViga(g, v);
+  // Pilha de barris do Raposo
+  const yP = alturaViga(L.vigas[5], L.pilhaX);
+  barrilEmPe(g, L.pilhaX - 9, yP);
+  barrilEmPe(g, L.pilhaX + 9, yP);
+  barrilEmPe(g, L.pilhaX, yP - 20);
+  desenharTonel(g, L.tonelX, alturaViga(L.vigas[0], L.tonelX));
+}
+// O céu, as estrelas, a lua, a cidade e o castelo ao longe (e a névoa).
+function desenharCeu(g, L) {
   const ceu = g.createLinearGradient(0, 0, 0, H);
   ceu.addColorStop(0, '#04080b');
   ceu.addColorStop(0.5, '#0a1915');
@@ -452,21 +505,11 @@ function desenharFundo(g, L) {
   nevoa.addColorStop(0, 'rgba(14,24,17,0)');
   nevoa.addColorStop(1, 'rgba(14,24,17,0.7)');
   g.fillStyle = nevoa; g.fillRect(0, 380, W, H - 380);
-  // Escadas compridas por onde o Raposo foge
-  const yR = alturaViga(L.vigas[5], L.saidaX);
-  for (const x of L.escadasRaposo) desenharEscada(g, x, -4, yR, '#6d5524', '#56421b');
-  for (const l of L.escadas) desenharEscada(g, l.x, l.yTopo, l.yBaixo, '#c09a42', '#97762c');
-  for (const v of L.vigas) desenharViga(g, v);
-  // Pilha de barris do Raposo
-  const yP = alturaViga(L.vigas[5], L.pilhaX);
-  barrilEmPe(g, L.pilhaX - 9, yP);
-  barrilEmPe(g, L.pilhaX + 9, yP);
-  barrilEmPe(g, L.pilhaX, yP - 20);
-  desenharTonel(g, L.tonelX, alturaViga(L.vigas[0], L.tonelX));
 }
 
 const camadas = [null, null];
 let semCanvas = false;
+aoMudarSprites(() => { camadas[0] = null; camadas[1] = null; }); // trocou um sprite: o fundo pronto é desenhado de novo
 function fundoPronto(L) {
   const i = L.espelho ? 1 : 0;
   if (camadas[i] || semCanvas) return camadas[i];
@@ -493,6 +536,7 @@ const PISCA = (() => {
   return l;
 })();
 function estrelasPiscando(g, t) {
+  if (temSprite('barris.fundo')) return; // o céu do sprite tem as estrelas dele
   g.fillStyle = '#fff6d8';
   for (let i = 0; i < PISCA.length; i++) {
     const s = PISCA[i];
@@ -505,10 +549,12 @@ function estrelasPiscando(g, t) {
 function desenharChamas(g, L, t, aceso, fogo) {
   const x = L.tonelX;
   const y = alturaViga(L.vigas[0], x) - 34;
-  g.font = `bold 7px ${FONTE}`; g.textAlign = 'center'; g.textBaseline = 'alphabetic'; g.fillStyle = OURO;
-  g.fillText('PICHE', x, y + 20);
+  if (!temSprite('barris.tonel')) { // o letreiro do tonel de sempre (o sprite do tonel tem o dele)
+    g.font = `bold 7px ${FONTE}`; g.textAlign = 'center'; g.textBaseline = 'alphabetic'; g.fillStyle = OURO;
+    g.fillText('PICHE', x, y + 20);
+  }
   if (!aceso) {
-    elipse(g, x + Math.sin(t * 2) * 2, y - 6, 4, 3, 'rgba(160,160,150,0.18)');
+    if (!(temExato('barris.fogo', 'apagado') && desenharSprite(g, 'barris.fogo', 'apagado', x, y, { t }))) fumacaTonel(g, x, y, t);
     return;
   }
   const forca = 1 + fogo * 0.9;
@@ -516,6 +562,12 @@ function desenharChamas(g, L, t, aceso, fogo) {
   brilho.addColorStop(0, fogo > 0.1 ? 'rgba(255,160,60,0.55)' : 'rgba(255,150,50,0.38)');
   brilho.addColorStop(1, 'rgba(255,120,40,0)');
   g.fillStyle = brilho; g.fillRect(x - 70, y - 70, 140, 140);
+  if (temExato('barris.fogo', 'aceso') && desenharSprite(g, 'barris.fogo', 'aceso', x, y, { t, escala: forca })) return;
+  labaredas(g, x, y, t, forca);
+}
+const fumacaTonel = (g, x, y, t) => elipse(g, x + Math.sin(t * 2) * 2, y - 6, 4, 3, 'rgba(160,160,150,0.18)');
+// As quatro labaredas em cima do tonel (forca: maiores quando uma fagulha nasce).
+function labaredas(g, x, y, t, forca) {
   for (let i = 0; i < 4; i++) {
     const fx = x - 8 + i * 5.3;
     const h = (13 + 5 * Math.sin(t * 11 + i * 1.9) + 3 * Math.sin(t * 17.3 + i * 0.7)) * forca;
@@ -553,8 +605,11 @@ function desenharRaposo(g, e, t) {
   const p = posRaposo(e);
   if (p.subindo) {
     // Foge escada acima com a princesa
-    g.save(); g.translate(p.x, p.y); g.rotate(-lado * Math.PI / 2); g.scale(1.6, 1.6);
-    desenharRaposa(g, 0, 0, { dir: lado, passo: t, andando: true, t });
+    g.save(); g.translate(p.x, p.y); g.rotate(-lado * Math.PI / 2);
+    if (!(temExato('barris.raposo', 'fugindo') && desenharSprite(g, 'barris.raposo', 'fugindo', 0, 0, { t, dir: lado }))) {
+      g.scale(1.6, 1.6);
+      desenharRaposa(g, 0, 0, { dir: lado, passo: t, andando: true, t });
+    }
     g.restore();
     if (e.faseT >= 2.6) {
       desenharPrincesa(g, p.x + lado * 16, p.y - 8, t, true);
@@ -571,13 +626,11 @@ function desenharRaposo(g, e, t) {
   }
   const bravo = e.fase === 'pronto' || (e.fase === 'vitoria' && e.faseT < 1.8) || (a < 0 && t % 3.4 < 0.55);
   const pulinho = bravo ? Math.abs(Math.sin(t * 16)) * 3 : 0;
-  g.save(); g.translate(p.x, p.y - pulinho); g.scale(1.6, 1.6);
-  desenharRaposa(g, 0, 0, { dir, t });
-  // Sobrancelha brava e um dentinho
-  g.scale(dir, 1); g.translate(0, -Math.sin(t * 2) * 0.5); g.strokeStyle = '#2a160c'; g.lineWidth = 1.4; g.lineCap = 'round';
-  g.beginPath(); g.moveTo(12.2, -29.4); g.lineTo(18.8, -26.6); g.stroke();
-  g.fillStyle = '#fff8e8'; g.beginPath(); g.moveTo(20.6, -18.6); g.lineTo(22.4, -18.6); g.lineTo(21.5, -16.2); g.closePath();
-  g.fill(); g.restore();
+  // Sprite: arremessando (do pegar na pilha até soltar), bravo ou parado; sem o da hora, o parado.
+  const quer = a >= 0 && a < 0.8 ? 'arremessando' : bravo ? 'bravo' : 'parado';
+  const anim = temExato('barris.raposo', quer) ? quer : temExato('barris.raposo', 'parado') ? 'parado' : null;
+  if (anim) desenharSprite(g, 'barris.raposo', anim, p.x, p.y - pulinho, { t, dir, progresso: anim === 'arremessando' ? a / 0.8 : null });
+  else corpoRaposo(g, p.x, p.y - pulinho, dir, t);
   if (mao === 1) barrilDeLado(g, p.x + dir * 40, p.y - 26, 0);
   else if (mao === 2) barrilDeLado(g, p.x + dir * 16, p.y - 78, 0);
   if (bravo) {
@@ -588,7 +641,29 @@ function desenharRaposo(g, e, t) {
   }
 }
 
+// O Raposo de sempre: a raposa grande, com a sobrancelha brava e um dentinho (o pé em x, y).
+function corpoRaposo(g, x, y, dir, t, previa = false) {
+  g.save(); g.translate(x, y); g.scale(1.6, 1.6);
+  desenharRaposa(g, 0, 0, { dir, t, semSprite: previa });
+  // Sobrancelha brava e um dentinho
+  g.scale(dir, 1); g.translate(0, -Math.sin(t * 2) * 0.5); g.strokeStyle = '#2a160c'; g.lineWidth = 1.4; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(12.2, -29.4); g.lineTo(18.8, -26.6); g.stroke();
+  g.fillStyle = '#fff8e8'; g.beginPath(); g.moveTo(20.6, -18.6); g.lineTo(22.4, -18.6); g.lineTo(21.5, -16.2); g.closePath();
+  g.fill(); g.restore();
+}
+
 /* O coelho */
+
+// Os momentos especiais do coelho com sprite (o centro da peça fica 11 acima do pé). Devolvem false sem o sprite.
+function coelhoMorrendoSprite(g, x, y, ft, dir, pelo) {
+  return temExato('barris.coelho', 'morrendo') && desenharSprite(g, 'barris.coelho', 'morrendo', x, y - 11, { progresso: Math.min(1, ft / 1.6), dir, cor: pelo });
+}
+function coelhoSubindoSprite(g, x, y, passo, pelo, coroa) {
+  if (!temExato('barris.coelho', 'subindo')) return false;
+  desenharSprite(g, 'barris.coelho', 'subindo', x, y - 11, { t: passo, cor: pelo });
+  if (coroa) { g.save(); g.translate(x, y); g.scale(ESCALA_COELHO, ESCALA_COELHO); coroinha(g, 0, -38, 1.3); g.restore(); }
+  return true;
+}
 
 function desenharJogador(g, e, t) {
   const c = e.coelho;
@@ -597,11 +672,13 @@ function desenharJogador(g, e, t) {
   if (e.fase === 'morte' || e.fase === 'fim') {
     // Gira, cai deitado e fica vendo estrelas
     const ft = e.fase === 'fim' ? 9 : e.faseT;
-    const final = -c.dir * Math.PI / 2;
-    const ang = ft < 0.5 ? 0 : ft < 1.6 ? final * 9 * (ft - 0.5) / 1.1 : final;
-    g.save(); g.translate(c.x, c.y - 11); g.rotate(ang); g.scale(s, s);
-    desenharCoelho(g, 0, 11 / s, { pelo: PELO, acessorio, dir: c.dir, t });
-    g.restore();
+    if (!coelhoMorrendoSprite(g, c.x, c.y, ft, c.dir, PELO)) {
+      const final = -c.dir * Math.PI / 2;
+      const ang = ft < 0.5 ? 0 : ft < 1.6 ? final * 9 * (ft - 0.5) / 1.1 : final;
+      g.save(); g.translate(c.x, c.y - 11); g.rotate(ang); g.scale(s, s);
+      desenharCoelho(g, 0, 11 / s, { pelo: PELO, acessorio, dir: c.dir, t });
+      g.restore();
+    }
     if (ft >= 1.6) {
       for (let k = 0; k < 3; k++) {
         const a = t * 4 + k * 2.09;
@@ -610,7 +687,7 @@ function desenharJogador(g, e, t) {
     }
     return;
   }
-  if (c.estado === 'escada') { desenharCoelhoCostas(g, c.x, c.y, c.passo, e.coroa); return; }
+  if (c.estado === 'escada') { if (!coelhoSubindoSprite(g, c.x, c.y, c.passo, PELO, e.coroa)) desenharCoelhoCostas(g, c.x, c.y, c.passo, e.coroa); return; }
   const festa = e.fase === 'vitoria';
   g.save(); g.translate(c.x, c.y); g.scale(s, s);
   desenharCoelho(g, 0, 0, { pelo: PELO, acessorio, dir: c.dir, passo: festa ? t * 0.6 : c.passo, andando: festa || (c.andando && c.estado === 'chao'), t });
@@ -781,6 +858,141 @@ function cenaDaFoto(f) {
 }
 let ultimaFoto = null;
 let ultimaCena = null;
+
+/* Sprites: o que pode trocar de desenho (veja ../sprites.js) */
+
+// Para as prévias: em que ponto (0 a 1) de uma animação de "quadros" a "fps" está o tempo t.
+const fasePrevia = (t, quadros, fps) => ((t * fps) / quadros) % 1;
+const NOME_JOGO = 'Barris do Raposo';
+const PARADO = [{ id: 'parado', nome: 'Parado', quadros: 1, fps: 1 }];
+const prendaPeca = (tipo, nome, desc) => ({
+  chave: CHAVE_ITEM[tipo], jogo: NOME_JOGO, nome, desc: `${desc} O brilho em volta o jogo desenha, e faz a prenda flutuar.`,
+  largura: 26, altura: 26, ancora: 'centro', animacoes: PARADO,
+  previa: (g, anim, t) => desenharItem(g, tipo, 0, 0, t, true),
+});
+
+export const SPRITES = [
+  {
+    chave: 'barris.coelho', jogo: NOME_JOGO, nome: 'Coelho subindo e caindo',
+    desc: 'Só os momentos especiais do coelho nos Barris: subindo a escada (de costas) e quando morre (gira e cai deitado; acontece uma vez, do primeiro ao último quadro, e o último fica). Andando, vale o sprite do "Coelho do jogador". Olhando para a DIREITA. Desenhe em cinza claro e marque "pintar com a cor do jogador" para cada um ter o seu pelo.',
+    largura: 50, altura: 50, ancora: 'centro', tingir: true,
+    animacoes: [{ id: 'subindo', nome: 'Subindo a escada', quadros: 4, fps: 6 }, { id: 'morrendo', nome: 'Morrendo', quadros: 8, fps: 5 }],
+    previa: (g, anim, t) => {
+      if (anim === 'subindo') { desenharCoelhoCostas(g, 0, 11, t, false); return; }
+      const ft = 1.6 * ((Math.floor(t * 5 + 1e-6) % 8) / 7); // o último quadro é o coelho já deitado
+      const final = -Math.PI / 2;
+      const ang = ft < 0.5 ? 0 : ft < 1.6 ? final * 9 * (ft - 0.5) / 1.1 : final;
+      g.save(); g.rotate(ang); g.scale(ESCALA_COELHO, ESCALA_COELHO);
+      desenharCoelho(g, 0, 11 / ESCALA_COELHO, { pelo: PELO, acessorio: 'nenhum', dir: 1, t: 0, semSprite: true });
+      g.restore();
+    },
+  },
+  {
+    chave: 'barris.raposo', jogo: NOME_JOGO, nome: 'Raposo',
+    desc: 'O Raposo lá no alto, olhando para a DIREITA. "Arremessando" vai uma vez do pegar o barril na pilha até soltar (o barril o jogo desenha na mão dele). "Fugindo" é ele andando: o jogo deita de lado para ele subir a escada com a princesa.',
+    largura: 100, altura: 72, ancora: 'pe',
+    animacoes: [
+      { id: 'parado', nome: 'Parado', quadros: 2, fps: 3 },
+      { id: 'bravo', nome: 'Bravo (pulando)', quadros: 4, fps: 16 },
+      { id: 'arremessando', nome: 'Arremessando', quadros: 4, fps: 5 },
+      { id: 'fugindo', nome: 'Fugindo', quadros: 4, fps: 10 },
+    ],
+    previa: (g, anim, t) => {
+      if (anim === 'fugindo') {
+        g.save(); g.scale(1.6, 1.6);
+        desenharRaposa(g, 0, 0, { dir: 1, passo: t, andando: true, t, semSprite: true });
+        g.restore();
+        return;
+      }
+      corpoRaposo(g, 0, anim === 'bravo' ? -Math.abs(Math.sin(t * 16)) * 3 : 0, 1, t, true);
+    },
+  },
+  {
+    chave: 'barris.princesa', jogo: NOME_JOGO, nome: 'Princesa Cenoura',
+    desc: 'A Princesa Cenoura no patamar de cima, de frente. "Assustada" é quando o Raposo vai levá-la. A sombra no chão o jogo desenha.',
+    largura: 32, altura: 46, ancora: 'pe',
+    animacoes: [{ id: 'acenando', nome: 'Acenando', quadros: 6, fps: 7 }, { id: 'assustada', nome: 'Assustada', quadros: 4, fps: 12 }],
+    previa: (g, anim, t) => desenharPrincesa(g, 0, 0, t, anim === 'assustada', true),
+  },
+  {
+    chave: 'barris.barril', jogo: NOME_JOGO, nome: 'Barril rolando',
+    desc: 'O barril visto de frente, rolando pelas vigas. Os quadros são uma volta inteira (o jogo anda os quadros conforme o barril gira, para os dois lados). A sombra o jogo desenha.',
+    largura: 20, altura: 20, ancora: 'centro',
+    animacoes: [{ id: 'rolando', nome: 'Rolando', quadros: 8, fps: 12 }],
+    previa: (g, anim, t) => barrilRolando(g, 0, 0, fasePrevia(t, 8, 12) * Math.PI * 2, true),
+  },
+  {
+    chave: 'barris.barril-escada', jogo: NOME_JOGO, nome: 'Barril descendo a escada',
+    desc: 'O barril deitado, visto de lado: descendo uma escada e nas mãos do Raposo (aí fica no primeiro quadro).',
+    largura: 26, altura: 22, ancora: 'centro',
+    animacoes: [{ id: 'descendo', nome: 'Descendo', quadros: 6, fps: 8 }],
+    previa: (g, anim, t) => barrilDeLado(g, 0, 0, (fasePrevia(t, 6, 8) * 15) / 8, true),
+  },
+  {
+    chave: 'barris.barril-em-pe', jogo: NOME_JOGO, nome: 'Barril em pé',
+    desc: 'Os barris em pé da pilha do Raposo (o jogo empilha três).',
+    largura: 22, altura: 22, ancora: 'pe', animacoes: PARADO,
+    previa: g => barrilEmPe(g, 0, 0, true),
+  },
+  {
+    chave: 'barris.fagulha', jogo: NOME_JOGO, nome: 'Fagulha',
+    desc: 'O foguinho com olhos que sai do tonel de piche e passeia pelas vigas.',
+    largura: 26, altura: 26, ancora: 'pe',
+    animacoes: [{ id: 'andando', nome: 'Andando', quadros: 4, fps: 8 }],
+    previa: (g, anim, t) => desenharFagulha(g, 0, -3, t, 0, true),
+  },
+  {
+    chave: 'barris.marreta', jogo: NOME_JOGO, nome: 'Marreta',
+    desc: 'A marreta deitada: o cabo à ESQUERDA e a cabeça à DIREITA. O jogo gira para bater (na viga e na mão do coelho). "Piscando" é quando está acabando: 2 quadros, o 1º claro.',
+    largura: 24, altura: 14, ancora: 'centro',
+    animacoes: [{ id: 'normal', nome: 'Normal', quadros: 1, fps: 1 }, { id: 'piscando', nome: 'Piscando', quadros: 2, fps: 10 }],
+    previa: (g, anim, t) => { g.save(); g.translate(-12, 0); martelo(g, 0, 0, 0, anim === 'piscando' && Math.floor(t * 10 + 1e-6) % 2 === 0, true); g.restore(); },
+  },
+  prendaPeca('cesta', 'Cesta de cenouras', 'A prenda da cesta com três cenouras.'),
+  prendaPeca('chapeu', 'Chapéu', 'A prenda do chapéu roxo da princesa.'),
+  prendaPeca('guardachuva', 'Guarda-chuva', 'A prenda do guarda-chuva rosa.'),
+  {
+    chave: 'barris.tonel', jogo: NOME_JOGO, nome: 'Tonel de piche',
+    desc: 'O tonel lá embaixo, com o letreiro "PICHE". O fogo em cima é outra peça.',
+    largura: 34, altura: 38, ancora: 'pe', animacoes: PARADO,
+    previa: g => {
+      desenharTonel(g, 0, 0, true);
+      g.font = `bold 7px ${FONTE}`; g.textAlign = 'center'; g.textBaseline = 'alphabetic'; g.fillStyle = OURO;
+      g.fillText('PICHE', 0, -14);
+    },
+  },
+  {
+    chave: 'barris.fogo', jogo: NOME_JOGO, nome: 'Fogo do tonel',
+    desc: 'As chamas em cima do tonel aceso (o jogo aumenta quando nasce uma fagulha, e põe o brilho em volta) e a fumacinha do tonel apagado.',
+    largura: 28, altura: 26, ancora: 'pe',
+    animacoes: [{ id: 'aceso', nome: 'Aceso', quadros: 6, fps: 12 }, { id: 'apagado', nome: 'Apagado (fumaça)', quadros: 2, fps: 3 }],
+    previa: (g, anim, t) => (anim === 'apagado' ? fumacaTonel(g, 0, 0, t) : labaredas(g, 0, 0, t, 1)),
+  },
+  {
+    chave: 'barris.fundo', jogo: NOME_JOGO, nome: 'Céu e cidade',
+    desc: 'O fundo da tela inteira: o céu, as estrelas, a lua e a cidade com o castelo ao longe. As vigas, as escadas e o tonel o jogo põe por cima. Nos níveis espelhados o fundo continua igual.',
+    largura: W, altura: H, ancora: 'topo', animacoes: [{ id: 'noite', nome: 'Noite', quadros: 1, fps: 1 }],
+    previa: g => { g.save(); g.translate(-W / 2, 0); desenharCeu(g, CENARIOS[0]); g.restore(); },
+  },
+  {
+    chave: 'barris.viga', jogo: NOME_JOGO, nome: 'Viga',
+    desc: 'Um pedaço de viga (16 de largura). O jogo repete ao longo de cada viga, acompanhando a inclinação: desenhe até as bordas, sem folga.',
+    largura: 16, altura: ESPESSURA, ancora: 'topo', animacoes: [{ id: 'normal', nome: 'Normal', quadros: 1, fps: 1 }],
+    previa: g => {
+      g.save(); g.beginPath(); g.rect(-8, -2, 16, ESPESSURA + 4); g.clip();
+      desenharViga(g, { xa: -56, xb: 56, yE: 0, yD: 0 }, true);
+      g.restore();
+    },
+  },
+  {
+    chave: 'barris.escada', jogo: NOME_JOGO, nome: 'Escada',
+    desc: 'Um degrau de escada (8 de altura). O jogo repete de baixo para cima até a viga de cima. "Do Raposo" são as escadas compridas por onde ele foge.',
+    largura: 16, altura: 8, ancora: 'topo',
+    animacoes: [{ id: 'normal', nome: 'Normal', quadros: 1, fps: 1 }, { id: 'raposo', nome: 'Do Raposo', quadros: 1, fps: 1 }],
+    previa: (g, anim) => (anim === 'raposo' ? desenharEscada(g, 0, 0, 8, '#6d5524', '#56421b', anim, true) : desenharEscada(g, 0, 0, 8, '#c09a42', '#97762c', anim, true)),
+  },
+];
+registrarPecas(SPRITES);
 
 /* O jogo */
 
@@ -1593,11 +1805,13 @@ function criar(ctx) {
     let topo = b.y - 44;
     if (b.pose === 'morte' || b.pose === 'espera') {
       const ft = b.pose === 'espera' ? 9 : b.morteT;
-      const final = -b.dir * Math.PI / 2;
-      const ang = ft < 0.5 ? 0 : ft < 1.6 ? final * 9 * (ft - 0.5) / 1.1 : final;
-      g.save(); g.translate(b.x, b.y - 11); g.rotate(ang); g.scale(s, s);
-      desenharCoelho(g, 0, 11 / s, { pelo: ap.pelo, roupa: ap.roupa, dir: b.dir, t });
-      g.restore();
+      if (!coelhoMorrendoSprite(g, b.x, b.y, ft, b.dir, ap.pelo)) {
+        const final = -b.dir * Math.PI / 2;
+        const ang = ft < 0.5 ? 0 : ft < 1.6 ? final * 9 * (ft - 0.5) / 1.1 : final;
+        g.save(); g.translate(b.x, b.y - 11); g.rotate(ang); g.scale(s, s);
+        desenharCoelho(g, 0, 11 / s, { pelo: ap.pelo, roupa: ap.roupa, dir: b.dir, t });
+        g.restore();
+      }
       if (ft >= 1.6) {
         for (let k = 0; k < 3; k++) {
           const a = t * 4 + k * 2.09;
@@ -1606,7 +1820,7 @@ function criar(ctx) {
       }
       topo = b.y - 34;
     } else if (b.estado === 'escada') {
-      desenharCoelhoCostas(g, b.x, b.y, b.passo, false, ap.pelo, ap.escuro);
+      if (!coelhoSubindoSprite(g, b.x, b.y, b.passo, ap.pelo, false)) desenharCoelhoCostas(g, b.x, b.y, b.passo, false, ap.pelo, ap.escuro);
     } else {
       const festa = b.pose === 'chegou';
       g.save(); g.translate(b.x, b.y); g.scale(s, s);

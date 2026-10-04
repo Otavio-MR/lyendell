@@ -4,6 +4,7 @@
 
 import { desenharCoelho, desenharRaposa, elipse, desenharArvore, sorte as sorteSemente } from '../desenho-coelho.js';
 import { T, LINHAS, TOPO, B, SOLIDO, FASES, nivelBase, posPlataforma, bolasDaBarra, posBolha } from './super-coelho-fases.js';
+import { registrarPecas, desenharSprite, temSprite, spriteDe, aoMudarSprites } from '../sprites.js';
 
 const W = 512;
 const H = 288;
@@ -1810,6 +1811,29 @@ function carimbo(g, chave, x, y, pintar) {
   else { g.save(); g.translate(x, y); pintar(g); g.restore(); }
 }
 
+/* Sprites enviados em #/recreacao/sprites (veja sprites.js e a lista SPRITES no fim do arquivo). Cada desenho
+   tenta o sprite primeiro; sem sprite, desenha como sempre. Só muda o desenho: nada de física, sorteio ou rede. */
+const SC = 'supercoelho.';
+const sprite = (g, peca, anim, x, y, o) => desenharSprite(g, SC + peca, anim, x, y, o);
+const temPeca = peca => temSprite(SC + peca);
+// Só a animação enviada com esse nome (sem cair na primeira que tiver).
+const enviada = (peca, anim) => temSprite(`${SC}${peca}.${anim}`);
+// Blocos de cada tema: só o sprite daquele tema (o tijolo da caverna não vira o do campo).
+const spriteExato = (g, peca, anim, x, y, o) => enviada(peca, anim) && sprite(g, peca, anim, x, y, o);
+// A primeira animação da lista que foi enviada; sem nenhuma, a primeira (aí o sprite cai na que tiver).
+const escolher = (peca, lista) => lista.find(a => enviada(peca, a)) || lista[0];
+// As Copas usam as cores dos Campos.
+const paleta = tema => (tema === 'copas' ? 'campo' : tema);
+const BLOCO = { largura: T + 0.5, altura: T + 0.5 };
+// Derrotado (de cabeça para baixo): o sprite "derrotado" com o pé no fundo da caixa de alto "alt";
+// sem ele, o de andar virado em volta de (x, y), como o desenho de sempre.
+function derrotado(g, peca, andar, x, y, alt, o) {
+  if (enviada(peca, 'derrotado')) return sprite(g, peca, 'derrotado', x, y + alt, o);
+  return sprite(g, peca, andar, x, y, { ...o, rot: Math.PI, dir: -(o.dir ?? 1) });
+}
+// Trocou algum sprite: os blocos guardados são redesenhados.
+aoMudarSprites(() => cache.clear());
+
 function pintarChao(g, tema, topo, baixoTeto, v) {
   const tm = TEMAS[tema];
   const [base, escuro, claro] = tm.chao;
@@ -1875,6 +1899,10 @@ function pintarPonte(g) {
 }
 
 function desenharLirio(g, x, y, t, fase = 0) {
+  if (sprite(g, 'lirio', 'girando', x, y, { t: t + fase / 3.5 })) return;
+  pintarLirio(g, x, y, t, fase);
+}
+function pintarLirio(g, x, y, t, fase = 0) {
   const lx = Math.max(0.15, Math.abs(Math.cos(t * 3.5 + fase)));
   elipse(g, x, y, 6 * lx, 7, '#a8781c');
   elipse(g, x, y, 5 * lx, 6, '#e8c24a');
@@ -2054,6 +2082,10 @@ function fundoCastelo(g, cam, t) {
 
 /* Enfeites da fase */
 function estandarte(g, x, y, s) {
+  if (sprite(g, 'estandarte', 'parado', x, y - 2, { escala: s })) return;
+  pintarEstandarte(g, x, y, s);
+}
+function pintarEstandarte(g, x, y, s) {
   g.fillStyle = '#c9a46b'; g.fillRect(x - 10 * s, y - 2, 20 * s, 2);
   g.fillStyle = '#7e1c1c';
   g.beginPath(); g.moveTo(x - 8 * s, y); g.lineTo(x + 8 * s, y); g.lineTo(x + 8 * s, y + 36 * s); g.lineTo(x, y + 30 * s); g.lineTo(x - 8 * s, y + 36 * s); g.fill();
@@ -2063,9 +2095,56 @@ function estandarte(g, x, y, s) {
   elipse(g, x + 1.6 * s, y + 11.5 * s, 0.7 * s, 0.7 * s, '#f4dd80');
 }
 function desenharEnfeites(g, base, cam, t) {
-  const CORES = ['#f0a0c0', '#f4dd80', '#a8d8f0', '#ffffff'];
   for (const d of base.deco) {
     if (d.x < cam - 70 || d.x > cam + W + 70) continue;
+    if (!spriteEnfeite(g, d, t)) pintarEnfeite(g, d, t);
+  }
+}
+const TAM_ARVORE = 28; // a árvore da prévia (as da fase vão de 22 a 34)
+const TAM_ESTALACTITE = 18;
+const TAM_CIPO = 40;
+// Enfeite com sprite enviado (devolve false sem sprite). As fases de "sin(t + x)" viram tempo: t + x / velocidade.
+function spriteEnfeite(g, d, t) {
+  const { x, y } = d;
+  switch (d.tp) {
+    case 'arvore': return sprite(g, 'arvore', 'parada', x, y, { escala: d.tam / TAM_ARVORE });
+    case 'arbusto': return sprite(g, 'arbusto', ['pequeno', 'medio', 'grande'][d.tam - 1] || 'grande', x + d.tam * 0.5, y, { t });
+    case 'flores': return sprite(g, 'flores', 'paradas', x, y, { quadro: d.cor });
+    case 'capim': return sprite(g, 'capim', 'balancando', x, y, { t: t + x / 2 });
+    case 'cristal': return sprite(g, 'cristal', ['azul', 'roxo', 'verde'][d.cor] || 'azul', x, y, { t: t + x / 2 });
+    case 'cogumelo': return sprite(g, 'cogumelo', 'brilhando', x, y, { t: t + x / 2 });
+    case 'estalactite':
+      if (!sprite(g, 'estalactite', 'parada', x, y, { t, escala: d.tam / TAM_ESTALACTITE })) return false;
+      pingo(g, d, t);
+      return true;
+    case 'cipo': return sprite(g, 'cipo', 'balancando', x, y, { t, escala: d.tam / TAM_CIPO });
+    case 'tocha':
+      if (!temPeca('tocha')) return false;
+      brilhoTocha(g, x, y);
+      return sprite(g, 'tocha', 'acesa', x, y + 10, { t: t + x / 13 });
+    case 'corrente':
+      if (!temPeca('corrente')) return false;
+      for (let k = 0; k < d.tam / 5; k++) sprite(g, 'corrente', 'parada', x, y + k * 5, { quadro: k });
+      return true;
+    case 'estandarte': return sprite(g, 'estandarte', 'parado', x, y + 2, { t });
+    default: return false;
+  }
+}
+const CORES_FLORES = ['#f0a0c0', '#f4dd80', '#a8d8f0', '#ffffff'];
+function pingo(g, d, t) {
+  const ciclo = (t * 0.6 + hash(d.x) * 5) % 3;
+  if (ciclo < 1) elipse(g, d.x, d.y + d.tam + ciclo * ciclo * 140, 0.9, 1.6, 'rgba(150,200,255,0.7)');
+}
+function brilhoTocha(g, x, y) {
+  const brilho = g.createRadialGradient(x, y - 5, 1, x, y - 5, 30);
+  brilho.addColorStop(0, 'rgba(255,180,80,0.35)');
+  brilho.addColorStop(1, 'rgba(255,180,80,0)');
+  g.fillStyle = brilho; g.fillRect(x - 30, y - 35, 60, 60);
+}
+// O enfeite desenhado por código. semBrilho/semPingo: para a prévia (o jogo põe por cima do sprite).
+function pintarEnfeite(g, d, t, { semBrilho = false, semPingo = false } = {}) {
+  const CORES = CORES_FLORES;
+  {
     const { x, y } = d;
     switch (d.tp) {
       case 'arvore': desenharArvore(g, x, y - d.tam * 0.55, d.tam, () => hash(x)); break;
@@ -2113,8 +2192,7 @@ function desenharEnfeites(g, base, cam, t) {
         g.fillStyle = '#26324d';
         g.beginPath(); g.moveTo(x - 4, y); g.lineTo(x, y + d.tam); g.lineTo(x + 4, y); g.fill();
         g.fillStyle = '#34446a'; g.fillRect(x - 3, y, 1.4, d.tam * 0.5);
-        const ciclo = (t * 0.6 + hash(x) * 5) % 3;
-        if (ciclo < 1) elipse(g, x, y + d.tam + ciclo * ciclo * 140, 0.9, 1.6, 'rgba(150,200,255,0.7)');
+        if (!semPingo) pingo(g, d, t);
         break;
       }
       case 'cipo':
@@ -2126,10 +2204,7 @@ function desenharEnfeites(g, base, cam, t) {
         break;
       case 'tocha': {
         g.fillStyle = '#3a2a1e'; g.fillRect(x - 1.5, y, 3, 10); g.fillRect(x - 4, y - 1, 8, 2);
-        const brilho = g.createRadialGradient(x, y - 5, 1, x, y - 5, 30);
-        brilho.addColorStop(0, 'rgba(255,180,80,0.35)');
-        brilho.addColorStop(1, 'rgba(255,180,80,0)');
-        g.fillStyle = brilho; g.fillRect(x - 30, y - 35, 60, 60);
+        if (!semBrilho) brilhoTocha(g, x, y);
         const f = Math.sin(t * 13 + x) * 0.8;
         elipse(g, x, y - 5, 3.4, 6 + f, '#ff7a1a');
         elipse(g, x, y - 4, 1.8, 3.5 + f * 0.5, '#ffe08a');
@@ -2139,7 +2214,7 @@ function desenharEnfeites(g, base, cam, t) {
         g.strokeStyle = '#5a5450'; g.lineWidth = 1;
         for (let k = 0; k < d.tam / 5; k++) { g.beginPath(); g.ellipse(x, y + k * 5 + 2.5, k % 2 ? 0.8 : 1.8, 2.6, 0, 0, Math.PI * 2); g.stroke(); }
         break;
-      case 'estandarte': estandarte(g, x, y + 4, 1); break;
+      case 'estandarte': pintarEstandarte(g, x, y + 4, 1); break;
       default: break;
     }
   }
@@ -2150,12 +2225,34 @@ function desenharCopa(g, cp, t) {
   const y = cp.r * T;
   const w = cp.len * T;
   const tw = Math.min(26, w * 0.4);
+  if (temPeca('copa-tronco')) {
+    // Pedaços do tronco um embaixo do outro, até o fim da tela (mais finos nas copas pequenas).
+    const k = tw / 26;
+    for (let yy = y + 8; yy < H; yy += 16 * k) sprite(g, 'copa-tronco', 'parado', x + w / 2, yy, { escala: k });
+  } else pintarTroncoCopa(g, cp);
+  if (temPeca('copa')) {
+    for (let k = 0; k < cp.len; k++) {
+      const anim = cp.len === 1 ? 'meio' : k === 0 ? 'esquerda' : k === cp.len - 1 ? 'direita' : 'meio';
+      sprite(g, 'copa', escolher('copa', [anim, 'meio']), x + k * T + 8, y + 9, { t });
+    }
+  } else pintarFolhasCopa(g, cp, t);
+}
+function pintarTroncoCopa(g, cp) {
+  const x = cp.c * T;
+  const y = cp.r * T;
+  const w = cp.len * T;
+  const tw = Math.min(26, w * 0.4);
   const tx = x + w / 2 - tw / 2;
   g.fillStyle = '#5b3c22'; g.fillRect(tx, y + 8, tw, H - y);
   g.fillStyle = '#6f4b2c'; g.fillRect(tx + 3, y + 8, 4, H - y);
   g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(tx + tw - 6, y + 8, 6, H - y);
   g.fillStyle = '#4a301b';
   for (let k = 0; k < 6; k++) g.fillRect(tx + 6 + hash(cp.c + k) * (tw - 10), y + 22 + k * 30, 2, 9);
+}
+function pintarFolhasCopa(g, cp, t) {
+  const x = cp.c * T;
+  const y = cp.r * T;
+  const w = cp.len * T;
   g.fillStyle = '#255a2c';
   retArred(g, x - 2, y + 3, w + 4, 15, 7);
   g.fill();
@@ -2165,6 +2262,14 @@ function desenharCopa(g, cp, t) {
   elipse(g, x + w / 2, y + 17, w / 2, 2.5, 'rgba(0,0,0,0.18)');
 }
 function desenharTronco(g, tr) {
+  if (temPeca('tronco')) {
+    sprite(g, 'tronco', 'topo', tr.c * T + 16, tr.topo * T);
+    for (let r = tr.topo + 1; r < tr.base; r++) sprite(g, 'tronco', 'meio', tr.c * T + 16, r * T);
+    return;
+  }
+  pintarTronco(g, tr);
+}
+function pintarTronco(g, tr) {
   const x = tr.c * T;
   const y = tr.topo * T;
   const fundo = tr.base * T;
@@ -2186,6 +2291,16 @@ function desenharTronco(g, tr) {
 function desenharCastelinho(g, def, F, tema) {
   const x = def.castelo * T;
   const chao = TOPO * T;
+  if (!spriteExato(g, 'castelinho', paleta(tema), x + 40, chao)) pintarCastelinho(g, x, chao, tema);
+  // A bandeirinha sobe na contagem (desenhada por cima do sprite também).
+  const sobe = F.m === 'contagem' ? Math.min(1, F.tm / 1.2) : 0;
+  g.fillStyle = '#5a4a3a'; g.fillRect(x + 39.5, chao - 160, 1.5, 24);
+  const by = chao - 140 - sobe * 18;
+  g.fillStyle = '#2f6b34';
+  g.beginPath(); g.moveTo(x + 41, by); g.lineTo(x + 56, by + 4); g.lineTo(x + 41, by + 8); g.fill();
+  elipse(g, x + 46, by + 4, 1.6, 1.6, '#e8c24a');
+}
+function pintarCastelinho(g, x, chao, tema) {
   const [pedra, escura, clara] = TEMAS[tema].castelo;
   g.fillStyle = pedra; g.fillRect(x, chao - 80, 80, 80);
   for (let k = 0; k < 5; k++) g.fillRect(x + k * 16 + 2, chao - 88, 12, 8);
@@ -2199,20 +2314,19 @@ function desenharCastelinho(g, def, F, tema) {
   g.beginPath(); g.moveTo(x + 30, chao); g.lineTo(x + 30, chao - 18); g.arc(x + 40, chao - 18, 10, Math.PI, 0); g.lineTo(x + 50, chao); g.fill();
   g.fillRect(x + 37, chao - 116, 6, 12);
   g.fillRect(x + 8, chao - 62, 6, 10); g.fillRect(x + 66, chao - 62, 6, 10);
-  const sobe = F.m === 'contagem' ? Math.min(1, F.tm / 1.2) : 0;
-  g.fillStyle = '#5a4a3a'; g.fillRect(x + 39.5, chao - 160, 1.5, 24);
-  const by = chao - 140 - sobe * 18;
-  g.fillStyle = '#2f6b34';
-  g.beginPath(); g.moveTo(x + 41, by); g.lineTo(x + 56, by + 4); g.lineTo(x + 41, by + 8); g.fill();
-  elipse(g, x + 46, by + 4, 1.6, 1.6, '#e8c24a');
 }
 function desenharMastro(g, def, bandeiraY, t) {
   const x = def.mastro * T + 8;
+  if (!sprite(g, 'mastro', 'parado', x, BASE_MASTRO, { t })) pintarPoste(g, x);
+  if (!sprite(g, 'bandeira', 'tremulando', x - 12.5, bandeiraY + 8, { t })) pintarBandeira(g, x, bandeiraY, t);
+}
+function pintarPoste(g, x) {
   g.fillStyle = '#9aa88e'; g.fillRect(x - 1.5, POSTE_TOPO, 3, BASE_MASTRO - POSTE_TOPO);
   g.fillStyle = 'rgba(255,255,255,0.5)'; g.fillRect(x - 1.2, POSTE_TOPO, 1, BASE_MASTRO - POSTE_TOPO);
   elipse(g, x, POSTE_TOPO - 2, 4, 4, '#e8c24a');
   elipse(g, x - 1.2, POSTE_TOPO - 3.2, 1.4, 1.4, '#fff3c4');
-  const y = bandeiraY;
+}
+function pintarBandeira(g, x, y, t) {
   const onda = k => Math.sin(t * 6 + k * 0.4) * 1.4 * (k / 22);
   g.fillStyle = '#2f6b34';
   g.beginPath();
@@ -2230,6 +2344,9 @@ function desenharMastro(g, def, bandeiraY, t) {
 function desenharMarco(g, def, ok, t) {
   const x = def.meio.c * T + 8;
   const y = def.meio.r * T;
+  if (!sprite(g, 'marco', ok ? 'aceso' : 'apagado', x, y, { t })) pintarMarco(g, x, y, ok, t);
+}
+function pintarMarco(g, x, y, ok, t) {
   g.fillStyle = '#7a5232'; g.fillRect(x - 1, y - 26, 2, 26);
   const cor = ok ? '#e8c24a' : '#8d8a80';
   const onda = Math.sin(t * 5) * (ok ? 1.5 : 0.4);
@@ -2240,6 +2357,9 @@ function desenharMarco(g, def, ok, t) {
 function desenharAlavanca(g, def, puxada, t) {
   const x = def.alavanca.c * T + 8;
   const y = def.alavanca.r * T;
+  if (!sprite(g, 'alavanca', puxada ? 'puxada' : 'parada', x, y, { t })) pintarAlavanca(g, x, y, puxada, t);
+}
+function pintarAlavanca(g, x, y, puxada, t) {
   g.fillStyle = '#5a5450'; g.fillRect(x - 6, y - 7, 12, 7);
   g.fillStyle = '#837c75'; g.fillRect(x - 6, y - 7, 12, 1.5);
   g.save();
@@ -2290,10 +2410,48 @@ function desenharPrincesa(g, x, y, t, feliz) {
 /* Personagens */
 // vis (junto): { pelo, roupa } do Club Coelho; sem vis, o coelho de sempre (a roupa mostra o poder).
 function desenharJogador(g, F, t, vis) {
-  const [x, y, forma, dir, bits, passo, estrela, inv, crescer, vx] = F.j;
+  const [x, y, forma, dir, bits, , estrela, inv] = F.j;
   if (bits & 8) return;
   const morto = bits & 32;
   if (!morto && inv > 0 && Math.floor(t * 18) % 2 === 0) return;
+  const hAtual = forma > 0 ? (bits & 1 ? AGACHADO : GRANDE) : PEQUENO;
+  if (!spriteJogador(g, F.j, t, vis)) corpoJogador(g, F.j, t, vis);
+  if (bits & 16) elipse(g, x + 6 + dir * 10, y + 8, 3.5, 3.5, 'rgba(255,200,90,0.85)');
+  if (estrela > 0) {
+    for (let k = 0; k < 3; k++) {
+      const a = t * 6 + k * 2.1;
+      estrelinha(g, x + 6 + Math.cos(a) * 12, y + hAtual / 2 + Math.sin(a) * 14, 2, '#fff6c0');
+    }
+  }
+}
+// O coelho com sprite: a peça de cada tamanho e poder (a da estrela, se foi enviada), com o pé no pé do coelho.
+// Pinta com o pelo de cada um no jogo junto (e com o arco-íris na estrela) se o sprite foi enviado para pintar.
+function spriteJogador(g, jj, t, vis) {
+  const [x, y, forma, dir, bits, passo, estrela, , crescer, vx] = jj;
+  const morto = bits & 32;
+  const chao = bits & 2;
+  const hAtual = forma > 0 ? (bits & 1 ? AGACHADO : GRANDE) : PEQUENO;
+  let grande = forma > 0;
+  if (crescer > 0) grande = Math.floor(crescer * 12) % 2 === 0;
+  const estrelado = estrela > 0 && temPeca('coelho-estrela');
+  const peca = estrelado ? 'coelho-estrela' : !grande ? 'coelho-pequeno' : forma === 2 ? 'coelho-fogo' : 'coelho-grande';
+  if (!temPeca(peca)) return false;
+  const lista = morto ? ['morrendo'] : grande && bits & 1 ? ['abaixado', 'parado']
+    : !chao ? (bits & 64 ? ['pulando'] : ['caindo', 'pulando'])
+      : vx * dir < -30 ? ['derrapando', 'andando'] : Math.abs(vx) > 8 ? ['andando'] : ['parado'];
+  let anim = escolher(peca, lista);
+  const o = { t: anim === 'andando' || anim === 'derrapando' ? passo : t, dir, cor: estrela > 0 ? ARCO_IRIS[Math.floor(t * 14) % ARCO_IRIS.length] : vis?.pelo || null };
+  if (estrelado && !grande) Object.assign(o, { largura: 20, altura: 24 });
+  let py = y + hAtual;
+  // Sem o sprite de morrer: o parado de cabeça para baixo, virado em volta do mesmo ponto do desenho de sempre.
+  if (morto && bits & 4 && !enviada(peca, 'morrendo')) { anim = 'parado'; py -= 22; o.rot = Math.PI; o.dir = -dir; }
+  return sprite(g, peca, anim, x + LARG / 2, py, o);
+}
+// O coelho desenhado por código (sem as estrelinhas da estrela nem o brilho do tiro, que vão por cima de tudo).
+// semSprite: a prévia não usa o sprite "coelho" de todos os jogos (o desenho daqui de dentro usa, como sempre).
+function corpoJogador(g, jj, t, vis, semSprite = false) {
+  const [x, y, forma, dir, bits, passo, estrela, , crescer, vx] = jj;
+  const morto = bits & 32;
   const hAtual = forma > 0 ? (bits & 1 ? AGACHADO : GRANDE) : PEQUENO;
   let grande = forma > 0;
   if (crescer > 0) grande = Math.floor(crescer * 12) % 2 === 0;
@@ -2313,15 +2471,8 @@ function desenharJogador(g, F, t, vis) {
   else if (chao && vx * dir < -30) g.rotate(-dir * 0.18);
   g.scale(sx, sy);
   if (forma === 2 || estrela > 0) elipse(g, 0, -24, 24, 28, estrela > 0 ? 'rgba(255,240,150,0.22)' : 'rgba(255,150,70,0.16)');
-  desenharCoelho(g, -2 * dir, 0, { pelo, roupa, dir, passo, andando: !!chao && Math.abs(vx) > 8 && !morto, t });
+  desenharCoelho(g, -2 * dir, 0, { pelo, roupa, dir, passo, andando: !!chao && Math.abs(vx) > 8 && !morto, t, semSprite });
   g.restore();
-  if (bits & 16) elipse(g, x + 6 + dir * 10, y + 8, 3.5, 3.5, 'rgba(255,200,90,0.85)');
-  if (estrela > 0) {
-    for (let k = 0; k < 3; k++) {
-      const a = t * 6 + k * 2.1;
-      estrelinha(g, x + 6 + Math.cos(a) * 12, y + hAtual / 2 + Math.sin(a) * 14, 2, '#fff6c0');
-    }
-  }
 }
 
 function desenharTatu(g, x, y, dir, passo, est, tt, tf) {
@@ -2402,21 +2553,87 @@ function desenharMorcego(g, x, y, est, dir, t) {
   g.restore();
 }
 function desenharInimigo(g, e, tf, t) {
+  if (spriteInimigo(g, e, tf, t)) return;
+  pintarInimigo(g, e, tf, t);
+}
+// semSprite: a prévia não usa o sprite "raposa" de todos os jogos.
+function pintarInimigo(g, e, tf, t, semSprite = false) {
   const [tp, x, y, est, dir, tt, id] = e;
   const passo = tf + id * 0.37;
   if (tp === 'r') {
     g.save();
-    if (est === 'p') { g.translate(x + 7, y + 12); g.scale(0.34, 0.12); desenharRaposa(g, 0, 0, { dir, t }); }
-    else if (est === 'x') { g.translate(x + 7, y); g.scale(0.3, -0.3); desenharRaposa(g, 0, 0, { dir, t }); }
-    else { g.translate(x + 7, y + 12); g.scale(0.3, 0.3); desenharRaposa(g, 0, 0, { dir, passo, andando: true, t }); }
+    if (est === 'p') { g.translate(x + 7, y + 12); g.scale(0.34, 0.12); desenharRaposa(g, 0, 0, { dir, t, semSprite }); }
+    else if (est === 'x') { g.translate(x + 7, y); g.scale(0.3, -0.3); desenharRaposa(g, 0, 0, { dir, t, semSprite }); }
+    else { g.translate(x + 7, y + 12); g.scale(0.3, 0.3); desenharRaposa(g, 0, 0, { dir, passo, andando: true, t, semSprite }); }
     g.restore();
   } else if (tp === 't') desenharTatu(g, x, y, dir, passo, est, tt, tf);
   else if (tp === 'o') desenharOurico(g, x, y, dir, passo, est === 'x');
   else desenharMorcego(g, x, y, est, dir, t);
 }
+// Inimigo com sprite (devolve false sem sprite). O pé fica no pé do desenho de sempre.
+function spriteInimigo(g, e, tf, t) {
+  const [tp, x, y, est, dir, tt, id] = e;
+  const passo = tf + id * 0.37;
+  if (tp === 'r') {
+    if (!temPeca('raposinho')) return false;
+    if (est === 'x') return derrotado(g, 'raposinho', 'andando', x + 7, y, 12, { t, dir });
+    if (est !== 'p') return sprite(g, 'raposinho', 'andando', x + 7, y + 12, { t: passo, dir });
+    if (enviada('raposinho', 'achatado')) return sprite(g, 'raposinho', 'achatado', x + 7, y + 12, { t, dir });
+    // Sem o sprite achatado: o de andar amassado, como o desenho de sempre.
+    g.save();
+    g.translate(x + 7, y + 12);
+    g.scale(0.34 / 0.3, 0.12 / 0.3);
+    sprite(g, 'raposinho', 'andando', 0, 0, { t, dir });
+    g.restore();
+    return true;
+  }
+  if (tp === 't' && (est === 'c' || est === 'k')) {
+    if (!temPeca('tatu-bolinha')) return false;
+    const tremer = est === 'c' && tt > 5.5 ? Math.sin(tf * 60) : 0;
+    const cx = x + 7 + tremer;
+    const cy = y + 6;
+    if (est === 'c') return sprite(g, 'tatu-bolinha', tt > 4.5 ? escolher('tatu-bolinha', ['acordando', 'parado']) : 'parado', cx, cy, { t });
+    // Rolando: com vários quadros, uma volta inteira a cada 6 x 2π de caminho; com um quadro só, o sprite gira.
+    const s = spriteDe(SC + 'tatu-bolinha', 'rolando');
+    if (s && s.quadros > 1) return sprite(g, 'tatu-bolinha', 'rolando', cx, cy, { quadro: Math.floor((x / 6 / (Math.PI * 2)) * s.quadros) });
+    return sprite(g, 'tatu-bolinha', 'rolando', cx, cy, { rot: x / 6 });
+  }
+  if (tp === 't') {
+    if (!temPeca('tatu')) return false;
+    if (est === 'x') return derrotado(g, 'tatu', 'andando', x + 7, y, 14, { t, dir });
+    return sprite(g, 'tatu', 'andando', x + 7, y + 14, { t: passo, dir });
+  }
+  if (tp === 'o') {
+    if (!temPeca('ourico')) return false;
+    if (est === 'x') return derrotado(g, 'ourico', 'andando', x + 7, y, 14, { t, dir });
+    return sprite(g, 'ourico', 'andando', x + 7, y + 12, { t: passo, dir });
+  }
+  if (!temPeca('morcego')) return false;
+  if (est === 'x') return derrotado(g, 'morcego', 'voando', x + 7, y + 5, 0, { t, dir });
+  return sprite(g, 'morcego', est === 'd' ? 'dormindo' : 'voando', x + 7, y + 5, { t, dir });
+}
 function desenharChefe(g, k, tf, t) {
-  const [x, y, dir, vida, est, pisca, boca] = k;
+  const [x, y, , vida, est, pisca] = k;
   if (pisca && Math.floor(t * 20) % 2) return;
+  if (!spriteChefe(g, k, tf, t)) corpoChefe(g, k, tf, t);
+  if (est === 'a') for (let i = 0; i < vida; i++) coracao(g, x + 3 + i * 7, y - 10, 2.6, '#e05a5a');
+}
+function spriteChefe(g, k, tf, t) {
+  const [x, y, dir, , est, , boca] = k;
+  if (!temPeca('raposo')) return false;
+  if (est === 'x') return derrotado(g, 'raposo', 'andando', x + 17, y, 46, { t, dir });
+  const cuspe = boca && enviada('raposo', 'cuspindo');
+  sprite(g, 'raposo', cuspe ? 'cuspindo' : 'andando', x + 17, y + 32, { t: tf * 0.6, dir });
+  // Sem o sprite cuspindo: o fogo na boca por cima, no lugar do desenho de sempre.
+  if (boca && !cuspe) {
+    elipse(g, x + 17 + dir * 29.4, y + 11, 5.25, 3.7, 'rgba(255,170,60,0.9)');
+    elipse(g, x + 17 + dir * 29.4, y + 11, 2.6, 1.9, '#fff1a8');
+  }
+  return true;
+}
+// O Raposo desenhado por código (os corações da vida vão por cima, com ou sem sprite).
+function corpoChefe(g, k, tf, t, semSprite = false) {
+  const [x, y, dir, , est, , boca] = k;
   g.save();
   if (est === 'x') { g.translate(x + 17, y); g.scale(1.05, -1.05); } else { g.translate(x + 17, y + 32); g.scale(1.05, 1.05); }
   g.save();
@@ -2424,14 +2641,13 @@ function desenharChefe(g, k, tf, t) {
   g.fillStyle = '#5b2a6e';
   g.beginPath(); g.moveTo(8, -27); g.quadraticCurveTo(-12, -30 + Math.sin(t * 5) * 2, -24, -4); g.lineTo(2, -9); g.closePath(); g.fill();
   g.restore();
-  desenharRaposa(g, 0, 0, { dir, passo: tf * 0.6, andando: est === 'a', t });
+  desenharRaposa(g, 0, 0, { dir, passo: tf * 0.6, andando: est === 'a', t, semSprite });
   g.scale(dir, 1);
   g.fillStyle = '#e8c24a';
   g.beginPath(); g.moveTo(6, -30); g.lineTo(6, -37); g.lineTo(9.5, -33); g.lineTo(13, -39); g.lineTo(16.5, -33); g.lineTo(20, -37); g.lineTo(20, -30); g.closePath(); g.fill();
   elipse(g, 13, -32.5, 1.2, 1.2, '#d8342a');
   if (boca) { elipse(g, 28, -20, 5, 3.5, 'rgba(255,170,60,0.9)'); elipse(g, 28, -20, 2.5, 1.8, '#fff1a8'); }
   g.restore();
-  if (est === 'a') for (let i = 0; i < vida; i++) coracao(g, x + 3 + i * 7, y - 10, 2.6, '#e05a5a');
 }
 function coracao(g, x, y, r, cor) {
   g.fillStyle = cor;
@@ -2443,7 +2659,13 @@ function coracao(g, x, y, r, cor) {
 }
 
 /* Poderes, fogo e lava */
+const PECA_ITEM = { c: ['cenoura', 'brilhando'], f: ['flor-de-fogo', 'girando'], e: ['estrela', 'piscando'], v: ['trevo', 'brilhando'] };
 function desenharItem(g, it, t) {
+  const [peca, anim] = PECA_ITEM[it[0]] || PECA_ITEM.v;
+  if (sprite(g, peca, anim, it[1] + 7, it[2] + 7, { t })) return;
+  pintarItem(g, it, t);
+}
+function pintarItem(g, it, t) {
   const [tp, x, y] = it;
   const cx = x + 7;
   const cy = y + 7;
@@ -2495,11 +2717,19 @@ function desenharItem(g, it, t) {
   }
 }
 function desenharBolaFogo(g, x, y, t) {
+  if (sprite(g, 'bola-de-fogo', 'girando', x + 4, y + 4, { t })) return;
+  pintarBolaFogo(g, x, y, t);
+}
+function pintarBolaFogo(g, x, y, t) {
   elipse(g, x + 4, y + 4, 6, 6, 'rgba(255,140,40,0.3)');
   elipse(g, x + 4, y + 4, 4, 4, '#ff7a1a');
   elipse(g, x + 4 + Math.cos(t * 20) * 1.2, y + 4 + Math.sin(t * 20) * 1.2, 2.2, 2.2, '#ffe08a');
 }
 function desenharChama(g, c, t) {
+  if (sprite(g, 'chama', 'queimando', c[0] + 7, c[1] + 3, { t, dir: c[2] < 0 ? -1 : 1 })) return;
+  pintarChama(g, c, t);
+}
+function pintarChama(g, c, t) {
   const [x, y, d] = c;
   const cx = x + 7;
   const cy = y + 3;
@@ -2507,6 +2737,10 @@ function desenharChama(g, c, t) {
   elipse(g, cx + d * 2, cy, 3, 2, '#fff1a8');
 }
 function desenharLava(g, x, y, topo, t) {
+  if (spriteExato(g, 'lava', topo ? 'superficie' : 'funda', x + 8.25, y + 8.25, { t, ...BLOCO })) return;
+  pintarLava(g, x, y, topo, t);
+}
+function pintarLava(g, x, y, topo, t) {
   g.fillStyle = '#c2360f';
   g.fillRect(x, y, T + 0.5, T + 0.5);
   if (!topo) { g.fillStyle = 'rgba(255,120,30,0.25)'; g.fillRect(x, y + ((t * 6 + x) % 16), 16, 2); return; }
@@ -2523,6 +2757,12 @@ function desenharLava(g, x, y, topo, t) {
   if (bolha < 0.5) elipse(g, x + 4 + hash(x + 1) * 8, y + 5 - bolha * 6, 1.5 + bolha * 2, 1.5 + bolha * 2, 'rgba(255,210,90,0.7)');
 }
 function desenharBolha(g, p, t) {
+  // Descendo sem o sprite próprio: o de subir de cabeça para baixo.
+  const virar = !p.sobe && !enviada('bolha-de-lava', 'descendo');
+  if (sprite(g, 'bolha-de-lava', p.sobe || virar ? 'subindo' : 'descendo', p.x + 6, p.y + 7, { t, rot: virar ? Math.PI : 0 })) return;
+  pintarBolha(g, p, t);
+}
+function pintarBolha(g, p, t) {
   const cx = p.x + 6;
   const cy = p.y + 7;
   elipse(g, cx, cy, 9, 9, 'rgba(255,120,30,0.25)');
@@ -2533,11 +2773,18 @@ function desenharBolha(g, p, t) {
   elipse(g, cx + 2, cy + (p.sobe ? -1 : 1), 0.8, 1.2, '#3a0a00');
 }
 
+function pintarBolinhaBarra(g, x, y) {
+  elipse(g, x, y, 5, 5, 'rgba(255,120,30,0.3)'); elipse(g, x, y, 3.4, 3.4, '#ff7a1a'); elipse(g, x, y, 1.8, 1.8, '#ffe08a');
+}
 function desenharPlataforma(g, p, tema, t) {
   if (p.vert) {
     g.strokeStyle = 'rgba(90,60,30,0.7)'; g.lineWidth = 1;
     g.beginPath(); g.moveTo(p.x + 6, 0); g.lineTo(p.x + 6, p.y); g.moveTo(p.x + p.w - 6, 0); g.lineTo(p.x + p.w - 6, p.y); g.stroke();
   }
+  if (sprite(g, 'plataforma', 'parada', p.x + p.w / 2, p.y + 4, { t, largura: p.w })) return;
+  pintarTabua(g, p);
+}
+function pintarTabua(g, p) {
   g.fillStyle = '#5a3418'; retArred(g, p.x, p.y, p.w, 8, 2); g.fill();
   g.fillStyle = '#a0703c';
   for (let k = 0; k < p.w / 8; k++) g.fillRect(p.x + k * 8 + 0.6, p.y + 0.8, 6.8, 5.6);
@@ -2551,6 +2798,7 @@ function desenharParticulas(g, ps, t) {
     const a = Math.max(0, 1 - p.t / p.vida);
     if (p.tp === 'brilho') estrelinha(g, p.x, p.y, Math.max(0.3, p.tam * a), p.cor);
     else if (p.tp === 'po') { g.globalAlpha = a * 0.6; elipse(g, p.x, p.y, p.tam * (1 + p.t * 2), p.tam * (0.7 + p.t), '#e8dcc0'); g.globalAlpha = 1; }
+    else if (p.tp === 'caco' && sprite(g, 'caco', 'voando', p.x, p.y, { t: p.t, rot: p.t * 12 * (p.vx < 0 ? -1 : 1), cor: p.cor })) continue;
     else if (p.tp === 'caco') { g.save(); g.translate(p.x, p.y); g.rotate(p.t * 12 * (p.vx < 0 ? -1 : 1)); g.fillStyle = p.cor; g.fillRect(-3, -3, 6, 6); g.restore(); }
     else if (p.tp === 'moeda') desenharLirio(g, p.x, p.y, t * 3, 0);
     else if (p.tp === 'fogos') { g.globalAlpha = a; elipse(g, p.x, p.y, p.tam, p.tam, p.cor); g.globalAlpha = 1; }
@@ -2584,33 +2832,41 @@ function desenharBlocos(g, F, mapa, base, cam, t) {
           const topo = r > 0 && mapa[i - L] !== B.CHAO;
           const baixo = r < LINHAS - 1 && !mapa[i + L] && r < 10;
           const vv = (c * 7 + r * 3) % 4;
-          carimbo(g, `${tema}:c:${topo ? 1 : 0}:${baixo ? 1 : 0}:${vv}`, x, y, cg => pintarChao(cg, tema, topo, baixo, vv));
+          // Os quadros do sprite do chão são variações espalhadas pelo chão (não anima).
+          const anim = tema === 'castelo' ? 'castelo' : `${tema === 'caverna' ? 'caverna' : 'campo'}${topo ? '-topo' : ''}`;
+          if (spriteExato(g, 'chao', anim, x + 8.25, y + 8.25, { quadro: vv, ...BLOCO })) {
+            if (baixo) { g.fillStyle = 'rgba(0,0,0,0.28)'; g.fillRect(x, y + 12, 16, 4); }
+          } else carimbo(g, `${tema}:c:${topo ? 1 : 0}:${baixo ? 1 : 0}:${vv}`, x, y, cg => pintarChao(cg, tema, topo, baixo, vv));
           break;
         }
-        case B.TIJOLO: carimbo(g, `${tema}:t`, x, y, cg => pintarTijolo(cg, tema)); break;
-        case B.PEDRA: carimbo(g, `${tema}:p`, x, y, cg => pintarPedra(cg, tema)); break;
-        case B.USADO: carimbo(g, `${tema}:u`, x, y, cg => pintarUsado(cg, tema)); break;
-        case B.PONTE: carimbo(g, 'ponte', x, y, pintarPonte); break;
+        case B.TIJOLO: if (!spriteExato(g, 'tijolo', paleta(tema), x + 8.25, y + 8.25, { t, ...BLOCO })) carimbo(g, `${tema}:t`, x, y, cg => pintarTijolo(cg, tema)); break;
+        case B.PEDRA: if (!spriteExato(g, 'pedra', paleta(tema), x + 8.25, y + 8.25, { t, ...BLOCO })) carimbo(g, `${tema}:p`, x, y, cg => pintarPedra(cg, tema)); break;
+        case B.USADO: if (!spriteExato(g, 'bloco-usado', paleta(tema), x + 8.25, y + 8.25, { t, ...BLOCO })) carimbo(g, `${tema}:u`, x, y, cg => pintarUsado(cg, tema)); break;
+        case B.PONTE: if (!sprite(g, 'ponte', 'parada', x + 8.25, y + 8.25, { t, ...BLOCO })) carimbo(g, 'ponte', x, y, pintarPonte); break;
         case B.LAVA: desenharLava(g, x, y, r > 0 && mapa[i - L] !== B.LAVA, t); break;
         case B.LIRIO: desenharLirio(g, x + 8, y + 8, t, c * 0.5); break;
-        case B.PERGUNTA: {
-          carimbo(g, 'pergunta', x, y, pintarPergunta);
-          const bob = Math.sin(t * 4 + c * 0.7) * 0.8;
-          texto(g, '?', x + 8, y + 8.6 + bob, 11, '#fff3c4', 'center', '#7a5512');
-          const brilho = (t * 0.6 + c * 0.13) % 1.8;
-          if (brilho < 0.4) {
-            const sx = x - 6 + (brilho / 0.4) * 28;
-            g.save();
-            g.beginPath(); g.rect(x + 1, y + 1, 14, 14); g.clip();
-            g.fillStyle = 'rgba(255,255,255,0.35)';
-            g.beginPath(); g.moveTo(sx, y); g.lineTo(sx + 5, y); g.lineTo(sx - 3, y + 16); g.lineTo(sx - 8, y + 16); g.closePath(); g.fill();
-            g.restore();
-          }
+        case B.PERGUNTA:
+          if (!sprite(g, 'bloco-pergunta', 'brilhando', x + 8.25, y + 8.25, { t, ...BLOCO })) desenharPergunta(g, x, y, c, t, true);
           break;
-        }
         default: break;
       }
     }
+  }
+}
+// O bloco "?" de sempre (o "?" balançando e o brilho que passa). guardado: usa o bloco já desenhado (carimbo).
+function desenharPergunta(g, x, y, c, t, guardado = false) {
+  if (guardado) carimbo(g, 'pergunta', x, y, pintarPergunta);
+  else { g.save(); g.translate(x, y); pintarPergunta(g); g.restore(); }
+  const bob = Math.sin(t * 4 + c * 0.7) * 0.8;
+  texto(g, '?', x + 8, y + 8.6 + bob, 11, '#fff3c4', 'center', '#7a5512');
+  const brilho = (t * 0.6 + c * 0.13) % 1.8;
+  if (brilho < 0.4) {
+    const sx = x - 6 + (brilho / 0.4) * 28;
+    g.save();
+    g.beginPath(); g.rect(x + 1, y + 1, 14, 14); g.clip();
+    g.fillStyle = 'rgba(255,255,255,0.35)';
+    g.beginPath(); g.moveTo(sx, y); g.lineTo(sx + 5, y); g.lineTo(sx - 3, y + 16); g.lineTo(sx - 8, y + 16); g.closePath(); g.fill();
+    g.restore();
   }
 }
 
@@ -2650,11 +2906,13 @@ function desenharCartao(g, F, t) {
   const def = FASES[F.f];
   texto(g, `Mundo 1-${F.f + 1}`, W / 2, 92, 24, '#e8c24a', 'center');
   texto(g, def.nome, W / 2, 122, 14, '#ece0bf', 'center');
-  g.save();
-  g.translate(W / 2 - 22, 190);
-  g.scale(0.62, 0.62);
-  desenharCoelho(g, 0, 0, { pelo: '#e9dcc3', dir: 1, t });
-  g.restore();
+  if (!sprite(g, 'coelho-pequeno', 'parado', W / 2 - 22, 190, { t, escala: 0.62 / 0.42 })) {
+    g.save();
+    g.translate(W / 2 - 22, 190);
+    g.scale(0.62, 0.62);
+    desenharCoelho(g, 0, 0, { pelo: '#e9dcc3', dir: 1, t });
+    g.restore();
+  }
   texto(g, `×  ${F.vi}`, W / 2 + 4, 176, 16, '#ece0bf');
   const dica = F.dj ? F.dj : F.v > 1 ? `Volta ${F.v}: os inimigos estão mais rápidos!` : F.f === 0 ? 'Salve a Princesa Cenoura do castelo do Raposo!' : F.f === 3 ? 'O Raposo espera na ponte sobre a lava...' : '';
   if (dica) texto(g, dica, W / 2, 226, 10, '#d8b13a', 'center');
@@ -2715,7 +2973,7 @@ function desenharCena(g, F, mapa, t, particulas, extra) {
     const px = def.princesa.c * T + 8;
     const py = def.princesa.r * T;
     const feliz = F.m === 'princesa';
-    desenharPrincesa(g, px, py, t, feliz);
+    if (!sprite(g, 'princesa', feliz ? 'feliz' : 'esperando', px, py, { t })) desenharPrincesa(g, px, py, t, feliz);
     if (feliz) for (let k = 0; k < 4; k++) {
       const ciclo = (t * 0.7 + k * 0.25) % 1;
       g.globalAlpha = 1 - ciclo;
@@ -2732,7 +2990,7 @@ function desenharCena(g, F, mapa, t, particulas, extra) {
   if (extra) extra.marca(g);
   for (const br of base.barras) {
     if (!visivel(br.cx - 70, br.cx + 70)) continue;
-    for (const p of bolasDaBarra(br, F.tf)) { elipse(g, p.x, p.y, 5, 5, 'rgba(255,120,30,0.3)'); elipse(g, p.x, p.y, 3.4, 3.4, '#ff7a1a'); elipse(g, p.x, p.y, 1.8, 1.8, '#ffe08a'); }
+    for (const p of bolasDaBarra(br, F.tf)) if (!sprite(g, 'barra-de-fogo', 'queimando', p.x, p.y, { t })) pintarBolinhaBarra(g, p.x, p.y);
   }
   for (const bo of base.bolhas) { const p = posBolha(bo, F.tf); if (p && visivel(p.x, p.x + 12)) desenharBolha(g, p, t); }
   for (const [x, y] of F.b) desenharBolaFogo(g, x, y, t);
@@ -2758,6 +3016,455 @@ function desenharCena(g, F, mapa, t, particulas, extra) {
   if (F.m === 'fim') desenharFimDeJogo(g);
   g.restore();
 }
+
+/* ─── Sprites: as peças que a Família Nobre pode trocar em #/recreacao/sprites ─── */
+// Cada prévia desenha o desenho de sempre (sem sprite) com a âncora em (0, 0), em unidades do jogo (um bloco = 16).
+// O molde para baixar sai dela: o quadro q é a prévia no tempo q / fps.
+
+const recortar = (g, x, y, w, h, f) => { g.save(); g.beginPath(); g.rect(x, y, w, h); g.clip(); f(); g.restore(); };
+const deslocado = (g, x, y, f) => { g.save(); g.translate(x, y); f(); g.restore(); };
+
+// O coelho: bits como na foto (1 agachado, 2 no chão, 4 de cabeça para baixo, 32 morto, 64 subindo).
+const BITS_COELHO = { parado: 2, andando: 2, derrapando: 2, pulando: 64, caindo: 0, abaixado: 3, morrendo: 36 };
+const previaCoelho = (forma, estrela) => (g, anim, t) => {
+  const bits = BITS_COELHO[anim] ?? 2;
+  const vx = anim === 'andando' ? 60 : anim === 'derrapando' ? -60 : 0;
+  const h = forma > 0 ? (bits & 1 ? AGACHADO : GRANDE) : PEQUENO;
+  corpoJogador(g, [-LARG / 2, -h, forma, 1, bits, t, estrela, 0, 0, vx], t, null, true);
+};
+const ANIMS_COELHO = [
+  { id: 'parado', nome: 'Parado', quadros: 2, fps: 2 },
+  { id: 'andando', nome: 'Andando e correndo', quadros: 4, fps: 6 },
+  { id: 'pulando', nome: 'Pulando (subindo)', quadros: 1, fps: 1 },
+  { id: 'caindo', nome: 'Caindo', quadros: 1, fps: 1 },
+  { id: 'derrapando', nome: 'Derrapando (virando de lado correndo)', quadros: 1, fps: 1 },
+];
+const ABAIXADO = { id: 'abaixado', nome: 'Abaixado', quadros: 1, fps: 1 };
+const MORRENDO = { id: 'morrendo', nome: 'Morrendo', quadros: 2, fps: 4 };
+const DICA_COELHO = 'Olhando para a direita, com o pé no fundo do quadro. Sem o sprite de uma animação, vale a primeira enviada (derrapando usa o de andar, caindo usa o de pular, abaixado usa o parado). Marque "pintar com a cor do jogador" para, no jogo junto, cada coelho ter a cor do seu pelo (e o arco-íris na estrela).';
+
+const DICA_DERROTADO = 'Derrotado: de cabeça para baixo, caindo da tela (sem ele, o jogo vira o de andar).';
+const temaDe = anim => (anim.startsWith('caverna') ? 'caverna' : anim === 'castelo' ? 'castelo' : 'campo');
+const ANIMS_TEMAS = [
+  { id: 'campo', nome: 'Campos e Copas', quadros: 1, fps: 1 },
+  { id: 'caverna', nome: 'Tocas', quadros: 1, fps: 1 },
+  { id: 'castelo', nome: 'Castelo', quadros: 1, fps: 1 },
+];
+// Tijolo e pedra não existem no castelo.
+const ANIMS_CAMPO_TOCAS = ANIMS_TEMAS.slice(0, 2);
+const bloco = pintar => (g, anim, t) => deslocado(g, -8, -8, () => pintar(g, anim, t));
+const DICA_BLOCO = 'Um bloco de 16 x 16. Cada tema tem o seu: sem o sprite de um tema, ele continua com o desenho de sempre.';
+const copa = k => (g, anim, t) => recortar(g, -8, -11, 16, 22, () => pintarFolhasCopa(g, { c: -0.5 - k, r: -9 / 16, len: 3 }, t));
+const enfeite = (d, o) => (g, anim, t) => pintarEnfeite(g, typeof d === 'function' ? d(anim, t) : d, t, o);
+
+export const SPRITES = [
+  /* O coelho */
+  {
+    chave: 'supercoelho.coelho-pequeno', jogo: 'Super Coelho', nome: 'Coelho pequeno',
+    desc: `O Super Coelho pequeno (sem cenoura). ${DICA_COELHO} O cartão de cada fase também usa o parado.`,
+    largura: 20, altura: 26, ancora: 'pe', tingir: true,
+    animacoes: [...ANIMS_COELHO, MORRENDO],
+    previa: previaCoelho(0, 0),
+  },
+  {
+    chave: 'supercoelho.coelho-grande', jogo: 'Super Coelho', nome: 'Coelho grande',
+    desc: `O coelho grande, depois da cenoura (no desenho de sempre, de cachecol). ${DICA_COELHO}`,
+    largura: 28, altura: 44, ancora: 'pe', tingir: true,
+    animacoes: [...ANIMS_COELHO, ABAIXADO, MORRENDO],
+    previa: previaCoelho(1, 0),
+  },
+  {
+    chave: 'supercoelho.coelho-fogo', jogo: 'Super Coelho', nome: 'Coelho de fogo',
+    desc: `O coelho com a Flor de Fogo (de coroa e capa), o que joga bolas de fogo. ${DICA_COELHO}`,
+    largura: 28, altura: 44, ancora: 'pe', tingir: true,
+    animacoes: [...ANIMS_COELHO, ABAIXADO, MORRENDO],
+    previa: previaCoelho(2, 0),
+  },
+  {
+    chave: 'supercoelho.coelho-estrela', jogo: 'Super Coelho', nome: 'Coelho com a estrela',
+    desc: 'O coelho invencível da estrela, grande ou pequeno (pequeno, o jogo diminui). Sem este sprite, o jogo usa o do tamanho do coelho pintado de arco-íris (se ele foi enviado para pintar). Olhando para a direita; as estrelinhas em volta continuam por cima.',
+    largura: 28, altura: 44, ancora: 'pe', tingir: true,
+    animacoes: [...ANIMS_COELHO, ABAIXADO],
+    previa: previaCoelho(1, 1),
+  },
+
+  /* Inimigos */
+  {
+    chave: 'supercoelho.raposinho', jogo: 'Super Coelho', nome: 'Raposinho',
+    desc: `A raposinha que anda pelas fases (pise nela). Olhando para a direita. Achatado: depois do pisão. ${DICA_DERROTADO}`,
+    largura: 18, altura: 12, ancora: 'pe',
+    animacoes: [
+      { id: 'andando', nome: 'Andando', quadros: 4, fps: 5 },
+      { id: 'achatado', nome: 'Achatado', quadros: 1, fps: 1 },
+      { id: 'derrotado', nome: 'Derrotado', quadros: 1, fps: 1 },
+    ],
+    previa: (g, anim, t) => pintarInimigo(g, ['r', -7, -12, anim === 'achatado' ? 'p' : anim === 'derrotado' ? 'x' : 'a', 1, 0, 0], t, t, true),
+  },
+  {
+    chave: 'supercoelho.tatu', jogo: 'Super Coelho', nome: 'Tatu',
+    desc: `O tatu andando. Olhando para a direita. Pisado, ele vira a bolinha (outra peça). ${DICA_DERROTADO}`,
+    largura: 26, altura: 14, ancora: 'pe',
+    animacoes: [
+      { id: 'andando', nome: 'Andando', quadros: 4, fps: 6 },
+      { id: 'derrotado', nome: 'Derrotado', quadros: 1, fps: 1 },
+    ],
+    previa: (g, anim, t) => pintarInimigo(g, ['t', -7, -14, anim === 'derrotado' ? 'x' : 'a', 1, 0, 0], t, t, true),
+  },
+  {
+    chave: 'supercoelho.tatu-bolinha', jogo: 'Super Coelho', nome: 'Tatu bolinha',
+    desc: 'O tatu enrolado depois do pisão (dá para chutar). Acordando: os olhinhos aparecendo antes de ele desenrolar (o jogo ainda treme o sprite). Rolando: com vários quadros, eles fazem uma volta inteira; com um quadro só, o jogo gira o desenho.',
+    largura: 16, altura: 14, ancora: 'centro',
+    animacoes: [
+      { id: 'parado', nome: 'Parada', quadros: 1, fps: 1 },
+      { id: 'acordando', nome: 'Acordando', quadros: 1, fps: 4 },
+      { id: 'rolando', nome: 'Rolando', quadros: 8, fps: 12 },
+    ],
+    previa: (g, anim, t) => {
+      if (anim === 'rolando') {
+        const x = t * 12 * ((6 * Math.PI * 2) / 8);
+        deslocado(g, -x, 0, () => pintarInimigo(g, ['t', x - 7, -6, 'k', 1, 0, 0], t, t, true));
+        return;
+      }
+      pintarInimigo(g, ['t', -7, -6, 'c', 1, anim === 'acordando' ? 5 : 0, 0], t, t, true);
+    },
+  },
+  {
+    chave: 'supercoelho.ourico', jogo: 'Super Coelho', nome: 'Ouriço',
+    desc: `O ouriço de espinhos (não dá para pisar). Olhando para a direita. ${DICA_DERROTADO}`,
+    largura: 22, altura: 14, ancora: 'pe',
+    animacoes: [
+      { id: 'andando', nome: 'Andando', quadros: 4, fps: 8 },
+      { id: 'derrotado', nome: 'Derrotado', quadros: 1, fps: 1 },
+    ],
+    previa: (g, anim, t) => pintarInimigo(g, anim === 'derrotado' ? ['o', -7, -14, 'x', 1, 0, 0] : ['o', -7, -12, 'a', 1, 0, 0], t, t, true),
+  },
+  {
+    chave: 'supercoelho.morcego', jogo: 'Super Coelho', nome: 'Morcego',
+    desc: 'O morcego das Tocas: dormindo pendurado no teto até o coelho chegar perto, depois voando. Olhando para a direita, pelo meio do quadro. Derrotado: de cabeça para baixo (sem ele, o jogo vira o de voar).',
+    largura: 26, altura: 20, ancora: 'centro',
+    animacoes: [
+      { id: 'dormindo', nome: 'Dormindo', quadros: 1, fps: 1 },
+      { id: 'voando', nome: 'Voando', quadros: 4, fps: 12 },
+      { id: 'derrotado', nome: 'Derrotado', quadros: 2, fps: 12 },
+    ],
+    previa: (g, anim, t) => pintarInimigo(g, ['m', -7, -5, anim === 'dormindo' ? 'd' : anim === 'derrotado' ? 'x' : 'v', 1, 0, 0], t, t, true),
+  },
+  {
+    chave: 'supercoelho.raposo', jogo: 'Super Coelho', nome: 'Raposo (o chefe)',
+    desc: 'O Raposo de coroa e capa, na ponte do castelo. Olhando para a direita. Cuspindo: quando joga a chama (sem ele, o jogo põe o fogo na boca do de andar). Derrotado: de cabeça para baixo, caindo na lava. Os corações da vida continuam por cima.',
+    largura: 72, altura: 46, ancora: 'pe',
+    animacoes: [
+      { id: 'andando', nome: 'Andando', quadros: 4, fps: 5 },
+      { id: 'cuspindo', nome: 'Cuspindo fogo', quadros: 2, fps: 5 },
+      { id: 'derrotado', nome: 'Derrotado', quadros: 1, fps: 1 },
+    ],
+    previa: (g, anim, t) => corpoChefe(g, anim === 'derrotado' ? [-17, -46, 1, 0, 'x', 0, 0] : [-17, -32, 1, 5, 'a', 0, anim === 'cuspindo' ? 1 : 0], t / 0.6, t / 0.6, true),
+  },
+  {
+    chave: 'supercoelho.chama', jogo: 'Super Coelho', nome: 'Chama do Raposo',
+    desc: 'A chama que o Raposo cospe. Indo para a direita (a ponta na frente, o rastro atrás).',
+    largura: 26, altura: 10, ancora: 'centro',
+    animacoes: [{ id: 'queimando', nome: 'Queimando', quadros: 4, fps: 12 }],
+    previa: (g, anim, t) => pintarChama(g, [-7, -3, 1], t),
+  },
+
+  /* Poderes e Lírios */
+  {
+    chave: 'supercoelho.cenoura', jogo: 'Super Coelho', nome: 'Cenoura',
+    desc: 'A cenoura que deixa o coelho grande. Sai do bloco e anda pelo chão.',
+    largura: 20, altura: 20, ancora: 'centro',
+    animacoes: [{ id: 'brilhando', nome: 'Brilhando', quadros: 4, fps: 6 }],
+    previa: (g, anim, t) => pintarItem(g, ['c', -7, -7, 0], t),
+  },
+  {
+    chave: 'supercoelho.flor-de-fogo', jogo: 'Super Coelho', nome: 'Flor de Fogo',
+    desc: 'A flor que dá o poder de jogar bolas de fogo. Fica parada em cima do bloco.',
+    largura: 20, altura: 20, ancora: 'centro',
+    animacoes: [{ id: 'girando', nome: 'Girando', quadros: 3, fps: 8 }],
+    previa: (g, anim, t) => pintarItem(g, ['f', -7, -7, 0], t),
+  },
+  {
+    chave: 'supercoelho.estrela', jogo: 'Super Coelho', nome: 'Estrela',
+    desc: 'A estrela que deixa o coelho invencível por dez segundos. Sai pulando do bloco.',
+    largura: 20, altura: 20, ancora: 'centro',
+    animacoes: [{ id: 'piscando', nome: 'Piscando', quadros: 2, fps: 10 }],
+    previa: (g, anim, t) => pintarItem(g, ['e', -7, -7, 0], t),
+  },
+  {
+    chave: 'supercoelho.trevo', jogo: 'Super Coelho', nome: 'Trevo (vida a mais)',
+    desc: 'O trevo escondido que dá uma vida a mais. Anda pelo chão como a cenoura.',
+    largura: 20, altura: 20, ancora: 'centro',
+    animacoes: [{ id: 'brilhando', nome: 'Brilhando', quadros: 4, fps: 5 }],
+    previa: (g, anim, t) => pintarItem(g, ['v', -7, -7, 0], t),
+  },
+  {
+    chave: 'supercoelho.lirio', jogo: 'Super Coelho', nome: 'Lírio (moeda)',
+    desc: 'A moeda de Lírio, girando. Vale para as que ficam no ar, as que pulam do bloco e a do placar.',
+    largura: 14, altura: 16, ancora: 'centro',
+    animacoes: [{ id: 'girando', nome: 'Girando', quadros: 6, fps: 7 }],
+    previa: (g, anim, t) => pintarLirio(g, 0, 0, t, 0),
+  },
+  {
+    chave: 'supercoelho.bola-de-fogo', jogo: 'Super Coelho', nome: 'Bola de fogo',
+    desc: 'A bola de fogo que o coelho de fogo joga e que quica no chão.',
+    largura: 12, altura: 12, ancora: 'centro',
+    animacoes: [{ id: 'girando', nome: 'Girando', quadros: 4, fps: 12 }],
+    previa: (g, anim, t) => pintarBolaFogo(g, -4, -4, t),
+  },
+
+  /* Blocos e chão */
+  {
+    chave: 'supercoelho.chao', jogo: 'Super Coelho', nome: 'Chão',
+    desc: 'O bloco de chão de 16 x 16, de cada tema ("com grama" é o de cima, que encosta no ar). Os quadros são variações que o jogo espalha pelo chão (não anima). Sem o sprite de um tema, ele continua com o desenho de sempre.',
+    largura: 16, altura: 16, ancora: 'centro',
+    animacoes: [
+      { id: 'campo-topo', nome: 'Campos e Copas, com grama', quadros: 4, fps: 2 },
+      { id: 'campo', nome: 'Campos e Copas, terra', quadros: 4, fps: 2 },
+      { id: 'caverna-topo', nome: 'Tocas, com musgo', quadros: 4, fps: 2 },
+      { id: 'caverna', nome: 'Tocas, pedra', quadros: 4, fps: 2 },
+      { id: 'castelo', nome: 'Castelo', quadros: 4, fps: 2 },
+    ],
+    previa: bloco((g, anim, t) => pintarChao(g, temaDe(anim), anim.endsWith('-topo'), false, Math.floor(t * 2) % 4)),
+  },
+  {
+    chave: 'supercoelho.tijolo', jogo: 'Super Coelho', nome: 'Tijolo',
+    desc: `O tijolo que o coelho grande quebra. ${DICA_BLOCO}`,
+    largura: 16, altura: 16, ancora: 'centro', animacoes: ANIMS_CAMPO_TOCAS,
+    previa: bloco((g, anim) => pintarTijolo(g, anim)),
+  },
+  {
+    chave: 'supercoelho.bloco-pergunta', jogo: 'Super Coelho', nome: 'Bloco "?"',
+    desc: 'O bloco de pergunta, com Lírio ou poder dentro. O mesmo em todas as fases.',
+    largura: 16, altura: 16, ancora: 'centro',
+    animacoes: [{ id: 'brilhando', nome: 'Brilhando', quadros: 6, fps: 2 }],
+    previa: (g, anim, t) => desenharPergunta(g, -8, -8, 0, t),
+  },
+  {
+    chave: 'supercoelho.bloco-usado', jogo: 'Super Coelho', nome: 'Bloco usado',
+    desc: `O bloco vazio, depois de dar o que tinha dentro (e o do meio das barras de fogo). ${DICA_BLOCO}`,
+    largura: 16, altura: 16, ancora: 'centro', animacoes: ANIMS_TEMAS,
+    previa: bloco((g, anim) => pintarUsado(g, anim)),
+  },
+  {
+    chave: 'supercoelho.pedra', jogo: 'Super Coelho', nome: 'Pedra das escadas',
+    desc: `O bloco duro das escadas e do pé do mastro. ${DICA_BLOCO}`,
+    largura: 16, altura: 16, ancora: 'centro', animacoes: ANIMS_CAMPO_TOCAS,
+    previa: bloco((g, anim) => pintarPedra(g, anim)),
+  },
+  {
+    chave: 'supercoelho.ponte', jogo: 'Super Coelho', nome: 'Ponte do castelo',
+    desc: 'Um pedaço da ponte sobre a lava, onde fica o Raposo (16 x 16, com a argola embaixo).',
+    largura: 16, altura: 16, ancora: 'centro',
+    animacoes: [{ id: 'parada', nome: 'Parada', quadros: 1, fps: 1 }],
+    previa: bloco(g => pintarPonte(g)),
+  },
+  {
+    chave: 'supercoelho.lava', jogo: 'Super Coelho', nome: 'Lava',
+    desc: 'Um bloco de lava do castelo: a superfície (com as ondas) e o de baixo. Sem o sprite de um deles, ele continua com o desenho de sempre.',
+    largura: 16, altura: 16, ancora: 'centro',
+    animacoes: [
+      { id: 'superficie', nome: 'Superfície', quadros: 8, fps: 4 },
+      { id: 'funda', nome: 'Funda', quadros: 8, fps: 3 },
+    ],
+    previa: bloco((g, anim, t) => pintarLava(g, 0, 0, anim === 'superficie', t)),
+  },
+  {
+    chave: 'supercoelho.bolha-de-lava', jogo: 'Super Coelho', nome: 'Bolha de lava',
+    desc: 'A bolha que pula da lava e volta. Subindo: com a cara para cima (sem o sprite descendo, o jogo vira o de subir).',
+    largura: 18, altura: 22, ancora: 'centro',
+    animacoes: [
+      { id: 'subindo', nome: 'Subindo', quadros: 1, fps: 8 },
+      { id: 'descendo', nome: 'Descendo', quadros: 1, fps: 8 },
+    ],
+    previa: (g, anim, t) => pintarBolha(g, { x: -6, y: -7, sobe: anim === 'subindo' }, t),
+  },
+  {
+    chave: 'supercoelho.barra-de-fogo', jogo: 'Super Coelho', nome: 'Bola da barra de fogo',
+    desc: 'Cada bolinha das barras de fogo que giram no castelo.',
+    largura: 10, altura: 10, ancora: 'centro',
+    animacoes: [{ id: 'queimando', nome: 'Queimando', quadros: 1, fps: 8 }],
+    previa: g => pintarBolinhaBarra(g, 0, 0),
+  },
+  {
+    chave: 'supercoelho.caco', jogo: 'Super Coelho', nome: 'Caco de tijolo',
+    desc: 'Os pedaços que voam quando o coelho grande quebra um tijolo (o jogo gira). Desenhe em cinza claro e marque "pintar com a cor do jogador" para pegar a cor do tijolo da fase.',
+    largura: 6, altura: 6, ancora: 'centro', tingir: true,
+    animacoes: [{ id: 'voando', nome: 'Voando', quadros: 1, fps: 8 }],
+    previa: g => { g.fillStyle = TEMAS.campo.tijolo[0]; g.fillRect(-3, -3, 6, 6); },
+  },
+
+  /* Troncos, copas e plataformas */
+  {
+    chave: 'supercoelho.tronco', jogo: 'Super Coelho', nome: 'Tronco cortado',
+    desc: 'Os troncos que fazem de cano nos Campos e nas Tocas (dois blocos de largura). O topo vai em cima e o meio se repete até o chão.',
+    largura: 32, altura: 16, ancora: 'topo',
+    animacoes: [{ id: 'topo', nome: 'Topo', quadros: 1, fps: 1 }, { id: 'meio', nome: 'Meio', quadros: 1, fps: 1 }],
+    previa: (g, anim) => {
+      if (anim === 'meio') recortar(g, -16, 0, 32, 16, () => pintarTronco(g, { c: -1, topo: -1, base: 2 }));
+      else pintarTronco(g, { c: -1, topo: 0, base: 1 });
+    },
+  },
+  {
+    chave: 'supercoelho.copa', jogo: 'Super Coelho', nome: 'Copa das árvores',
+    desc: 'As folhas das plataformas da fase das Copas, um bloco por vez: a ponta da esquerda, o meio (que se repete) e a ponta da direita. O bloco onde se pisa fica no meio do quadro, com folga em cima e embaixo.',
+    largura: 16, altura: 22, ancora: 'centro',
+    animacoes: [
+      { id: 'esquerda', nome: 'Ponta da esquerda', quadros: 1, fps: 1 },
+      { id: 'meio', nome: 'Meio', quadros: 1, fps: 1 },
+      { id: 'direita', nome: 'Ponta da direita', quadros: 1, fps: 1 },
+    ],
+    previa: (g, anim, t) => copa(anim === 'esquerda' ? 0 : anim === 'direita' ? 2 : 1)(g, anim, t),
+  },
+  {
+    chave: 'supercoelho.copa-tronco', jogo: 'Super Coelho', nome: 'Tronco das copas',
+    desc: 'Um pedaço do tronco embaixo das copas, repetido até o fim da tela (nas copas pequenas, o jogo afina).',
+    largura: 26, altura: 16, ancora: 'topo',
+    animacoes: [{ id: 'parado', nome: 'Parado', quadros: 1, fps: 1 }],
+    previa: g => recortar(g, -13, 0, 26, 16, () => pintarTroncoCopa(g, { c: -2, r: -1.5, len: 4 })),
+  },
+  {
+    chave: 'supercoelho.plataforma', jogo: 'Super Coelho', nome: 'Plataforma que se mexe',
+    desc: 'As tábuas que sobem e descem (ou vão e voltam) nas Copas, com três blocos de largura. As cordas continuam desenhadas pelo jogo.',
+    largura: 48, altura: 8, ancora: 'centro',
+    animacoes: [{ id: 'parada', nome: 'Parada', quadros: 1, fps: 1 }],
+    previa: g => pintarTabua(g, { x: -24, y: -4, w: 48 }),
+  },
+
+  /* Fim da fase e castelo */
+  {
+    chave: 'supercoelho.mastro', jogo: 'Super Coelho', nome: 'Mastro',
+    desc: 'O mastro do fim da fase, com a bolinha dourada em cima (a bandeira é outra peça). Fica em cima do bloco de pedra.',
+    largura: 10, altura: 166, ancora: 'pe',
+    animacoes: [{ id: 'parado', nome: 'Parado', quadros: 1, fps: 1 }],
+    previa: g => deslocado(g, 0, -BASE_MASTRO, () => pintarPoste(g, 0)),
+  },
+  {
+    chave: 'supercoelho.bandeira', jogo: 'Super Coelho', nome: 'Bandeira do mastro',
+    desc: 'A bandeira da Casa Luckham que desce pelo mastro. Fica à esquerda do mastro (o lado direito do quadro encosta nele).',
+    largura: 24, altura: 20, ancora: 'centro',
+    animacoes: [{ id: 'tremulando', nome: 'Tremulando', quadros: 4, fps: 4 }],
+    previa: (g, anim, t) => pintarBandeira(g, 12.5, -8, t),
+  },
+  {
+    chave: 'supercoelho.castelinho', jogo: 'Super Coelho', nome: 'Castelinho do fim da fase',
+    desc: 'O castelinho depois do mastro, onde o coelho entra (a porta no meio, embaixo). A bandeirinha em cima continua desenhada pelo jogo. Sem o sprite de um tema, ele continua com o desenho de sempre.',
+    largura: 80, altura: 136, ancora: 'pe',
+    animacoes: [{ id: 'campo', nome: 'Campos e Copas', quadros: 1, fps: 1 }, { id: 'caverna', nome: 'Tocas', quadros: 1, fps: 1 }],
+    previa: (g, anim) => pintarCastelinho(g, -40, 0, anim),
+  },
+  {
+    chave: 'supercoelho.marco', jogo: 'Super Coelho', nome: 'Marco do meio da fase',
+    desc: 'A bandeirinha do meio da fase: cinza até o coelho passar, dourada depois (quem morre volta dali).',
+    largura: 26, altura: 36, ancora: 'pe',
+    animacoes: [{ id: 'apagado', nome: 'Antes de passar', quadros: 1, fps: 1 }, { id: 'aceso', nome: 'Depois de passar', quadros: 4, fps: 4 }],
+    previa: (g, anim, t) => pintarMarco(g, 0, 0, anim === 'aceso', t),
+  },
+  {
+    chave: 'supercoelho.alavanca', jogo: 'Super Coelho', nome: 'Alavanca do castelo',
+    desc: 'A alavanca atrás do Raposo que derruba a ponte. Parada: inclinada para a esquerda, com um brilho; puxada: para a direita.',
+    largura: 32, altura: 30, ancora: 'pe',
+    animacoes: [{ id: 'parada', nome: 'Parada', quadros: 4, fps: 3 }, { id: 'puxada', nome: 'Puxada', quadros: 1, fps: 1 }],
+    previa: (g, anim, t) => pintarAlavanca(g, 0, 0, anim === 'puxada', t),
+  },
+  {
+    chave: 'supercoelho.princesa', jogo: 'Super Coelho', nome: 'Princesa Cenoura',
+    desc: 'A Princesa Cenoura no fim do castelo, de frente. Feliz: pulando e acenando depois do resgate (os coraçõezinhos continuam por cima).',
+    largura: 30, altura: 44, ancora: 'pe',
+    animacoes: [{ id: 'esperando', nome: 'Esperando', quadros: 1, fps: 2 }, { id: 'feliz', nome: 'Feliz', quadros: 4, fps: 8 }],
+    previa: (g, anim, t) => desenharPrincesa(g, 0, 0, t, anim === 'feliz'),
+  },
+
+  /* Enfeites (não encostam em nada) */
+  {
+    chave: 'supercoelho.arvore', jogo: 'Super Coelho', nome: 'Árvore',
+    desc: 'As árvores do fundo dos Campos, com o pé do tronco no fundo do quadro (o jogo aumenta ou diminui um pouco cada uma).',
+    largura: 56, altura: 44, ancora: 'pe',
+    animacoes: [{ id: 'parada', nome: 'Parada', quadros: 1, fps: 1 }],
+    previa: enfeite({ tp: 'arvore', x: 0, y: 0, tam: TAM_ARVORE }),
+  },
+  {
+    chave: 'supercoelho.arbusto', jogo: 'Super Coelho', nome: 'Arbusto',
+    desc: 'Os arbustos dos Campos, em três tamanhos (todos no quadro do maior).',
+    largura: 52, altura: 14, ancora: 'pe',
+    animacoes: [
+      { id: 'pequeno', nome: 'Pequeno', quadros: 1, fps: 1 },
+      { id: 'medio', nome: 'Médio', quadros: 1, fps: 1 },
+      { id: 'grande', nome: 'Grande', quadros: 1, fps: 1 },
+    ],
+    previa: enfeite(anim => { const tam = { pequeno: 1, medio: 2, grande: 3 }[anim] || 3; return { tp: 'arbusto', x: -tam * 0.5, y: 0, tam }; }),
+  },
+  {
+    chave: 'supercoelho.flores', jogo: 'Super Coelho', nome: 'Flores',
+    desc: 'O tufinho de três flores dos Campos e das Copas. Os quadros são as variações de cor que o jogo espalha (não anima).',
+    largura: 14, altura: 9, ancora: 'pe',
+    animacoes: [{ id: 'paradas', nome: 'Paradas', quadros: 4, fps: 2 }],
+    previa: enfeite((anim, t) => ({ tp: 'flores', x: 0, y: 0, cor: Math.floor(t * 2) % 4 })),
+  },
+  {
+    chave: 'supercoelho.capim', jogo: 'Super Coelho', nome: 'Capim',
+    desc: 'O capinzinho dos Campos, balançando com o vento.',
+    largura: 12, altura: 9, ancora: 'pe',
+    animacoes: [{ id: 'balancando', nome: 'Balançando', quadros: 4, fps: 3 }],
+    previa: enfeite({ tp: 'capim', x: 0, y: 0 }),
+  },
+  {
+    chave: 'supercoelho.cristal', jogo: 'Super Coelho', nome: 'Cristal',
+    desc: 'Os cristais que brilham no chão das Tocas, de três cores.',
+    largura: 24, altura: 16, ancora: 'pe',
+    animacoes: [
+      { id: 'azul', nome: 'Azul', quadros: 4, fps: 3 },
+      { id: 'roxo', nome: 'Roxo', quadros: 4, fps: 3 },
+      { id: 'verde', nome: 'Verde', quadros: 4, fps: 3 },
+    ],
+    previa: enfeite(anim => ({ tp: 'cristal', x: 0, y: 0, cor: Math.max(0, ['azul', 'roxo', 'verde'].indexOf(anim)) })),
+  },
+  {
+    chave: 'supercoelho.cogumelo', jogo: 'Super Coelho', nome: 'Cogumelo',
+    desc: 'O cogumelo azul que brilha no chão das Tocas.',
+    largura: 14, altura: 10, ancora: 'pe',
+    animacoes: [{ id: 'brilhando', nome: 'Brilhando', quadros: 4, fps: 3 }],
+    previa: enfeite({ tp: 'cogumelo', x: 0, y: 0 }),
+  },
+  {
+    chave: 'supercoelho.estalactite', jogo: 'Super Coelho', nome: 'Estalactite',
+    desc: 'A ponta de pedra pendurada no teto das Tocas, com o topo no alto do quadro (o jogo muda o tamanho de cada uma; a gota que pinga continua por cima).',
+    largura: 8, altura: 18, ancora: 'topo',
+    animacoes: [{ id: 'parada', nome: 'Parada', quadros: 1, fps: 1 }],
+    previa: enfeite({ tp: 'estalactite', x: 0, y: 0, tam: TAM_ESTALACTITE }, { semPingo: true }),
+  },
+  {
+    chave: 'supercoelho.cipo', jogo: 'Super Coelho', nome: 'Cipó',
+    desc: 'O cipó pendurado embaixo das copas, com o topo no alto do quadro (o jogo muda o comprimento de cada um).',
+    largura: 10, altura: 40, ancora: 'topo',
+    animacoes: [{ id: 'balancando', nome: 'Balançando', quadros: 4, fps: 2 }],
+    previa: enfeite({ tp: 'cipo', x: 0, y: 0, tam: TAM_CIPO }),
+  },
+  {
+    chave: 'supercoelho.tocha', jogo: 'Super Coelho', nome: 'Tocha',
+    desc: 'A tocha na parede do castelo (o brilho em volta continua desenhado pelo jogo).',
+    largura: 10, altura: 22, ancora: 'pe',
+    animacoes: [{ id: 'acesa', nome: 'Acesa', quadros: 4, fps: 8 }],
+    previa: enfeite({ tp: 'tocha', x: 0, y: -10 }, { semBrilho: true }),
+  },
+  {
+    chave: 'supercoelho.corrente', jogo: 'Super Coelho', nome: 'Corrente',
+    desc: 'Um elo das correntes penduradas no teto do castelo, repetido para baixo. Os quadros se alternam elo por elo (o de frente e o de lado).',
+    largura: 5, altura: 5, ancora: 'topo',
+    animacoes: [{ id: 'parada', nome: 'Parada', quadros: 2, fps: 2 }],
+    previa: (g, anim, t) => {
+      g.strokeStyle = '#5a5450'; g.lineWidth = 1;
+      g.beginPath(); g.ellipse(0, 2.5, Math.floor(t * 2) % 2 ? 0.8 : 1.8, 2.6, 0, 0, Math.PI * 2); g.stroke();
+    },
+  },
+  {
+    chave: 'supercoelho.estandarte', jogo: 'Super Coelho', nome: 'Estandarte',
+    desc: 'O estandarte vermelho do Raposo, pendurado no castelo (também nos do fundo), com a barra no alto do quadro.',
+    largura: 20, altura: 38, ancora: 'topo',
+    animacoes: [{ id: 'parado', nome: 'Parado', quadros: 1, fps: 1 }],
+    previa: g => pintarEstandarte(g, 0, 2, 1),
+  },
+];
+registrarPecas(SPRITES);
 
 // Quem assiste: o mapa vem dos dados da fase mais as mudanças (blocos quebrados, Lírios pegos) que estão na tela.
 const vista = { f: -1, mapa: null, aplicados: [] };

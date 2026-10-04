@@ -4,6 +4,10 @@
 import { h, trocar, botao, modal, post, aviso, num } from './core.js';
 import { som } from './arcade.js';
 import { desenharCoelho, sorte, elipse as el } from './desenho-coelho.js';
+import { registrarPecas, desenharSprite } from './sprites.js';
+
+// Sprite enviado em #/recreacao/sprites para uma peça dos minijogos (false sem sprite: desenha o de sempre).
+const sp = (g, peca, anim, x, y, o) => desenharSprite(g, `clube-mini.${peca}`, anim, x, y, o);
 
 const mudo = () => { try { return localStorage.getItem('arcade-mudo') === '1'; } catch { return false; } };
 function ret(g, x, y, w, hh, cor, r = 0) {
@@ -93,6 +97,76 @@ const PEIXES = {
   bota: { valor: 0, cor: '#5b4a3f', tam: 14, vel: [30, 45], chance: 0.1 },
   aguaviva: { valor: 0, cor: 'rgba(240,160,220,0.75)', tam: 14, vel: [20, 35], chance: 0.1 },
 };
+// A peça de sprite de cada coisa que nada no lago.
+const PECA_PEIXE = { peixe: 'peixe', grande: 'peixe-grande', dourado: 'peixe-dourado', bota: 'bota', aguaviva: 'agua-viva' };
+const ANIM_PEIXE = { bota: 'boiando' };
+
+// p: { tipo, x, y, d (1 = nadando para a direita), fase }.
+function desenharPeixe(g, p, t) {
+  g.save();
+  g.translate(p.x, p.y);
+  g.scale(p.d, 1);
+  if (!sp(g, PECA_PEIXE[p.tipo], ANIM_PEIXE[p.tipo] || 'nadando', 0, 0, { t: t + p.fase })) corpoDoPeixe(g, p.tipo, t, p.fase);
+  g.restore();
+}
+function corpoDoPeixe(g, tipo, t, fase) {
+  const def = PEIXES[tipo];
+  if (tipo === 'aguaviva') {
+    el(g, 0, 0, 14, 11, def.cor);
+    for (let k = 0; k < 4; k++) {
+      g.strokeStyle = 'rgba(240,160,220,0.6)'; g.lineWidth = 2;
+      g.beginPath(); g.moveTo(-9 + k * 6, 6); g.quadraticCurveTo(-11 + k * 6 + Math.sin(t * 4 + k) * 4, 16, -9 + k * 6, 26); g.stroke();
+    }
+  } else if (tipo === 'bota') {
+    ret(g, -10, -12, 12, 18, def.cor, 3);
+    ret(g, -10, 2, 24, 8, def.cor, 3);
+    ret(g, -10, 8, 24, 3, '#2a2018');
+  } else {
+    const r = def.tam;
+    g.fillStyle = def.cor;
+    g.beginPath(); g.moveTo(-r * 0.8, 0); g.lineTo(-r * 1.5, -r * 0.6 + Math.sin(t * 10 + fase) * 2); g.lineTo(-r * 1.5, r * 0.6 + Math.sin(t * 10 + fase) * 2); g.closePath(); g.fill();
+    el(g, 0, 0, r, r * 0.6, def.cor);
+    el(g, r * 0.1, r * 0.15, r * 0.7, r * 0.3, 'rgba(255,255,255,0.18)');
+    el(g, r * 0.55, -r * 0.15, 2, 2, '#1b1403');
+    if (tipo === 'dourado') el(g, -r * 0.2, -r * 0.2, 2, 2, '#fff7c0');
+  }
+}
+// O siri que anda no fundo do lago (x, y: as patas no chão).
+function desenharSiri(g, x, y, d, t) {
+  if (!sp(g, 'siri', 'andando', x, y, { t, dir: d })) corpoDoSiri(g, x, y);
+}
+function corpoDoSiri(g, x, y) {
+  g.save(); g.translate(x, y);
+  el(g, 0, -8, 16, 9, '#d8504a');
+  for (const d of [-1, 1]) { el(g, d * 20, -14, 6, 5, '#d8504a'); g.strokeStyle = '#d8504a'; g.lineWidth = 2; g.beginPath(); g.moveTo(d * 10, -10); g.lineTo(d * 18, -13); g.stroke(); }
+  el(g, -5, -17, 2, 2, '#1b1403'); el(g, 5, -17, 2, 2, '#1b1403');
+  g.restore();
+}
+// O trapiche lá em cima, de onde o coelho pesca (sup: a altura da água).
+function desenharTrapichePesca(g, sup) {
+  if (!sp(g, 'trapiche', 'parado', 130, sup + 22)) corpoDoTrapichePesca(g, sup);
+}
+function corpoDoTrapichePesca(g, sup) {
+  ret(g, 0, sup - 30, 260, 14, '#8a5a32', 2);
+  for (const x of [30, 120, 210]) ret(g, x, sup - 18, 8, 40, '#5b3c22');
+}
+// Uma alga do fundo (x, y: a raiz). k muda a altura e o balanço.
+function desenharAlga(g, x, y, t, k) {
+  if (!sp(g, 'alga', 'balancando', x, y, { t: t + k * 0.4 })) corpoDaAlga(g, x, y, t, k);
+}
+function corpoDaAlga(g, x, y, t, k) {
+  g.strokeStyle = '#2f7a4a'; g.lineWidth = 5; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + Math.sin(t * 1.5 + k) * 12, y - 38, x + Math.sin(t * 1.2 + k) * 6, y - 63 - (k % 3) * 12); g.stroke();
+}
+// O anzol na ponta da linha (x, y: onde a linha acaba), com ou sem a minhoca.
+function desenharAnzol(g, x, y, comIsca) {
+  if (!sp(g, 'anzol', comIsca ? 'com-isca' : 'sem-isca', x - 4, y + 3)) corpoDoAnzol(g, x, y, comIsca);
+}
+function corpoDoAnzol(g, x, y, comIsca) {
+  g.strokeStyle = '#ccd'; g.lineWidth = 2;
+  g.beginPath(); g.arc(x - 4, y, 5, 0, Math.PI); g.stroke();
+  if (comIsca) el(g, x - 4, y + 5, 4, 2.5, '#e07a8a');
+}
 
 export function abrirPescaria({ visual, aoTerminar }) {
   const L = 600;
@@ -195,33 +269,6 @@ export function abrirPescaria({ visual, aoTerminar }) {
         e.bolhas = e.bolhas.filter(b => b.y > SUPERFICIE);
       }
 
-      function desenharPeixe(g, p, t) {
-        const def = PEIXES[p.tipo];
-        g.save();
-        g.translate(p.x, p.y);
-        g.scale(p.d, 1);
-        if (p.tipo === 'aguaviva') {
-          el(g, 0, 0, 14, 11, def.cor);
-          for (let k = 0; k < 4; k++) {
-            g.strokeStyle = 'rgba(240,160,220,0.6)'; g.lineWidth = 2;
-            g.beginPath(); g.moveTo(-9 + k * 6, 6); g.quadraticCurveTo(-11 + k * 6 + Math.sin(t * 4 + k) * 4, 16, -9 + k * 6, 26); g.stroke();
-          }
-        } else if (p.tipo === 'bota') {
-          ret(g, -10, -12, 12, 18, def.cor, 3);
-          ret(g, -10, 2, 24, 8, def.cor, 3);
-          ret(g, -10, 8, 24, 3, '#2a2018');
-        } else {
-          const r = def.tam;
-          g.fillStyle = def.cor;
-          g.beginPath(); g.moveTo(-r * 0.8, 0); g.lineTo(-r * 1.5, -r * 0.6 + Math.sin(t * 10 + p.fase) * 2); g.lineTo(-r * 1.5, r * 0.6 + Math.sin(t * 10 + p.fase) * 2); g.closePath(); g.fill();
-          el(g, 0, 0, r, r * 0.6, def.cor);
-          el(g, r * 0.1, r * 0.15, r * 0.7, r * 0.3, 'rgba(255,255,255,0.18)');
-          el(g, r * 0.55, -r * 0.15, 2, 2, '#1b1403');
-          if (p.tipo === 'dourado') el(g, -r * 0.2, -r * 0.2, 2, 2, '#fff7c0');
-        }
-        g.restore();
-      }
-
       function desenhar(t) {
         const g = api.g;
         // Céu e o trapiche
@@ -229,8 +276,7 @@ export function abrirPescaria({ visual, aoTerminar }) {
         gr.addColorStop(0, '#f7a072'); gr.addColorStop(1, '#ffe2b8');
         g.fillStyle = gr; g.fillRect(0, 0, L, SUPERFICIE);
         el(g, 440, 58, 24, 24, '#fff0c0');
-        ret(g, 0, SUPERFICIE - 30, 260, 14, '#8a5a32', 2);
-        for (const x of [30, 120, 210]) ret(g, x, SUPERFICIE - 18, 8, 40, '#5b3c22');
+        desenharTrapichePesca(g, SUPERFICIE);
         // Água
         gr = g.createLinearGradient(0, SUPERFICIE, 0, A);
         gr.addColorStop(0, '#3d8ab8'); gr.addColorStop(1, '#123d5a');
@@ -244,18 +290,10 @@ export function abrirPescaria({ visual, aoTerminar }) {
         g.restore();
         for (let x = 0; x < L; x += 30) el(g, x + ((t * 20) % 30), SUPERFICIE + 2, 10, 2, 'rgba(255,255,255,0.35)');
         ret(g, 0, FUNDO + 6, L, A - FUNDO - 6, '#c9b07a');
-        for (let k = 0; k < 9; k++) {
-          const x = 30 + k * 68;
-          g.strokeStyle = '#2f7a4a'; g.lineWidth = 5; g.lineCap = 'round';
-          g.beginPath(); g.moveTo(x, FUNDO + 8); g.quadraticCurveTo(x + Math.sin(t * 1.5 + k) * 12, FUNDO - 30, x + Math.sin(t * 1.2 + k) * 6, FUNDO - 55 - (k % 3) * 12); g.stroke();
-        }
+        for (let k = 0; k < 9; k++) desenharAlga(g, 30 + k * 68, FUNDO + 8, t, k);
         for (const b of e.bolhas) { g.strokeStyle = 'rgba(255,255,255,0.4)'; g.lineWidth = 1; g.beginPath(); g.arc(b.x, b.y, 3, 0, Math.PI * 2); g.stroke(); }
         // O siri
-        g.save(); g.translate(e.siri.x, FUNDO);
-        el(g, 0, -8, 16, 9, '#d8504a');
-        for (const d of [-1, 1]) { el(g, d * 20, -14, 6, 5, '#d8504a'); g.strokeStyle = '#d8504a'; g.lineWidth = 2; g.beginPath(); g.moveTo(d * 10, -10); g.lineTo(d * 18, -13); g.stroke(); }
-        el(g, -5, -17, 2, 2, '#1b1403'); el(g, 5, -17, 2, 2, '#1b1403');
-        g.restore();
+        desenharSiri(g, e.siri.x, FUNDO, e.siri.d, t);
         for (const p of e.peixes) desenharPeixe(g, p, t);
         // O coelho pescando no trapiche, a vara e a linha
         g.save(); g.translate(170, SUPERFICIE - 30); g.scale(1.4, 1.4);
@@ -266,9 +304,7 @@ export function abrirPescaria({ visual, aoTerminar }) {
         g.strokeStyle = e.choque > 0 ? '#ffe46b' : 'rgba(255,255,255,0.8)';
         g.lineWidth = 1;
         g.beginPath(); g.moveTo(X_ANZOL, 30); g.lineTo(X_ANZOL, e.y); g.stroke();
-        g.strokeStyle = '#ccd'; g.lineWidth = 2;
-        g.beginPath(); g.arc(X_ANZOL - 4, e.y, 5, 0, Math.PI); g.stroke();
-        if (!e.fisgado) el(g, X_ANZOL - 4, e.y + 5, 4, 2.5, '#e07a8a');
+        desenharAnzol(g, X_ANZOL, e.y, !e.fisgado);
         // Placar
         texto(g, `${Math.ceil(e.tempo)}s`, 30, 22, '#fff', '700 18px "Cinzel", Georgia, serif', 'left');
         texto(g, `Peixes: ${e.pontos}`, L - 20, 22, '#ffe46b', '700 18px "Cinzel", Georgia, serif', 'right');
@@ -298,6 +334,28 @@ const BATIDA = 60 / BPM;
 const BATIDAS = 96;
 const NOTAS_MUSICA = [261.6, 293.7, 329.6, 392.0, 440.0, 523.3];
 const BAIXO = [130.8, 110.0, 87.3, 98.0]; // Dó, Lá menor, Fá, Sol (4 batidas cada)
+// O sprite da seta aponta para a direita; o jogo gira para cada faixa (esquerda, baixo, cima, direita).
+const GIRO_SETA = [Math.PI, Math.PI / 2, -Math.PI / 2, 0];
+
+// Uma pessoa da plateia, em sombra (x, y: os pés).
+function desenharPlateia(g, x, y, t) {
+  if (!sp(g, 'plateia', 'pulando', x, y, { t })) corpoDaPlateia(g, x, y);
+}
+function corpoDaPlateia(g, x, y) {
+  el(g, x, y - 16, 12, 16, 'rgba(0,0,0,0.55)');
+  el(g, x - 4, y - 38, 3, 9, 'rgba(0,0,0,0.55)');
+  el(g, x + 4, y - 38, 3, 9, 'rgba(0,0,0,0.55)');
+}
+// A seta-alvo de cima de cada faixa (apertada fica branca e acesa).
+function desenharAlvo(g, faixa, x, y, apertada) {
+  if (!sp(g, 'alvo', apertada ? 'apertado' : 'normal', x, y, { rot: GIRO_SETA[faixa], cor: apertada ? '#ffffff' : CORES_SETA[faixa] })) {
+    texto(g, SETAS[faixa], x, y, apertada ? '#ffffff' : CORES_SETA[faixa], '700 40px sans-serif');
+  }
+}
+// A seta que vem subindo pela faixa.
+function desenharNota(g, faixa, x, y) {
+  if (!sp(g, 'seta', 'subindo', x, y, { rot: GIRO_SETA[faixa], cor: CORES_SETA[faixa] })) texto(g, SETAS[faixa], x, y, CORES_SETA[faixa], '700 38px sans-serif');
+}
 
 function criarCoreografia(nivel, semente) {
   const n = NIVEIS[nivel];
@@ -473,9 +531,7 @@ export function abrirDanca({ visual, aoTerminar }) {
         // O meu coelho dançando e a plateia
         for (let k = 0; k < 6; k++) {
           const x = 40 + k * 20 + (k > 2 ? 400 : 0);
-          el(g, x, 404 - Math.abs(Math.sin(batida * Math.PI + k)) * 6, 12, 16, 'rgba(0,0,0,0.55)');
-          el(g, x - 4, 382 - Math.abs(Math.sin(batida * Math.PI + k)) * 6, 3, 9, 'rgba(0,0,0,0.55)');
-          el(g, x + 4, 382 - Math.abs(Math.sin(batida * Math.PI + k)) * 6, 3, 9, 'rgba(0,0,0,0.55)');
+          desenharPlateia(g, x, 420 - Math.abs(Math.sin(batida * Math.PI + k)) * 6, t + k * 0.3);
         }
         g.save();
         g.translate(100, 300 - (e?.pulo || 0) * 40);
@@ -489,7 +545,7 @@ export function abrirDanca({ visual, aoTerminar }) {
           const ap = apertadas.has(k);
           g.save();
           g.globalAlpha = ap ? 1 : 0.55;
-          texto(g, SETAS[k], FAIXAS[k], ALVO, ap ? '#ffffff' : CORES_SETA[k], '700 40px sans-serif');
+          desenharAlvo(g, k, FAIXAS[k], ALVO, ap);
           g.restore();
         }
         if (!e) return;
@@ -501,7 +557,7 @@ export function abrirDanca({ visual, aoTerminar }) {
           g.save();
           g.globalAlpha = n.julgada === 'errou' ? 0.25 : 1;
           el(g, FAIXAS[n.faixa], y, 24, 24, 'rgba(0,0,0,0.35)');
-          texto(g, SETAS[n.faixa], FAIXAS[n.faixa], y, CORES_SETA[n.faixa], '700 38px sans-serif');
+          desenharNota(g, n.faixa, FAIXAS[n.faixa], y);
           g.restore();
         }
         texto(g, num(e.pontos), L - 20, 24, '#ffe46b', '700 20px "Cinzel", Georgia, serif', 'right');
@@ -524,3 +580,44 @@ export function abrirDanca({ visual, aoTerminar }) {
     },
   });
 }
+
+/* ─── Sprites (veja sprites.js) ───────────────────── */
+// Cada prévia é o desenho de sempre, sem sprite, com a âncora da peça em (0, 0).
+const mini = (chave, nome, desc, largura, altura, ancora, animacoes, previa, extra = {}) => ({
+  chave: `clube-mini.${chave}`, jogo: 'Club Coelho: minijogos', nome, desc, largura, altura, ancora, animacoes, previa, ...extra,
+});
+const NOME_PEIXE = { peixe: 'Peixe', grande: 'Peixe grande', dourado: 'Peixe dourado', bota: 'Bota velha', aguaviva: 'Água-viva' };
+const DESC_PEIXE = {
+  peixe: 'O peixe comum da Pescaria (vale 1).', grande: 'O peixe grande e lento da Pescaria (vale 2).', dourado: 'O peixe dourado e rápido da Pescaria (vale 3).',
+  bota: 'A bota velha que às vezes vem no anzol (não vale nada).', aguaviva: 'A água-viva que solta o peixe ou come a isca.',
+};
+// Caixa de cada um, centrada no ponto do peixe (o rabo fica para trás).
+const CAIXA_PEIXE = { peixe: [40, 20], grande: [60, 28], dourado: [36, 18], bota: [28, 24], aguaviva: [28, 52] };
+
+export const SPRITES = [
+  ...Object.keys(PEIXES).map(tipo => mini(PECA_PEIXE[tipo], NOME_PEIXE[tipo],
+    `${DESC_PEIXE[tipo]} Olhando para a direita: o jogo vira quando nada para a esquerda.`,
+    ...CAIXA_PEIXE[tipo], 'centro',
+    tipo === 'bota' ? [{ id: 'boiando', nome: 'Boiando', quadros: 1, fps: 1 }] : [{ id: 'nadando', nome: 'Nadando', quadros: 4, fps: 6 }],
+    (g, anim, t) => corpoDoPeixe(g, tipo, t, 0))),
+  mini('siri', 'Siri', 'O siri que anda no fundo do lago e corta a linha. O jogo vira para o lado em que ele anda.',
+    52, 24, 'pe', [{ id: 'andando', nome: 'Andando', quadros: 1, fps: 6 }], g => corpoDoSiri(g, 0, 0)),
+  mini('anzol', 'Anzol', 'O anzol na ponta da linha, com a minhoca (isca) ou já sem ela, quando tem um peixe fisgado.',
+    14, 12, 'centro', [{ id: 'com-isca', nome: 'Com a isca', quadros: 1, fps: 1 }, { id: 'sem-isca', nome: 'Sem a isca', quadros: 1, fps: 1 }],
+    (g, anim) => corpoDoAnzol(g, 4, -3, anim !== 'sem-isca')),
+  mini('trapiche', 'Trapiche da Pescaria', 'O cais de madeira lá em cima, de onde o coelho pesca.',
+    260, 52, 'pe', [{ id: 'parado', nome: 'Parado', quadros: 1, fps: 1 }], g => { g.save(); g.translate(-130, 0); corpoDoTrapichePesca(g, -22); g.restore(); }),
+  mini('alga', 'Alga', 'As algas que balançam no fundo do lago (a âncora é a raiz).',
+    30, 92, 'pe', [{ id: 'balancando', nome: 'Balançando', quadros: 4, fps: 4 }], (g, anim, t) => corpoDaAlga(g, 0, 0, t, 2)),
+  mini('seta', 'Seta da Dança', 'As setas que sobem pelas faixas da Dança da Toca. Desenhe apontando para a direita: o jogo gira para cada faixa. Marque "pintar com a cor" e desenhe em tons claros para cada faixa ter a sua cor.',
+    44, 44, 'centro', [{ id: 'subindo', nome: 'Subindo', quadros: 1, fps: 1 }], g => texto(g, '→', 0, 0, CORES_SETA[3], '700 38px sans-serif'), { tingir: true }),
+  mini('alvo', 'Seta-alvo da Dança', 'As setas paradas lá em cima, onde é a hora de apertar (ficam meio apagadas e acendem quando apertadas). Apontando para a direita; com "pintar com a cor", cada faixa tem a sua cor e a apertada fica branca.',
+    44, 44, 'centro', [{ id: 'normal', nome: 'Esperando', quadros: 1, fps: 1 }, { id: 'apertado', nome: 'Apertada', quadros: 1, fps: 1 }],
+    (g, anim) => texto(g, '→', 0, 0, anim === 'apertado' ? '#ffffff' : CORES_SETA[3], '700 40px sans-serif'), { tingir: true }),
+  mini('plateia', 'Plateia', 'As sombras da plateia que pulam no ritmo da Dança da Toca (o pulo o jogo faz).',
+    24, 48, 'pe', [{ id: 'pulando', nome: 'Na plateia', quadros: 1, fps: 4 }], g => corpoDaPlateia(g, 0, 0)),
+];
+registrarPecas(SPRITES);
+
+// Para os testes: os desenhos que não dependem da janela do minijogo.
+export const _desenhos = { desenharPeixe, desenharSiri, desenharTrapichePesca, desenharAlga, desenharAnzol, desenharPlateia, desenharAlvo, desenharNota };

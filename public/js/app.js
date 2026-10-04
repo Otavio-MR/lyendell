@@ -22,6 +22,8 @@ import { juramento } from './telas/juramento.js';
 import { telaArcade } from './arcade.js';
 import { clube } from './telas/clube.js';
 import { ARCADE } from './jogos/lista.js';
+import { telaSprites } from './telas/sprites.js';
+import { ligarSpritesAoVivo } from './sprites.js';
 
 const app = document.getElementById('app');
 
@@ -84,6 +86,7 @@ const ROTAS = [
   [/^\/recreacao\/quebra-cabeca$/, () => quebraCabeca()],
   [/^\/recreacao\/pac-coelho$/, () => pacCoelho()],
   [/^\/recreacao\/perguntas$/, () => perguntasQuiz()],
+  [/^\/recreacao\/sprites$/, () => telaSprites()],
   [/^\/recreacao\/sala\/([0-9a-f]+)$/, id => sala(id)],
   [/^\/recreacao\/assistir\/(\d+)$/, id => assistir(id)],
   [/^\/comunidade$/, () => comunidade()],
@@ -213,6 +216,7 @@ function montar() {
     radioDoCanto()));
 
   if (pode('recreacao.usar')) ligar();
+  ligarSpritesAoVivo(ouvir); // alguém trocou um sprite: todos recarregam
   carregarTrilha();
   rotear();
 }

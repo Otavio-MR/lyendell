@@ -4,9 +4,20 @@
 // e os pontos de clique (portas, balcão, pescaria...). Não usa nada da página: dá para testar no Node.
 
 import { desenharCoelho, sorte } from './desenho-coelho.js';
+import { registrarPecas, desenharSprite, temSprite } from './sprites.js';
 
 export const W = 1000;
 export const H = 600;
+
+// Sprite enviado em #/recreacao/sprites para uma peça do clube (devolve false sem sprite: desenha o de sempre).
+const sp = (g, peca, anim, x, y, o) => desenharSprite(g, `clube.${peca}`, anim, x, y, o);
+// Para as prévias: o desenho de sempre, que usa as coordenadas da sala, com a âncora da peça em (0, 0).
+function naOrigem(g, x, y, f) {
+  g.save();
+  g.translate(-x, -y);
+  f();
+  g.restore();
+}
 
 /* ─── Utilidades de desenho ─── */
 
@@ -56,6 +67,9 @@ const sombraNoChao = (g, x, y, rx, ry = rx * 0.28) => el(g, x, y, rx, ry, 'rgba(
 
 function arvoreRedonda(g, x, y, r, cor = '#4f8a3c') {
   sombraNoChao(g, x, y + 2, r * 0.8);
+  if (!sp(g, 'arvore', 'parado', x, y, { quadro: 0, escala: r / 32 })) copaRedonda(g, x, y, r, cor);
+}
+function copaRedonda(g, x, y, r, cor) {
   ret(g, x - r * 0.12, y - r * 0.7, r * 0.24, r * 0.72, '#6b4a2b');
   el(g, x, y - r * 1.05, r, r * 0.9, cor);
   el(g, x - r * 0.35, y - r * 1.3, r * 0.55, r * 0.5, 'rgba(255,255,255,0.12)');
@@ -72,14 +86,26 @@ function placa(g, x, y, w, h, textoPlaca, { fundo = '#8a6a44', borda = '#5b4228'
   g.stroke();
   texto(g, textoPlaca, x, y + 1, { cor, fonte });
 }
-// Um NPC: coelho parado com roupa (balança um pouquinho).
-const npc = (g, x, y, pelo, roupa, t, dir = 1, escala = 1.25) => {
+// Os NPCs: coelhos parados com roupa (balançam um pouquinho). vel: o quanto o tempo corre para ele.
+const NPCS = {
+  'npc-cozinheiro': { nome: 'Cozinheiro do Café', sala: 'no balcão do Café da Cenoura', pelo: '#c99a6b', roupa: { cabeca: 'cozinheiro', corpo: 'avental' }, escala: 1.25 },
+  'npc-felpuda': { nome: 'Dona Felpuda', sala: 'no balcão do Armarinho', pelo: '#f7f3ea', roupa: { cabeca: 'laco', rosto: 'oculos', corpo: 'avental' }, escala: 1.25 },
+  'npc-dj': { nome: 'DJ do Salão', sala: 'na cabine do Salão de Dança', pelo: '#5b4a3f', roupa: { cabeca: 'fones', rosto: 'escuros' }, escala: 1.15, vel: 2 },
+  'npc-pescador': { nome: 'Velho pescador', sala: 'na ponta do trapiche do Lago Cintilante', pelo: '#9aa3ad', roupa: { cabeca: 'chapeu', rosto: 'bigode', mao: 'vara' }, escala: 1.05 },
+};
+function npc(g, id, x, y, t, dir = 1) {
+  const n = NPCS[id];
+  if (temSprite(`clube.${id}`)) {
+    el(g, x, y + n.escala, 15 * n.escala, 4.5 * n.escala, 'rgba(0,0,0,0.28)');
+    sp(g, id, 'parado', x, y, { t, dir });
+    return;
+  }
   g.save();
   g.translate(x, y);
-  g.scale(escala, escala);
-  desenharCoelho(g, 0, 0, { pelo, roupa, dir, t });
+  g.scale(n.escala, n.escala);
+  desenharCoelho(g, 0, 0, { pelo: n.pelo, roupa: n.roupa, dir, t: t * (n.vel || 1) });
   g.restore();
-};
+}
 
 /* ─── Chãos ─── */
 
@@ -160,6 +186,12 @@ function fundoPraca(g) {
     g.closePath();
     g.fill();
   }
+  if (!sp(g, 'fachada-cafe', 'parado', 210, 335, { quadro: 0 })) fachadaCafe(g);
+  if (!sp(g, 'fachada-armarinho', 'parado', 500, 335, { quadro: 0 })) fachadaArmarinho(g);
+  if (!sp(g, 'fachada-salao', 'parado', 790, 335, { quadro: 0 })) fachadaSalao(g);
+}
+// As fachadas da praça (nas coordenadas da sala).
+function fachadaCafe(g) {
   // Café da Cenoura
   ret(g, 100, 140, 220, 195, '#b5835a');
   for (let x = 108; x < 320; x += 14) { g.fillStyle = 'rgba(70,40,20,0.18)'; g.fillRect(x, 140, 2, 195); }
@@ -176,6 +208,8 @@ function fundoPraca(g) {
   ret(g, 188, 258, 44, 77, '#7a5434', 22);
   el(g, 225, 300, 3, 3, '#e8c24a');
   placa(g, 210, 182, 150, 34, 'Café da Cenoura');
+}
+function fachadaArmarinho(g) {
   // Armarinho (loja)
   ret(g, 380, 130, 240, 205, '#e9dcc3');
   for (let y = 140; y < 335; y += 20) { g.fillStyle = 'rgba(150,130,100,0.18)'; g.fillRect(380, y, 240, 2); }
@@ -192,6 +226,8 @@ function fundoPraca(g) {
   ret(g, 472, 254, 56, 81, '#6a4a8a', 26);
   el(g, 520, 300, 3, 3, '#e8c24a');
   placa(g, 500, 182, 170, 34, 'Armarinho', { fundo: '#6a4a8a', borda: '#3e2a5a' });
+}
+function fachadaSalao(g) {
   // Salão de Dança
   ret(g, 680, 150, 220, 185, '#3b2a5a');
   for (let x = 690; x < 900; x += 24) { g.fillStyle = 'rgba(255,255,255,0.04)'; g.fillRect(x, 150, 12, 185); }
@@ -223,15 +259,21 @@ function animarPraca(g, t) {
   for (let k = 0; k < 3; k++) {
     const bx = 150 + ((t * 30 + k * 300) % 760);
     const by = 380 + Math.sin(t * 1.3 + k * 2) * 40 + k * 30;
-    const a = Math.abs(Math.sin(t * 14 + k)) * 5 + 1;
-    el(g, bx - 3, by, a, 4, ['#f4dd80', '#f0a0c0', '#a8d8f0'][k]);
-    el(g, bx + 3, by, a, 4, ['#f4dd80', '#f0a0c0', '#a8d8f0'][k]);
+    const cor = ['#f4dd80', '#f0a0c0', '#a8d8f0'][k];
+    if (!sp(g, 'borboleta', 'voando', bx, by, { t: t + k * 0.3, cor })) borboleta(g, bx, by, Math.abs(Math.sin(t * 14 + k)) * 5 + 1, cor);
   }
+}
+function borboleta(g, bx, by, a, cor) {
+  el(g, bx - 3, by, a, 4, cor);
+  el(g, bx + 3, by, a, 4, cor);
 }
 function fonte(g, t) {
   const x = 500;
   const y = 470;
   sombraNoChao(g, x, y + 4, 110, 26);
+  if (!sp(g, 'fonte', 'agua', x, y + 24, { t })) fonteCorpo(g, x, y, t);
+}
+function fonteCorpo(g, x, y, t, semSprite = false) {
   el(g, x, y - 6, 104, 30, '#9a917f');
   el(g, x, y - 12, 96, 26, '#b8ae98');
   el(g, x, y - 14, 86, 21, '#4f9ac4');
@@ -246,9 +288,7 @@ function fonte(g, t) {
   ret(g, x - 10, y - 70, 20, 58, '#b8ae98', 4);
   el(g, x, y - 72, 26, 8, '#9a917f');
   // A estátua do coelho
-  g.save(); g.translate(x - 4, y - 74); g.scale(0.9, 0.9);
-  desenharCoelho(g, 0, 0, { pelo: '#cfc6b2', dir: 1, t: 0 });
-  g.restore();
+  if (semSprite || !sp(g, 'estatua', 'parado', x - 4, y - 74, { t })) estatua(g, x - 4, y - 74, semSprite);
   // Jatos de água
   for (let k = 0; k < 14; k++) {
     const f = (t * 1.2 + k / 14) % 1;
@@ -258,21 +298,36 @@ function fonte(g, t) {
     el(g, x + dx, y - 100 + dy + f * 86, 2.4, 2.4, `rgba(190,230,255,${0.9 - f * 0.5})`);
   }
 }
+function estatua(g, x, y, semSprite = false) {
+  g.save(); g.translate(x, y); g.scale(0.9, 0.9);
+  desenharCoelho(g, 0, 0, { pelo: '#cfc6b2', dir: 1, t: 0, semSprite });
+  g.restore();
+}
 function banco(g, x, y) {
   sombraNoChao(g, x, y + 2, 50);
+  if (!sp(g, 'banco', 'parado', x, y)) bancoCorpo(g, x, y);
+}
+function bancoCorpo(g, x, y) {
   ret(g, x - 46, y - 30, 92, 8, '#8a5a32', 3);
   ret(g, x - 46, y - 46, 92, 7, '#9c6a3c', 3);
   for (const dx of [-38, 34]) ret(g, x + dx, y - 30, 5, 30, '#3a2a20');
 }
 function poste(g, x, y, t) {
   sombraNoChao(g, x, y + 2, 16);
+  if (!sp(g, 'poste', 'aceso', x, y, { t })) posteCorpo(g, x, y);
+  brilho(g, x, y - 128, 50, 'rgba(255,230,150,A)', 0.25 + Math.sin(t * 2 + x) * 0.03);
+}
+function posteCorpo(g, x, y) {
   ret(g, x - 3, y - 120, 6, 120, '#2f2f38');
   ret(g, x - 12, y - 140, 24, 24, '#2f2f38', 4);
   ret(g, x - 9, y - 137, 18, 18, '#ffe9a8', 3);
-  brilho(g, x, y - 128, 50, 'rgba(255,230,150,A)', 0.25 + Math.sin(t * 2 + x) * 0.03);
 }
 function setaPlaca(g, x, y, textoPlaca, dir) {
   sombraNoChao(g, x, y + 2, 18);
+  if (!sp(g, 'placa-seta', 'parado', x, y, { dir })) setaCorpo(g, x, y, dir);
+  texto(g, textoPlaca, x + dir * 6, y - 69, { fonte: '700 14px "Cinzel", Georgia, serif' });
+}
+function setaCorpo(g, x, y, dir) {
   ret(g, x - 3, y - 80, 6, 80, '#6b4a2b');
   const w = 104;
   g.fillStyle = '#8a6a44';
@@ -281,9 +336,11 @@ function setaPlaca(g, x, y, textoPlaca, dir) {
   if (dir < 0) { g.moveTo(x0 - 14, y - 70); g.lineTo(x0, y - 86); g.lineTo(x0 + w, y - 86); g.lineTo(x0 + w, y - 54); g.lineTo(x0, y - 54); } else { g.moveTo(x0 + w + 14, y - 70); g.lineTo(x0 + w, y - 86); g.lineTo(x0, y - 86); g.lineTo(x0, y - 54); g.lineTo(x0 + w, y - 54); }
   g.closePath();
   g.fill();
-  texto(g, textoPlaca, x + dir * 6, y - 69, { fonte: '700 14px "Cinzel", Georgia, serif' });
 }
 function canteiro(g, x, y) {
+  if (!sp(g, 'canteiro', 'parado', x, y)) canteiroCorpo(g, x, y);
+}
+function canteiroCorpo(g, x, y) {
   ret(g, x - 40, y - 18, 80, 18, '#8a6a44', 4);
   for (let k = 0; k < 9; k++) {
     el(g, x - 32 + k * 8, y - 24 - (k % 3) * 3, 4, 4, ['#f0a0c0', '#f4dd80', '#e05a5a'][k % 3]);
@@ -301,6 +358,14 @@ function fundoCafe(g) {
   g.fillRect(0, 280, W, 80);
   g.fillStyle = '#5b3a20';
   g.fillRect(0, 276, W, 6);
+  if (!sp(g, 'janela-cafe', 'parado', 210, 240, { quadro: 0 })) janelaCafe(g);
+  if (!sp(g, 'cardapio', 'parado', 480, 233, { quadro: 0 })) cardapio(g);
+  if (!sp(g, 'prateleira-potes', 'parado', 780, 130, { quadro: 0 })) prateleiraPotes(g);
+  chaoTabuas(g, 360, H);
+  ret(g, 430, 568, 140, 30, '#7a2f2f', 6);
+  texto(g, 'Saída', 500, 584, { fonte: '700 13px "Cinzel", Georgia, serif', cor: '#f4dd80' });
+}
+function janelaCafe(g) {
   // Janela com a praça lá fora
   ret(g, 110, 80, 200, 150, '#5b3c22', 6);
   g.fillStyle = grad(g, 0, 88, 0, 222, [[0, '#8fd3f4'], [1, '#e0f4ff']]);
@@ -310,11 +375,15 @@ function fundoCafe(g) {
   g.fillStyle = '#5b3c22'; g.fillRect(208, 88, 4, 134); g.fillRect(118, 153, 184, 4);
   forma(g, '#c0392b', [104, 74, 150, 74, 128, 240, 100, 240]);
   forma(g, '#c0392b', [316, 74, 270, 74, 292, 240, 320, 240]);
+}
+function cardapio(g) {
   // Cardápio
   ret(g, 380, 70, 200, 160, '#2b3a2e', 6);
   g.strokeStyle = '#7a5434'; g.lineWidth = 6; g.strokeRect(380, 70, 200, 160);
   texto(g, 'Cardápio', 480, 98, { cor: '#f4e9c8', fonte: '700 20px "Cinzel", Georgia, serif' });
   for (const [k, l] of ['Café de cenoura', 'Bolo de cenoura', 'Chá de trevo', 'Leite com mel'].entries()) texto(g, l, 480, 132 + k * 24, { cor: '#e8e2d0', fonte: '15px "EB Garamond", Georgia, serif' });
+}
+function prateleiraPotes(g) {
   // Prateleira com potes
   ret(g, 630, 120, 300, 10, '#5b3c22');
   for (let k = 0; k < 8; k++) {
@@ -323,20 +392,23 @@ function fundoCafe(g) {
     ret(g, x + 3, 100, 18, 18, ['#e07a2a', '#d8b13a', '#7fb069', '#c97a3a'][k % 4], 3);
     ret(g, x - 1, 82, 26, 6, '#8a5a3a', 2);
   }
-  chaoTabuas(g, 360, H);
-  ret(g, 430, 568, 140, 30, '#7a2f2f', 6);
-  texto(g, 'Saída', 500, 584, { fonte: '700 13px "Cinzel", Georgia, serif', cor: '#f4dd80' });
 }
 function animarCafe(g, t) {
   for (const x of [250, 500, 750]) {
-    g.strokeStyle = '#3a2a1a'; g.lineWidth = 2;
-    g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 40); g.stroke();
-    forma(g, '#d8b13a', [x - 22, 58, x + 22, 58, x + 12, 38, x - 12, 38]);
+    if (!sp(g, 'luminaria-cafe', 'acesa', x, 0, { t })) luminariaCafe(g, x);
     brilho(g, x, 70, 120, 'rgba(255,214,140,A)', 0.22 + Math.sin(t * 3 + x) * 0.02);
   }
 }
+function luminariaCafe(g, x) {
+  g.strokeStyle = '#3a2a1a'; g.lineWidth = 2;
+  g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 40); g.stroke();
+  forma(g, '#d8b13a', [x - 22, 58, x + 22, 58, x + 12, 38, x - 12, 38]);
+}
 function balcaoCafe(g, t) {
-  npc(g, 780, 296, '#c99a6b', { cabeca: 'cozinheiro', corpo: 'avental' }, t, -1);
+  npc(g, 'npc-cozinheiro', 780, 296, t, -1);
+  if (!sp(g, 'balcao-cafe', 'vapor', 770, 378, { t })) balcaoCafeCorpo(g, t);
+}
+function balcaoCafeCorpo(g, t) {
   ret(g, 600, 300, 340, 26, '#c9a06a', 4);
   ret(g, 606, 326, 328, 52, '#5b3c22', 2);
   for (let x = 620; x < 930; x += 50) ret(g, x, 334, 36, 36, '#6b4a2b', 3);
@@ -355,6 +427,9 @@ function balcaoCafe(g, t) {
 }
 function mesaCafe(g, x, y) {
   sombraNoChao(g, x, y + 2, 46);
+  if (!sp(g, 'mesa-cafe', 'parado', x, y)) mesaCafeCorpo(g, x, y);
+}
+function mesaCafeCorpo(g, x, y) {
   for (const dx of [-48, 48]) {
     ret(g, x + dx - 14, y - 26, 28, 8, '#7a4a2a', 3);
     ret(g, x + dx - 12, y - 54, 24, 30, '#8a5a32', 4);
@@ -374,6 +449,14 @@ function fundoLoja(g) {
   for (let x = 0; x < W; x += 36) { g.fillStyle = 'rgba(200,170,120,0.18)'; g.fillRect(x, 0, 14, 380); }
   g.fillStyle = '#c9a06a'; g.fillRect(0, 0, W, 16);
   g.fillStyle = '#a8814e'; g.fillRect(0, 300, W, 80);
+  if (!sp(g, 'prateleira-roupas', 'parado', 170, 280, { quadro: 0 })) prateleiraRoupas(g);
+  if (!sp(g, 'arara', 'parado', 830, 300, { quadro: 0 })) arara(g);
+  chaoXadrez(g, 380, H, '#d9c7a3', '#c4ae86');
+  ret(g, 430, 568, 140, 30, '#6a4a8a', 6);
+  texto(g, 'Saída', 500, 584, { fonte: '700 13px "Cinzel", Georgia, serif', cor: '#f4dd80' });
+  if (!sp(g, 'placa-armarinho', 'parado', 500, 60, { quadro: 0 })) placaArmarinho(g);
+}
+function prateleiraRoupas(g) {
   // Prateleiras com roupas dobradas
   for (const y of [110, 190, 270]) {
     ret(g, 40, y, 260, 10, '#7a5434');
@@ -384,6 +467,8 @@ function fundoLoja(g) {
       g.fillStyle = 'rgba(0,0,0,0.12)'; g.fillRect(52 + k * 41, y - 15, 34, 2);
     }
   }
+}
+function arara(g) {
   // Arara com roupas penduradas
   ret(g, 700, 90, 260, 6, '#5b3c22');
   for (const x of [705, 952]) ret(g, x, 90, 5, 210, '#5b3c22');
@@ -393,13 +478,15 @@ function fundoLoja(g) {
     g.beginPath(); g.moveTo(x, 96); g.lineTo(x, 104); g.stroke();
     forma(g, ['#c0392b', '#2f6b34', '#7b5ab8', '#1f1f26', '#e48ab8', '#a8b0ba'][k % 6], [x - 11, 104, x + 11, 104, x + 13, 170, x - 13, 170]);
   }
-  chaoXadrez(g, 380, H, '#d9c7a3', '#c4ae86');
-  ret(g, 430, 568, 140, 30, '#6a4a8a', 6);
-  texto(g, 'Saída', 500, 584, { fonte: '700 13px "Cinzel", Georgia, serif', cor: '#f4dd80' });
+}
+function placaArmarinho(g) {
   placa(g, 500, 60, 360, 46, 'Armarinho da Dona Felpuda', { fundo: '#6a4a8a', borda: '#3e2a5a', fonte: '700 19px "Cinzel", Georgia, serif' });
 }
 function balcaoLoja(g, t) {
-  npc(g, 500, 300, '#f7f3ea', { cabeca: 'laco', rosto: 'oculos', corpo: 'avental' }, t, 1);
+  npc(g, 'npc-felpuda', 500, 300, t, 1);
+  if (!sp(g, 'balcao-loja', 'brilhando', 500, 384, { t })) balcaoLojaCorpo(g, t);
+}
+function balcaoLojaCorpo(g, t) {
   ret(g, 370, 310, 260, 22, '#c9a06a', 4);
   ret(g, 376, 332, 248, 52, '#7a5434', 2);
   ret(g, 400, 342, 200, 32, '#6a4a8a', 4);
@@ -413,6 +500,9 @@ function balcaoLoja(g, t) {
 }
 function espelho(g, x, y, t) {
   sombraNoChao(g, x, y + 2, 34);
+  if (!sp(g, 'espelho', 'brilhando', x, y, { t })) espelhoCorpo(g, x, y, t);
+}
+function espelhoCorpo(g, x, y, t) {
   ret(g, x - 6, y - 20, 12, 20, '#7a5434');
   el(g, x, y - 90, 36, 70, '#c9a06a');
   el(g, x, y - 90, 30, 63, grad(g, x - 30, y - 150, x + 30, y - 30, [[0, '#dff0fa'], [0.5, '#a9cde0'], [1, '#e8f6ff']]));
@@ -421,14 +511,21 @@ function espelho(g, x, y, t) {
   ret(g, x - 18, y - 140, 8, 60, '#ffffff', 4);
   g.restore();
 }
-function manequim(g, x, y, roupa, t) {
+// Os dois manequins da vitrine, cada um com a sua roupa.
+const MANEQUINS = {
+  'manequim-smoking': { nome: 'Manequim de smoking', roupa: { cabeca: 'cartola', corpo: 'smoking', mao: 'bandeira' } },
+  'manequim-vestido': { nome: 'Manequim de vestido', roupa: { cabeca: 'tiara', corpo: 'vestido', costas: 'asas' } },
+};
+function manequim(g, x, y, id, t) {
   sombraNoChao(g, x, y + 2, 22);
+  if (!sp(g, id, 'parado', x, y + 2, { t })) manequimCorpo(g, x, y, MANEQUINS[id].roupa);
+}
+function manequimCorpo(g, x, y, roupa, semSprite = false) {
   ret(g, x - 18, y - 4, 36, 6, '#5b3c22', 3);
   ret(g, x - 2, y - 14, 4, 12, '#5b3c22');
   g.save(); g.translate(x, y - 10); g.scale(1.25, 1.25);
-  desenharCoelho(g, 0, 0, { pelo: '#e4dccb', roupa, t: 0 });
+  desenharCoelho(g, 0, 0, { pelo: '#e4dccb', roupa, t: 0, semSprite });
   g.restore();
-  void t;
 }
 
 /* ─── Salão de Dança ─── */
@@ -440,13 +537,16 @@ function fundoDanca(g) {
   for (let k = 0; k < 60; k++) el(g, rnd() * W, rnd() * 260, 1.2, 1.2, 'rgba(255,255,255,0.5)');
   g.fillStyle = '#140c22';
   g.fillRect(0, 300, W, 40);
+  if (!sp(g, 'cabine-dj', 'parado', 500, 330, { quadro: 0 })) cabineDj(g);
+  g.fillStyle = '#0a0612';
+  g.fillRect(0, 336, W, 6);
+}
+function cabineDj(g) {
   // Cabine do DJ
   ret(g, 390, 240, 220, 90, '#2a1d42', 8);
   ret(g, 398, 248, 204, 18, '#3b2a5a', 4);
   for (const x of [440, 560]) { el(g, x, 257, 26, 6, '#111'); el(g, x, 257, 6, 2, '#444'); }
   texto(g, 'DJ', 500, 300, { cor: '#6be0ff', fonte: '700 22px "Cinzel", Georgia, serif' });
-  g.fillStyle = '#0a0612';
-  g.fillRect(0, 336, W, 6);
 }
 function animarDanca(g, t) {
   // Pista de dança que muda de cor
@@ -479,14 +579,20 @@ function animarDanca(g, t) {
   g.restore();
   g.strokeStyle = '#555'; g.lineWidth = 2;
   g.beginPath(); g.moveTo(500, 0); g.lineTo(500, 34); g.stroke();
-  el(g, 500, 60, 28, 28, '#c8ccd4');
+  if (!sp(g, 'globo', 'girando', 500, 60, { t })) globo(g, 500, 60, t);
+}
+function globo(g, x, y, t) {
+  el(g, x, y, 28, 28, '#c8ccd4');
   for (let k = 0; k < 14; k++) {
     const a = (k / 14) * Math.PI * 2 + t;
-    el(g, 500 + Math.cos(a) * 16, 60 + Math.sin(a) * 16, 3, 3, (k + Math.floor(t * 6)) % 3 ? '#eef2f8' : '#ffffff');
+    el(g, x + Math.cos(a) * 16, y + Math.sin(a) * 16, 3, 3, (k + Math.floor(t * 6)) % 3 ? '#eef2f8' : '#ffffff');
   }
 }
 function caixaDeSom(g, x, y, t) {
   sombraNoChao(g, x, y + 2, 60, 12);
+  if (!sp(g, 'caixa-som', 'tocando', x, y, { t })) caixaDeSomCorpo(g, x, y, t);
+}
+function caixaDeSomCorpo(g, x, y, t) {
   ret(g, x - 55, y - 150, 110, 150, '#1b1430', 8);
   const pulso = 1 + Math.max(0, Math.sin(t * 8.4)) * 0.12;
   for (const [cy, r] of [[-110, 22], [-48, 34]]) {
@@ -496,6 +602,9 @@ function caixaDeSom(g, x, y, t) {
 }
 function maquinaDanca(g, x, y, t) {
   sombraNoChao(g, x, y + 2, 46, 12);
+  if (!sp(g, 'maquina-danca', 'piscando', x, y, { t })) maquinaDancaCorpo(g, x, y, t);
+}
+function maquinaDancaCorpo(g, x, y, t) {
   ret(g, x - 42, y - 140, 84, 140, '#3b1d5a', 8);
   ret(g, x - 34, y - 128, 68, 50, '#0e0a1a', 4);
   const setas = ['←', '↓', '↑', '→'];
@@ -505,7 +614,7 @@ function maquinaDanca(g, x, y, t) {
   brilho(g, x, y - 100, 70, 'rgba(255,120,220,A)', 0.18 + Math.sin(t * 4) * 0.06);
 }
 function dj(g, t) {
-  npc(g, 500, 252, '#5b4a3f', { cabeca: 'fones', rosto: 'escuros' }, t * 2, 1, 1.15);
+  npc(g, 'npc-dj', 500, 252, t, 1);
 }
 
 /* ─── Lago Cintilante ─── */
@@ -532,11 +641,7 @@ function fundoLago(g) {
   // Caminho de volta para a praça
   g.fillStyle = '#c4ad84';
   g.beginPath(); g.moveTo(W, 450); g.quadraticCurveTo(900, 480, W - 10, 560); g.lineTo(W, 560); g.fill();
-  // Cabana do pescador
-  ret(g, 820, 250, 110, 80, '#8a5a32');
-  forma(g, '#6b3a2a', [808, 254, 942, 254, 875, 205]);
-  ret(g, 862, 290, 26, 40, '#4a2e18', 4);
-  ret(g, 834, 272, 20, 18, '#ffe9a8', 2);
+  if (!sp(g, 'cabana', 'parado', 875, 330, { quadro: 0 })) cabana(g);
   // Juncos
   for (let k = 0; k < 14; k++) {
     const x = 20 + k * 11;
@@ -545,18 +650,34 @@ function fundoLago(g) {
     if (k % 3 === 0) el(g, x + 4, 340 - (k % 3) * 10, 3, 8, '#6b4a2b');
   }
 }
+function cabana(g) {
+  // Cabana do pescador
+  ret(g, 820, 250, 110, 80, '#8a5a32');
+  forma(g, '#6b3a2a', [808, 254, 942, 254, 875, 205]);
+  ret(g, 862, 290, 26, 40, '#4a2e18', 4);
+  ret(g, 834, 272, 20, 18, '#ffe9a8', 2);
+}
 function trapiche(g, t) {
   // O trapiche (cais de madeira) entra no lago; o velho pescador fica na ponta.
+  if (!sp(g, 'trapiche', 'parado', 300, 390, { t })) trapicheCorpo(g);
+  npc(g, 'npc-pescador', 300, 236, t, 1);
+  // A placa da pescaria e o balde
+  if (!sp(g, 'placa-pescaria', 'parado', 231, 400, { t })) placaPescaria(g);
+  if (!sp(g, 'balde', 'parado', 369, 406, { t })) balde(g);
+}
+function trapicheCorpo(g) {
   for (let k = 0; k < 9; k++) {
     const y = 384 - k * 18;
     const w = 90 - k * 3;
     ret(g, 300 - w / 2, y - 16, w, 15, k % 2 ? '#9c6c42' : '#a8774a', 2);
   }
   for (const dx of [-40, 36]) ret(g, 300 + dx, 230, 6, 160, '#5b3c22');
-  npc(g, 300, 236, '#9aa3ad', { cabeca: 'chapeu', rosto: 'bigode', mao: 'vara' }, t, 1, 1.05);
-  // A placa da pescaria e o balde
+}
+function placaPescaria(g) {
   ret(g, 228, 360, 6, 40, '#6b4a2b');
   placa(g, 231, 352, 104, 30, 'Pescaria', { fonte: '700 14px "Cinzel", Georgia, serif' });
+}
+function balde(g) {
   ret(g, 356, 384, 26, 22, '#7f8893', 4);
   el(g, 369, 384, 13, 4, '#5a8fb0');
 }
@@ -572,10 +693,7 @@ function animarLago(g, t) {
     const y = 290 + Math.sin(t * 0.3 + k * 3) * 40 + k * 20;
     const dir = Math.sin(t * 0.3 + k * 3) > 0 ? -1 : 1;
     el(g, x, y + 4, 18, 4, 'rgba(255,255,255,0.25)');
-    el(g, x, y, 13, 8, '#f7f3ea');
-    el(g, x + dir * 10, y - 8, 6, 6, '#f7f3ea');
-    el(g, x + dir * 16, y - 7, 4, 2, '#f0a030');
-    el(g, x + dir * 11, y - 9.5, 1, 1, '#1b1403');
+    if (!sp(g, 'pato', 'nadando', x, y + 8, { t: t + k * 0.5, dir })) pato(g, x, y, dir);
   }
   // Um peixe pula de vez em quando
   const ciclo = t % 6;
@@ -583,8 +701,14 @@ function animarLago(g, t) {
     const f = ciclo / 0.9;
     const px = 760 - f * 60;
     const py = 300 - Math.sin(f * Math.PI) * 50;
-    el(g, px, py, 9, 4, '#e8a040', -0.6 + f * 1.2);
+    if (!sp(g, 'peixe-pulando', 'pulando', px, py, { progresso: f, dir: -1, rot: 0.6 - f * 1.2 })) el(g, px, py, 9, 4, '#e8a040', -0.6 + f * 1.2);
   }
+}
+function pato(g, x, y, dir) {
+  el(g, x, y, 13, 8, '#f7f3ea');
+  el(g, x + dir * 10, y - 8, 6, 6, '#f7f3ea');
+  el(g, x + dir * 16, y - 7, 4, 2, '#f0a030');
+  el(g, x + dir * 11, y - 9.5, 1, 1, '#1b1403');
 }
 
 /* ─── Toca (com o chão e a parede que a pessoa escolher) ─── */
@@ -627,6 +751,13 @@ export function fundoToca(g, toca) {
   g.moveTo(0, 0); g.lineTo(0, 220); g.quadraticCurveTo(20, 30, 260, 0); g.closePath(); g.fill();
   g.beginPath();
   g.moveTo(W, 0); g.lineTo(W, 220); g.quadraticCurveTo(W - 20, 30, W - 260, 0); g.closePath(); g.fill();
+  if (!sp(g, 'porta-toca', 'parado', 500, 362, { quadro: 0 })) portaToca(g);
+  for (const x of [400, 600]) {
+    brilho(g, x, 236, 70, 'rgba(255,200,120,A)', 0.35);
+    if (!sp(g, 'lampiao-toca', 'aceso', x, 266, { quadro: 0 })) lampiaoToca(g, x);
+  }
+}
+function portaToca(g) {
   // A porta redonda (saída)
   el(g, 500, 300, 56, 62, '#4a2e18');
   el(g, 500, 304, 46, 54, '#7a5434');
@@ -635,12 +766,11 @@ export function fundoToca(g, toca) {
   el(g, 528, 300, 4, 4, '#e8c24a');
   g.fillStyle = '#7a5434';
   g.fillRect(444, 326, 112, 6);
-  for (const x of [400, 600]) {
-    brilho(g, x, 236, 70, 'rgba(255,200,120,A)', 0.35);
-    ret(g, x - 3, 244, 6, 22, '#3a2a1a', 2);
-    ret(g, x - 9, 222, 18, 22, '#3a2a1a', 4);
-    ret(g, x - 6, 225, 12, 16, '#ffd98a', 3);
-  }
+}
+function lampiaoToca(g, x) {
+  ret(g, x - 3, 244, 6, 22, '#3a2a1a', 2);
+  ret(g, x - 9, 222, 18, 22, '#3a2a1a', 4);
+  ret(g, x - 6, 225, 12, 16, '#ffd98a', 3);
 }
 
 /* ─── Móveis da toca ─── */
@@ -655,19 +785,65 @@ export const MOVEIS = {
   quadro: { w: 80, h: 66, parede: true }, estandarte: { w: 56, h: 100, parede: true },
 };
 
+// Para os sprites: o nome (o mesmo do catálogo do servidor), o tamanho do desenho, a animação e a sombra
+// no chão (que o jogo continua fazendo, com ou sem sprite). Sem "anim", o móvel fica parado.
+const PECA_MOVEL = {
+  cenouras: { nome: 'Cesto de cenouras', l: 46, a: 40, sombra: [24] },
+  planta: { nome: 'Vaso de planta', l: 44, a: 78, sombra: [18] },
+  cadeira: { nome: 'Cadeira de madeira', l: 44, a: 70, sombra: [22] },
+  abajur: { nome: 'Abajur', l: 36, a: 86, sombra: [16], obs: 'A luz em volta continua feita pelo jogo.' },
+  tapete: { nome: 'Tapete redondo', l: 170, a: 56 },
+  mesa: { nome: 'Mesa redonda', l: 96, a: 64, sombra: [44] },
+  banquinho: { nome: 'Banquinho de cogumelo', l: 40, a: 40, sombra: [18] },
+  bau: { nome: 'Baú', l: 66, a: 52, sombra: [32] },
+  estante: { nome: 'Estante de livros', l: 96, a: 140, sombra: [46] },
+  cama: { nome: 'Cama de palha', l: 150, a: 70, sombra: [72] },
+  sofa: { nome: 'Sofá verde', l: 160, a: 76, sombra: [72] },
+  aquario: { nome: 'Aquário', l: 86, a: 96, sombra: [42], anim: { id: 'nadando', nome: 'Peixinhos nadando', quadros: 6, fps: 6 } },
+  vitrola: { nome: 'Vitrola', l: 84, a: 132, sombra: [30], anim: { id: 'tocando', nome: 'Tocando', quadros: 6, fps: 4 } },
+  lareira: { nome: 'Lareira', l: 156, a: 134, sombra: [70, 12], anim: { id: 'fogo', nome: 'Fogo aceso', quadros: 4, fps: 8 }, obs: 'O clarão do fogo continua feito pelo jogo.' },
+  trono: { nome: 'Trono da Casa', l: 88, a: 150, sombra: [44] },
+  janela: { nome: 'Janela redonda', l: 80, a: 80, parede: true },
+  luzes: { nome: 'Varal de luzes', l: 200, a: 56, parede: true, anim: { id: 'piscando', nome: 'Piscando', quadros: 2, fps: 3 } },
+  relogio: { nome: 'Relógio de parede', l: 46, a: 46, parede: true, obs: 'Os ponteiros continuam feitos pelo jogo, andando por cima.' },
+  quadro: { nome: 'Quadro da Casa Luckham', l: 80, a: 66, parede: true },
+  estandarte: { nome: 'Estandarte Luckham', l: 60, a: 100, parede: true, anim: { id: 'balancando', nome: 'Balançando', quadros: 4, fps: 4 } },
+};
+const ANIM_PARADO = { id: 'parado', nome: 'Parado', quadros: 1, fps: 1 };
+const animDoMovel = id => PECA_MOVEL[id]?.anim || ANIM_PARADO;
+
 export function desenharMovel(g, id, x, y, v = 0, t = 0) {
   const f = DESENHO_MOVEL[id];
   if (!f) return;
   g.save();
   g.translate(x, y);
   if (v) g.scale(-1, 1);
-  f(g, t);
+  const sombra = PECA_MOVEL[id]?.sombra;
+  if (sombra) sombraNoChao(g, 0, 2, ...sombra);
+  if (!sp(g, `movel-${id}`, animDoMovel(id).id, 0, 0, { t })) f(g, t);
+  POR_CIMA_DO_MOVEL[id]?.(g, t);
   g.restore();
 }
 
+// O que o jogo desenha por cima do móvel mesmo com sprite (luz, ponteiros).
+const POR_CIMA_DO_MOVEL = {
+  abajur(g, t) {
+    brilho(g, 0, -64, 70, 'rgba(255,225,140,A)', 0.3 + Math.sin(t * 2) * 0.03);
+  },
+  lareira(g) {
+    brilho(g, 0, -30, 110, 'rgba(255,150,70,A)', 0.28);
+  },
+  relogio(g, t) {
+    g.strokeStyle = '#1b1403'; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(0, 0); g.lineTo(Math.cos(t * 0.1 - 1.5) * 9, Math.sin(t * 0.1 - 1.5) * 9); g.stroke();
+    g.lineWidth = 1;
+    g.beginPath(); g.moveTo(0, 0); g.lineTo(Math.cos(t - 1.5) * 14, Math.sin(t - 1.5) * 14); g.stroke();
+  },
+};
+
+// O desenho de cada móvel, sem a sombra e sem o que vai por cima.
 const DESENHO_MOVEL = {
   cenouras(g) {
-    sombraNoChao(g, 0, 2, 24);
     for (const [dx, rot] of [[-10, -0.3], [0, 0], [10, 0.3], [-4, -0.1], [6, 0.15]]) {
       g.save(); g.translate(dx, -26); g.rotate(rot);
       forma(g, '#e07a2a', [-4, 0, 4, 0, 0, 22]);
@@ -678,13 +854,11 @@ const DESENHO_MOVEL = {
     for (const y of [-18, -10]) ret(g, -20, y, 40, 2, 'rgba(90,55,25,0.45)');
   },
   planta(g) {
-    sombraNoChao(g, 0, 2, 18);
     forma(g, '#b5523a', [-16, -26, 16, -26, 12, 0, -12, 0]);
     ret(g, -18, -30, 36, 6, '#c96a50', 2);
     for (const [dx, dy, r, rot] of [[-12, -46, 13, -0.6], [10, -50, 14, 0.5], [0, -64, 12, 0], [-4, -40, 10, 0.2]]) el(g, dx, dy, r * 0.55, r, '#4f8a3c', rot);
   },
   cadeira(g) {
-    sombraNoChao(g, 0, 2, 22);
     ret(g, -18, -70, 6, 70, '#7a4a2a');
     ret(g, 12, -70, 6, 70, '#7a4a2a');
     ret(g, -18, -70, 36, 8, '#8a5a32', 3);
@@ -692,12 +866,10 @@ const DESENHO_MOVEL = {
     ret(g, -20, -34, 40, 9, '#9c6a3c', 3);
     ret(g, -16, -26, 5, 26, '#6b4226'); ret(g, 11, -26, 5, 26, '#6b4226');
   },
-  abajur(g, t) {
-    sombraNoChao(g, 0, 2, 16);
+  abajur(g) {
     el(g, 0, -3, 14, 4, '#5b3c22');
     ret(g, -2, -60, 4, 58, '#5b3c22');
     forma(g, '#f4dd80', [-18, -58, 18, -58, 11, -86, -11, -86]);
-    brilho(g, 0, -64, 70, 'rgba(255,225,140,A)', 0.3 + Math.sin(t * 2) * 0.03);
   },
   tapete(g) {
     el(g, 0, 0, 84, 26, '#8a2f3a');
@@ -706,7 +878,6 @@ const DESENHO_MOVEL = {
     el(g, 0, 0, 30, 8, '#8a2f3a');
   },
   mesa(g) {
-    sombraNoChao(g, 0, 2, 44);
     ret(g, -4, -44, 8, 44, '#5b3c22');
     el(g, 0, -2, 20, 5, '#5b3c22');
     el(g, 0, -46, 46, 13, '#8a5a32');
@@ -714,13 +885,11 @@ const DESENHO_MOVEL = {
     el(g, -12, -52, 7, 3, '#f7f3ea'); el(g, 14, -53, 9, 4, '#e07a2a');
   },
   banquinho(g) {
-    sombraNoChao(g, 0, 2, 18);
     ret(g, -8, -24, 16, 24, '#f2e8cf', 4);
     el(g, 0, -28, 20, 12, '#d8504a');
     for (const [dx, dy] of [[-8, -32], [6, -30], [0, -36], [10, -26]]) el(g, dx, dy, 2.6, 2, '#ffffff');
   },
   bau(g) {
-    sombraNoChao(g, 0, 2, 32);
     ret(g, -32, -34, 64, 34, '#8a5a32', 4);
     g.fillStyle = '#9c6a3c';
     g.beginPath(); g.ellipse(0, -34, 32, 16, 0, Math.PI, 0); g.fill();
@@ -729,7 +898,6 @@ const DESENHO_MOVEL = {
     el(g, 0, -24, 1.6, 2.2, '#3a2414');
   },
   estante(g) {
-    sombraNoChao(g, 0, 2, 46);
     ret(g, -46, -140, 92, 140, '#7a4a2a', 4);
     ret(g, -40, -134, 80, 128, '#5b3420', 2);
     const cores = ['#c0392b', '#2f6b34', '#d8b13a', '#5aa0d8', '#7b5ab8', '#e07a2a'];
@@ -740,7 +908,6 @@ const DESENHO_MOVEL = {
     }
   },
   cama(g) {
-    sombraNoChao(g, 0, 2, 72);
     ret(g, -74, -64, 12, 64, '#7a4a2a', 3);
     ret(g, 62, -46, 12, 46, '#7a4a2a', 3);
     ret(g, -68, -36, 136, 24, '#e6c56b', 6);
@@ -750,7 +917,6 @@ const DESENHO_MOVEL = {
     el(g, -46, -50, 20, 10, '#ffffff');
   },
   sofa(g) {
-    sombraNoChao(g, 0, 2, 72);
     ret(g, -72, -76, 144, 44, '#2f6b34', 14);
     ret(g, -72, -40, 144, 30, '#3a7a3c', 8);
     ret(g, -80, -56, 18, 46, '#2b5e2f', 8);
@@ -759,7 +925,6 @@ const DESENHO_MOVEL = {
     for (const dx of [-66, 60]) ret(g, dx, -12, 6, 12, '#3a2414');
   },
   aquario(g, t) {
-    sombraNoChao(g, 0, 2, 42);
     ret(g, -40, -36, 80, 36, '#5b3c22', 3);
     ret(g, -42, -96, 84, 62, 'rgba(160,210,240,0.55)', 4);
     ret(g, -38, -84, 76, 48, 'rgba(70,150,200,0.55)', 2);
@@ -775,7 +940,6 @@ const DESENHO_MOVEL = {
     for (const dx of [-26, -18, 28]) el(g, dx, -46, 3, 8, '#4f8a3c');
   },
   vitrola(g, t) {
-    sombraNoChao(g, 0, 2, 30);
     ret(g, -28, -34, 56, 34, '#7a4a2a', 4);
     el(g, -2, -36, 22, 6, '#111');
     ret(g, -3, -60, 5, 26, '#b8922a');
@@ -787,7 +951,6 @@ const DESENHO_MOVEL = {
     }
   },
   lareira(g, t) {
-    sombraNoChao(g, 0, 2, 70, 12);
     ret(g, -70, -130, 140, 130, '#9c9a95', 4);
     ret(g, -78, -134, 156, 14, '#7f7d78', 3);
     ret(g, -42, -86, 84, 86, '#2a1c10', 6);
@@ -796,10 +959,8 @@ const DESENHO_MOVEL = {
     el(g, tremor(1) * 0.5, -26, 18, 26 + tremor(2), '#e0682a');
     el(g, tremor(3) * 0.6, -22, 12, 18 + tremor(4), '#f4b03a');
     el(g, 0, -16, 6, 10, '#fff1a8');
-    brilho(g, 0, -30, 110, 'rgba(255,150,70,A)', 0.28);
   },
   trono(g) {
-    sombraNoChao(g, 0, 2, 44);
     ret(g, -40, -132, 80, 100, '#b8922a', 10);
     ret(g, -32, -122, 64, 84, '#8a2f3a', 8);
     forma(g, '#e8c24a', [-18, -132, -10, -146, -2, -136, 0, -150, 2, -136, 10, -146, 18, -132]);
@@ -827,14 +988,10 @@ const DESENHO_MOVEL = {
       if (aceso) brilho(g, x, y + 6, 18, 'rgba(255,240,180,A)', 0.25);
     }
   },
-  relogio(g, t) {
+  relogio(g) {
     el(g, 0, 0, 23, 23, '#7a4a2a');
     el(g, 0, 0, 19, 19, '#f7f3ea');
     for (let k = 0; k < 12; k++) { const a = (k / 12) * Math.PI * 2; el(g, Math.cos(a) * 15, Math.sin(a) * 15, 1.2, 1.2, '#3a2414'); }
-    g.strokeStyle = '#1b1403'; g.lineWidth = 2;
-    g.beginPath(); g.moveTo(0, 0); g.lineTo(Math.cos(t * 0.1 - 1.5) * 9, Math.sin(t * 0.1 - 1.5) * 9); g.stroke();
-    g.lineWidth = 1;
-    g.beginPath(); g.moveTo(0, 0); g.lineTo(Math.cos(t - 1.5) * 14, Math.sin(t - 1.5) * 14); g.stroke();
   },
   quadro(g) {
     ret(g, -40, -33, 80, 66, '#b8922a', 4);
@@ -892,8 +1049,8 @@ export const SALAS = {
     objetos: [
       { y: 384, desenhar: balcaoLoja },
       { y: 450, desenhar: (g, t) => espelho(g, 130, 450, t) },
-      { y: 440, desenhar: (g, t) => manequim(g, 780, 440, { cabeca: 'cartola', corpo: 'smoking', mao: 'bandeira' }, t) },
-      { y: 500, desenhar: (g, t) => manequim(g, 880, 500, { cabeca: 'tiara', corpo: 'vestido', costas: 'asas' }, t) },
+      { y: 440, desenhar: (g, t) => manequim(g, 780, 440, 'manequim-smoking', t) },
+      { y: 500, desenhar: (g, t) => manequim(g, 880, 500, 'manequim-vestido', t) },
     ],
     pontos: [
       { x0: 370, y0: 270, x1: 630, y1: 390, ir: [500, 405], acao: 'loja', rotulo: 'Ver o catálogo' },
@@ -927,3 +1084,105 @@ export const SALAS = {
     pontos: [{ x0: 444, y0: 238, x1: 556, y1: 335, ir: [500, 345], acao: 'sala:praca', rotulo: 'Sair da toca' }],
   },
 };
+
+/* ─── Sprites (veja sprites.js) ─── */
+// Cada prévia é o desenho de sempre, sem sprite, com a âncora da peça em (0, 0).
+const NO_FUNDO = ' Faz parte do fundo da sala, então fica parado (vale só o primeiro quadro).';
+const animacao = (id, nome, quadros = 1, fps = 1) => [{ id, nome, quadros, fps }];
+const PARADO = [ANIM_PARADO];
+const peca = (chave, nome, desc, largura, altura, animacoes, previa, extra = {}) => ({
+  chave: `clube.${chave}`, jogo: 'Club Coelho', nome, desc, largura, altura, ancora: 'pe', animacoes, previa, ...extra,
+});
+
+export const SPRITES = [
+  ...Object.entries(NPCS).map(([id, n]) => peca(id, n.nome,
+    `O NPC ${n.sala}. O sprite troca o coelho inteiro, com a roupa. Olhando para a direita.`,
+    Math.round(44 * n.escala), Math.round(56 * n.escala), animacao('parado', 'Parado', 2, 3),
+    (g, anim, t) => { g.save(); g.scale(n.escala, n.escala); desenharCoelho(g, 0, 0, { pelo: n.pelo, roupa: n.roupa, dir: 1, t: t * (n.vel || 1), semSprite: true }); g.restore(); })),
+  ...Object.entries(MANEQUINS).map(([id, m]) => peca(id, m.nome,
+    'Na loja do Armarinho, com a roupa à mostra e o pezinho de madeira. A sombra continua feita pelo jogo.',
+    64, 96, PARADO, g => manequimCorpo(g, 0, -2, m.roupa, true))),
+  // Praça
+  peca('fachada-cafe', 'Fachada do Café da Cenoura', `A casinha do Café na praça. A fumaça da chaminé e o brilho das janelas continuam feitos pelo jogo.${NO_FUNDO}`,
+    260, 266, PARADO, g => naOrigem(g, 210, 335, () => fachadaCafe(g))),
+  peca('fachada-armarinho', 'Fachada do Armarinho', `A loja de roupas na praça. O brilho da vitrine continua feito pelo jogo.${NO_FUNDO}`,
+    270, 244, PARADO, g => naOrigem(g, 500, 335, () => fachadaArmarinho(g))),
+  peca('fachada-salao', 'Fachada do Salão de Dança', `O Salão na praça. O letreiro de neon, as luzinhas e as janelas coloridas continuam feitos pelo jogo, por cima.${NO_FUNDO}`,
+    240, 208, PARADO, g => naOrigem(g, 790, 335, () => fachadaSalao(g))),
+  peca('arvore', 'Árvore da praça', `As árvores redondas atrás da praça (o jogo muda o tamanho de cada uma).${NO_FUNDO}`,
+    64, 64, PARADO, g => copaRedonda(g, 0, 0, 32, '#4f8a3c')),
+  peca('fonte', 'Fonte da praça', 'A fonte no meio da praça, com a estátua do coelho e os jatos de água. A sombra no chão continua feita pelo jogo.',
+    210, 150, animacao('agua', 'Água correndo', 6, 8), (g, anim, t) => fonteCorpo(g, 0, -24, t, true)),
+  peca('estatua', 'Estátua do coelho', 'A estátua de pedra em cima da fonte (só aparece quando a fonte não tem sprite próprio).',
+    40, 52, PARADO, g => estatua(g, 0, 0, true)),
+  peca('banco', 'Banco da praça', 'Os bancos de madeira da praça. A sombra continua feita pelo jogo.',
+    92, 46, PARADO, g => bancoCorpo(g, 0, 0)),
+  peca('poste', 'Poste de luz', 'Os postes da praça. O brilho da lâmpada continua feito pelo jogo.',
+    24, 140, animacao('aceso', 'Aceso'), g => posteCorpo(g, 0, 0)),
+  peca('placa-seta', 'Placa de seta', 'As placas "Lago" e "Tocas" da praça. Desenhe a placa apontando para a direita e sem letras: o jogo vira para o lado certo e escreve o nome por cima.',
+    132, 88, PARADO, g => setaCorpo(g, 0, 0, 1)),
+  peca('canteiro', 'Canteiro de flores', 'Os canteiros floridos na frente da praça.',
+    80, 32, PARADO, g => canteiroCorpo(g, 0, 0)),
+  peca('borboleta', 'Borboleta', 'As borboletas que voam pela praça. Marque "pintar com a cor" e desenhe em tons claros: cada uma fica de uma cor.',
+    18, 10, animacao('voando', 'Voando', 2, 9), (g, anim, t) => borboleta(g, 0, 0, Math.abs(Math.sin(t * 14)) * 5 + 1, '#f4dd80'), { ancora: 'centro', tingir: true }),
+  // Café da Cenoura
+  peca('janela-cafe', 'Janela do Café', `A janela com cortinas, mostrando a praça lá fora.${NO_FUNDO}`,
+    220, 166, PARADO, g => naOrigem(g, 210, 240, () => janelaCafe(g))),
+  peca('cardapio', 'Cardápio do Café', `O quadro-negro com o cardápio (as letras fazem parte do desenho).${NO_FUNDO}`,
+    206, 166, PARADO, g => naOrigem(g, 480, 233, () => cardapio(g))),
+  peca('prateleira-potes', 'Prateleira de potes', `A prateleira com os potes de geleia atrás do balcão.${NO_FUNDO}`,
+    300, 48, PARADO, g => naOrigem(g, 780, 130, () => prateleiraPotes(g))),
+  peca('luminaria-cafe', 'Luminária do Café', 'As luminárias penduradas no teto (a âncora é o ponto do teto). O brilho continua feito pelo jogo.',
+    44, 58, animacao('acesa', 'Acesa'), g => luminariaCafe(g, 0), { ancora: 'topo' }),
+  peca('balcao-cafe', 'Balcão do Café', 'O balcão com a máquina de café (soltando vapor) e o bolo de cenoura. O cozinheiro é outra peça.',
+    340, 130, animacao('vapor', 'Soltando vapor', 4, 3), (g, anim, t) => naOrigem(g, 770, 378, () => balcaoCafeCorpo(g, t))),
+  peca('mesa-cafe', 'Mesa do Café', 'As mesinhas redondas com duas cadeiras. A sombra continua feita pelo jogo.',
+    124, 58, PARADO, g => mesaCafeCorpo(g, 0, 0)),
+  // Armarinho
+  peca('prateleira-roupas', 'Prateleiras de roupas', `As três prateleiras com roupas dobradas.${NO_FUNDO}`,
+    260, 196, PARADO, g => naOrigem(g, 170, 280, () => prateleiraRoupas(g))),
+  peca('arara', 'Arara de roupas', `A arara com as roupas penduradas.${NO_FUNDO}`,
+    260, 210, PARADO, g => naOrigem(g, 830, 300, () => arara(g))),
+  peca('placa-armarinho', 'Placa do Armarinho', `A placa "Armarinho da Dona Felpuda" na parede (as letras fazem parte do desenho).${NO_FUNDO}`,
+    366, 50, PARADO, g => naOrigem(g, 500, 60, () => placaArmarinho(g)), { ancora: 'centro' }),
+  peca('balcao-loja', 'Balcão do Armarinho', 'O balcão com o livro do catálogo aberto, que brilha. A Dona Felpuda é outra peça.',
+    260, 100, animacao('brilhando', 'Livro brilhando', 4, 2), (g, anim, t) => naOrigem(g, 500, 384, () => balcaoLojaCorpo(g, t))),
+  peca('espelho', 'Espelho do provador', 'O espelho grande do provador, com o reflexo que brilha. A sombra continua feita pelo jogo.',
+    72, 162, animacao('brilhando', 'Brilhando', 4, 2), (g, anim, t) => espelhoCorpo(g, 0, 0, t)),
+  // Salão de Dança
+  peca('cabine-dj', 'Cabine do DJ', `A cabine com os dois toca-discos (as letras fazem parte do desenho).${NO_FUNDO}`,
+    220, 90, PARADO, g => naOrigem(g, 500, 330, () => cabineDj(g))),
+  peca('globo', 'Globo espelhado', 'O globo no teto do Salão. O fio e os raios de luz coloridos continuam feitos pelo jogo.',
+    60, 60, animacao('girando', 'Girando', 4, 6), (g, anim, t) => globo(g, 0, 0, t), { ancora: 'centro' }),
+  peca('caixa-som', 'Caixa de som', 'As caixas de som dos dois lados da pista, pulsando com a música. A sombra continua feita pelo jogo.',
+    110, 150, animacao('tocando', 'Tocando', 4, 6), (g, anim, t) => caixaDeSomCorpo(g, 0, 0, t)),
+  peca('maquina-danca', 'Máquina da Dança da Toca', 'O fliperama onde se joga a Dança da Toca. A sombra continua feita pelo jogo.',
+    84, 140, animacao('piscando', 'Piscando', 4, 6), (g, anim, t) => maquinaDancaCorpo(g, 0, 0, t)),
+  // Lago Cintilante
+  peca('cabana', 'Cabana do pescador', `A cabana do outro lado do Lago.${NO_FUNDO}`,
+    134, 126, PARADO, g => naOrigem(g, 875, 330, () => cabana(g))),
+  peca('trapiche', 'Trapiche', 'O cais de madeira que entra no Lago, onde fica o velho pescador.',
+    90, 166, PARADO, g => naOrigem(g, 300, 390, () => trapicheCorpo(g))),
+  peca('placa-pescaria', 'Placa da Pescaria', 'A placa "Pescaria" na beira do Lago (as letras fazem parte do desenho).',
+    108, 66, PARADO, g => naOrigem(g, 231, 400, () => placaPescaria(g))),
+  peca('balde', 'Balde de peixes', 'O baldinho ao lado do trapiche.',
+    26, 26, PARADO, g => naOrigem(g, 369, 406, () => balde(g))),
+  peca('pato', 'Patinho', 'Os patinhos que nadam no Lago. Olhando para a direita; a marquinha na água continua feita pelo jogo.',
+    40, 22, animacao('nadando', 'Nadando', 1, 2), g => pato(g, 0, -8, 1)),
+  peca('peixe-pulando', 'Peixe que pula', 'O peixe que pula no Lago de vez em quando. Olhando para a direita: o jogo vira e inclina no pulo (o pulo inteiro passa pelos quadros uma vez).',
+    20, 10, animacao('pulando', 'Pulando', 1, 4), g => el(g, 0, 0, 9, 4, '#e8a040'), { ancora: 'centro' }),
+  // Tocas
+  peca('porta-toca', 'Porta da toca', `A porta redonda de saída, no fundo de todas as tocas.${NO_FUNDO}`,
+    112, 124, PARADO, g => naOrigem(g, 500, 362, () => portaToca(g))),
+  peca('lampiao-toca', 'Lampião da toca', `Os dois lampiões na parede das tocas. O brilho continua feito pelo jogo.${NO_FUNDO}`,
+    18, 44, animacao('aceso', 'Aceso'), g => lampiaoToca(g, 0)),
+  ...Object.keys(MOVEIS).map(id => {
+    const p = PECA_MOVEL[id];
+    const ondeFica = p.parede ? 'Móvel de parede das tocas (o meio do desenho fica onde a pessoa pôs).'
+      : MOVEIS[id].chao ? 'Fica no chão da toca, por baixo de tudo e de todos.'
+        : 'Móvel das tocas, com o pé no chão. Quem decora pode virar para o outro lado.';
+    return peca(`movel-${id}`, p.nome, [ondeFica, p.obs, p.sombra && 'A sombra continua feita pelo jogo.'].filter(Boolean).join(' '),
+      p.l, p.a, [animDoMovel(id)], (g, anim, t) => DESENHO_MOVEL[id](g, t), { ancora: p.parede || MOVEIS[id].chao ? 'centro' : 'pe' });
+  }),
+];
+registrarPecas(SPRITES);
