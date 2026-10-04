@@ -167,6 +167,9 @@ const CARGOS_PADRAO = [
   { nome: 'Bobo da Corte', cor: '#c46bd8',
     descricao: 'Alegra Lyendell: tem a Caixa de Pegadinhas (torta na cara, almofada de pum, nariz de palhaço...) e conta piadas na praça.',
     permissoes: [...MEMBRO, 'bobo.pegadinhas'] },
+  { nome: 'Game Dev', cor: '#4fc1b8',
+    descricao: 'Cuida do visual dos joguinhos: troca os desenhos pelos próprios sprites em Recreação > Sprites dos jogos, e a troca vale para todo mundo.',
+    permissoes: [...MEMBRO, 'sprites.editar'] },
 ];
 
 module.exports = { CATALOGO, TODAS, VALIDAS, PERMITIDAS_CRIANCA, CARGOS_PADRAO, DESCRICOES, EXCLUSIVAS, MODULOS, SO_DO_BOBO };

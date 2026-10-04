@@ -35,6 +35,7 @@ Todo usuário é morador. Os cargos somam poderes em cima disso, e uma pessoa po
 | Senadora | Tudo no Congresso: publica as PECs, leis e regras votadas, aprova o que outros enviarem e avalia as propostas do povo |
 | Lorde Comandante | Faz as Leis de Lyendell junto com a Família Nobre: escreve, publica, edita e revoga |
 | Bobo da Corte | A Caixa de Pegadinhas, só dele: prega peças no pessoal e conta piadas na praça (veja "Bobo da Corte") |
+| Game Dev | Troca os desenhos dos joguinhos pelos próprios sprites, e a troca vale para todo mundo (veja "Sprites dos jogos") |
 | Morador | Ver tudo (menos o Hospital), ajudar nas atividades, usar a Recreação e mandar propostas ao Congresso |
 
 Qualquer usuário pode ser marcado como **criança** (veja "Personagem criança" mais abaixo): mesmo com cargo, só olha, brinca e ajuda.
@@ -391,7 +392,7 @@ ranking (vitórias, festas e douradas). O código está em `src/festa.js` (as re
 
 Os joguinhos são desenhados por código, mas cada peça (o coelho, o Raposo, os barris, as cenouras, os
 blocos, os móveis do Club Coelho...) pode virar um sprite feito à mão. Quem tem a permissão
-`sprites.editar` (a Família Nobre) abre **Recreação > Sprites dos jogos** (`#/recreacao/sprites`):
+`sprites.editar` (o Game Dev e a Família Nobre) abre **Recreação > Sprites dos jogos** (`#/recreacao/sprites`):
 
 - Cada jogo tem a lista das suas peças, e cada peça as suas animações (parado, andando, pulando...),
   com o desenho de sempre animado ao lado do sprite enviado.

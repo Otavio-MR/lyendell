@@ -450,7 +450,7 @@ CREATE TABLE IF NOT EXISTS diario (
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 23;
+const VERSAO = 24;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -530,6 +530,8 @@ async function migrar() {
   if (versao < 22) await darPermissoes({ 'Família Nobre': ['sprites.editar'] });
   // v23: os Procurados ganham o cartaz (vivo, morto ou vivo ou morto) e a recompensa em Lírios.
   if (versao < 23) await cartazDosProcurados();
+  // v24: cargo novo, o Game Dev (troca os sprites dos joguinhos).
+  if (versao < 24) await criarCargo('Game Dev');
   // v20: o campo "Nickname" vira "Endereço" em todos os livros (no RP o nick é o endereço da pessoa).
   if (versao < 20) await nickVirouEndereco();
   // v19: propostas do povo para o Congresso (todo morador manda; a Senadora avalia).
@@ -646,6 +648,17 @@ async function migrarBobo() {
     await db.run('INSERT INTO cargos (nome, descricao, cor, permissoes, base, ordem) VALUES (?, ?, ?, ?, 0, ?)', bobo.nome, bobo.descricao, bobo.cor, '[]', ordem + 1);
   }
   await darPermissoes({ [bobo.nome]: bobo.permissoes });
+}
+
+// Cria um cargo de CARGOS_PADRAO que ainda não existe no banco (no banco novo, o semear já cria).
+async function criarCargo(nome) {
+  if (!(await db.get('SELECT COUNT(*) AS n FROM cargos')).n) return;
+  const c = CARGOS_PADRAO.find(x => x.nome === nome);
+  if (!await db.get('SELECT id FROM cargos WHERE nome = ?', c.nome)) {
+    const { ordem } = await db.get('SELECT COALESCE(MAX(ordem), 0) AS ordem FROM cargos');
+    await db.run('INSERT INTO cargos (nome, descricao, cor, permissoes, base, ordem) VALUES (?, ?, ?, ?, 0, ?)', c.nome, c.descricao, c.cor, '[]', ordem + 1);
+  }
+  await darPermissoes({ [c.nome]: c.permissoes });
 }
 
 // v20: campo do nick ainda com o nome antigo "Nickname" passa a se chamar "Endereço" (os renomeados à mão ficam).
