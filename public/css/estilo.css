@@ -1937,6 +1937,19 @@ body.com-radio.radio-mini #toasts { bottom: 86px; }
 .b2048-bloco[data-v="1024"] { background: #e8c24f; color: #1b1403; font-size: clamp(0.75rem, 3.8vw, 1.3rem); box-shadow: 0 0 18px rgba(216, 177, 58, 0.5); }
 .b2048-bloco[data-v="2048"] { background: #f4dd80; color: #1b1403; font-size: clamp(0.75rem, 3.8vw, 1.3rem); box-shadow: 0 0 26px rgba(244, 221, 128, 0.75); }
 .b2048-bloco[data-v="grande"] { background: #b77be6; color: #160b20; font-size: clamp(0.7rem, 3.4vw, 1.15rem); box-shadow: 0 0 26px rgba(183, 123, 230, 0.6); }
+/* 2048 junto: pedras, o tabuleiro dos outros e quem mexeu */
+.b2048-bloco.pedra { background: repeating-linear-gradient(45deg, #5a5650, #5a5650 6px, #4b4843 6px, #4b4843 12px); color: #d8d2c4; gap: 0; }
+.b2048-bloco.pedra .ico { width: 40%; height: 40%; }
+.b2048-bloco.pedra small { position: absolute; right: 6%; bottom: 4%; font-size: 0.7rem; }
+.b2048.fora { filter: grayscale(0.8) brightness(0.7); }
+.b2048-outros { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; width: 100%; }
+.b2048-outro { display: grid; gap: 6px; }
+.b2048-outro p { margin: 0; display: flex; align-items: center; gap: 6px; font-size: 0.9rem; color: var(--texto-2); }
+.b2048-outro.fora { opacity: 0.55; }
+.b2048.mini .b2048-bloco { font-size: 0.75rem; border-radius: 5px; transition: none; }
+.b2048.mini .b2048-fundo span { border-radius: 5px; }
+.b2048-quem { color: var(--cor); font-weight: 700; }
+.b2048-junto { --tam-jogo: 460px; }
 .b2048-faixa { width: min(100%, 460px); padding: 8px 12px; border-radius: var(--raio-p); text-align: center; color: #1b1403; background: var(--ouro); font-weight: 600; }
 
 /* ─── Lyendell Dorme ──────────────────────────────── */
@@ -2444,6 +2457,10 @@ body.modo-crianca .tabela th { color: var(--rosa); }
 .qc-foto:disabled { cursor: default; }
 .minado-casa.ultimo { box-shadow: inset 0 0 0 2px var(--quem, #fff); }
 .qc-peca.trocada { box-shadow: inset 0 0 0 3px var(--quem, #fff); }
+/* Versus no mesmo tabuleiro: cada casa ou peça com a cor de quem fez */
+.minado-grade.versus .minado-casa.de-alguem { box-shadow: inset 0 -3px 0 color-mix(in srgb, var(--dono) 80%, transparent); background-image: linear-gradient(color-mix(in srgb, var(--dono) 14%, transparent), color-mix(in srgb, var(--dono) 14%, transparent)); }
+.qc-peca.presa { box-shadow: inset 0 0 0 3px var(--dono, var(--ouro)); cursor: default; }
+.mesa-fora { color: #f08466; font-weight: 600; }
 .mem-carta.achada { box-shadow: 0 0 0 3px var(--quem, var(--ouro)); }
 .mesa-vez { font-family: var(--f-titulo); color: var(--texto-2); }
 .mesa-vez.minha { color: var(--ouro-l); animation: piscar 1.4s ease-in-out infinite; }
@@ -2714,3 +2731,60 @@ a.juramento-pessoa:hover { border-color: var(--ouro-d); color: var(--texto); }
 .jura-tabela tr:hover td { background: rgba(26, 43, 31, 0.5); }
 .jura-num { color: var(--suave); width: 2.5em; }
 .jura-acao { text-align: right; white-space: nowrap; }
+/* Festa na Toca */
+.festa-grade { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
+.festa-palco { min-width: 0; }
+.festa-tabuleiro { display: block; width: 100%; aspect-ratio: 3 / 2; border-radius: var(--raio); border: 1px solid var(--borda-2); background: #16271b; touch-action: manipulation; }
+.festa-lado { display: grid; gap: 12px; position: sticky; top: 12px; }
+.festa-lado .painel { padding: 14px; }
+.festa-acoes { display: grid; gap: 10px; }
+.festa-rodada { margin: 0; font-family: var(--f-titulo); font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ouro-l); display: flex; align-items: center; gap: 6px; }
+.festa-msg { margin: 0; padding: 8px 10px; border-radius: var(--raio-p); background: var(--sup-2); border: 1px solid var(--borda-2); font-size: 0.92rem; }
+.festa-msg.m-azul, .festa-msg.m-sorte { border-color: #3e6fb0; color: #a9c8f0; }
+.festa-msg.m-vermelha, .festa-msg.m-raposo { border-color: #7a3f3f; color: #f0a0a0; }
+.festa-msg.m-item { border-color: #5b4a8a; color: #c9b8f5; }
+.festa-msg.m-dourada { border-color: var(--ouro-d); color: var(--ouro-l); background: var(--ouro-fundo); }
+.festa-botoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.festa-botoes > .btn { flex: 1 1 auto; }
+.festa-botoes.coluna { flex-direction: column; }
+.festa-itens { display: grid; gap: 6px; }
+.festa-itens p { margin: 0; }
+.festa-ordem { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.festa-ordem li { display: flex; align-items: center; gap: 8px; }
+.festa-ordem li strong { margin-left: auto; color: var(--ouro-l); }
+.festa-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.festa-lista li { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: var(--raio-p); border: 1px solid transparent; }
+.festa-lista li.eu-linha { background: var(--ouro-fundo); }
+.festa-lista li.na-vez { border-color: var(--ouro-d); }
+.festa-lista li > strong { margin-left: auto; }
+.festa-nome { display: grid; min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.festa-nome small { color: var(--texto-2); font-size: 0.74rem; overflow: hidden; text-overflow: ellipsis; }
+.festa-douradas { color: var(--ouro-l); font-weight: 700; white-space: nowrap; }
+.festa-cenouras { color: #f0a35a; white-space: nowrap; min-width: 52px; text-align: right; }
+.festa-hist { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 190px; overflow-y: auto; font-size: 0.84rem; color: var(--texto-2); }
+.festa-hist li:first-child { color: var(--texto); }
+.festa-podio { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.festa-podio li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--raio-p); background: var(--sup-2); border: 1px solid var(--borda-2); }
+.festa-podio li.p1 { border-color: var(--ouro); background: var(--ouro-fundo); font-size: 1.08rem; }
+.festa-podio li.p2 { border-color: #9aa7b0; }
+.festa-podio li.p3 { border-color: #a8703f; }
+.festa-minijogo-cartao { display: grid; gap: 12px; max-width: 640px; margin: 0 auto; text-align: center; }
+.festa-minijogo-cartao .festa-lista { text-align: left; }
+.festa-formato { margin: 0; font-weight: 700; color: var(--ouro-l); }
+.festa-times { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: left; }
+.festa-time { padding: 10px; border-radius: var(--raio-p); border: 1px solid var(--borda-2); }
+.festa-time.t-azul { border-color: #3e6fb0; background: rgba(62, 111, 176, 0.12); }
+.festa-time.t-vermelho { border-color: #b04a3e; background: rgba(176, 74, 62, 0.12); }
+.festa-mini { display: grid; gap: 12px; }
+.festa-mini-moldura { border-radius: var(--raio); overflow: hidden; border: 1px solid var(--borda-2); background: #10190f; }
+.festa-mini-tela { display: block; width: 100%; outline: none; touch-action: none; }
+.festa-cruz { display: grid; grid-template-columns: repeat(4, 54px); gap: 8px; }
+.festa-cruz:empty { display: none; }
+@media (max-width: 900px) {
+  .festa-grade { grid-template-columns: 1fr; }
+  .festa-lado { position: static; }
+}
+@media (max-width: 480px) {
+  .festa-cruz { grid-template-columns: repeat(4, 1fr); flex: 1; }
+  .festa-times { grid-template-columns: 1fr; }
+}

@@ -3,8 +3,11 @@
 // ordem, e tudo que anda (carroças, troncos, trens, vitórias-régias que afundam) é só uma conta do tempo:
 // no desafio, quem tem a mesma sorte atravessa exatamente o mesmo mundo.
 // O desenho é "de bloquinhos" visto do alto: cada coisa tem o topo mais claro e a frente mais escura.
+// Jogo junto (ctx.junto): todos atravessam o MESMO mundo ao mesmo tempo (mesma semente e o relógio da sala);
+// cada um controla o seu coelho aqui e vê os outros chegando pelas posições que eles mandam. Versus: quem
+// sobra vivo vence. Co-op: vidas da equipe e uma linha de chegada que todos os vivos precisam cruzar.
 
-import { desenharCoelho, elipse, sombrear } from '../desenho-coelho.js';
+import { desenharCoelho, elipse, sombrear, PELOS } from '../desenho-coelho.js';
 
 const LARGURA = 432;
 const ALTURA = 576;
@@ -35,6 +38,13 @@ const FONTE_PONTOS = `900 46px ${FONTE}`;
 const FONTE_MEDIA = `800 22px ${FONTE}`;
 const FONTE_PEQ = `700 15px ${FONTE}`;
 const FONTE_AVISO = `800 17px ${FONTE}`;
+const FONTE_NOME = `800 12px ${FONTE}`;
+const FONTE_PLACA = `900 14px ${FONTE}`;
+const DUR_COD = [0, 1, 1, 1.5, 1.1];  // duração da morte pelo código (para desenhar os outros)
+const ESPERA_RENASCER = 1.5;          // segundos entre o "renasce" da sala e o coelho voltar
+const CORES_BANDEIRA = ['#e8c24a', '#fff4d6', '#b23a48'];
+const OURO_CASA = '#e8c24a';
+const nada = () => {};
 
 let melhorSessao = 0;
 
@@ -90,18 +100,23 @@ function garantirSaidas(G, livres) {
   return livres;
 }
 
-const dificuldade = r => limitar((r - 10) / 260, 0, 1);
+// k: o quanto a dificuldade sobe mais depressa (1 sozinho; no jogo junto, cresce com o número de pessoas)
+const dificuldade = (r, k = 1) => limitar(((r - 10) / 260) * k, 0, 1);
+const rampa = G => 1 + (G.dif - 1) * 0.8;
 
 // alcance: colunas por onde dá para chegar na faixa atual (o caminho nunca fecha)
-const novoGerador = semente => ({ s: semente >>> 0, r: -6, tipo: 'g', resta: 0, dir: 1, alcance: 1 << 4 });
+// dif: a dificuldade da sala junto (1 sozinho); meta: a fileira da chegada no co-op (null sem chegada)
+const novoGerador = (semente, dif = 1, meta = null) => ({ s: semente >>> 0, r: -6, tipo: 'g', resta: 0, dir: 1, alcance: 1 << 4, dif, meta });
 
 function gerarFaixa(G) {
   const r = G.r++;
   if (r < 0) return gerarGrama(G, r, 1);
+  // chegada do co-op: campo de festa e, depois, a mata fechada
+  if (G.meta != null && r >= G.meta) return gerarGrama(G, r, r === G.meta ? 0 : 0.12, r >= G.meta + 3);
   if (r <= 2) return gerarGrama(G, r, r === 0 ? 0.1 : 0.16);
   if (G.resta <= 0) escolherCorrida(G, r);
   G.resta--;
-  const d = dificuldade(r);
+  const d = dificuldade(r, rampa(G));
   if (proximo(G) < 0.72) G.dir = -G.dir; // faixas vizinhas costumam andar para lados opostos
   if (G.tipo === 'g') return gerarGrama(G, r, 0.13 + 0.2 * d + proximo(G) * 0.1);
   if (G.tipo === 'e') return gerarEstrada(G, r, d);
@@ -111,7 +126,7 @@ function gerarFaixa(G) {
 
 // Corridas temáticas: um pedaço de campo, depois algumas estradas, ou um rio, ou trilhos.
 function escolherCorrida(G, r) {
-  const d = dificuldade(r);
+  const d = dificuldade(r, rampa(G));
   const ant = G.tipo;
   let tipo;
   if (ant !== 'g' && (r < 30 || proximo(G) < 0.68)) tipo = 'g';
@@ -139,8 +154,7 @@ function escolherBloqueio(G, muro) {
   return p < 0.48 ? 1 : p < 0.66 ? 2 : p < 0.84 ? 3 : p < 0.94 ? 5 : 4;
 }
 
-function gerarGrama(G, r, dens) {
-  const muro = r < 0;
+function gerarGrama(G, r, dens, muro = r < 0) {
   const bloq = [0, 0, 0, 0, 0, 0, 0, 0, 0];
   let livres = 0;
   for (let c = 0; c < COLUNAS; c++) {
@@ -155,7 +169,8 @@ function gerarGrama(G, r, dens) {
     G.alcance = espalhar(livres, G.alcance);
     if (r > 3 && proximo(G) < 0.15) cenoura = colunaDe(G, G.alcance);
   }
-  return { r, tipo: 'g', bloq, bs: bloq.join(''), cenoura };
+  // alc: as colunas alcançáveis desta fileira (onde dá para largar ou renascer sem ficar preso)
+  return { r, tipo: 'g', bloq, bs: bloq.join(''), cenoura, alc: muro ? 0 : G.alcance };
 }
 
 // Espalha os objetos numa volta de comprimento L, com pelo menos "vao" entre um e outro.
@@ -176,10 +191,10 @@ function gerarEstrada(G, r, d) {
   const suave = r < 12;
   const principal = suave ? (proximo(G) < 0.55 ? 0 : 1) : inteiro(G, 4);
   const base = suave ? 36 + 20 * proximo(G) : 44 + 26 * proximo(G) + d * (85 + 45 * proximo(G));
-  const vel = base * [1.15, 1, 0.92, 0.8][principal];
+  const vel = base * [1.15, 1, 0.92, 0.8][principal] * (1 + (G.dif - 1) * 0.5);
   const L = 700 + 220 * proximo(G) - 50 * d;
   const vao = 100 + vel * 0.4; // espaço mínimo entre duas carroças
-  const n = suave ? 1 + (proximo(G) < 0.35 ? 1 : 0) : 1 + inteiro(G, 2 + Math.round(d * 2.5));
+  const n = suave ? 1 + (proximo(G) < 0.35 ? 1 : 0) : 1 + inteiro(G, 2 + Math.round(d * 2.5) + Math.round((G.dif - 1) * 2));
   const tipos = [];
   for (let i = 0; i < n; i++) tipos.push(proximo(G) < 0.7 ? principal : inteiro(G, suave ? 2 : 4));
   const total = () => tipos.reduce((s, t) => s + COMP_VEIC[t] + vao, 0);
@@ -191,7 +206,7 @@ function gerarEstrada(G, r, d) {
 
 function gerarTroncos(G, r, d) {
   const suave = r < 12;
-  const vel = suave ? 26 + 16 * proximo(G) : 30 + 22 * proximo(G) + d * (40 + 30 * proximo(G));
+  const vel = (suave ? 26 + 16 * proximo(G) : 30 + 22 * proximo(G) + d * (40 + 30 * proximo(G))) * (1 + (G.dif - 1) * 0.3);
   const L = 660 + 160 * proximo(G);
   const cobertura = suave ? 0.62 : 0.6 - 0.25 * d;
   const celulas = suave ? [3, 4] : d < 0.45 ? [2, 3, 4] : [2, 3, 3];
@@ -233,7 +248,7 @@ function gerarTrilho(G, r, d) {
   const comp = 74 + nv * 66;
   const vel = 760 + 240 * d + 80 * proximo(G);
   const dur = (LARGURA + comp) / vel;
-  const per = Math.max(AVISO + dur + 2.4, 7.2 - 2.2 * d + 2.2 * proximo(G));
+  const per = Math.max(AVISO + dur + 2.4, (7.2 - 2.2 * d + 2.2 * proximo(G)) / (1 + (G.dif - 1) * 0.4));
   G.alcance = TODAS;
   return { r, tipo: 'f', dir: G.dir, vel, per, fase: proximo(G) * per, nv, comp };
 }
@@ -599,7 +614,8 @@ function objetos(g, fx, y0, t) {
 
 /* ─── O coelho, o gavião e os finais ─── */
 
-function coelho(g, x, yPes, s, esmaga, olhar, m, t) {
+// vis: o visual do Club Coelho ({ pelo, roupa }) no jogo junto; sem ele, o coelho de sempre.
+function coelho(g, x, yPes, s, esmaga, olhar, m, t, vis = null) {
   const arco = s > 0 ? Math.sin(Math.PI * s) * 13 : 0;
   let sx = 1;
   let sy = 1;
@@ -610,15 +626,17 @@ function coelho(g, x, yPes, s, esmaga, olhar, m, t) {
   if (m & 1) g.globalAlpha = 0.45;
   g.translate(x, yPes - arco);
   g.scale(ESCALA * sx, ESCALA * sy);
-  desenharCoelho(g, 0, 0, { pelo: peloDe(m), acessorio: m & 2 ? 'coroa' : ACESSORIO, dir: olhar < 0 ? -1 : 1, t });
+  desenharCoelho(g, 0, 0, vis
+    ? { pelo: vis.pelo, roupa: vis.roupa, acessorio: ACESSORIO, dir: olhar < 0 ? -1 : 1, t }
+    : { pelo: peloDe(m), acessorio: m & 2 ? 'coroa' : ACESSORIO, dir: olhar < 0 ? -1 : 1, t });
   g.restore();
 }
 
-function amassado(g, x, yPes, olhar, m, t) {
+function amassado(g, x, yPes, olhar, m, t, vis = null) {
   g.save();
   g.translate(x, yPes);
   g.scale(ESCALA * 1.5, ESCALA * 0.22);
-  desenharCoelho(g, 0, 0, { pelo: peloDe(m), acessorio: 'nenhum', dir: olhar < 0 ? -1 : 1, t: 0 });
+  desenharCoelho(g, 0, 0, { pelo: vis ? vis.pelo : peloDe(m), acessorio: 'nenhum', dir: olhar < 0 ? -1 : 1, t: 0 });
   g.restore();
   for (let i = 0; i < 3; i++) {
     const a = t * 4 + i * 2.1;
@@ -626,8 +644,9 @@ function amassado(g, x, yPes, olhar, m, t) {
   }
 }
 
-function respingo(g, x, yPes, q, m) {
+function respingo(g, x, yPes, q, m, vis = null) {
   const y = yPes - 4;
+  const pelo = vis ? vis.pelo : peloDe(m);
   g.save();
   g.lineWidth = 2;
   g.strokeStyle = '#ffffff';
@@ -649,8 +668,8 @@ function respingo(g, x, yPes, q, m) {
   }
   if (q < 0.35) { // as orelhas afundando
     const s = q / 0.35;
-    elipse(g, x - 3, y - 6 + s * 8, 3, 9 * (1 - s) + 0.5, peloDe(m), -0.2);
-    elipse(g, x + 4, y - 6 + s * 8, 3, 9 * (1 - s) + 0.5, peloDe(m), 0.15);
+    elipse(g, x - 3, y - 6 + s * 8, 3, 9 * (1 - s) + 0.5, pelo, -0.2);
+    elipse(g, x + 4, y - 6 + s * 8, 3, 9 * (1 - s) + 0.5, pelo, 0.15);
   }
   g.restore();
 }
@@ -676,7 +695,7 @@ function gaviao(g, x, y, bate, esc) {
 }
 
 // O gavião mergulha, agarra o coelho e sobe com ele.
-function gaviaoPega(g, x, yPes, q, olhar, m, t) {
+function gaviaoPega(g, x, yPes, q, olhar, m, t, vis = null) {
   const bate = t * 18;
   if (q < 0.33) {
     const k = q / 0.33;
@@ -689,17 +708,17 @@ function gaviaoPega(g, x, yPes, q, olhar, m, t) {
   g.save();
   g.translate(hx, hy + 46);
   g.rotate(Math.sin(t * 14) * 0.25);
-  coelho(g, 0, 0, 0, 0, olhar, m, t);
+  coelho(g, 0, 0, 0, 0, olhar, m, t, vis);
   g.restore();
   gaviao(g, hx, hy, bate, 1);
 }
 
 // O trem arremessa o coelho girando.
-function voando(g, x, yPes, q, olhar, m, t) {
+function voando(g, x, yPes, q, olhar, m, t, vis = null) {
   g.save();
   g.translate(x, yPes - Math.sin(Math.PI * Math.min(1, q * 1.3)) * 50 - 16);
   g.rotate(q * 16 * (olhar < 0 ? -1 : 1));
-  coelho(g, 0, 16, 0, 0, olhar, m, t);
+  coelho(g, 0, 16, 0, 0, olhar, m, t, vis);
   g.restore();
 }
 
@@ -763,8 +782,144 @@ function hud(g, v, t) {
   g.restore();
 }
 
+/* ─── Jogo junto: chegada, nomes, vidas e avisos ─── */
+
+function coracao(g, x, y, r, cheio) {
+  g.beginPath();
+  g.moveTo(x, y + r);
+  g.bezierCurveTo(x - r * 1.5, y, x - r * 0.9, y - r * 1.2, x, y - r * 0.4);
+  g.bezierCurveTo(x + r * 0.9, y - r * 1.2, x + r * 1.5, y, x, y + r);
+  g.closePath();
+  g.lineWidth = 4;
+  g.strokeStyle = 'rgba(38,28,16,0.55)';
+  g.stroke();
+  g.fillStyle = cheio ? '#e0455a' : 'rgba(255,255,255,0.35)';
+  g.fill();
+  if (cheio) elipse(g, x - r * 0.45, y - r * 0.35, r * 0.22, r * 0.16, 'rgba(255,255,255,0.6)', -0.5);
+}
+
+// Xadrez dourado no chão da fileira da chegada.
+function faixaChegada(g, y0) {
+  const y = y0 + CEL - 10;
+  for (let i = 0; i * 12 < LARGURA; i++) {
+    ret(g, i & 1 ? '#fff4d6' : OURO_CASA, i * 12, y, 12, 5);
+    ret(g, i & 1 ? OURO_CASA : '#fff4d6', i * 12, y + 5, 12, 5);
+  }
+}
+
+// O bandeirão da chegada: dois postes, corda com bandeirinhas e a placa dourada da Casa Luckham.
+function bandeirao(g, y0, t) {
+  for (const x of [4, LARGURA - 12]) {
+    sombra(g, x - 2, y0 + 34, 14, 5);
+    bloco(g, x, y0 + 30, 8, 8, 66, '#9a6a3c', '#6e4526');
+    elipse(g, x + 4, y0 - 38, 6, 6, OURO_CASA);
+    elipse(g, x + 2.5, y0 - 40, 2, 2, '#fff4d6');
+  }
+  const x0 = 10;
+  const x1 = LARGURA - 10;
+  const ya = y0 - 32;
+  const yc = y0;
+  g.strokeStyle = '#6b4325';
+  g.lineWidth = 2;
+  g.beginPath();
+  g.moveTo(x0, ya);
+  g.quadraticCurveTo(LARGURA / 2, yc, x1, ya);
+  g.stroke();
+  const n = 15;
+  for (let i = 0; i < n; i++) {
+    const u = (i + 0.5) / n;
+    const a = (1 - u) * (1 - u);
+    const b = 2 * (1 - u) * u;
+    const x = a * x0 + b * (LARGURA / 2) + u * u * x1;
+    const y = a * ya + b * yc + u * u * ya;
+    poligono(g, CORES_BANDEIRA[i % 3], x - 7, y, x + 7, y, x + Math.sin(t * 4 + i * 0.9) * 2.5, y + 14);
+  }
+  const cx = LARGURA / 2;
+  poligono(g, OURO_CASA, cx - 10, y0 - 15, cx - 10, y0 - 24, cx - 5, y0 - 19, cx, y0 - 27, cx + 5, y0 - 19, cx + 10, y0 - 24, cx + 10, y0 - 15);
+  elipse(g, cx, y0 - 19, 1.8, 1.8, '#b23a48');
+  ret(g, '#8a5a1e', cx - 54, y0 - 15, 108, 24);
+  ret(g, OURO_CASA, cx - 52, y0 - 13, 104, 20);
+  ret(g, '#f6d978', cx - 52, y0 - 13, 104, 4);
+  g.save();
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.font = FONTE_PLACA;
+  g.fillStyle = '#5a3510';
+  g.fillText('CHEGADA', cx, y0 - 2);
+  g.restore();
+}
+
+function etiqueta(g, s, x, y, cor) {
+  g.save();
+  g.textAlign = 'center';
+  g.textBaseline = 'alphabetic';
+  g.lineJoin = 'round';
+  texto(g, s, x, y, FONTE_NOME, cor, 'rgba(30,20,10,0.8)', 4);
+  g.restore();
+}
+
+// A faixa de aviso embaixo da tela ("Você está fora: assistindo"...).
+function faixaAviso(g, s) {
+  g.save();
+  g.font = FONTE_AVISO;
+  const w = g.measureText(s).width + 32;
+  const x = (LARGURA - w) / 2;
+  const y = ALTURA - 64;
+  ret(g, 'rgba(38,26,14,0.78)', x, y, w, 34);
+  ret(g, OURO_CASA, x, y, w, 2);
+  g.fillRect(x, y + 32, w, 2);
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillStyle = '#ffe9a8';
+  g.fillText(s, LARGURA / 2, y + 17);
+  g.restore();
+}
+
+// info: { coop, vidas, faltam, vivos, total, faixa }
+function hudJunto(g, v, t, info) {
+  const contorno = 'rgba(38,28,16,0.55)';
+  g.save();
+  g.textBaseline = 'top';
+  g.lineJoin = 'round';
+  g.textAlign = 'center';
+  texto(g, String(v.p || 0), LARGURA / 2, 8, FONTE_PONTOS, '#fffdf4', contorno, 7);
+  formaCenoura(g, 22, 30, 0.95);
+  g.textAlign = 'left';
+  texto(g, String(v.k || 0), 36, 18, FONTE_MEDIA, '#ffe08a', contorno, 5);
+  if (info.vidas != null) { // versus: um coração; co-op: as vidas da equipe
+    const n = info.vidas;
+    const xs = LARGURA - 22;
+    if (n <= 0) coracao(g, xs, 28, 9, false);
+    else if (n <= 5) for (let i = 0; i < n; i++) coracao(g, xs - i * 22, 28, 9, true);
+    else {
+      coracao(g, xs - 34, 28, 9, true);
+      g.textAlign = 'left';
+      texto(g, `x${n}`, xs - 20, 18, FONTE_MEDIA, '#ffffff', contorno, 5);
+    }
+    if (info.coop) {
+      g.textAlign = 'right';
+      texto(g, 'Equipe', LARGURA - 12, 42, FONTE_PEQ, '#ffffff', contorno, 4);
+    }
+  }
+  g.textAlign = 'center';
+  if (info.coop) {
+    const f = info.faltam;
+    const s = f <= 0 ? 'Linha de chegada!' : f === 1 ? 'Falta 1 fileira' : `Faltam ${f} fileiras`;
+    texto(g, s, LARGURA / 2, 58, FONTE_PEQ, '#ffe08a', contorno, 4);
+  } else {
+    texto(g, `Vivos: ${info.vivos} de ${info.total}`, LARGURA / 2, 58, FONTE_PEQ, '#ffffff', contorno, 4);
+  }
+  if (!info.faixa && !v.e && v.o > 0.05) {
+    g.globalAlpha = Math.min(1, v.o * 1.5) * (0.6 + 0.4 * Math.sin(t * 10));
+    texto(g, 'Ande! O gavião está de olho!', LARGURA / 2, 80, FONTE_AVISO, '#ffd9c9', 'rgba(60,20,10,0.7)', 4);
+  }
+  g.restore();
+  if (info.faixa) faixaAviso(g, info.faixa);
+}
+
 // Desenha a cena inteira a partir de uma "vista" (a mesma coisa que vai para quem assiste).
-function desenharCena(g, v, t, extra) {
+// J (só no jogo junto): ganchos para desenhar a chegada, os outros coelhos, os nomes e o placar junto.
+function desenharCena(g, v, t, extra, J = null) {
   const cam = v.c || 0;
   const f = v.f || [];
   const b = v.b || [LARGURA / 2, 0, 1, 0, 0, 0];
@@ -779,24 +934,32 @@ function desenharCena(g, v, t, extra) {
   for (let i = 0; i < f.length - 1; i++) {
     if (f[i][1] === 0 && f[i + 1][1] !== 0) barranco(g, topoFaixa(f[i][0], cam), f[i + 1][1]);
   }
+  if (J) J.chao(g, cam, t);
   const bx = b[0];
   const by = ALTURA - (b[1] - cam + 0.5) * CEL + 7 - b[5] * 9; // os pés
-  if (e === 1) amassado(g, bx, by, b[2], m, t);
+  const vis = v.vis; // o visual do Club Coelho (só no jogo junto)
+  if (e === 1 && !v.z) amassado(g, bx, by, b[2], m, t, vis);
   // de longe para perto; o coelho entra logo depois da fileira dele
-  let feito = !(e === 0 || (e === 3 && q < 0.33));
+  let feito = !!v.z || !(e === 0 || (e === 3 && q < 0.33));
   const filaCoelho = Math.round(b[1]);
   for (let i = 0; i < f.length; i++) {
     objetos(g, f[i], topoFaixa(f[i][0], cam), t);
-    if (!feito && f[i][0] <= filaCoelho) { coelho(g, bx, by, b[3], b[4], b[2], m, t); feito = true; }
+    if (J) J.fila(g, f[i][0], cam, t);
+    if (!feito && f[i][0] <= filaCoelho) { coelho(g, bx, by, b[3], b[4], b[2], m, t, vis); feito = true; }
   }
-  if (!feito) coelho(g, bx, by, b[3], b[4], b[2], m, t);
-  if (e === 2) respingo(g, bx, by, q, m);
-  else if (e === 3) gaviaoPega(g, bx, by, q, b[2], m, t);
-  else if (e === 4) voando(g, bx, by, q, b[2], m, t);
-  else if (e === 0 && v.o > 0) sombraGaviao(g, bx, by, v.o, t);
+  if (J) J.fila(g, -Infinity, cam, t);
+  if (!feito) coelho(g, bx, by, b[3], b[4], b[2], m, t, vis);
+  if (!v.z) {
+    if (e === 2) respingo(g, bx, by, q, m, vis);
+    else if (e === 3) gaviaoPega(g, bx, by, q, b[2], m, t, vis);
+    else if (e === 4) voando(g, bx, by, q, b[2], m, t, vis);
+    else if (e === 0 && v.o > 0) sombraGaviao(g, bx, by, v.o, t);
+  }
+  if (J) J.cima(g, cam, t, v, bx, by);
   if (extra) extra(g, cam);
   if (noiteAtiva) noite(g, bx, e === 3 && q >= 0.33 ? by - 60 : by - 18);
-  hud(g, v, t);
+  if (J) J.hud(g, v, t);
+  else hud(g, v, t);
   g.restore();
 }
 
@@ -826,12 +989,24 @@ function descreverFaixa(fx, tempo, rd) {
 
 function novoEstado(ctx) {
   const semente = Math.floor(ctx.sorte() * 4294967296) >>> 0;
-  return {
-    tempo: 0, semente, ger: novoGerador(semente), faixas: [],
+  const J = ctx.junto || null;
+  const dif = J ? Math.max(1, Number(J.dif) || 1) : 1;
+  // co-op: a chegada fica mais longe quanto mais gente (40 + 15 por pessoa)
+  const meta = J && J.modo === 'coop' ? 40 + 15 * Math.max(1, Number(J.n) || 1) : null;
+  const E = {
+    tempo: 0, semente, ger: J ? novoGerador(semente, dif, meta) : novoGerador(semente), faixas: [],
     fila: 0, x: 4 * CEL + 24, olhar: 1, tronco: -1, desloc: 0,
     pulo: null, guardado: null, cam: -3.5, maxFila: 0, cenouras: 0, ocioso: 0, esmaga: 0, suaveX: 0,
     morte: null, acabou: false,
   };
+  if (J) {
+    Object.assign(E, {
+      meta, posto: false, chegou: false, fora: false, morriEnviado: false, renascer: 0, protegido: 0, pulos: 0,
+      pontosEnviados: 0, relogioPontos: 1, ultimaPos: '', relogioPos: 0, ultimaGrama: { fila: 0, x: 4 * CEL + 24 },
+      pegas: new Set(), pedidas: new Set(),
+    });
+  }
+  return E;
 }
 
 // copia: um jogo copiado (só nos testes) não mexe no melhor da sessão.
@@ -840,15 +1015,27 @@ function montar(ctx, E, copia = false) {
   const segredo = chave => { try { return !!ctx.segredo?.(chave); } catch { return false; } };
   const parts = Array.from({ length: 60 }, () => ({ vida: 0, max: 1, x: 0, p: 0, z: 0, vx: 0, vz: 0, tipo: 0 }));
   let relogioBrilho = 0;
+  // Jogo junto (versus ou co-op). As cópias dos testes (teste.clonar) não mandam nada para a sala.
+  const J0 = ctx.junto || null;
+  const J = J0 && copia ? { ...J0, pos: nada, evento: nada, pegar: nada, morri: nada, cheguei: nada, pontos: nada } : J0;
+  const coop = !!J && J.modo === 'coop';
+  const versus = !!J && !coop;
+  const R = [];     // cada pessoa da sala: o que ela mandou e onde o coelho dela aparece aqui
+  const lista = []; // os outros que aparecem neste quadro, de longe para perto
+  let iLista = 0;
 
   const faixa = r => {
     const i = r - E.faixas[0].r;
     return i >= 0 && i < E.faixas.length ? E.faixas[i] : null;
   };
   // gera à frente da câmera e esquece o que ficou para trás
-  function gerarAte() {
-    const ate = Math.floor(E.cam) + 16;
-    while (E.ger.r <= ate) E.faixas.push(gerarFaixa(E.ger));
+  function gerarAte(ate = Math.floor(E.cam) + 16) {
+    while (E.ger.r <= ate) {
+      const fx = gerarFaixa(E.ger);
+      if (J && fx.cenoura >= 0 && E.pegas.has(`c:${fx.r}:${fx.cenoura}`)) fx.cenoura = -1; // alguém já pegou
+      E.faixas.push(fx);
+    }
+    if (J) return; // junto: guarda tudo (renascer e assistir os outros podem levar a câmera para trás)
     const corte = Math.floor(E.cam) - 3;
     while (E.faixas.length > 1 && E.faixas[0].r < corte) E.faixas.shift();
   }
@@ -896,9 +1083,18 @@ function montar(ctx, E, copia = false) {
   function brilhos(n, x, p) {
     for (let i = 0; i < n; i++) soltar(1, x + acaso(-15, 15), p, acaso(8, 34), acaso(-25, 25), acaso(20, 60), acaso(0.5, 0.9));
   }
+  // Puf! uma nuvenzinha (alguém sumiu ou apareceu)
+  function puf(x, p) {
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      soltar(0, x + Math.cos(a) * 6, p, 12 + Math.sin(a) * 6, Math.cos(a) * acaso(40, 75), acaso(8, 40), acaso(0.4, 0.75));
+    }
+    brilhos(4, x, p);
+  }
 
   /* Pulos */
   function iniciarPulo(a) {
+    if (J) E.pulos++; // os outros sabem que começou um pulo novo
     const dx = a === 'esq' ? -1 : a === 'dir' ? 1 : 0;
     const dy = a === 'cima' ? 1 : a === 'baixo' ? -1 : 0;
     if (dx) E.olhar = dx;
@@ -911,6 +1107,7 @@ function montar(ctx, E, copia = false) {
         if (x1 < 6 || x1 > LARGURA - 6) pode = false;
       } else if (alvo.tipo !== 't' || E.tronco < 0) x1 = colunaDoX(E.x) * CEL + 24; // tronco para tronco: pula reto
       if (pode && alvo.tipo === 'g' && alvo.bloq[colunaDoX(x1)]) pode = false;
+      if (pode && E.chegou && E.fila + dy < E.meta) pode = false; // chegou (co-op): não volta para o perigo
     }
     if (!pode) { // esbarrou (árvore, pedra, beirada): só um tranco no lugar
       E.pulo = { t: 0, dur: 0.1, x0: E.x, x1: E.x, f0: E.fila, f1: E.fila, bater: true, bx: dx, by: dy };
@@ -959,11 +1156,15 @@ function montar(ctx, E, copia = false) {
     const fx = faixa(E.fila);
     E.tronco = -1;
     if (fx.tipo === 'g') {
+      if (J) E.ultimaGrama = { fila: E.fila, x: E.x };
       if (fx.cenoura >= 0 && fx.cenoura === colunaDoX(E.x)) {
-        fx.cenoura = -1;
-        E.cenouras++;
-        som('moeda');
-        brilhos(10, E.x, E.fila);
+        if (J) pedirCenoura(fx); // junto: só conta quando a sala disser quem pegou primeiro
+        else {
+          fx.cenoura = -1;
+          E.cenouras++;
+          som('moeda');
+          brilhos(10, E.x, E.fila);
+        }
       }
     } else if (fx.tipo === 't') {
       if (!prenderTronco(fx)) morrer('agua');
@@ -1004,6 +1205,7 @@ function montar(ctx, E, copia = false) {
       if (fx.tipo === 't' && E.tronco >= 0 && (E.x < 0 || E.x > LARGURA)) { morrer('correnteza'); return; }
       if (fx.tipo === 'n' && estadoNenufar(fx, colunaDoX(E.x), E.tempo) === 3) { morrer('afundou'); return; }
     }
+    if (E.chegou) { E.ocioso = 0; return; } // chegou (co-op): o gavião deixa em paz
     E.ocioso += dt;
     if (E.ocioso > OCIO_MAX) morrer('gaviao', 'parado');
     else if (pAtual() < E.cam - 0.3) morrer('gaviao', 'atras');
@@ -1019,6 +1221,415 @@ function montar(ctx, E, copia = false) {
       const antes = fx._tau ?? tau;
       if (tau < antes || (antes < 0.5 && tau >= 0.5)) som('alerta');
       fx._tau = tau;
+    }
+  }
+
+  /* ─── Jogo junto: os outros coelhos, a sala e a câmera ─── */
+
+  function visualDe(jg, i) {
+    const v = jg?.visual;
+    const pelo = typeof v?.pelo === 'string' && /^#[0-9a-f]{6}$/i.test(v.pelo) ? v.pelo : PELOS[i % PELOS.length];
+    return { pelo, roupa: v?.roupa && typeof v.roupa === 'object' ? v.roupa : null };
+  }
+  // A coluna livre e alcançável de um campo mais perto de "pref" (-1 se não tem nenhuma).
+  function colunaLivre(fx, pref) {
+    let melhor = -1;
+    let dist = 99;
+    for (let c = 0; c < COLUNAS; c++) {
+      if (!fx || fx.tipo !== 'g' || fx.bloq[c] || !((fx.alc >> c) & 1)) continue;
+      if (Math.abs(c - pref) < dist) { dist = Math.abs(c - pref); melhor = c; }
+    }
+    return melhor;
+  }
+  const PREF_LARGADA = [4, 3, 5, 2, 6, 1, 7, 0, 8];
+  const xLargada = i => {
+    const c = colunaLivre(faixa(0), PREF_LARGADA[i % COLUNAS]);
+    return (c < 0 ? 4 : c) * CEL + 24;
+  };
+
+  const estadoSala = () => { try { return J.estado?.() || null; } catch { return null; } };
+  const vivoRemoto = (o, est) => !o.fora && !est?.p?.[o.i]?.fora && !est?.p?.[o.i]?.saiu;
+  const chegouRemoto = (o, est) => o.chegou || !!est?.p?.[o.i]?.chegou;
+
+  // x de quem está num tronco: o tronco anda igual para todos (mesmo relógio), então basta o lugar nele.
+  function alvoX(d) {
+    if (d.t >= 0) {
+      const fx = faixa(Math.round(d.f));
+      const ob = fx && fx.tipo === 't' ? fx.objs[d.t] : null;
+      if (ob) return posObj(fx, ob, E.tempo) + d.od;
+    }
+    return d.x;
+  }
+
+  // Chegou a posição de alguém: guarda e começa a animação (pulo, morte ou aparecer de novo).
+  function receber(o, d) {
+    if (!o || o.i === J.eu || o.fora || !d || typeof d !== 'object') return;
+    const f = Number(d.f);
+    const x = Number(d.x);
+    if (!Number.isFinite(f) || !Number.isFinite(x)) return;
+    const e = d.e >= 1 && d.e <= 4 ? Math.floor(d.e) : 0;
+    const antes = o.d;
+    const novo = {
+      f: limitar(f, -6, 1e6), x: limitar(x, -300, LARGURA + 300), t: Number.isInteger(d.t) ? d.t : -1, od: Number(d.o) || 0,
+      l: d.l < 0 ? -1 : 1, n: Math.floor(Number(d.n) || 0), h: limitar(Number(d.h) || 0, 0, 1),
+    };
+    o.d = novo;
+    o.olhar = novo.l;
+    if (d.c) o.chegou = true;
+    if (e) { // morreu: a animação começa no lugar onde aconteceu
+      if (!o.e) Object.assign(o, { e, et: 0, ex: novo.x, ep: novo.f, vx: Number(d.v) || 0, pulo: null });
+      return;
+    }
+    if (o.e || o.sumido) { // renasceu: aparece direto no lugar novo
+      Object.assign(o, { e: 0, sumido: false, pulo: null, n: novo.n, x: alvoX(novo), p: novo.f, erroX: 0, erroP: 0, pisca: 1.2 });
+      puf(o.x, o.p);
+      return;
+    }
+    if (novo.n !== o.n) { // pulo novo: daqui até o destino
+      o.n = novo.n;
+      const bate = !!antes && novo.f === antes.f && Math.abs(alvoX(novo) - o.x) < 10;
+      o.pulo = { t: Math.min(0.5, novo.h), x0: o.x, p0: o.p, bate };
+      return;
+    }
+    if (!o.pulo) { o.erroX = o.x - alvoX(novo); o.erroP = o.p - novo.f; }
+  }
+
+  // Os outros andam suave: o erro até o destino some aos poucos (e quem está no tronco vai com ele).
+  function moverOutros(dt) {
+    const k = 1 - Math.min(1, dt * 14);
+    for (const o of R) {
+      if (o.i === J.eu) continue;
+      o.pisca = Math.max(0, o.pisca - dt);
+      o.esmaga = Math.max(0, o.esmaga - dt * 9);
+      if (o.e) {
+        o.et += dt;
+        if (o.e === 4) o.ex += o.vx * dt;
+        continue;
+      }
+      const d = o.d;
+      if (!d) continue;
+      const tx = alvoX(d);
+      if (o.pulo) {
+        const P = o.pulo;
+        P.t = Math.min(1, P.t + dt / DUR_PULO);
+        if (P.bate) { o.x = tx; o.p = d.f; } else { o.x = P.x0 + (tx - P.x0) * P.t; o.p = P.p0 + (d.f - P.p0) * P.t; }
+        if (P.t >= 1) { o.pulo = null; o.esmaga = 1; o.erroX = 0; o.erroP = 0; }
+      } else {
+        o.erroX *= k;
+        o.erroP *= k;
+        o.x = tx + o.erroX;
+        o.p = d.f + o.erroP;
+      }
+      const fx = faixa(Math.round(d.f));
+      o.alt = !o.pulo && fx && (fx.tipo === 't' || fx.tipo === 'n') ? 1 : 0;
+    }
+  }
+
+  function pedirCenoura(fx) {
+    const chave = `c:${fx.r}:${fx.cenoura}`;
+    if (E.pedidas.has(chave) || E.pegas.has(chave)) return;
+    E.pedidas.add(chave);
+    J.pegar(chave, 1);
+  }
+  // A sala disse quem pegou a cenoura (o primeiro que pediu leva).
+  function pegou(i, chave) {
+    const m = /^c:(-?\d+):(\d+)$/.exec(String(chave));
+    if (!m) return;
+    const r = Number(m[1]);
+    const c = Number(m[2]);
+    const k = `c:${r}:${c}`;
+    if (E.pegas.has(k)) return;
+    E.pegas.add(k);
+    const fx = faixa(r);
+    if (fx && fx.cenoura === c) fx.cenoura = -1;
+    if (i === J.eu) {
+      E.cenouras++;
+      som('moeda');
+      brilhos(10, c * CEL + 24, r);
+    }
+  }
+
+  function chegar() {
+    E.chegou = true;
+    E.ocioso = 0;
+    J.cheguei();
+    som('fase');
+    brilhos(16, xAtual(), pAtual());
+  }
+
+  // Onde renascer: um campo uma fileira atrás de quem vai mais na frente (co-op), ou o meu último campo.
+  function pontoDeRenascer() {
+    let base = E.ultimaGrama.fila;
+    let xPref = E.ultimaGrama.x;
+    if (coop) {
+      const est = estadoSala();
+      let lider = null;
+      for (const o of R) {
+        if (o.i === J.eu || !o.d || o.e || o.sumido || !vivoRemoto(o, est) || chegouRemoto(o, est)) continue;
+        if (!lider || o.d.f > lider.d.f) lider = o;
+      }
+      if (lider && Math.floor(lider.d.f) - 1 > base) { base = Math.floor(lider.d.f) - 1; xPref = lider.x; }
+      if (E.meta != null) base = Math.min(base, E.meta - 1);
+    }
+    gerarAte(base + 2);
+    for (let r = Math.max(0, base); r >= 0; r--) {
+      const c = colunaLivre(faixa(r), colunaDoX(xPref));
+      if (c >= 0) return { fila: r, x: c * CEL + 24 };
+    }
+    return { fila: 0, x: xLargada(J.eu) };
+  }
+
+  function renascer() {
+    const m = E.morte;
+    if (m) puf(m.x, m.p);
+    const pt = pontoDeRenascer();
+    Object.assign(E, {
+      morte: null, morriEnviado: false, renascer: 0, fila: pt.fila, x: pt.x, pulo: null, guardado: null, tronco: -1, desloc: 0,
+      ocioso: 0, esmaga: 1, suaveX: 0, protegido: 1.5, cam: pt.fila - 3.5, maxFila: Math.max(E.maxFila, pt.fila),
+      ultimaGrama: { fila: pt.fila, x: pt.x },
+    });
+    gerarAte();
+    puf(pt.x, pt.fila);
+    som('poder');
+  }
+
+  // Quem assistir (fora ou já chegou): quem está vivo mais na frente (depois de chegar, quem ainda atravessa).
+  function alvoAssistir() {
+    const est = estadoSala();
+    let melhor = null;
+    for (const o of R) {
+      if (o.i === J.eu || o.sumido || !vivoRemoto(o, est)) continue;
+      if (E.chegou && chegouRemoto(o, est)) continue;
+      const p = o.e ? o.ep : o.p;
+      if (melhor === null || p > melhor) melhor = p;
+    }
+    if (melhor === null && !E.fora) melhor = pAtual();
+    return melhor;
+  }
+
+  function moverCamera(dt) {
+    if (E.fora || E.chegou) {
+      const alvo = alvoAssistir();
+      if (alvo !== null) E.cam += (alvo - 3.5 - E.cam) * Math.min(1, dt * 2.5);
+      return;
+    }
+    if (E.morte) return;
+    const alvo = pAtual() - 3.5;
+    if (alvo > E.cam) E.cam += (alvo - E.cam) * Math.min(1, dt * 4);
+    let anda = 0.14 + 0.2 * dificuldade(E.maxFila, rampa(E.ger));
+    if (versus) anda += Math.min(0.6, E.tempo * 0.0025); // no versus a tela aperta com o tempo
+    E.cam += anda * dt;
+  }
+
+  // Manda onde estou (só quando muda, ou uma vez por segundo); a sala segura uns 12 por segundo.
+  function enviarPos(dt) {
+    if (E.fora) return;
+    const m = E.morte;
+    const P = E.pulo;
+    const d = m
+      ? { f: Math.round(m.p * 100) / 100, x: Math.round(m.x), t: -1, o: 0, l: E.olhar, n: E.pulos, h: 0, e: COD_MORTE[m.tipo], v: Math.round(m.vx) }
+      : { f: P ? P.f1 : E.fila, x: Math.round(P ? P.x1 : E.x), t: P ? -1 : E.tronco, o: Math.round(E.desloc), l: E.olhar, n: E.pulos, h: P ? Math.round(P.t * 10) / 10 : 0, e: 0 };
+    if (E.chegou) d.c = 1;
+    const chave = `${d.f}|${d.t >= 0 ? `t${d.t}` : d.x}|${d.o}|${d.l}|${d.n}|${d.e}|${d.c ? 1 : 0}`;
+    E.relogioPos += dt;
+    if (chave === E.ultimaPos && E.relogioPos < 1) return;
+    E.ultimaPos = chave;
+    E.relogioPos = 0;
+    J.pos(d);
+  }
+
+  // O quanto já andei (no máximo umas 2 vezes por segundo).
+  function progresso(dt) {
+    E.relogioPontos += dt;
+    if (E.maxFila > E.pontosEnviados && E.relogioPontos >= 0.5) {
+      E.relogioPontos = 0;
+      E.pontosEnviados = E.maxFila;
+      J.pontos(E.maxFila);
+    }
+  }
+
+  // Um passo do jogo junto: o mundo vai pelo relógio da sala; o meu coelho, pelo passo daqui.
+  function atualizarJunto(dt, entrada) {
+    const antes = E.tempo;
+    E.tempo = copia ? E.tempo + dt : Math.max(E.tempo, Math.max(0, Number(J.tempo()) || 0));
+    const dtm = E.tempo - antes;
+    moverParticulas(dt);
+    moverOutros(dt);
+    E.protegido = Math.max(0, E.protegido - dt);
+    if (E.morte) {
+      const m = E.morte;
+      const a = m.t;
+      m.t += dt;
+      if (m.tipo === 'trem') m.x += m.vx * dt;
+      if (m.tipo === 'gaviao' && a < 0.5 && m.t >= 0.5) som('morte');
+      if (m.t >= DUR_MORTE[m.tipo] && !E.morriEnviado) { E.morriEnviado = true; J.morri(); } // uma vez só
+      if (E.renascer > 0 && (E.renascer -= dt) <= 0) renascer();
+    } else if (!E.fora) {
+      for (const k of entrada?.apertou || []) {
+        const a = ACAO[k];
+        if (!a) continue;
+        if (!E.pulo) iniciarPulo(a);
+        else if (!E.guardado) E.guardado = a;
+      }
+      const aqui = faixa(E.fila);
+      if (E.tronco >= 0 && aqui && aqui.tipo === 't') {
+        if (E.pulo) {
+          const dv = aqui.dir * aqui.vel * dtm;
+          E.pulo.x0 += dv;
+          E.pulo.x1 += dv;
+        } else E.x = posObj(aqui, aqui.objs[E.tronco], E.tempo) + E.desloc;
+      }
+      if (E.pulo) {
+        E.pulo.t = Math.min(1, E.pulo.t + dt / E.pulo.dur);
+        if (E.pulo.t >= 1) {
+          aterrissar();
+          if (!E.morte && E.guardado) {
+            const a = E.guardado;
+            E.guardado = null;
+            iniciarPulo(a);
+          }
+        }
+      }
+      E.esmaga = Math.max(0, E.esmaga - dt * 9);
+      E.suaveX *= Math.max(0, 1 - dt * 18);
+      if (!E.morte) verificarPerigos(dt);
+      if (!E.morte) {
+        if (coop && !E.chegou && E.fila >= E.meta) chegar();
+        sinos();
+      }
+    }
+    moverCamera(dt);
+    progresso(dt);
+    enviarPos(dt);
+    gerarAte();
+  }
+
+  // Os ganchos de desenho do jogo junto (veja desenharCena).
+  function desenharOutro(g, o, cam, t, etapa) {
+    const morto = o.e > 0;
+    const x = morto ? o.ex : o.x;
+    const p = morto ? o.ep : o.p;
+    const y = ALTURA - (p - cam + 0.5) * CEL + 7 - (morto ? 0 : o.alt) * 9;
+    if (y < -90 || y > ALTURA + 90 || x < -120 || x > LARGURA + 120) return;
+    const q = morto ? Math.min(1, o.et / DUR_COD[o.e]) : 0;
+    if (etapa === 0) { if (o.e === 1) amassado(g, x, y, o.olhar, 0, t, o.vis); return; }
+    if (etapa === 1) {
+      if (!morto || (o.e === 3 && q < 0.33)) {
+        const s = o.pulo ? (o.pulo.bate ? o.pulo.t * 0.35 : o.pulo.t) : 0;
+        coelho(g, x, y, s, o.esmaga, o.olhar, o.pisca > 0 && Math.floor(o.pisca * 8) % 2 ? 1 : 0, t, o.vis);
+      }
+      return;
+    }
+    if (etapa === 2) {
+      if (o.e === 2) respingo(g, x, y, q, 0, o.vis);
+      else if (o.e === 3) gaviaoPega(g, x, y, q, o.olhar, 0, t, o.vis);
+      else if (o.e === 4) voando(g, x, y, q, o.olhar, 0, t, o.vis);
+      return;
+    }
+    if (!morto) { // o nome, na cor da pessoa
+      const s = o.pulo ? (o.pulo.bate ? o.pulo.t * 0.35 : o.pulo.t) : 0;
+      etiqueta(g, o.nome, x, y - 46 - Math.sin(Math.PI * s) * 13, o.cor);
+    }
+  }
+  function prepararOutros() {
+    lista.length = 0;
+    iLista = 0;
+    const est = estadoSala();
+    for (const o of R) {
+      if (o.i === J.eu || o.fora || o.sumido) continue;
+      const g = est?.p?.[o.i];
+      if (g && (g.saiu || (g.fora && !o.e))) continue;
+      o.pd = o.e ? o.ep : o.p;
+      lista.push(o);
+    }
+    lista.sort((a, b) => b.pd - a.pd);
+  }
+  function infoHud() {
+    const est = estadoSala();
+    const ps = est?.p || [];
+    let vivos = 0;
+    for (const p of ps) if (p && !p.fora && !p.saiu) vivos++;
+    let faixaTxt = null;
+    if (E.fora) faixaTxt = 'Você está fora: assistindo';
+    else if (E.chegou) faixaTxt = 'Você chegou! Esperando a equipe';
+    else if (E.morte && E.renascer > 0) faixaTxt = 'Renascendo...';
+    const vidasEquipe = Number(est?.vidasEquipe);
+    return {
+      coop,
+      vidas: coop ? (Number.isFinite(vidasEquipe) ? vidasEquipe : null) : E.fora || E.morte ? 0 : 1,
+      faltam: coop ? Math.max(0, E.meta - E.maxFila) : 0,
+      vivos, total: ps.length || R.length, faixa: faixaTxt,
+    };
+  }
+  const cena = J ? {
+    chao(g, cam, t) {
+      prepararOutros();
+      if (E.meta != null) {
+        const y = topoFaixa(E.meta, cam);
+        if (y > -CEL && y < ALTURA) faixaChegada(g, y);
+      }
+      for (const o of lista) if (o.e === 1) desenharOutro(g, o, cam, t, 0);
+    },
+    fila(g, r, cam, t) {
+      if (r === E.meta) bandeirao(g, topoFaixa(r, cam), t);
+      while (iLista < lista.length && Math.round(lista[iLista].pd) >= r) desenharOutro(g, lista[iLista++], cam, t, 1);
+    },
+    cima(g, cam, t, v, bx, by) {
+      for (const o of lista) if (o.e > 1) desenharOutro(g, o, cam, t, 2);
+      for (const o of lista) desenharOutro(g, o, cam, t, 3);
+      if (!v.z && !v.e) etiqueta(g, 'Você', bx, by - 46 - Math.sin(Math.PI * v.b[3]) * 13, R[J.eu]?.cor || OURO_CASA);
+    },
+    hud(g, v, t) { hudJunto(g, v, t, infoHud()); },
+  } : null;
+
+  if (J) {
+    const n = Math.max(1, Number(J.n) || J.jogadores?.length || 1);
+    for (let i = 0; i < n; i++) {
+      const jg = J.jogadores?.[i];
+      const x = xLargada(i);
+      R.push({
+        i, nome: String(jg?.nome || `Coelho ${i + 1}`).slice(0, 14), cor: jg?.cor || OURO_CASA, vis: visualDe(jg, i),
+        d: null, x, p: 0, ex: x, ep: 0, pd: 0, olhar: 1, pulo: null, n: 0, e: 0, et: 0, vx: 0, esmaga: 0, alt: 0, pisca: 0,
+        erroX: 0, erroP: 0, fora: false, chegou: false, sumido: false,
+      });
+    }
+    if (!E.posto) { // cada um larga numa coluna (todos na mesma fileira)
+      E.posto = true;
+      E.x = xLargada(J.eu);
+      E.ultimaGrama = { fila: 0, x: E.x };
+    }
+    if (!copia) {
+      J.aoPos = (i, d) => receber(R[i], d);
+      J.aoPegou = (i, chave) => pegou(i, chave);
+      J.aoRenascer = i => {
+        if (i === J.eu) {
+          if (E.morte && !E.fora && E.renascer <= 0) E.renascer = ESPERA_RENASCER;
+          return;
+        }
+        const o = R[i];
+        if (!o || o.fora || o.sumido) return;
+        puf(o.e ? o.ex : o.x, o.e ? o.ep : o.p);
+        o.sumido = true; // some até mandar o lugar novo
+      };
+      J.aoFora = i => {
+        if (i === J.eu) {
+          if (E.fora) return;
+          E.fora = true;
+          const m = E.morte;
+          puf(m ? m.x : xAtual(), m ? m.p : pAtual());
+          return;
+        }
+        const o = R[i];
+        if (!o || o.fora) return;
+        if (!o.sumido) puf(o.e ? o.ex : o.x, o.e ? o.ep : o.p);
+        o.fora = true;
+      };
+      J.aoChegou = i => {
+        const o = R[i];
+        if (!o) return;
+        o.chegou = true;
+        if (i !== J.eu && !o.e) brilhos(8, o.x, o.p);
+      };
     }
   }
 
@@ -1054,7 +1665,7 @@ function montar(ctx, E, copia = false) {
       }
       o = Math.max(limitar((E.ocioso - 4.2) / (OCIO_MAX - 4.2), 0, 1), limitar((1.3 - (p - E.cam)) / 1.3, 0, 1));
     }
-    return {
+    const v = {
       c: rd2(E.cam),
       b: [rd1(x), rd2(p), E.olhar, rd2(s), rd2(E.esmaga), alt],
       e: m ? COD_MORTE[m.tipo] : 0,
@@ -1066,6 +1677,13 @@ function montar(ctx, E, copia = false) {
       o: rd2(o),
       f,
     };
+    if (J) {
+      v.vis = R[J.eu]?.vis || null;
+      if (E.fora) v.z = 1; // fora: o meu coelho some (só assisto)
+      if (E.chegou || E.fora) v.o = 0;
+      if (E.protegido > 0 && Math.floor(E.protegido * 8) % 2) v.m |= 1; // pisca quando renasce
+    }
+    return v;
   }
 
   return {
@@ -1074,6 +1692,7 @@ function montar(ctx, E, copia = false) {
 
     atualizar(dt, entrada) {
       if (E.acabou) return;
+      if (J) { atualizarJunto(dt, entrada); return; } // junto: nunca acaba por aqui (quem encerra é a sala)
       E.tempo += dt;
       moverParticulas(dt);
       if (E.morte) {
@@ -1132,7 +1751,7 @@ function montar(ctx, E, copia = false) {
     },
 
     desenhar(g, t) {
-      desenharCena(g, vista(false), t, desenharParticulas);
+      desenharCena(g, vista(false), t, desenharParticulas, cena);
     },
 
     resumo() {
@@ -1168,7 +1787,7 @@ function montar(ctx, E, copia = false) {
     // Ganchos para os testes no Node (não mexem no jogo, exceto colocar).
     teste: {
       linhas(n, de = 0) {
-        const G = novoGerador(E.semente);
+        const G = novoGerador(E.semente, E.ger.dif, E.ger.meta);
         const lista = [];
         while (G.r < de + n) {
           const fx = gerarFaixa(G);
@@ -1184,6 +1803,9 @@ function montar(ctx, E, copia = false) {
       faixa: r => faixa(r),
       clonar: () => montar({ ...ctx, som: () => {} }, structuredClone(E), true),
       estado: () => E,
+      outros: () => R,
+      // o mundo que anda agora (carroças, troncos, vitórias-régias e trens), fileira por fileira
+      mundo: () => E.faixas.filter(fx => fx.tipo !== 'g').map(fx => descreverFaixa(fx, E.tempo, n => Math.round(n * 1000) / 1000)),
     },
   };
 }
@@ -1194,6 +1816,10 @@ export default {
   icone: 'estrada',
   sub: 'Pule pelos campos, estradas, rios e trilhos e leve o coelho o mais longe que conseguir.',
   subDesafio: 'Todos atravessam o mesmo mundo: quem chegar mais longe vence.',
+  subJunto: {
+    versus: 'Todos no mesmo mundo, ao mesmo tempo, cada um por si: quem sobrar vivo vence.',
+    coop: 'Todos no mesmo mundo e do mesmo lado: a equipe inteira precisa cruzar a linha de chegada.',
+  },
   largura: LARGURA,
   altura: ALTURA,
   cor: '#86c35f',

@@ -338,6 +338,15 @@ const acoes = {
   },
 };
 
+// O coelho de cada um, pronto para desenhar nos jogos (cor do pelo e a roupa por partes).
+async function visualDesenho(id) {
+  const l = await db.get('SELECT visual, itens FROM clube WHERE usuario_id = ?', id);
+  const v = validarVisual(json(l?.visual, {}), json(l?.itens, {}));
+  const roupa = {};
+  for (const p of PARTES) if (v[p]) roupa[p] = v[p];
+  return { pelo: ITEM[v.pelo]?.cor || '#e9dcc3', roupa };
+}
+
 // A roupa mudou (pela rota PUT /api/clube/visual): quem está na mesma sala vê na hora.
 function mudouVisual(id, visual) {
   const p = presentes.get(id);
@@ -360,5 +369,5 @@ function iniciar(opcoes) { ctx = { ...ctx, ...opcoes }; }
 
 module.exports = {
   CATALOGO, ITEM, PARTES, ROUPA, SALAS, EMOTES, INICIAIS, PRESENTE, TETO_DIA, MAX_MOVEIS, ErroClube,
-  perfil, validarVisual, validarToca, ganhar, ganharDeJogo, acoes, sair, fechou, mudouVisual, mudouToca, iniciar, posicaoAgora,
+  perfil, validarVisual, visualDesenho, validarToca, ganhar, ganharDeJogo, acoes, sair, fechou, mudouVisual, mudouToca, iniciar, posicaoAgora,
 };

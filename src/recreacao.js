@@ -14,9 +14,10 @@ const cobras = require('./cobras');
 const damas = require('./damas');
 const raposa = require('./raposa');
 const { MESAS, ErroMesa } = require('./mesa');
-const desafio = require('./desafio');
 const cidade = require('./cidade');
 const clube = require('./clube');
+const junto = require('./junto');
+const festa = require('./festa');
 const mundo = require('./cidade-mundo');
 const { paraCriancas } = require('./censura');
 const bobo = require('./bobo');
@@ -174,9 +175,12 @@ const JOGOS = {
   minado: { nome: 'Campo Minado', max: 6, min: 1, grupo: true, mesa: true },
   quebra: { nome: 'Quebra-cabeça', max: 6, min: 1, grupo: true, mesa: true },
   memoria: { nome: 'Jogo da Memória', max: 6, min: 1, grupo: true, mesa: true },
-  // Desafio: um jogo de uma pessoa só, com a mesma semente para todos (veja desafio.js).
-  desafio: { nome: 'Desafio', max: 6, min: 1, grupo: true },
+  // Jogos juntos: todos no mesmo jogo, ao mesmo tempo (veja junto.js). O máximo depende do jogo.
+  junto: { nome: 'Juntos', max: 6, min: 1, grupo: true },
+  // Festa na Toca: o tabuleiro com minijogos (veja festa.js). Os lugares vazios podem ser coelhos da casa.
+  festa: { nome: 'Festa na Toca', max: 4, min: 1, grupo: true },
 };
+const maxDa = s => (s.jogo === 'junto' ? junto.maximo(s.opcoes) : JOGOS[s.jogo].max);
 const ehMesa = s => !!JOGOS[s.jogo]?.mesa;
 
 /* ─── Salas ───────────────────────────────────────── */
@@ -191,7 +195,8 @@ function validarOpcoesDaSala(jogo, opcoes = {}) {
   }
   if (jogo === 'cobras') return { modo: cobras.MODOS.includes(opcoes?.modo) ? opcoes.modo : 'todos' };
   if (MESAS[jogo]) return MESAS[jogo].opcoes(opcoes || {});
-  if (jogo === 'desafio') return desafio.opcoes(opcoes || {});
+  if (jogo === 'junto') return junto.opcoes(opcoes || {});
+  if (jogo === 'festa') return festa.opcoes(opcoes || {});
   // Velha, Lig 4 e Damas: um contra o outro (versus) ou contra a Raposa, o computador (co-op).
   if (raposa.COM_RAPOSA.includes(jogo)) return { modo: opcoes?.modo === 'raposa' ? 'raposa' : 'versus' };
   return null;
@@ -203,12 +208,12 @@ const MODO_QUIZ = { equipe: 'em equipe', times: 'dois times' };
 function nomeDaSala(s) {
   const nome = JOGOS[s.jogo].nome;
   const o = s.opcoes || {};
-  if (s.jogo === 'desafio') return `Desafio de ${desafio.nomeDo(o)}`;
+  if (s.jogo === 'junto') return junto.nomeDo(o);
+  if (s.jogo === 'festa') return `${nome} (${o.rodadas} rodadas)`;
   if (o.modo === 'raposa') return `${nome} contra a Raposa`;
   if (s.jogo === 'quiz' && MODO_QUIZ[o.modo]) return `${nome} (${MODO_QUIZ[o.modo]})`;
   if (s.jogo === 'cobras' && MODO_COBRAS[o.modo]) return `${nome} (${MODO_COBRAS[o.modo]})`;
-  if (s.jogo === 'memoria') return `${nome} (${o.modo === 'coop' ? 'co-op' : 'versus'})`;
-  if (s.jogo === 'minado' || s.jogo === 'quebra') return `${nome} (co-op)`;
+  if (ehMesa(s)) return `${nome} (${o.modo === 'coop' ? 'co-op' : 'versus'})`;
   return nome;
 }
 const salaAtivaDe = id => [...salas.values()].find(s => s.status !== 'fim' && s.jogadores.some(p => p.id === id && !p.saiu));
@@ -224,8 +229,9 @@ function visaoSala(s, id) {
   let estado = null;
   if (s.estado) {
     estado = ehQuiz(s) ? visaoQuiz(s, id) : s.jogo === 'cobras' ? visaoCobras(s) : s.jogo === 'cidade' ? cidade.visao(s.estado, eu)
-      : ehMesa(s) ? { ...MESAS[s.jogo].visao(s.estado), vencedores: s.estado.vencedores || null }
-      : s.jogo === 'desafio' ? desafio.visao(s.estado, indicesAtivos(s)) : jogo.visao(s.estado, eu);
+      : ehMesa(s) ? { ...MESAS[s.jogo].visao(s.estado, eu), vencedores: s.estado.vencedores || null }
+      : s.jogo === 'junto' ? junto.visao(s.estado)
+      : s.jogo === 'festa' ? festa.visao(s.estado) : jogo.visao(s.estado, eu);
     if (s.jogo === 'cidade' && ehCrianca(id)) {
       estado.chat = Object.fromEntries(Object.entries(estado.chat).map(([c, l]) => [c, l.map(limparMsg)]));
     }
@@ -235,8 +241,8 @@ function visaoSala(s, id) {
     jogo: s.jogo,
     nomeJogo: nomeDaSala(s),
     grupo: !!jogo.grupo,
-    max: jogo.max,
-    min: jogo.min || 1,
+    max: maxDa(s),
+    min: s.jogo === 'junto' ? junto.minimo(s.opcoes) : s.jogo === 'festa' ? (s.opcoes?.cpus ? 1 : 2) : jogo.min || 1,
     opcoes: s.opcoes || null,
     status: s.status,
     eu,
@@ -319,7 +325,7 @@ function enviarSala(s) {
 const resumoSalas = () => [...salas.values()]
   .filter(s => s.status !== 'fim')
   .map(s => ({
-    id: s.id, jogo: s.jogo, nomeJogo: nomeDaSala(s), status: s.status, grupo: ehGrupo(s), max: JOGOS[s.jogo].max,
+    id: s.id, jogo: s.jogo, nomeJogo: nomeDaSala(s), status: s.status, grupo: ehGrupo(s), max: maxDa(s),
     opcoes: s.opcoes || null, jogadores: ativos(s).map(p => p.nome), espectadores: s.espectadores.size,
   }));
 
@@ -327,6 +333,7 @@ const avisarLobby = () => paraTodos('salas', { salas: resumoSalas() });
 
 function fecharSala(s) {
   clearTimeout(s.timer);
+  clearInterval(s.relogio);
   salas.delete(s.id);
 }
 
@@ -525,7 +532,11 @@ function sairDoGrupo(id, s, i) {
     s.estado.fechar = false;
     MESAS.memoria.passarVez(s.estado, indicesAtivos(s));
   }
-  if (s.status === 'jogando' && s.jogo === 'desafio' && desafio.acabou(s.estado, indicesAtivos(s))) { terminarDesafio(s); return; }
+  if (s.status === 'jogando' && s.jogo === 'festa') festa.sair(s.estado, i); // vira um coelho da casa e a festa continua
+  if (s.status === 'jogando' && s.jogo === 'junto') {
+    junto.sair(s.estado, i);
+    if (junto.verificar(s.estado)) { terminarJunto(s); return; }
+  }
   if (s.status === 'jogando' && s.jogo === 'cidade') {
     cidade.sair(s.estado, i); // quem sai morre na cidade
     if (s.estado.fase === 'fim') { terminarCidade(s); return; }
@@ -604,9 +615,10 @@ function comecarCobras(s) {
   const modo = s.opcoes?.modo || 'todos';
   if (modo === 'duplas' && jogadores.length !== 4) throw new ErroJogo('O 2 contra 2 precisa de exatamente 4 jogadores.');
   s.jogadores = jogadores;
-  // Colheita (co-op): 90 segundos para a equipe juntar 15 cenouras por cobra.
+  // Colheita (co-op): 90 segundos para a equipe juntar 15 cenouras por cobra (e mais 15% por cobra a mais).
   const limite = Math.ceil(COLHEITA_MS / COBRAS_PASSO_MS);
-  s.estado = Object.assign(cobras.novo(jogadores.map(p => p.id), Math.random, { modo, limite, meta: 15 * jogadores.length }),
+  const meta = Math.round(15 * jogadores.length * (1 + 0.15 * (jogadores.length - 1)));
+  s.estado = Object.assign(cobras.novo(jogadores.map(p => p.id), Math.random, { modo, limite, meta }),
     { fase: 'largada', largada: Date.now() + COBRAS_LARGADA_MS });
   Object.assign(s, { status: 'jogando', vencedor: null, empate: false, motivo: null });
   s.revanche.clear();
@@ -666,7 +678,7 @@ const indicesAtivos = s => s.jogadores.map((p, i) => (p.saiu ? -1 : i)).filter(i
 
 function comecarMesa(s) {
   const jogadores = ativos(s);
-  if (s.jogo === 'memoria' && s.opcoes.modo === 'versus' && jogadores.length < 2) throw new ErroJogo('A Memória em versus precisa de pelo menos 2 pessoas.');
+  if (s.opcoes.modo === 'versus' && jogadores.length < 2) throw new ErroJogo('O versus precisa de pelo menos 2 pessoas.');
   s.jogadores = jogadores;
   s.estado = MESAS[s.jogo].novo(s.opcoes, jogadores.length);
   Object.assign(s, { status: 'jogando', vencedor: null, empate: false, motivo: null });
@@ -705,70 +717,141 @@ function terminarMesa(s) {
   const lista = ativosIdx.map(i => s.jogadores[i]);
   db.lote(ativosIdx.map(i => [
     'INSERT INTO resultados (jogo, usuario_id, usuario_nome, posicao, jogadores, pontos, venceu) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    `${s.jogo}_${s.jogo === 'memoria' ? s.opcoes.modo : 'coop'}`, s.jogadores[i].id, s.jogadores[i].nome, venceram.includes(i) ? 1 : 2, lista.length,
-    s.jogo === 'memoria' ? e.pares[i] : 0, venceram.includes(i) ? 1 : 0,
+    `${s.jogo}_${s.opcoes.modo}`, s.jogadores[i].id, s.jogadores[i].nome, venceram.includes(i) ? 1 : 2, lista.length,
+    s.jogo === 'memoria' ? e.pares[i] : s.jogo === 'minado' ? e.casas?.[i] || 0 : s.jogo === 'quebra' ? e.certas?.[i] || 0 : 0, venceram.includes(i) ? 1 : 0,
   ])).then(async () => {
     for (const i of ativosIdx) {
       await progresso.registrar(s.jogadores[i].id, lista.length > 1 ? 'partida' : 'solo');
       if (lista.length > 1 && venceram.includes(i)) await progresso.registrar(s.jogadores[i].id, 'vitoria');
     }
   }).then(async () => {
-    if (s.jogo !== 'memoria' || s.opcoes.modo === 'coop') for (const i of ativosIdx) await progresso.registrar(s.jogadores[i].id, 'coop');
+    if (s.opcoes.modo === 'coop') for (const i of ativosIdx) await progresso.registrar(s.jogadores[i].id, 'coop');
   }).catch(err => console.error('Erro ao guardar a mesa:', err.message));
   enviarSala(s);
   avisarLobby();
 }
 
-/* ─── Desafio ─────────────────────────────────────── */
+/* ─── Jogos juntos ────────────────────────────────── */
 
-function comecarDesafio(s) {
+const JUNTO_PASSO_MS = 50; // o relógio dos jogos que rodam no servidor (Pac-Coelho): 20 passos por segundo
+
+async function comecarJunto(s) {
   const jogadores = ativos(s);
-  if (jogadores.length < desafio.minimo(s.opcoes)) throw new ErroJogo('O versus precisa de pelo menos 2 pessoas.');
+  if (jogadores.length < junto.minimo(s.opcoes)) throw new ErroJogo('O versus precisa de pelo menos 2 pessoas.');
+  if (jogadores.length > junto.maximo(s.opcoes)) throw new ErroJogo(`Esse jogo cabe no máximo ${junto.maximo(s.opcoes)} pessoas.`);
+  s.comecando = true;
+  let visuais;
+  try {
+    visuais = await Promise.all(jogadores.map(p => clube.visualDesenho(p.id).catch(() => null)));
+  } finally {
+    s.comecando = false;
+  }
+  if (!salas.has(s.id) || s.status !== 'esperando') return;
   s.jogadores = jogadores;
-  s.estado = desafio.novo(s.opcoes, jogadores.length);
+  s.estado = junto.novo(s.opcoes, jogadores.length, visuais);
   Object.assign(s, { status: 'jogando', vencedor: null, empate: false, motivo: null });
   s.revanche.clear();
-  // Quando o tempo acabar, o desafio termina com os pontos que cada um mandou.
-  clearTimeout(s.timer);
-  s.timer = setTimeout(() => {
-    if (salas.has(s.id) && s.status === 'jogando' && desafio.acabou(s.estado, indicesAtivos(s), Math.max(Date.now(), s.estado.limite))) terminarDesafio(s);
-  }, s.estado.limite - Date.now() + 50);
+  agendarJunto(s);
   enviarSala(s);
   avisarLobby();
 }
 
-function jogarDesafio(s, i, jogada) {
-  let terminou;
-  try {
-    terminou = desafio.agir(s.estado, i, jogada, indicesAtivos(s));
-  } catch (x) {
-    throw x instanceof desafio.ErroDesafio ? new ErroJogo(x.message) : x;
-  }
-  if (terminou) terminarDesafio(s);
-  else enviarSala(s);
+function agendarJunto(s) {
+  const e = s.estado;
+  clearTimeout(s.timer);
+  clearInterval(s.relogio);
+  s.timer = setTimeout(() => {
+    if (salas.has(s.id) && s.status === 'jogando' && s.estado === e && junto.verificar(e)) terminarJunto(s);
+  }, e.limite - Date.now() + 50);
+  if (!junto.temPasso(e)) return;
+  let antes = Date.now();
+  s.relogio = setInterval(() => {
+    if (!salas.has(s.id) || s.status !== 'jogando' || s.estado !== e) { clearInterval(s.relogio); return; }
+    const agora = Date.now();
+    const dt = Math.min(0.2, (agora - antes) / 1000);
+    antes = agora;
+    if (junto.passo(e, dt, agora)) enviarQuadroJunto(s);
+    if (junto.verificar(e, agora)) terminarJunto(s);
+  }, JUNTO_PASSO_MS);
 }
 
-function terminarDesafio(s) {
+const quemVeJunto = s => new Set([...s.jogadores.map(p => p.id), ...s.espectadores]);
+function enviarQuadroJunto(s) {
+  const q = junto.quadro(s.estado);
+  for (const id of quemVeJunto(s)) paraUsuario(id, 'junto:quadro', { id: s.id, q });
+}
+
+function terminarJunto(s) {
   clearTimeout(s.timer);
+  clearInterval(s.relogio);
   const e = s.estado;
-  const ativosIdx = indicesAtivos(s);
   const venceram = e.vencedores || [];
   Object.assign(s, { status: 'fim', vencedor: venceram.length === 1 ? venceram[0] : null, empate: !venceram.length, motivo: e.fim, terminou: Date.now() });
-  const lista = ativosIdx.map(i => s.jogadores[i]);
-  // Posição: no versus, pela ordem de chegada (corrida) ou pelos pontos; no co-op, todos juntos.
-  const ordem = [...ativosIdx].sort((a, b) => (e.prog[b].completo - e.prog[a].completo) || (e.prog[a].completo ? e.prog[a].seg - e.prog[b].seg : e.prog[b].pontos - e.prog[a].pontos));
-  db.lote(ativosIdx.map(i => [
+  const lista = indicesAtivos(s);
+  db.lote(lista.map(i => [
     'INSERT INTO resultados (jogo, usuario_id, usuario_nome, posicao, jogadores, pontos, venceu) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    `desafio_${e.jogo}_${e.modo}`, s.jogadores[i].id, s.jogadores[i].nome, e.modo === 'coop' ? (venceram.length ? 1 : 2) : ordem.indexOf(i) + 1, lista.length,
-    e.prog[i].pontos, venceram.includes(i) ? 1 : 0,
+    `junto_${e.jogo}_${e.modo}`, s.jogadores[i].id, s.jogadores[i].nome, venceram.includes(i) ? 1 : 2, lista.length,
+    e.p[i]?.pontos || 0, venceram.includes(i) ? 1 : 0,
   ])).then(async () => {
-    for (const i of ativosIdx) {
+    for (const i of lista) {
       await progresso.registrar(s.jogadores[i].id, lista.length > 1 ? 'partida' : 'solo');
       if (lista.length > 1 && venceram.includes(i)) await progresso.registrar(s.jogadores[i].id, 'vitoria');
+      if (e.modo === 'coop') await progresso.registrar(s.jogadores[i].id, 'coop');
     }
-  }).then(async () => {
-    if (e.modo === 'coop') for (const i of ativosIdx) await progresso.registrar(s.jogadores[i].id, 'coop');
-  }).catch(err => console.error('Erro ao guardar o desafio:', err.message));
+  }).catch(err => console.error('Erro ao guardar o jogo junto:', err.message));
+  if (e.sim) enviarQuadroJunto(s);
+  enviarSala(s);
+  avisarLobby();
+}
+
+/* ─── Festa na Toca ───────────────────────────────── */
+
+async function comecarFesta(s) {
+  const jogadores = ativos(s);
+  if (!s.opcoes.cpus && jogadores.length < 2) throw new ErroJogo('Sem os coelhos da casa, a festa precisa de pelo menos 2 pessoas.');
+  s.comecando = true;
+  let visuais;
+  try {
+    visuais = await Promise.all(jogadores.map(p => clube.visualDesenho(p.id).catch(() => null)));
+  } finally {
+    s.comecando = false;
+  }
+  if (!salas.has(s.id) || s.status !== 'esperando') return;
+  s.jogadores = jogadores;
+  s.estado = festa.novo(s.opcoes, jogadores, visuais);
+  Object.assign(s, { status: 'jogando', vencedor: null, empate: false, motivo: null });
+  s.revanche.clear();
+  const e = s.estado;
+  clearInterval(s.relogio);
+  s.relogio = setInterval(() => {
+    if (!salas.has(s.id) || s.status !== 'jogando' || s.estado !== e) { clearInterval(s.relogio); return; }
+    if (festa.passo(e, Date.now())) {
+      if (e.fim) terminarFesta(s);
+      else enviarSala(s);
+    }
+  }, 150);
+  enviarSala(s);
+  avisarLobby();
+}
+
+function terminarFesta(s) {
+  clearInterval(s.relogio);
+  const e = s.estado;
+  const venceram = (e.vencedores || []).filter(k => k < s.jogadores.length);
+  Object.assign(s, { status: 'fim', vencedor: venceram.length === 1 ? venceram[0] : null, empate: venceram.length !== 1, motivo: 'acabou', terminou: Date.now() });
+  const ranking = festa.ranking(e);
+  const humanos = s.jogadores.map((p, k) => k).filter(k => !s.jogadores[k].saiu);
+  db.lote(humanos.map(k => [
+    'INSERT INTO resultados (jogo, usuario_id, usuario_nome, posicao, jogadores, pontos, venceu) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    'festa', s.jogadores[k].id, s.jogadores[k].nome, ranking.find(r => r.k === k)?.pos || 4, e.j.length, e.j[k].douradas, venceram.includes(k) ? 1 : 0,
+  ])).then(async () => {
+    for (const k of humanos) {
+      await progresso.registrar(s.jogadores[k].id, 'partida');
+      if (venceram.includes(k)) await progresso.registrar(s.jogadores[k].id, 'vitoria');
+      // As cenouras da festa viram cenouras do Club Coelho (um quinto delas, até 40).
+      await clube.ganhar(s.jogadores[k].id, Math.min(40, Math.floor(e.j[k].cenouras / 5)));
+    }
+  }).catch(err => console.error('Erro ao guardar a festa:', err.message));
   enviarSala(s);
   avisarLobby();
 }
@@ -973,7 +1056,7 @@ const acoes = {
     if (i >= 0 && !s.jogadores[i].saiu) { enviarSala(s); return; }
     if (s.status !== 'esperando') throw new ErroJogo('Essa partida já começou. Você pode assistir.');
     if (salaAtivaDe(u.id)) throw new ErroJogo('Você já está numa partida. Termine ou saia dela antes.');
-    if (s.jogadores.length >= JOGOS[s.jogo].max) throw new ErroJogo('A sala está cheia.');
+    if (s.jogadores.length >= maxDa(s)) throw new ErroJogo('A sala está cheia.');
     s.jogadores.push(pessoaDe(u));
     s.espectadores.delete(u.id);
     if (!ehGrupo(s) && !ehRaposa(s)) {
@@ -1001,7 +1084,8 @@ const acoes = {
     if (s.jogo === 'cobras') { comecarCobras(s); return; }
     if (s.jogo === 'cidade') { comecarCidade(s); return; }
     if (ehMesa(s)) { comecarMesa(s); return; }
-    if (s.jogo === 'desafio') { comecarDesafio(s); return; }
+    if (s.jogo === 'junto') { await comecarJunto(s); return; }
+    if (s.jogo === 'festa') { await comecarFesta(s); return; }
     s.comecando = true;
     try {
       await comecarQuiz(s);
@@ -1020,7 +1104,7 @@ const acoes = {
     if (ehQuiz(s)) { responder(s, i, jogada || {}); return; }
     if (s.jogo === 'cidade') { jogarCidade(s, i, jogada || {}); return; }
     if (ehMesa(s)) { jogarMesa(s, i, jogada || {}); return; }
-    if (s.jogo === 'desafio') { jogarDesafio(s, i, jogada || {}); return; }
+    if (s.jogo === 'junto' || s.jogo === 'festa') throw new ErroJogo('Jogue pela tela do jogo.');
     if (ehRaposa(s)) { jogarContraRaposa(s, u, jogada); return; }
     if (ehGrupo(s)) throw new ErroJogo('Use as setas para jogar.');
     const resultado = JOGOS[s.jogo].jogar(s.estado, i, jogada || {});
@@ -1040,6 +1124,62 @@ const acoes = {
     s.opcoes = validarOpcoesDaSala(s.jogo, { ...(s.opcoes || {}), ...(opcoes || {}) });
     enviarSala(s);
     avisarLobby();
+  },
+
+  // Festa na Toca: jogar o dado, usar item, escolher o caminho, comprar, dizer que leu as regras.
+  'festa:acao'(u, { id, acao }) {
+    const s = salas.get(id);
+    if (!s || s.jogo !== 'festa' || s.status !== 'jogando') return;
+    const i = indiceNa(s, u.id);
+    if (i < 0 || s.jogadores[i].saiu) throw new ErroJogo('Você não está nessa festa.');
+    let mudou;
+    try {
+      mudou = festa.agir(s.estado, i, acao || {}, Date.now());
+    } catch (x) {
+      throw x instanceof festa.ErroFesta ? new ErroJogo(x.message) : x;
+    }
+    if (mudou) enviarSala(s);
+  },
+
+  // Jogos juntos: onde está o meu coelho (cada um manda o seu; o servidor só repassa para os outros).
+  'junto:pos'(u, { id, d }) {
+    const s = salas.get(id);
+    if (!s || s.status !== 'jogando' || !(s.jogo === 'junto' ? !s.estado.sim : s.jogo === 'festa' && s.estado.fase === 'minijogo')) return;
+    const i = indiceNa(s, u.id);
+    if (i < 0 || s.jogadores[i].saiu || !d || typeof d !== 'object') return;
+    s.ultimaPos ??= new Map();
+    const agora = Date.now();
+    if (agora - (s.ultimaPos.get(i) || 0) < 40) return;
+    s.ultimaPos.set(i, agora);
+    if (JSON.stringify(d).length > 600) return;
+    for (const uid of quemVeJunto(s)) if (uid !== u.id) paraUsuario(uid, 'junto:pos', { id: s.id, i, d });
+  },
+
+  // Jogos juntos: pegou um item, morreu, chegou, ou algo do próprio jogo (ver junto.js).
+  'junto:evento'(u, { id, ev }) {
+    const s = salas.get(id);
+    if (!s || (s.jogo !== 'junto' && s.jogo !== 'festa') || s.status !== 'jogando') return;
+    const i = indiceNa(s, u.id);
+    if (i < 0 || s.jogadores[i].saiu || !ev || typeof ev !== 'object') return;
+    s.contaEventos ??= new Map();
+    const agora = Date.now();
+    const c = s.contaEventos.get(i) || { ini: agora, n: 0 };
+    if (agora - c.ini > 1000) { c.ini = agora; c.n = 0; }
+    if (++c.n > 40) return; // no máximo 40 por segundo
+    s.contaEventos.set(i, c);
+    let r;
+    try {
+      r = s.jogo === 'festa' ? festa.evento(s.estado, i, ev) : junto.evento(s.estado, i, ev, agora);
+    } catch (x) {
+      throw x instanceof junto.ErroJunto || x instanceof festa.ErroFesta ? new ErroJogo(x.message) : x;
+    }
+    if (!r) return;
+    for (const x of r.todos || []) for (const uid of quemVeJunto(s)) paraUsuario(uid, 'junto:evento', { id: s.id, ev: x });
+    if (r.outros) for (const uid of quemVeJunto(s)) if (uid !== u.id) paraUsuario(uid, 'junto:evento', { id: s.id, ev: r.outros });
+    if (s.jogo === 'festa') { if (r.mudou) enviarSala(s); return; }
+    if (r.quadro) enviarQuadroJunto(s);
+    if (junto.verificar(s.estado, agora)) { terminarJunto(s); return; }
+    if (r.mudou) enviarSala(s);
   },
 
   // Vila dos coelhos: o meu coelho andou (o servidor guarda e repassa para quem enxerga).
@@ -1131,6 +1271,7 @@ const acoes = {
     if (ehGrupo(s)) {
       // Quiz e cobrinha: a sala volta a esperar gente, com quem ficou até o fim.
       clearTimeout(s.timer);
+      clearInterval(s.relogio);
       if (dono(s)?.id !== u.id) throw new ErroJogo('Só quem abriu a sala pode começar outra rodada.');
       s.jogadores = ativos(s);
       Object.assign(s, { status: 'esperando', estado: null, vencedor: null, empate: false, motivo: null, criada: Date.now() });

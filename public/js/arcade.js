@@ -1,21 +1,22 @@
 // O "fliperama": a moldura comum dos jogos de ação de uma pessoa só desenhados num canvas
 // (Barris do Raposo, Super Coelho, Travessia). Cada jogo é um módulo em public/js/jogos/ que só cuida das
 // regras e do desenho; aqui ficam a tela, o teclado, os botões de toque, o som, o relógio (60 passos por
-// segundo), a pausa, o recorde, o desafio (versus e co-op), os códigos secretos e a transmissão para quem assiste.
+// segundo), a pausa, o recorde, o jogo junto (versus e co-op, todos no mesmo jogo: veja junto.js), os códigos
+// secretos e a transmissão para quem assiste.
 //
 // O módulo do jogo exporta um objeto (def) assim:
-//   { id, nome, icone, sub, subDesafio, largura, altura, cor,
+//   { id, nome, icone, sub, subJunto: { versus, coop }, largura, altura, cor,
 //     controles: { cima, baixo, pular: 'Pular', acao: 'Correr' | null, deslizar, cimaPula },
 //     instrucoes: { teclado, toque }, comoJogar: [[emoji, nome, texto], ...],
 //     criar(ctx) -> jogo, desenharFoto(g, foto, t) }
-// ctx = { sorte, segredo(chave), som(nome), desafio, largura, altura }
+// ctx = { sorte, segredo(chave), som(nome), junto, largura, altura } (junto: null quando a pessoa joga sozinha)
 // jogo = { pontos, acabou, atualizar(dt, entrada), desenhar(g, t), resumo(), foto(),
 //          usarSegredo?(chave), mudouSegredo?(chave, ligado) }
 // entrada = { esq, dir, cima, baixo, pular, acao, apertou: Set('esq'|'dir'|'cima'|'baixo'|'pular'|'acao'|'toque') }
 
 import { h, trocar, icone, botao, cabecalho, aviso, get, post, pode, aoSair, estado, num } from './core.js';
 import { rt, ouvir, transmitir, enviarQuadro, pararTransmissao } from './tempo-real.js';
-import { desafioNoJogo } from './telas/desafio.js';
+import { juntoNoJogo, sorteJunto, textoDoFimJunto } from './junto.js';
 import { segredosDoJogo } from './segredos.js';
 
 const PASSO = 1 / 60;
@@ -131,14 +132,15 @@ export function telaArcade(def) {
   let pendentes = new Set();
   const seguros = { teclado: new Set(), toque: new Map() }; // o que está apertado em cada lugar
 
-  // Desafio: todos largam juntos com a mesma sorte; não dá para pausar.
-  const ds = desafioNoJogo(def.id, {
+  // Junto: todos no mesmo jogo, com a mesma sorte, largando juntos; não dá para pausar.
+  let fimJunto = null;
+  const jt = juntoNoJogo(def.id, {
     aoLargar: () => { if (situacao === 'inicio') comecar(); },
-    aoAcabar: () => { if (situacao !== 'fim') { situacao = 'fim'; mostrarSobre(); } },
+    aoAcabar: s => { fimJunto = s; situacao = 'fim'; mostrarSobre(); },
   });
-  const sorte = ds ? ds.sorte : Math.random;
+  const sorte = jt ? sorteJunto(jt.semente) : Math.random;
   const seg = segredosDoJogo(def.id, {
-    bloqueado: !!ds,
+    bloqueado: !!jt,
     aoMudar: (chave, ligado) => jogo?.mudouSegredo?.(chave, ligado),
     aoUsar: chave => (jogo && situacao !== 'fim' ? !!jogo.usarSegredo?.(chave) : false),
   });
@@ -156,7 +158,7 @@ export function telaArcade(def) {
 
   function novoJogo() {
     seg.novaPartida();
-    jogo = def.criar({ sorte, segredo: chave => seg.ativo(chave), som, desafio: !!ds, largura: def.largura, altura: def.altura });
+    jogo = def.criar({ sorte, segredo: chave => seg.ativo(chave), som, junto: jt, largura: def.largura, altura: def.altura });
     situacao = 'inicio';
     pontosAntes = -1;
     acumulado = 0;
@@ -165,7 +167,7 @@ export function telaArcade(def) {
   }
 
   function comecar() {
-    if (ds && (!ds.largou() || ds.acabou())) return;
+    if (jt && (!jt.largou() || jt.acabou())) return;
     if (situacao === 'fim') novoJogo();
     if (situacao === 'inicio' || situacao === 'pausado') situacao = 'jogando';
     ultimo = 0;
@@ -175,7 +177,7 @@ export function telaArcade(def) {
   }
 
   function pausar() {
-    if (ds || situacao !== 'jogando') return;
+    if (jt || situacao !== 'jogando') return;
     situacao = 'pausado';
     mostrarSobre();
   }
@@ -183,11 +185,10 @@ export function telaArcade(def) {
   async function fim() {
     situacao = 'fim';
     const pontos = Math.max(0, Math.floor(jogo.pontos || 0));
-    ds?.terminar(pontos);
     som('fim');
     const r = jogo.resumo?.() || {};
     mostrarSobre();
-    if (ds || pontos <= 0) return;
+    if (jt || pontos <= 0) return;
     if (!seg.valeRecorde()) { anexarAoFim(h('p', { class: 'cobra-recorde' }, icone('estrela'), 'Modo secreto ligado: esta partida não vale recorde.')); return; }
     try {
       const resp = await post('/api/recreacao/recordes', { jogo: def.id, pontos, detalhe: String(r.detalhe || '').slice(0, 60) });
@@ -208,8 +209,16 @@ export function telaArcade(def) {
     if (situacao === 'jogando') { sobre.hidden = true; return; }
     sobre.hidden = false;
     const instr = toque ? def.instrucoes?.toque : def.instrucoes?.teclado;
-    if (situacao === 'inicio' && ds) {
-      trocar(sobre, h('div', { class: 'cobra-caixa' }, h('h2', null, 'Prepare-se!'), h('p', null, 'O desafio começa junto para todos.'), instr && h('p', { class: 'suave' }, instr)));
+    if (situacao === 'inicio' && jt) {
+      trocar(sobre, h('div', { class: 'cobra-caixa' }, h('h2', null, 'Prepare-se!'),
+        h('p', null, jt.modo === 'coop' ? 'Todos juntos, do mesmo lado.' : 'Todos juntos, cada um por si.'),
+        def.subJunto?.[jt.modo] && h('p', null, def.subJunto[jt.modo]),
+        instr && h('p', { class: 'suave' }, instr)));
+    } else if (situacao === 'fim' && jt) {
+      trocar(sobre, h('div', { class: 'cobra-caixa' },
+        h('h2', null, 'Fim de jogo!'),
+        h('p', { class: 'cobra-placar' }, fimJunto ? textoDoFimJunto(fimJunto) : 'A partida acabou.'),
+        jt.botoesFim()));
     } else if (situacao === 'inicio') {
       trocar(sobre, h('div', { class: 'cobra-caixa' },
         h('h2', null, def.nome),
@@ -224,7 +233,7 @@ export function telaArcade(def) {
         h('h2', null, r.titulo || 'Fim de jogo'),
         h('p', { class: 'cobra-placar' }, `${num(Math.floor(jogo?.pontos || 0))} pontos`),
         (r.linhas || []).map(l => h('p', null, l)),
-        ds ? ds.botoesFim(() => { novoJogo(); comecar(); }) : botao('Jogar de novo', { classe: 'btn-ouro', icone: 'aleatorio', onclick: () => { novoJogo(); comecar(); } })));
+        botao('Jogar de novo', { classe: 'btn-ouro', icone: 'aleatorio', onclick: () => { novoJogo(); comecar(); } })));
     }
   }
 
@@ -234,7 +243,6 @@ export function telaArcade(def) {
     pontosAntes = p;
     pontosEl.textContent = num(p);
     recordeEl.textContent = recorde == null ? '0' : num(recorde);
-    if (situacao === 'jogando') ds?.progresso(p);
   }
 
   /* Entrada: teclado, botões na tela e deslizar o dedo */
@@ -248,7 +256,7 @@ export function telaArcade(def) {
   function apertar(k) {
     pendentes.add(k);
     if (def.controles?.cimaPula && k === 'cima') pendentes.add('pular');
-    if (situacao === 'inicio' && !ds && (k === 'pular' || (def.controles?.deslizar && NOME_DIR[k]))) comecar();
+    if (situacao === 'inicio' && !jt && (k === 'pular' || (def.controles?.deslizar && NOME_DIR[k]))) comecar();
   }
 
   const digitando = e => e.target.closest?.('input, textarea, select, [contenteditable]') || document.querySelector('.modal-fundo');
@@ -266,7 +274,7 @@ export function telaArcade(def) {
       e.preventDefault();
       if (situacao === 'jogando') pausar(); else if (situacao === 'pausado') comecar();
     }
-    if (e.code === 'Enter' && !ds && situacao !== 'jogando') { e.preventDefault(); comecar(); }
+    if (e.code === 'Enter' && !jt && situacao !== 'jogando') { e.preventDefault(); comecar(); }
   };
   const aoSoltar = e => {
     const k = TECLAS[e.code];
@@ -312,7 +320,7 @@ export function telaArcade(def) {
   // Deslizar o dedo no canvas (Travessia): cada deslizada é um pulinho; um toque é para frente.
   let inicioToque = null;
   tela.addEventListener('pointerdown', e => {
-    if (situacao !== 'jogando' && !ds && e.pointerType !== 'mouse') { comecar(); return; }
+    if (situacao !== 'jogando' && !jt && e.pointerType !== 'mouse') { comecar(); return; }
     inicioToque = { x: e.clientX, y: e.clientY };
   });
   tela.addEventListener('pointerup', e => {
@@ -345,17 +353,17 @@ export function telaArcade(def) {
           jogo.atualizar(PASSO, entrada);
           acumulado -= PASSO;
           n++;
-          if (jogo.acabou) break;
+          if (jogo.acabou && !jt) break;
         }
         if (n === 6) acumulado = 0;
         atualizarPlacar();
-        if (jogo.acabou) fim();
+        if (jogo.acabou && !jt) fim();
       } else {
         pendentes.clear();
       }
       const g = contexto();
       jogo.desenhar(g, (agora - inicioDaPagina) / 1000);
-      if (rt.conectado && rt.plateia > 0) enviarQuadro({ f: jogo.foto(), p: Math.floor(jogo.pontos || 0), s: situacao });
+      if (!jt && rt.conectado && rt.plateia > 0) enviarQuadro({ f: jogo.foto(), p: Math.floor(jogo.pontos || 0), s: situacao });
     } catch (e) {
       console.error(`${def.nome}:`, e); // um erro não pode travar a página
     }
@@ -363,7 +371,7 @@ export function telaArcade(def) {
 
   const aoEsconder = () => { if (document.hidden) pausar(); };
   document.addEventListener('visibilitychange', aoEsconder);
-  const comecarTransmissao = () => { if (rt.conectado) transmitir(def.id, {}); };
+  const comecarTransmissao = () => { if (rt.conectado && !jt) transmitir(def.id, {}); };
   aoSair(ouvir('estado', comecarTransmissao));
   aoSair(ouvir('solo:plateia', () => {
     plateiaEl.hidden = !rt.plateia;
@@ -373,7 +381,7 @@ export function telaArcade(def) {
   comecarTransmissao();
   aoSair(() => {
     cancelAnimationFrame(quadro);
-    pararTransmissao();
+    if (!jt) pararTransmissao();
     document.removeEventListener('keydown', aoApertar);
     document.removeEventListener('keyup', aoSoltar);
     window.removeEventListener('blur', aoSairDaJanela);
@@ -395,23 +403,26 @@ export function telaArcade(def) {
 
   desenharBotaoSom();
   novoJogo();
-  if (!ds) carregarRanking();
+  if (!jt) carregarRanking();
   quadro = requestAnimationFrame(passo);
 
   return h('div', { class: 'pagina' },
-    cabecalho({ titulo: ds ? `${def.nome}: desafio` : def.nome, icone: def.icone, voltar: { href: '#/recreacao', texto: 'Recreação' }, sub: ds ? def.subDesafio || def.sub : def.sub }),
+    cabecalho({
+      titulo: jt ? `${def.nome}: ${jt.modo === 'coop' ? 'co-op' : 'versus'}` : def.nome, icone: def.icone, voltar: { href: '#/recreacao', texto: 'Recreação' },
+      sub: jt ? def.subJunto?.[jt.modo] || def.sub : def.sub,
+    }),
     // Jogo largo (como o Super Coelho): a tela usa a largura toda e o ranking vai para baixo.
     h('div', { class: `jogo-solo ${def.largura / def.altura > 1.4 ? 'arcade-largo' : ''}`.trim() },
       h('div', { class: 'jogo-area arcade-area', style: { maxWidth: larguraMaxima(def) } },
         h('div', { class: 'cobra-placar-linha' },
           h('span', null, 'Pontos: ', pontosEl),
           plateiaEl,
-          !ds && h('span', null, icone('trofeu'), ' Recorde: ', recordeEl),
+          !jt && h('span', null, icone('trofeu'), ' Recorde: ', recordeEl),
           botaoSom),
         h('div', { class: 'cobra-moldura arcade-moldura' }, tela, sobre),
         controles),
       h('aside', { class: 'jogo-lateral arcade-lateral' },
-        ds ? ds.painel : h('section', { class: 'painel' },
+        jt ? jt.painel : h('section', { class: 'painel' },
           h('div', { class: 'painel-cab' }, h('h2', null, icone('trofeu'), 'Melhores')),
           ranking),
         h('section', { class: 'painel' },

@@ -2,7 +2,7 @@
 // as Tocas, as Copas das Árvores e o Castelo do Raposo para salvar a Princesa Cenoura.
 // Aqui ficam só as regras e o desenho; a moldura (teclado, toque, som, pausa, recorde, desafio) é o arcade.js.
 
-import { desenharCoelho, desenharRaposa, elipse, desenharArvore } from '../desenho-coelho.js';
+import { desenharCoelho, desenharRaposa, elipse, desenharArvore, sorte as sorteSemente } from '../desenho-coelho.js';
 import { T, LINHAS, TOPO, B, SOLIDO, FASES, nivelBase, posPlataforma, bolasDaBarra, posBolha } from './super-coelho-fases.js';
 
 const W = 512;
@@ -47,10 +47,27 @@ const CHEFE = { w: 34, h: 32, vida: 5 };
 const AUTO = { esq: false, dir: true, cima: false, baixo: false, pular: false, acao: false, apertou: new Set() };
 const NADA = new Set();
 
+/* ─── Jogo junto (versus e co-op na mesma fase) ─── */
+const QUADRO = 1 / 60;
+const HORIZONTE = 360; // quadros que dá para voltar no tempo (6 s)
+const ALCANCE = 320; // a que distância o meu coelho acorda um inimigo
+const ALCANCE_MORCEGO = 150;
+const CARTAO = 1.2; // segundos de cartão antes da fase nova (co-op)
+const ESPERA_CHEGADA = 0.25; // espera antes do "cheguei": quem tocou primeiro no mastro é quem chama
+const LIMITE_EVENTOS = 28; // por segundo (o servidor aceita até 40)
+const PELOS_JUNTO = ['#c99a6b', '#9aa3ad', '#e2b3a3', '#8a6a4f', '#f7f3ea', '#d9b48a'];
+const MUNDO_EVENTOS = ['acordou', 'matou', 'chutou', 'bloco', 'chefe'];
+const COR_HEX = /^#[0-9a-f]{6}$/i;
+
 /* ─── O jogo ─── */
 
 function criar(ctx) {
   const { sorte, som } = ctx;
+  // Junto: null quando a pessoa joga sozinha (aí tudo fica exatamente como no solo).
+  const jt = ctx.junto || null;
+  const DIF = jt ? Number(jt.dif) || 1 : 1;
+  const SEM = jt ? (Number(jt.semente) || 0) >>> 0 : 0;
+  const J = jt ? { log: [], fotos: [], voltar: null, seq: 0, fila: [], enviados: [], adiantados: [], ultimoPonto: -1, tPonto: 0, posFora: false } : null;
   const S = {
     fase: 0, volta: 1, modo: 'titulo', tm: 0, acabou: false,
     pontos: 0, lirios: 0, totalLirios: 0, vidas: 3, tempo: TEMPO_FASE, relogio: 0, tf: 0,
@@ -135,7 +152,8 @@ function criar(ctx) {
     S.pontos += p;
     if (x != null) popup(x, y, txt ?? p);
   }
-  function ganharVida(x, y) { S.vidas++; som('vida'); popup(x, y, '1UP'); }
+  // No junto as vidas são do servidor: o 1UP vira uma vida guardada (a próxima queda não gasta vida).
+  function ganharVida(x, y) { if (jt) S.reserva++; else S.vidas++; som('vida'); popup(x, y, '1UP'); }
   function particula(p) { if (S.particulas.length < 160) S.particulas.push({ t: 0, vx: 0, vy: 0, tam: 2, ...p }); }
   function faiscas(x, y, n, cor) {
     for (let k = 0; k < n; k++) {
@@ -156,6 +174,13 @@ function criar(ctx) {
   }
 
   /* Carregar uma fase (do começo ou do meio) */
+  function novoInimigo(e, id) {
+    const tp = INIMIGOS[e.tipo];
+    return {
+      id, t: e.tipo, x: e.c * T + (T - tp.w) / 2, y: e.tipo === 'm' ? e.r * T : e.r * T - tp.h, w: tp.w, h: tp.h,
+      vx: 0, vy: 0, dir: -1, est: e.tipo === 'm' ? 'd' : 'a', tt: 0, ativo: false, chao: false, combo: 0, tchute: 0, base: 0, alvo: 0, fora: false,
+    };
+  }
   function carregar(i, noMeio = false) {
     const base = nivelBase(i);
     const def = base.def;
@@ -166,11 +191,7 @@ function criar(ctx) {
     S.inimigos = [];
     base.inimigos.forEach((e, k) => {
       if (noMeio && e.c < def.meio.c + 8) return;
-      const tp = INIMIGOS[e.tipo];
-      S.inimigos.push({
-        id: k, t: e.tipo, x: e.c * T + (T - tp.w) / 2, y: e.tipo === 'm' ? e.r * T : e.r * T - tp.h, w: tp.w, h: tp.h,
-        vx: 0, vy: 0, dir: -1, est: e.tipo === 'm' ? 'd' : 'a', tt: 0, ativo: false, chao: false, combo: 0, tchute: 0, base: 0, alvo: 0, fora: false,
-      });
+      S.inimigos.push(novoInimigo(e, k));
     });
     S.chefe = def.chefe ? {
       x: def.chefe.c * T, y: def.chefe.r * T - CHEFE.h, w: CHEFE.w, h: CHEFE.h, vx: 0, vy: 0, dir: -1, vida: CHEFE.vida,
@@ -298,7 +319,7 @@ function criar(ctx) {
   }
 
   function atualizarJogador(dt, ent) {
-    const lua = ctx.segredo('super-lua');
+    const lua = !jt && ctx.segredo('super-lua');
     const ap = ent.apertou || NADA;
     const antesNoChao = j.chao;
     j.inv = Math.max(0, j.inv - dt);
@@ -347,13 +368,15 @@ function criar(ctx) {
     j.chao = false;
     const bt = moverY(j, j.vy * dt, true);
     if (bt?.baixo) { j.chao = true; j.vy = 0; }
-    else if (bt) { j.vy = 20; j.segurando = false; baterBloco(bt.c, bt.r); }
+    else if (bt) { j.vy = 20; j.segurando = false; if (jt) baterJunto(bt.c, bt.r); else baterBloco(bt.c, bt.r); }
     pousarPlataforma();
     if (j.chao && !antesNoChao) aterrissar(vyAntes);
     // Lírios no caminho
     for (let c = Math.floor(j.x / T); c <= Math.floor((j.x + j.w - 0.01) / T); c++) {
       for (let r = Math.floor(j.y / T); r <= Math.floor((j.y + j.h - 0.01) / T); r++) {
-        if (cod(c, r) === B.LIRIO) { trocar(c, r, B.VAZIO); pegarLirio(c * T + 8, r * T + 8); }
+        if (cod(c, r) !== B.LIRIO) continue;
+        if (jt) pegarLirioJunto(c, r);
+        else { trocar(c, r, B.VAZIO); pegarLirio(c * T + 8, r * T + 8); }
       }
     }
     if (j.chao && Math.abs(j.vx) > 1) j.passo += dt * (0.4 + Math.abs(j.vx) / ANDAR);
@@ -386,21 +409,24 @@ function criar(ctx) {
   }
 
   /* Poderes */
+  function moverItem(it, dt) {
+    if (it.sai > 0) {
+      it.sai -= dt;
+      it.y = it.y0 - 14 * Math.min(1, 1 - Math.max(0, it.sai) / 0.6);
+      if (it.sai <= 0) {
+        if (it.t === 'c' || it.t === 'v') it.vx = 70;
+        if (it.t === 'e') { it.vx = 80; it.vy = -250; }
+      }
+    } else if (it.t !== 'f') {
+      it.vy = Math.min(400, it.vy + 1100 * dt);
+      if (moverX(it, it.vx * dt)) it.vx = -it.vx;
+      const bt = moverY(it, it.vy * dt);
+      if (bt) it.vy = bt.baixo && it.t === 'e' ? -260 : 0;
+    }
+  }
   function atualizarItens(dt) {
     for (const it of S.itens) {
-      if (it.sai > 0) {
-        it.sai -= dt;
-        it.y = it.y0 - 14 * Math.min(1, 1 - Math.max(0, it.sai) / 0.6);
-        if (it.sai <= 0) {
-          if (it.t === 'c' || it.t === 'v') it.vx = 70;
-          if (it.t === 'e') { it.vx = 80; it.vy = -250; }
-        }
-      } else if (it.t !== 'f') {
-        it.vy = Math.min(400, it.vy + 1100 * dt);
-        if (moverX(it, it.vx * dt)) it.vx = -it.vx;
-        const bt = moverY(it, it.vy * dt);
-        if (bt) it.vy = bt.baixo && it.t === 'e' ? -260 : 0;
-      }
+      moverItem(it, dt);
       if (it.y > H + 16 || it.x + it.w < S.cam - 32) it.fora = true;
       else if (toca(j, it)) { coletar(it); it.fora = true; }
     }
@@ -454,6 +480,20 @@ function criar(ctx) {
     alvo.est = 'x';
     alvo.vy = -220;
     alvo.vx = casco.dir * 60;
+    if (jt) {
+      // Os pontos são de quem chutou (uma vez só, mesmo que o mundo seja refeito); os outros recebem o "matou".
+      if (casco.dono === jt.eu && !S.premiados.has(alvo.id)) {
+        S.premiados.add(alvo.id);
+        S.derrotados++;
+        som('pisao');
+        if (casco.combo >= COMBO_CASCO.length) ganharVida(alvo.x + 7, alvo.y);
+        else ganhar(COMBO_CASCO[casco.combo], alvo.x + 7, alvo.y);
+        const ev = { tipo: 'matou', e: alvo.id, m: 'x', d: casco.dir, q: S.q + 1, s: S.fase, n: ++J.seq };
+        enviar(() => jt.evento(ev));
+      }
+      casco.combo++;
+      return;
+    }
     S.derrotados++;
     som('pisao');
     if (casco.combo >= COMBO_CASCO.length) ganharVida(alvo.x + 7, alvo.y);
@@ -462,14 +502,19 @@ function criar(ctx) {
   }
 
   function atualizarInimigos(dt) {
-    const m = mult();
+    const m = jt ? DIF : mult();
     const cauteloso = S.nivel.def.tema === 'copas';
+    const fimX = S.nivel.L * T + 64;
     for (const e of S.inimigos) {
       if (!e.ativo) {
+        if (jt) continue; // no junto, só acorda com o acontecimento "acordou"
         if (e.x < S.cam + W + 24) e.ativo = true;
         else continue;
       }
-      if (e.x + e.w < S.cam - 64 && e.est !== 'k') { e.fora = true; continue; }
+      if (jt) {
+        // nada depende da câmera de ninguém: só sai quem deixa o mapa
+        if (e.x + e.w < -64 || e.x > fimX) { e.fora = true; continue; }
+      } else if (e.x + e.w < S.cam - 64 && e.est !== 'k') { e.fora = true; continue; }
       if (e.est === 'x') {
         e.vy += 1200 * dt;
         e.x += e.vx * dt;
@@ -479,6 +524,7 @@ function criar(ctx) {
       }
       if (e.est === 'p') { e.tt -= dt; if (e.tt <= 0) e.fora = true; continue; }
       if (e.est === 'd') {
+        if (jt) continue;
         if (Math.abs(j.x + j.w / 2 - (e.x + 7)) < 150) {
           e.est = 'v';
           e.vx = (j.x < e.x ? -1 : 1) * INIMIGOS.m.vel * m;
@@ -493,7 +539,7 @@ function criar(ctx) {
         e.tt += dt;
         e.x += e.vx * dt;
         e.y = e.base + (e.alvo - e.base) * Math.min(1, e.tt / 0.9) + Math.sin(e.tt * 3.4) * 20 * Math.min(1, e.tt);
-        if (e.x > S.cam + W + 200) e.fora = true;
+        if (jt ? e.tt > 20 : e.x > S.cam + W + 200) e.fora = true;
         continue;
       }
       // Andando, casco parado ou casco rolando: gravidade e paredes
@@ -506,16 +552,20 @@ function criar(ctx) {
       } else if (e.est === 'c') {
         e.vx = 0;
         e.tt += dt;
-        if (e.tt > 7) { e.est = 'a'; e.y -= INIMIGOS.t.h - e.h; e.h = INIMIGOS.t.h; e.dir = j.x < e.x ? -1 : 1; }
+        if (e.tt > 7) {
+          e.est = 'a'; e.y -= INIMIGOS.t.h - e.h; e.h = INIMIGOS.t.h;
+          e.dir = jt ? (azar(e.id, S.q) < 0.5 ? -1 : 1) : j.x < e.x ? -1 : 1;
+        }
       } else if (e.est === 'k') {
         e.vx = e.dir * 230;
         e.tchute = Math.max(0, e.tchute - dt);
-        if (e.x < S.cam - 64 || e.x > S.cam + W + 64) { e.fora = true; continue; }
+        if (jt) { e.tk = (e.tk || 0) + dt; if (e.tk > 12) { e.fora = true; continue; } }
+        else if (e.x < S.cam - 64 || e.x > S.cam + W + 64) { e.fora = true; continue; }
       }
       e.vy = Math.min(400, e.vy + 1200 * dt);
       if (moverX(e, e.vx * dt)) {
         e.dir = -e.dir;
-        if (e.est === 'k' && e.x > S.cam - 8 && e.x < S.cam + W) som('bater');
+        if (e.est === 'k' && e.x > S.cam - 8 && e.x < S.cam + W && !S.replay) som('bater');
       }
       e.chao = false;
       const bt = moverY(e, e.vy * dt);
@@ -545,17 +595,18 @@ function criar(ctx) {
       if (S.modo !== 'jogo') return;
       if (!e.ativo || e.fora || ['x', 'p', 'd'].includes(e.est) || !toca(j, e)) continue;
       if (j.estrela > 0) {
-        derrubar(e, COMBO[Math.min(S.comboEstrela, COMBO.length - 1)]);
+        const p = COMBO[Math.min(S.comboEstrela, COMBO.length - 1)];
+        if (jt) derrubarJunto(e, p); else derrubar(e, p);
         S.comboEstrela++;
         continue;
       }
       const deCima = j.vy > 0 && (j.yAnt + j.h <= e.y + 6 || j.y + j.h <= e.y + 6);
       if (e.est === 'c') {
-        chutar(e);
+        if (jt) chutarJunto(e); else chutar(e);
         if (deCima) { j.vy = -(ent.pular ? 300 : 210); j.segurando = ent.pular; }
         continue;
       }
-      if (deCima && INIMIGOS[e.t].pisa) { pisar(e, ent); continue; }
+      if (deCima && INIMIGOS[e.t].pisa) { if (jt) pisarJunto(e, ent); else pisar(e, ent); continue; }
       if (e.est === 'k' && e.tchute > 0) continue;
       ferir();
     }
@@ -572,7 +623,7 @@ function criar(ctx) {
       if (b.y > H || b.x < S.cam - 16 || b.x > S.cam + W + 16) { b.fora = true; continue; }
       for (const e of S.inimigos) {
         if (!e.ativo || e.fora || ['x', 'p'].includes(e.est) || !toca(b, e)) continue;
-        derrubar(e, 200);
+        if (jt) derrubarJunto(e, 200); else derrubar(e, 200);
         b.fora = true;
         fumaca(b.x + 4, b.y + 4);
         break;
@@ -581,6 +632,7 @@ function criar(ctx) {
       if (!b.fora && k && k.ativo && k.est === 'a' && toca(b, k)) {
         b.fora = true;
         fumaca(b.x + 4, b.y + 4);
+        if (jt) { eventoMundo({ tipo: 'chefe' }); continue; }
         k.vida--;
         k.piscar = 0.3;
         som('bater');
@@ -732,7 +784,10 @@ function criar(ctx) {
       }
       return;
     }
-    if (S.fogos === 0 && S.tm > S.tFim + 1.3) carregar(S.fase + 1);
+    if (S.fogos === 0 && S.tm > S.tFim + 1.3) {
+      if (jt) { S.modo = 'aguardando'; S.tm = 0; } // a fase seguinte vem do servidor (aoFase)
+      else carregar(S.fase + 1);
+    }
   }
   function iniciarPonte() {
     S.modo = 'ponte';
@@ -778,7 +833,7 @@ function criar(ctx) {
       S.pontos += 50 * n;
       if (++S.tique % 4 === 0) som('passo');
     }
-    if (S.tm > 8.5) { S.volta++; S.resgates++; carregar(0); }
+    if (S.tm > 8.5 && !jt) { S.volta++; S.resgates++; carregar(0); }
   }
   function passoMorte(dt) {
     S.tm += dt;
@@ -788,6 +843,7 @@ function criar(ctx) {
       j.y += j.vy * dt;
     }
     if (S.tm > 3) {
+      if (jt) { fimDaMorte(); return; }
       S.vidas--;
       if (S.vidas <= 0) { S.modo = 'fim'; S.tm = 0; S.acabou = true; }
       else { j.forma = 0; carregar(S.fase, S.meio); }
@@ -849,28 +905,793 @@ function criar(ctx) {
     for (const [i, v] of S.mudancas) { const c = i % L; if (c >= c0 && c <= c0 + 37) mu.push([i, v]); }
     const bits = (j.agachado ? 1 : 0) | (j.chao ? 2 : 0) | (j.subiu ? 4 : 0) | (j.dentro ? 8 : 0) | (j.tiro > 0 ? 16 : 0) | (j.morto ? 32 : 0) | (j.vy < 0 ? 64 : 0);
     const k = S.chefe;
-    return {
+    // No junto, quem ainda dorme também aparece (acorda quando algum coelho chega perto).
+    const F = {
       f: S.fase, v: S.volta, m: S.modo, tm: R1(S.tm), cx: R1(S.cam), tf: R2(S.tf),
       pt: S.pontos, li: S.lirios, vi: S.vidas, te: S.tempo, mk: S.meio ? 1 : 0, bd: R(S.bandeira), bn: S.bonus,
       j: [R1(j.x), R1(j.y), j.forma, j.dir, bits, R2(j.passo), R1(j.estrela), R1(j.inv), R1(j.crescer), R(j.vx)],
-      e: S.inimigos.filter(e => e.ativo && naTela(e)).map(e => [e.t, R(e.x), R(e.y), e.est, e.dir, R1(e.tt), e.id]),
+      e: S.inimigos.filter(e => (e.ativo || jt) && naTela(e)).map(e => [e.t, R(e.x), R(e.y), e.est, e.dir, R1(e.tt), e.id]),
       it: S.itens.filter(naTela).map(it => [it.t, R(it.x), R(it.y), it.sai > 0 ? 1 : 0]),
       b: S.bolas.map(b => [R(b.x), R(b.y)]),
       ch: S.chamas.filter(naTela).map(c => [R(c.x), R(c.y), Math.sign(c.vx)]),
-      k: k && k.est !== 'morto' && k.ativo ? [R(k.x), R(k.y), k.dir, k.vida, k.est, k.piscar > 0 ? 1 : 0, k.boca > 0 ? 1 : 0] : null,
+      k: k && k.est !== 'morto' && (k.ativo || jt) ? [R(k.x), R(k.y), k.dir, k.vida, k.est, k.piscar > 0 ? 1 : 0, k.boca > 0 ? 1 : 0] : null,
       mu,
       bp: S.bumps.map(b => [b.c, b.r, R2(b.t)]),
       pp: S.popups.map(p => [R(p.x), R(p.y), p.txt, R1(p.t)]),
     };
+    if (jt) {
+      F.jv = jt.modo === 'coop' ? 'EQUIPE' : 'VIDAS';
+      F.rs = S.reserva;
+      const alavanca = !!S.nivel.def.alavanca;
+      F.dj = jt.modo === 'coop' ? `Co-op: a equipe toda junta até ${alavanca ? 'a alavanca' : 'o mastro'}!`
+        : `Versus: quem ${alavanca ? 'puxar primeiro a alavanca' : 'tocar primeiro no mastro'} vence!`;
+    }
+    return F;
   }
 
-  carregar(0);
+  /* ─── Junto: todos na mesma fase, ao mesmo tempo, vendo os outros coelhos ─── */
+  // O mundo (inimigos, poderes, blocos e o Raposo) é o mesmo para todos: anda pelo relógio da fase (faseTempo) e
+  // só muda por acontecimentos marcados com o número do quadro (q). Quem recebe um acontecimento atrasado volta
+  // para a foto do mundo de antes dele e refaz os quadros: assim todos chegam ao mesmo mundo, na mesma ordem.
+  // O coelho de cada um é local (sem atraso nos controles); os outros aparecem pelo que mandam (aoPos).
+
+  // Número "aleatório" fixo por (a, b) e pela semente da sala.
+  function azar(a, b) {
+    let t = (SEM ^ Math.imul(a + 1, 0x9e3779b1) ^ Math.imul(b + 7, 0x85ebca6b)) >>> 0;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+  // O Raposo tem a sua própria sequência (guardada nele, então volta junto com as fotos do mundo).
+  function rndChefe(k) {
+    k.rs = (k.rs + 0x6d2b79f5) >>> 0;
+    let t = k.rs;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+  const porId = id => S.inimigos.find(e => e.id === id);
+  const naVista = x => x > S.cam - 32 && x < S.cam + W + 32;
+  const r1 = v => Math.round(v * 10) / 10;
+  const nomeDe = i => String(jt.jogadores[i]?.nome || `Coelho ${i + 1}`).slice(0, 14);
+  const corDe = i => jt.jogadores[i]?.cor || '#ece0bf';
+  function visualDe(i) {
+    const v = jt.jogadores[i]?.visual;
+    const pelo = v && COR_HEX.test(String(v.pelo || '')) ? v.pelo : null;
+    const roupa = v && v.roupa && typeof v.roupa === 'object' ? v.roupa : null;
+    if (pelo || roupa) return { pelo, roupa };
+    return i === jt.eu ? null : { pelo: PELOS_JUNTO[i % PELOS_JUNTO.length], roupa: null };
+  }
+  function avisar(txt, cor = '#fff6d8') {
+    S.avisos.push({ txt, cor, t: 3.5 });
+    if (S.avisos.length > 3) S.avisos.shift();
+  }
+
+  // Com mais gente, alguns raposinhos a mais (sempre os mesmos para a mesma sala e fase).
+  function extrasDaFase(f) {
+    const base = nivelBase(f);
+    const qtd = Math.round((DIF - 1) / 0.15) * 2;
+    const lista = [];
+    if (qtd <= 0) return lista;
+    const rnd = sorteSemente((SEM ^ Math.imul(f + 3, 0x2c1b3c6d)) >>> 0);
+    const cand = base.inimigos.filter(e => e.tipo === 'r' || e.tipo === 't');
+    const solido = (c, r) => c >= 0 && c < base.largura && r >= 0 && r < LINHAS && SOLIDO[base.mapa[r * base.largura + c]];
+    for (let k = 0; k < 60 && lista.length < qtd && cand.length; k++) {
+      const e = cand[Math.floor(rnd() * cand.length)];
+      const c = e.c + (rnd() < 0.5 ? -3 : 3);
+      if (c < 14 || c > base.largura - 24) continue;
+      if (!solido(c, e.r) || solido(c, e.r - 1) || solido(c, e.r - 2)) continue;
+      if (lista.some(x => Math.abs(x.c - c) < 2) || base.inimigos.some(x => x.r === e.r && x.c === c)) continue;
+      lista.push({ tipo: 'r', c, r: e.r });
+    }
+    return lista;
+  }
+
+  /* As fotos do mundo (para voltar no tempo) */
+  const copiar = o => ({ ...o });
+  function guardar() {
+    J.fotos.push({
+      q: S.q, ini: S.inimigos.map(copiar), it: S.itens.map(copiar), k: S.chefe && copiar(S.chefe), ch: S.chamas.map(copiar),
+      mapa: S.nivel.mapa.slice(), mud: new Map(S.mudancas), cont: { ...S.nivel.conteudo }, multi: [...S.multi].map(([i, m]) => [i, copiar(m)]),
+    });
+    while (J.fotos.length > 2 && J.fotos[1].q <= S.q - HORIZONTE) J.fotos.shift();
+    const q0 = J.fotos[0].q;
+    if (J.log.length && J.log[0].q < q0) J.log = J.log.filter(ev => ev.q >= q0); // esses já estão na foto mais velha
+  }
+  function restaurar(f) {
+    S.q = f.q;
+    S.tf = f.q / 60;
+    S.inimigos = f.ini.map(copiar);
+    S.itens = f.it.map(copiar).filter(it => !S.pegos.has(it.chave));
+    S.chefe = f.k && copiar(f.k);
+    S.chamas = f.ch.map(copiar);
+    S.nivel.mapa.set(f.mapa);
+    S.mudancas = new Map(f.mud);
+    S.nivel.conteudo = { ...f.cont };
+    S.multi = new Map(f.multi.map(([i, m]) => [i, copiar(m)]));
+    for (const i of S.lirioPegos) if (S.nivel.mapa[i] === B.LIRIO) trocar(i % S.nivel.L, Math.floor(i / S.nivel.L), B.VAZIO);
+  }
+
+  /* Os acontecimentos do mundo, sempre na mesma ordem: quadro, quem mandou, número */
+  const ordem = (a, b) => a.q - b.q || a.i - b.i || a.n - b.n;
+  function inserir(ev) {
+    if (J.fotos.length && ev.q < J.fotos[0].q) ev.q = J.fotos[0].q; // atrasado demais: vale na foto mais velha
+    let k = J.log.length;
+    while (k > 0 && ordem(J.log[k - 1], ev) > 0) k--;
+    J.log.splice(k, 0, ev);
+  }
+  const marcarVolta = q => { J.voltar = J.voltar == null ? q : Math.min(J.voltar, q); };
+
+  // Um acontecimento meu: vale na hora aqui e vai para os outros com o número do quadro.
+  function eventoMundo(dados) {
+    const ev = { ...dados, q: S.q, s: S.fase, n: ++J.seq };
+    enviar(() => jt.evento(ev));
+    const meu = { ...ev, i: jt.eu };
+    inserir(meu);
+    if (J.log.some(o => o.feito && ordem(o, meu) > 0)) marcarVolta(meu.q); // fora de ordem: refaz no próximo passo
+    aplicar(meu);
+    meu.feito = true;
+    return meu;
+  }
+  // Um acontecimento de outro coelho: entra na fila em ordem; se é do passado, o mundo volta e refaz.
+  function recebido(i, ev) {
+    const q = Math.floor(Number(ev.q));
+    if (!Number.isFinite(q) || q < 0) return;
+    const dele = { ...ev, i, q, n: Number(ev.n) || 0 };
+    if (dele.s > S.fase) { J.adiantados.push(dele); return; }
+    if (dele.s !== S.fase) return;
+    inserir(dele);
+    if (dele.q <= S.q) marcarVolta(dele.q);
+  }
+  function aplicarDe(q) {
+    for (const ev of J.log) {
+      if (ev.q > q) break;
+      if (ev.q === q && !ev.feito) { aplicar(ev); ev.feito = true; }
+    }
+  }
+  function voltarNoTempo() {
+    const q = J.voltar;
+    J.voltar = null;
+    if (!J.fotos.length) return;
+    const alvo = S.q;
+    let f = J.fotos[0];
+    for (const x of J.fotos) if (x.q <= q) f = x;
+    while (J.fotos[J.fotos.length - 1].q > f.q) J.fotos.pop();
+    restaurar(f);
+    for (const ev of J.log) if (ev.q >= f.q) ev.feito = false;
+    S.replay = true;
+    aplicarDe(f.q);
+    while (S.q < alvo) passoMundo();
+    S.replay = false;
+  }
+  // Um quadro do mundo: só depende do próprio mundo (nada da câmera ou do coelho de ninguém).
+  function passoMundo() {
+    moverItensMundo(QUADRO);
+    atualizarInimigos(QUADRO);
+    chefeMundo(QUADRO);
+    chamasMundo(QUADRO);
+    S.q++;
+    S.tf = S.q / 60;
+    if (S.q % 10 === 0) guardar();
+    aplicarDe(S.q);
+  }
+  // Leva o mundo até o relógio da fase (até max quadros por passo; muito atrasado, alcança de uma vez).
+  function avancarMundo(max) {
+    if (J.voltar != null) voltarNoTempo();
+    const falta = Math.floor(jt.faseTempo() * 60) - S.q;
+    let n = falta > 30 ? Math.min(falta, 1200) : Math.min(falta, max);
+    while (n-- > 0) passoMundo();
+  }
+
+  /* Aplicar um acontecimento (igual em todos os navegadores; efeitos só na primeira vez) */
+  function aplicar(ev) {
+    const efeitos = !ev.visto;
+    ev.visto = true;
+    if (ev.tipo === 'bloco') { aplicarBloco(ev, efeitos); return; }
+    if (ev.tipo === 'chefe') { aplicarChefe(ev, efeitos); return; }
+    if (ev.tipo === 'acordou' && ev.e === -1) {
+      if (S.chefe && S.chefe.est === 'a') S.chefe.ativo = true;
+      return;
+    }
+    const e = porId(ev.e);
+    if (!e || e.fora) return;
+    if (ev.tipo === 'acordou') {
+      if (e.ativo) return;
+      e.ativo = true;
+      if (e.t === 'm' && e.est === 'd') {
+        const d = ev.d < 0 ? -1 : 1;
+        Object.assign(e, { est: 'v', vx: d * INIMIGOS.m.vel * DIF, dir: d, base: e.y, alvo: Math.max(110, Math.min(220, Number(ev.a) || 150)), tt: 0 });
+      }
+    } else if (ev.tipo === 'matou') {
+      if (e.est === 'x' || e.est === 'p') return;
+      e.ativo = true;
+      if (ev.m === 'p') { e.est = 'p'; e.tt = 0.5; }
+      else if (ev.m === 'c' && e.t === 't') {
+        if (e.est === 'a') { e.y += e.h - 12; e.h = 12; }
+        Object.assign(e, { est: 'c', tt: 0, vx: 0 });
+      } else if (ev.m === 'q') Object.assign(e, { est: 'x', vy: 0, vx: 0 });
+      else Object.assign(e, { est: 'x', vy: -220, vx: (ev.d < 0 ? -1 : 1) * 50 });
+      if (efeitos && ev.i !== jt.eu && naVista(e.x)) som('pisao');
+    } else if (ev.tipo === 'chutou') {
+      if (e.est === 'x' || e.est === 'p' || e.t !== 't') return;
+      if (e.est === 'a') { e.y += e.h - 12; e.h = 12; }
+      const x = Number(ev.x);
+      Object.assign(e, { ativo: true, est: 'k', x: Number.isFinite(x) ? x : e.x, dir: ev.dir < 0 ? -1 : 1, tchute: 0.25, combo: 0, dono: ev.i, tk: 0 });
+    }
+  }
+  function aplicarChefe(ev, efeitos) {
+    const k = S.chefe;
+    if (!k || k.est !== 'a') return;
+    k.ativo = true;
+    k.vida--;
+    k.piscar = 0.3;
+    if (efeitos && naVista(k.x)) som('bater');
+    if (k.vida > 0) return;
+    k.est = 'x';
+    k.vy = -200;
+    if (ev.i === jt.eu && !S.premioChefe) {
+      S.premioChefe = true;
+      ganhar(5000, k.x + 17, k.y - 6, 'Raposo vencido! 5000');
+      S.derrotados++;
+      som('pisao');
+    } else if (efeitos) popup(k.x + 17, k.y - 6, 'Raposo vencido!');
+  }
+  function popMoeda(c, r) {
+    particula({ tp: 'moeda', x: c * T + 8, y: r * T - 6, vy: -300, vida: 0.5 });
+  }
+  function aplicarBloco(ev, efeitos) {
+    const c = Math.floor(Number(ev.c));
+    const r = Math.floor(Number(ev.r));
+    if (!(c >= 0 && c < S.nivel.L && r >= 0 && r < LINHAS)) return;
+    const f = Number(ev.f) || 0;
+    const v = cod(c, r);
+    const i = r * S.nivel.L + c;
+    const perto = efeitos && naVista(c * T);
+    // Quem está em cima do bloco leva o tranco
+    for (const e of S.inimigos) {
+      if (!e.ativo || e.fora || !['a', 'c', 'k'].includes(e.est)) continue;
+      if (Math.abs(e.y + e.h - r * T) < 3 && e.x + e.w > c * T - 2 && e.x < c * T + T + 2) {
+        Object.assign(e, { est: 'x', vy: -220, vx: (e.x + e.w / 2 < c * T + 8 ? -1 : 1) * 50 });
+        if (perto) som('pisao');
+      }
+    }
+    for (const it of S.itens) {
+      if (it.sai <= 0 && Math.abs(it.y + it.h - r * T) < 3 && it.x + it.w > c * T && it.x < c * T + T) {
+        it.vy = -230;
+        it.vx = (it.x + 7 < c * T + 8 ? -1 : 1) * Math.max(60, Math.abs(it.vx));
+      }
+    }
+    if (cod(c, r - 1) === B.LIRIO) { trocar(c, r - 1, B.VAZIO); if (efeitos) popMoeda(c, r - 1); }
+    const item = S.nivel.conteudo[i];
+    if (v === B.PERGUNTA || v === B.OCULTO) {
+      trocar(c, r, B.USADO);
+      delete S.nivel.conteudo[i];
+      if (efeitos) bump(c, r);
+      if (perto && item) som('bater');
+      soltarMundo(item, c, r, f, efeitos);
+    } else if (v === B.TIJOLO) {
+      if (item === 'moedas') {
+        const m = S.multi.get(i) || { n: 0, t0: S.tf };
+        S.multi.set(i, m);
+        m.n++;
+        if (efeitos) { bump(c, r); popMoeda(c, r); }
+        if (m.n >= 10 || S.tf - m.t0 > 4) { trocar(c, r, B.USADO); delete S.nivel.conteudo[i]; }
+      } else if (item) {
+        trocar(c, r, B.USADO);
+        delete S.nivel.conteudo[i];
+        if (efeitos) bump(c, r);
+        if (perto) som('bater');
+        soltarMundo(item, c, r, f, efeitos);
+      } else if (f > 0) {
+        trocar(c, r, B.VAZIO);
+        if (perto) {
+          som('quebra');
+          const cor = TEMAS[S.nivel.def.tema].tijolo[0];
+          for (let k = 0; k < 4; k++) {
+            particula({ tp: 'caco', x: c * T + 4 + (k % 2) * 8, y: r * T + 4 + (k >> 1) * 8, vx: (k % 2 ? 1 : -1) * (55 + Math.random() * 40), vy: k >> 1 ? -200 : -290, vida: 1.2, cor });
+          }
+        }
+      } else if (efeitos) { bump(c, r); if (perto) som('bater'); }
+    }
+  }
+  // O que sai do bloco: a moeda é só enfeite (quem bateu pede), o resto anda igual para todos.
+  function soltarMundo(item, c, r, forma, efeitos) {
+    if (!item || item === 'moeda') { if (efeitos) popMoeda(c, r); return; }
+    const chave = `${item}:${c}:${r}`;
+    if (S.pegos.has(chave)) return;
+    const t = item === 'poder' ? (forma === 0 ? 'c' : 'f') : item === 'estrela' ? 'e' : 'v';
+    S.itens.push({ t, x: c * T + 1, y: r * T, w: 14, h: 14, vx: 0, vy: 0, sai: 0.6, y0: r * T, fora: false, chave });
+    if (efeitos && naVista(c * T)) som('passo');
+  }
+
+  /* O que anda sozinho no mundo */
+  function moverItensMundo(dt) {
+    const fim = S.nivel.L * T + 32;
+    for (const it of S.itens) {
+      moverItem(it, dt);
+      if (it.y > H + 16 || it.x < -32 || it.x > fim) it.fora = true;
+    }
+    S.itens = S.itens.filter(it => !it.fora && !S.pegos.has(it.chave));
+  }
+  // O Raposo do junto: olha para quem vem (a esquerda), às vezes vira; mais bravo com mais gente.
+  function chefeMundo(dt) {
+    const k = S.chefe;
+    if (!k || k.est === 'morto' || !k.ativo) return;
+    k.piscar = Math.max(0, k.piscar - dt);
+    k.boca = Math.max(0, k.boca - dt);
+    if (k.est === 'x') {
+      k.vy += 900 * dt;
+      k.y += k.vy * dt;
+      if (k.y > H + 40) k.est = 'morto';
+      return;
+    }
+    k.vy = Math.min(400, k.vy + 1100 * dt);
+    k.chao = false;
+    const bt = moverY(k, k.vy * dt);
+    if (bt) { k.vy = 0; k.chao = bt.baixo; }
+    if (k.y > H + 40) { k.est = 'morto'; return; }
+    const p = S.nivel.def.ponte;
+    k.tAnda -= dt;
+    if (k.tAnda <= 0) {
+      k.vx = (rndChefe(k) < 0.5 ? -1 : 1) * 28 * DIF;
+      k.tAnda = 0.8 + rndChefe(k) * 1.2;
+      k.dir = rndChefe(k) < 0.8 ? -1 : 1;
+    }
+    const xmin = (p.c0 + 3) * T;
+    const xmax = (p.c1 - 1) * T - k.w;
+    k.x += k.vx * dt;
+    if (k.x < xmin) { k.x = xmin; k.vx = Math.abs(k.vx); } else if (k.x > xmax) { k.x = xmax; k.vx = -Math.abs(k.vx); }
+    k.tPulo -= dt;
+    if (k.tPulo <= 0 && k.chao) { k.vy = -300; k.tPulo = (1.6 + rndChefe(k) * 2.2) / DIF; }
+    k.tt -= dt;
+    if (k.tt <= 0) {
+      const alto = rndChefe(k) < 0.5;
+      S.chamas.push({ x: k.dir < 0 ? k.x - 12 : k.x + k.w, y: k.y + 8, w: 14, h: 6, vx: k.dir * 110 * DIF, alvo: p.r * T - (alto ? 26 : 10), t: 0 });
+      k.tt = (1.4 + rndChefe(k) * 1.8) / DIF;
+      k.boca = 0.3;
+      if (!S.replay && naVista(k.x)) som('tiro');
+    }
+  }
+  function chamasMundo(dt) {
+    for (const c of S.chamas) {
+      c.x += c.vx * dt;
+      c.y += (c.alvo - c.y) * Math.min(1, dt * 2.5);
+      c.t = (c.t || 0) + dt;
+      if (c.t > 6) c.fora = true;
+    }
+    S.chamas = S.chamas.filter(c => !c.fora);
+  }
+
+  /* O meu coelho no mundo de todos */
+  function baterJunto(c, r) {
+    const v = cod(c, r);
+    const i = r * S.nivel.L + c;
+    const item = S.nivel.conteudo[i];
+    const emCima = e => e.ativo && !e.fora && ['a', 'c', 'k'].includes(e.est) && Math.abs(e.y + e.h - r * T) < 3 && e.x + e.w > c * T - 2 && e.x < c * T + T + 2;
+    const alvos = S.inimigos.filter(emCima).map(e => e.id);
+    const itemEmCima = S.itens.some(it => it.sai <= 0 && Math.abs(it.y + it.h - r * T) < 3 && it.x + it.w > c * T && it.x < c * T + T);
+    const lirio = cod(c, r - 1) === B.LIRIO;
+    if (v !== B.PERGUNTA && v !== B.OCULTO && v !== B.TIJOLO && !alvos.length && !itemEmCima && !lirio) { som('bater'); return; }
+    let moeda = null;
+    if ((v === B.PERGUNTA || v === B.OCULTO) && (!item || item === 'moeda')) moeda = `moeda:${c}:${r}`;
+    else if (v === B.TIJOLO && item === 'moedas') moeda = `moeda:${c}:${r}:${(S.multi.get(i)?.n || 0) + 1}`;
+    const quebra = v === B.TIJOLO && !item && j.forma > 0;
+    eventoMundo({ tipo: 'bloco', c, r, f: j.forma });
+    for (const id of alvos) {
+      const e = porId(id);
+      if (e && e.est === 'x') { ganhar(100, e.x + 7, e.y); S.derrotados++; }
+    }
+    if (lirio) { S.lirioPegos.add((r - 1) * S.nivel.L + c); pedir(`lirio:${c}:${r - 1}`, 'lirio', c * T + 8, r * T - 8); }
+    if (moeda) { pedir(moeda, 'lirio', c * T + 8, r * T - 6); popup(c * T + 8, r * T - 30, 200); }
+    if (quebra) ganhar(50);
+  }
+  // Pedir um Lírio ou poder: some na hora aqui; quem pediu primeiro (no servidor) leva.
+  function pedir(chave, tipo, x, y) {
+    if (S.pegos.has(chave)) return;
+    S.pegos.add(chave);
+    S.pedidos.set(chave, tipo);
+    enviar(() => jt.pegar(chave, 0));
+    if (tipo === 'lirio') { som('moeda'); faiscas(x, y, 3, '#f7e08a'); }
+  }
+  function pegarLirioJunto(c, r) {
+    S.lirioPegos.add(r * S.nivel.L + c);
+    trocar(c, r, B.VAZIO);
+    pedir(`lirio:${c}:${r}`, 'lirio', c * T + 8, r * T + 8);
+  }
+  function sumir(chave) {
+    const [tipo, c, r] = chave.split(':');
+    if (tipo === 'lirio') {
+      const cc = Number(c);
+      const rr = Number(r);
+      if (!(cc >= 0 && cc < S.nivel.L && rr >= 0 && rr < LINHAS)) return;
+      S.lirioPegos.add(rr * S.nivel.L + cc);
+      if (cod(cc, rr) === B.LIRIO) trocar(cc, rr, B.VAZIO);
+    } else S.itens = S.itens.filter(it => it.chave !== chave);
+  }
+  function contarLirio() {
+    S.pontos += 200;
+    S.lirios++;
+    S.totalLirios++;
+    if (S.lirios >= 100) { S.lirios -= 100; ganharVida(j.x + 6, j.y - 10); }
+  }
+  function coletarItensJunto() {
+    let algum = false;
+    for (const it of S.itens) if (!S.pegos.has(it.chave) && toca(j, it)) { pedir(it.chave, it.t, it.x + 7, it.y); algum = true; }
+    if (algum) S.itens = S.itens.filter(it => !S.pegos.has(it.chave));
+  }
+  // Quando o MEU coelho chega perto de um inimigo dormindo, ele acorda (para todos, no mesmo quadro).
+  function acordarInimigos() {
+    const cx = j.x + j.w / 2;
+    for (const e of S.inimigos) {
+      if (e.ativo || e.fora) continue;
+      const dx = e.x + e.w / 2 - cx;
+      if (e.t === 'm' ? Math.abs(dx) >= ALCANCE_MORCEGO : Math.abs(dx) >= ALCANCE) continue;
+      const ev = { tipo: 'acordou', e: e.id };
+      if (e.t === 'm') { ev.d = j.x < e.x ? -1 : 1; ev.a = Math.round(Math.max(110, Math.min(220, j.y))); }
+      eventoMundo(ev);
+    }
+    const k = S.chefe;
+    if (k && !k.ativo && k.est === 'a' && k.x - cx < 300) eventoMundo({ tipo: 'acordou', e: -1 });
+  }
+  function derrubarJunto(e, p) {
+    const d = e.x + e.w / 2 < j.x + j.w / 2 ? -1 : 1;
+    eventoMundo({ tipo: 'matou', e: e.id, m: 'x', d });
+    ganhar(p, e.x + 7, e.y);
+    S.derrotados++;
+    som('pisao');
+  }
+  function chutarJunto(e) {
+    const dir = j.x + j.w / 2 < e.x + e.w / 2 ? 1 : -1;
+    eventoMundo({ tipo: 'chutou', e: e.id, x: Math.round(e.x * 100) / 100, dir });
+    ganhar(400, e.x + 7, e.y);
+    som('pisao');
+  }
+  function pisarJunto(e, ent) {
+    const m = e.t === 'r' ? 'p' : e.t === 't' ? 'c' : 'q';
+    if (m !== 'c') S.derrotados++;
+    eventoMundo({ tipo: 'matou', e: e.id, m });
+    pontosCombo(e);
+    som('pisao');
+    poeira(e.x + 7, e.y, 3);
+    j.vy = -(ent.pular ? 300 : 210);
+    j.segurando = ent.pular;
+    j.chao = false;
+  }
+  function tocarChefe() {
+    const k = S.chefe;
+    if (k && k.ativo && k.est === 'a' && toca(j, k)) ferir();
+    for (const c of S.chamas) if (toca(j, { x: c.x + 2, y: c.y + 1, w: c.w - 4, h: c.h - 2 })) ferir();
+  }
+
+  function passoJogoJunto(dt, ent) {
+    if (j.crescer > 0) { j.crescer = Math.max(0, j.crescer - dt); return; } // só o meu coelho para; o mundo segue
+    S.relogio += dt;
+    while (S.relogio >= TIQUE) {
+      S.relogio -= TIQUE;
+      S.tempo--;
+      if (S.tempo === 100) som('alerta');
+      if (S.tempo <= 0) { S.tempo = 0; morrer(false); return; }
+    }
+    moverPlataformas();
+    atualizarJogador(dt, ent);
+    coletarItensJunto();
+    acordarInimigos();
+    contatoInimigos(ent);
+    atualizarBolas(dt);
+    if (S.modo === 'jogo') tocarChefe();
+    if (S.modo !== 'jogo') return;
+    perigos();
+    if (S.modo !== 'jogo') return;
+    atualizarCamera(dt);
+    S.maxX = Math.max(S.maxX, j.x);
+    const def = S.nivel.def;
+    if (!S.meio && def.meio && j.x >= def.meio.c * T) { S.meio = true; faiscas(def.meio.c * T + 8, def.meio.r * T - 24, 8, '#e8c24a'); }
+    if (def.mastro && j.x + j.w >= def.mastro * T - 0.5) { chegar(); pegarMastro(); }
+    else if (def.alavanca && toca(j, { x: def.alavanca.c * T + 2, y: def.alavanca.r * T - 24, w: 12, h: 24 })) { chegar(); iniciarPonte(); }
+  }
+  function fimDaMorte() {
+    j.forma = 0;
+    if (S.proxima != null) { S.modo = 'aguardando'; S.tm = 0; return; } // a fase vai mudar: não gasta vida
+    if (S.reserva > 0) { S.reserva--; renascer(); popup(j.x + 6, j.y - 10, 'Vida guardada!'); return; }
+    S.modo = 'esperando';
+    S.tm = 0;
+    S.esperando = true;
+    jt.morri();
+  }
+  // Volta no último marco que eu passei (ou no começo), pequeno e piscando por 2 segundos.
+  function renascer() {
+    const def = S.nivel.def;
+    const ini = S.meio && def.meio ? def.meio : def.inicio;
+    j.forma = 0;
+    Object.assign(j, {
+      x: ini.c * T + 2, y: ini.r * T - PEQUENO, w: LARG, h: PEQUENO, vx: 0, vy: 0, chao: true, dir: 1, inv: 2, estrela: 0, agachado: false,
+      coyote: 0, buffer: 0, segurando: false, crescer: 0, sobre: -1, morto: false, caiu: false, subiu: false, dentro: false, tiro: 0,
+    });
+    S.cam = Math.max(0, Math.min(S.nivel.L * T - W, ini.c * T - 96));
+    Object.assign(S, { tempo: TEMPO_FASE, relogio: 0, bolas: [], combo: 0, esperando: false });
+    if (['esperando', 'morrendo', 'jogo'].includes(S.modo)) { S.modo = 'jogo'; S.tm = 0; }
+  }
+  // Toquei no mastro (ou na alavanca): avisa os outros e, se fui o primeiro, chama "cheguei" uma vez só.
+  function chegar() {
+    if (S.chegada) return;
+    S.chegada = { q: S.q, t: 0, feito: false };
+    jt.evento({ tipo: 'mastro', q: S.q, s: S.fase, a: S.nivel.def.alavanca ? 1 : 0 });
+    J.tPonto = 1;
+  }
+  function conferirChegada(dt) {
+    const c = S.chegada;
+    if (c.feito) return;
+    c.t += dt;
+    if (c.t < ESPERA_CHEGADA) return;
+    if (S.proxima != null) { c.feito = true; return; } // a fase já passou
+    const antes = S.mastros.some(m => m.q < c.q || (m.q === c.q && m.i < jt.eu));
+    if (antes && c.t < 2) return; // quem chegou antes chama (e, se sumir, eu chamo depois de 2 s)
+    c.feito = true;
+    jt.cheguei();
+  }
+
+  /* Mandar para os outros: no máximo LIMITE_EVENTOS por segundo (o resto espera na fila, em ordem) */
+  function enviar(f) { J.fila.push(f); drenarFila(); }
+  function drenarFila() {
+    const agora = jt.tempo();
+    while (J.enviados.length && J.enviados[0] <= agora - 1) J.enviados.shift();
+    while (J.fila.length && J.enviados.length < LIMITE_EVENTOS) { J.enviados.push(agora); J.fila.shift()(); }
+  }
+  function codigoModo() {
+    if (S.fora) return 3;
+    if (S.modo === 'titulo' || (S.modo === 'aguardando' && j.morto)) return 4;
+    if (j.morto) return 1;
+    return ['mastro', 'andando', 'contagem', 'ponte', 'resgate', 'princesa', 'aguardando'].includes(S.modo) ? 2 : 0;
+  }
+  function mandarPos() {
+    if (S.fora) {
+      if (!J.posFora) { J.posFora = true; jt.pos({ s: S.fase, m: 3 }); }
+      return;
+    }
+    const bits = (j.agachado ? 1 : 0) | (j.chao ? 2 : 0) | (j.subiu ? 4 : 0) | (j.dentro ? 8 : 0) | (j.tiro > 0 ? 16 : 0) | (j.morto ? 32 : 0) | (j.vy < 0 ? 64 : 0);
+    jt.pos({
+      x: r1(j.x), y: r1(j.y), f: j.forma, o: j.dir, b: bits, v: Math.round(j.vx), e: j.estrela > 0 ? 1 : 0, n: j.inv > 0 ? 1 : 0,
+      c: j.crescer > 0 ? 1 : 0, s: S.fase, m: codigoModo(),
+    });
+  }
+  // Progresso que só cresce: (fase e o mais longe que fui, em blocos) x 10 + pontos / 100.
+  const progresso = () => (S.fase * 212 + Math.floor(S.maxX / T)) * 10 + Math.floor(S.pontos / 100);
+  function mandarPontos(dt) {
+    J.tPonto += dt;
+    if (J.tPonto < 0.5 || S.fora) return;
+    J.tPonto = 0;
+    const n = progresso();
+    if (n > J.ultimoPonto) { J.ultimoPonto = n; enviar(() => jt.pontos(n)); }
+  }
+  function vidasAgora() {
+    const e = jt.estado?.();
+    if (!e) return S.vidas;
+    if (jt.modo === 'coop') return Math.max(0, Number(e.vidasEquipe) || 0);
+    return Math.max(0, Number(e.p?.[jt.eu]?.vidas) || 0);
+  }
+
+  /* Os outros coelhos */
+  function foraDe(i) {
+    const p = jt.estado?.()?.p?.[i];
+    return !!(p?.fora || p?.saiu || S.outros[i]?.fora);
+  }
+  const outroNaFase = o => o && o.d.s === S.fase && o.d.m !== 3 && o.d.m !== 4 && Number.isFinite(o.d.x) && !foraDe(o.i);
+  function suavizarOutros(dt) {
+    for (const o of S.outros) {
+      if (!o || !Number.isFinite(o.d.x)) continue;
+      o.idade += dt;
+      const d = o.d;
+      const ax = d.x + (Number(d.v) || 0) * Math.min(0.1, o.idade);
+      const ay = Number(d.y) || 0;
+      if (Math.abs(ax - o.x) > 96 || Math.abs(ay - o.y) > 96) { o.x = ax; o.y = ay; }
+      else { const k = Math.min(1, dt * 14); o.x += (ax - o.x) * k; o.y += (ay - o.y) * k; }
+      if (d.b & 2 && Math.abs(d.v) > 1) o.passo += dt * (0.4 + Math.abs(d.v) / ANDAR);
+    }
+  }
+  // Fora do jogo: a câmera segue (só para a frente) o coelho vivo que está mais longe.
+  function cameraAssistindo(dt) {
+    let alvo = null;
+    for (const o of S.outros) if (outroNaFase(o) && o.d.m !== 1) alvo = Math.max(alvo ?? -1e9, o.x);
+    if (alvo == null) return;
+    const c = alvo + 6 - W * 0.42;
+    if (c > S.cam) S.cam += (c - S.cam) * Math.min(1, dt * 5);
+    S.cam = Math.max(0, Math.min(S.nivel.L * T - W, S.cam));
+  }
+
+  /* Fases do junto */
+  function carregarJunto(f) {
+    if (j.morto || S.fora) j.forma = 0;
+    carregar(f);
+    const base = nivelBase(f);
+    extrasDaFase(f).forEach((e, k) => S.inimigos.push(novoInimigo(e, base.inimigos.length + k)));
+    const k = S.chefe;
+    if (k) {
+      k.vida = Math.round(CHEFE.vida * DIF);
+      k.rs = (SEM ^ Math.imul(f + 1, 0x9e3779b1)) >>> 0;
+      k.tPulo = 1.5 + rndChefe(k);
+      k.tAnda = 0;
+    }
+    Object.assign(S, {
+      q: 0, tf: 0, proxima: null, chegada: null, mastros: [], pegos: new Set(), pedidos: new Map(), lirioPegos: new Set(),
+      premiados: new Set(), premioChefe: false, maxX: j.x, replay: false,
+    });
+    Object.assign(J, { log: [], fotos: [], voltar: null, posFora: false });
+    guardar();
+    const daqui = J.adiantados.filter(ev => ev.s === f);
+    J.adiantados = J.adiantados.filter(ev => ev.s > f);
+    for (const ev of daqui) { inserir(ev); if (ev.q <= S.q) marcarVolta(ev.q); }
+  }
+  function iniciarJunto() {
+    Object.assign(S, { outros: jt.jogadores.map(() => null), avisos: [], reserva: 0, esperando: false, proxima: null });
+    S.fora = !!jt.estado?.()?.p?.[jt.eu]?.fora;
+    carregarJunto(Math.max(0, Math.min(FASES.length - 1, Math.floor(Number(jt.fase()) || 0))));
+    S.vidas = vidasAgora();
+    jt.aoPos = (i, d) => {
+      if (i === jt.eu || !d || typeof d !== 'object' || !S.outros || i < 0 || i >= S.outros.length) return;
+      const o = S.outros[i];
+      if (!o || o.d.s !== d.s || !Number.isFinite(o.x)) S.outros[i] = { i, x: Number(d.x) || 0, y: Number(d.y) || 0, d, idade: 0, passo: 0, fora: o?.fora };
+      else { o.d = d; o.idade = 0; }
+    };
+    jt.aoEvento = (i, ev) => {
+      if (i === jt.eu || !ev) return;
+      if (ev.tipo === 'mastro') {
+        if (ev.s !== S.fase) return;
+        S.mastros.push({ i, q: Number(ev.q) || 0 });
+        avisar(`${nomeDe(i)} ${ev.a ? 'puxou a alavanca' : 'chegou no mastro'}!`, corDe(i));
+      } else if (MUNDO_EVENTOS.includes(ev.tipo)) recebido(i, ev);
+    };
+    jt.aoPegou = (i, chave) => {
+      chave = String(chave);
+      const meu = S.pedidos.get(chave);
+      S.pedidos.delete(chave);
+      S.pegos.add(chave);
+      sumir(chave);
+      if (i !== jt.eu || meu === undefined) return;
+      if (meu === 'lirio') { contarLirio(); return; }
+      if (meu === 'v') { ganharVida(j.x + 6, j.y - 8); return; }
+      if (S.modo !== 'jogo' || j.morto) { ganhar(1000, j.x + 6, j.y - 8); return; }
+      coletar({ t: meu, x: j.x - 1, y: j.y });
+    };
+    jt.aoRenascer = i => {
+      if (i !== jt.eu) return;
+      if (!S.fora) renascer();
+    };
+    jt.aoFora = i => {
+      if (i !== jt.eu) {
+        if (S.outros[i]) S.outros[i].fora = true;
+        avisar(`${nomeDe(i)} está fora.`, corDe(i));
+        return;
+      }
+      S.fora = true;
+      S.esperando = false;
+      if (S.modo !== 'titulo') { S.modo = 'fora'; S.tm = 0; }
+    };
+    jt.aoChegou = i => {
+      if (i === jt.eu || S.mastros.some(m => m.i === i)) return;
+      avisar(`${nomeDe(i)} chegou!`, corDe(i));
+    };
+    jt.aoFase = f => {
+      if (jt.modo !== 'coop' || !(f >= 0 && f < FASES.length) || f === S.fase) return;
+      S.proxima = f;
+      if (S.modo === 'jogo') { S.modo = 'aguardando'; S.tm = 0; j.vx = 0; }
+    };
+  }
+
+  function atualizarJunto(dt, ent) {
+    atualizarEfeitos(dt);
+    for (const a of S.avisos) a.t -= dt;
+    S.avisos = S.avisos.filter(a => a.t > 0);
+    // Co-op: a fase nova carrega um pouco antes (cartão) e começa para todos em faseTempo() = 0.
+    if (S.proxima != null && jt.faseTempo() >= -CARTAO) carregarJunto(S.proxima);
+    if (!['ponte', 'resgate', 'princesa'].includes(S.modo)) { // no fim do castelo o mundo para
+      if (S.proxima != null) { if (J.voltar != null) voltarNoTempo(); passoMundo(); }
+      else avancarMundo(2);
+    }
+    suavizarOutros(dt);
+    S.vidas = vidasAgora();
+    switch (S.modo) {
+      case 'titulo':
+        S.tm += dt;
+        if (jt.faseTempo() >= 0) { S.modo = S.fora ? 'fora' : S.esperando ? 'esperando' : 'jogo'; S.tm = 0; }
+        break;
+      case 'jogo': passoJogoJunto(dt, ent); break;
+      case 'morrendo': passoMorte(dt); break;
+      case 'fora': S.tm += dt; cameraAssistindo(dt); break;
+      case 'mastro': passoMastro(dt); break;
+      case 'andando': passoAndando(dt); break;
+      case 'contagem': passoContagem(dt); break;
+      case 'ponte': passoPonte(dt); break;
+      case 'resgate': passoResgate(dt); break;
+      case 'princesa': passoPrincesa(dt); break;
+      default: S.tm += dt; break; // esperando, aguardando
+    }
+    if (S.chegada) conferirChegada(dt);
+    mandarPos();
+    mandarPontos(dt);
+    drenarFila();
+  }
+
+  /* Desenho do junto: os outros coelhos, setas, barra de progresso e avisos */
+  function desenharOutros(g, t) {
+    for (const o of S.outros) {
+      if (!outroNaFase(o)) continue;
+      const d = o.d;
+      const forma = [0, 1, 2].includes(d.f) ? d.f : 0;
+      desenharJogador(g, { j: [o.x, o.y, forma, d.o < 0 ? -1 : 1, d.b | 0, o.passo, d.e ? 1 : 0, d.n ? 1 : 0, 0, Number(d.v) || 0] }, t, visualDe(o.i));
+      if (d.b & 8) continue;
+      const h = forma > 0 ? (d.b & 1 ? AGACHADO : GRANDE) : PEQUENO;
+      texto(g, nomeDe(o.i), o.x + 6, o.y + h - (forma > 0 && !(d.b & 1) ? 50 : 30), 7, corDe(o.i), 'center', 'rgba(0,0,0,0.8)');
+    }
+  }
+  function desenharMarca(g) {
+    if (S.fora || j.morto || j.dentro || S.modo === 'titulo') return;
+    const x = j.x + 6;
+    const y = j.y + j.h - (j.forma > 0 && !j.agachado ? 52 : 32);
+    g.fillStyle = corDe(jt.eu);
+    g.beginPath(); g.moveTo(x - 3.5, y - 4); g.lineTo(x + 3.5, y - 4); g.lineTo(x, y + 1); g.closePath(); g.fill();
+  }
+  function setasOutros(g) {
+    for (const o of S.outros) {
+      if (!outroNaFase(o) || o.d.m === 1) continue;
+      const sx = o.x + 6 - S.cam;
+      if (sx >= -2 && sx <= W + 2) continue;
+      const esq = sx < 0;
+      const y = Math.max(48, Math.min(H - 18, o.y + 8));
+      const x = esq ? 6 : W - 6;
+      const s = esq ? 1 : -1;
+      g.fillStyle = 'rgba(0,0,0,0.55)';
+      g.beginPath(); g.moveTo(x - s * 1.5, y); g.lineTo(x + s * 11, y - 8); g.lineTo(x + s * 11, y + 8); g.closePath(); g.fill();
+      g.fillStyle = corDe(o.i);
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x + s * 9, y - 6); g.lineTo(x + s * 9, y + 6); g.closePath(); g.fill();
+      texto(g, nomeDe(o.i), x + s * 14, y, 7, corDe(o.i), esq ? 'left' : 'right', 'rgba(0,0,0,0.8)');
+    }
+  }
+  function barraProgresso(g) {
+    const def = S.nivel.def;
+    const fimX = (def.mastro ?? def.alavanca?.c ?? S.nivel.L) * T;
+    const x0 = 16;
+    const x1 = W - 16;
+    const y = 34;
+    const px = x => x0 + (x1 - x0) * Math.max(0, Math.min(1, x / fimX));
+    g.fillStyle = 'rgba(0,0,0,0.4)';
+    retArred(g, x0 - 2, y - 2, x1 - x0 + 4, 4, 2);
+    g.fill();
+    g.fillStyle = 'rgba(236,224,191,0.55)';
+    g.fillRect(x0, y - 0.5, x1 - x0, 1);
+    g.fillStyle = '#e8c24a';
+    g.fillRect(x1, y - 8, 1, 8);
+    g.beginPath(); g.moveTo(x1 + 1, y - 8); g.lineTo(x1 + 6, y - 6); g.lineTo(x1 + 1, y - 4); g.fill();
+    for (const o of S.outros) if (outroNaFase(o)) elipse(g, px(o.x + 6), y, 3, 3, corDe(o.i));
+    if (!S.fora) {
+      elipse(g, px(j.x + 6), y, 4, 4, '#ffffff');
+      elipse(g, px(j.x + 6), y, 3, 3, corDe(jt.eu));
+    }
+  }
+  function faixa(g, txt, y, cor) {
+    g.font = `bold 10px ${FONTE}`;
+    const w = Math.min(W - 20, (g.measureText?.(txt)?.width || txt.length * 6) + 20);
+    g.fillStyle = 'rgba(8,14,10,0.7)';
+    retArred(g, W / 2 - w / 2, y - 8, w, 16, 6);
+    g.fill();
+    texto(g, txt, W / 2, y, 10, cor, 'center', null);
+  }
+  function sobreposicaoJunto(g) {
+    if (S.modo !== 'titulo') { setasOutros(g); barraProgresso(g); }
+    let y = S.modo === 'titulo' ? 250 : 56;
+    if (S.fora) { faixa(g, 'Você está fora: assistindo', y, '#ece0bf'); y += 19; }
+    for (const a of S.avisos) { faixa(g, a.txt, y, a.cor); y += 19; }
+  }
+  const extraJunto = jt ? { outros: desenharOutros, eu: visualDe(jt.eu), marca: desenharMarca } : null;
+
+  if (jt) iniciarJunto();
+  else carregar(0);
 
   const jogo = {
     get pontos() { return S.pontos; },
     get acabou() { return S.acabou; },
     atualizar(dt, ent) {
       if (S.acabou) return;
+      if (jt) { atualizarJunto(dt, ent); return; } // no junto, quem acaba a partida é o servidor
       atualizarEfeitos(dt);
       switch (S.modo) {
         case 'titulo': S.tm += dt; if (S.tm >= 2.4) { S.modo = 'jogo'; S.tm = 0; } break;
@@ -885,7 +1706,11 @@ function criar(ctx) {
         default: break;
       }
     },
-    desenhar(g, t) { desenharCena(g, cena(false), S.nivel.mapa, t, S.particulas); },
+    desenhar(g, t) {
+      if (!jt) { desenharCena(g, cena(false), S.nivel.mapa, t, S.particulas); return; }
+      desenharCena(g, cena(false), S.nivel.mapa, t, S.particulas, extraJunto);
+      sobreposicaoJunto(g);
+    },
     foto: () => cena(true),
     resumo() {
       const mundo = `Mundo 1-${S.fase + 1}`;
@@ -925,7 +1750,10 @@ function criar(ctx) {
     },
     // Para os testes
     _estado: S,
+    _junto: J,
     _teste: {
+      // junto: leva o mundo até o quadro q (depois de refazer o que chegou atrasado)
+      mundoAte(q) { if (J.voltar != null) voltarNoTempo(); while (S.q < q) passoMundo(); },
       irFase: (i, noMeio = false) => { carregar(i, noMeio); S.modo = 'jogo'; },
       colocar(x, y) { Object.assign(j, { x, y, vx: 0, vy: 0, sobre: -1 }); S.cam = Math.max(0, Math.min(S.nivel.L * T - W, x - 200)); },
     },
@@ -1460,7 +2288,8 @@ function desenharPrincesa(g, x, y, t, feliz) {
 }
 
 /* Personagens */
-function desenharJogador(g, F, t) {
+// vis (junto): { pelo, roupa } do Club Coelho; sem vis, o coelho de sempre (a roupa mostra o poder).
+function desenharJogador(g, F, t, vis) {
   const [x, y, forma, dir, bits, passo, estrela, inv, crescer, vx] = F.j;
   if (bits & 8) return;
   const morto = bits & 32;
@@ -1473,6 +2302,7 @@ function desenharJogador(g, F, t) {
   let roupa = {};
   if (forma === 1) { pelo = '#d9b48a'; roupa = { pescoco: 'cachecol' }; }
   if (forma === 2) { pelo = '#f7f3ea'; roupa = { cabeca: 'coroa', costas: 'capa' }; }
+  if (vis) { if (vis.pelo) pelo = vis.pelo; if (vis.roupa) roupa = vis.roupa; }
   if (estrela > 0) pelo = ARCO_IRIS[Math.floor(t * 14) % ARCO_IRIS.length];
   const sx = grande ? 0.58 : 0.42;
   const sy = grande ? (bits & 1 ? 0.4 : 0.72) : 0.42;
@@ -1798,12 +2628,12 @@ function desenharHud(g, F, t) {
   rot('MUNDO', 214); val(`1-${F.f + 1}`, 214);
   const pouco = F.te <= 100 && F.m === 'jogo' && Math.floor(t * 4) % 2;
   rot('TEMPO', 296); val(String(Math.max(0, F.te)).padStart(3, '0'), 296, pouco ? '#ff8a6a' : '#ece0bf');
-  rot('VIDAS', 380);
+  rot(F.jv || 'VIDAS', 380);
   elipse(g, 389, 20, 4.5, 4, '#e9dcc3');
   elipse(g, 387, 13.5, 1.4, 3.6, '#e9dcc3', -0.2);
   elipse(g, 391, 13.5, 1.4, 3.6, '#e9dcc3', 0.2);
   elipse(g, 390.5, 19.5, 0.8, 0.8, '#1b1403');
-  val(`× ${F.vi}`, 397);
+  val(F.rs ? `× ${F.vi} +${F.rs}` : `× ${F.vi}`, 397);
   if (F.v > 1) texto(g, `VOLTA ${F.v}`, W - 12, 8, 7, '#e8c24a', 'right');
 }
 function desenharCartao(g, F, t) {
@@ -1826,7 +2656,7 @@ function desenharCartao(g, F, t) {
   desenharCoelho(g, 0, 0, { pelo: '#e9dcc3', dir: 1, t });
   g.restore();
   texto(g, `×  ${F.vi}`, W / 2 + 4, 176, 16, '#ece0bf');
-  const dica = F.v > 1 ? `Volta ${F.v}: os inimigos estão mais rápidos!` : F.f === 0 ? 'Salve a Princesa Cenoura do castelo do Raposo!' : F.f === 3 ? 'O Raposo espera na ponte sobre a lava...' : '';
+  const dica = F.dj ? F.dj : F.v > 1 ? `Volta ${F.v}: os inimigos estão mais rápidos!` : F.f === 0 ? 'Salve a Princesa Cenoura do castelo do Raposo!' : F.f === 3 ? 'O Raposo espera na ponte sobre a lava...' : '';
   if (dica) texto(g, dica, W / 2, 226, 10, '#d8b13a', 'center');
   desenharHud(g, F, t);
 }
@@ -1850,7 +2680,8 @@ function desenharFimDeJogo(g) {
   texto(g, 'Fim de jogo', W / 2, H / 2, 26, '#e8c24a', 'center');
 }
 
-function desenharCena(g, F, mapa, t, particulas) {
+// extra (junto): { outros(g, t), eu: visual do meu coelho, marca(g) }
+function desenharCena(g, F, mapa, t, particulas, extra) {
   const base = nivelBase(F.f);
   const def = base.def;
   g.save();
@@ -1896,7 +2727,9 @@ function desenharCena(g, F, mapa, t, particulas) {
   for (const it of F.it) if (!it[3]) desenharItem(g, it, t);
   for (const e of F.e) desenharInimigo(g, e, F.tf, t);
   if (F.k) desenharChefe(g, F.k, F.tf, t);
-  desenharJogador(g, F, t);
+  if (extra) extra.outros(g, t);
+  desenharJogador(g, F, t, extra?.eu);
+  if (extra) extra.marca(g);
   for (const br of base.barras) {
     if (!visivel(br.cx - 70, br.cx + 70)) continue;
     for (const p of bolasDaBarra(br, F.tf)) { elipse(g, p.x, p.y, 5, 5, 'rgba(255,120,30,0.3)'); elipse(g, p.x, p.y, 3.4, 3.4, '#ff7a1a'); elipse(g, p.x, p.y, 1.8, 1.8, '#ffe08a'); }
@@ -1943,6 +2776,10 @@ export default {
   icone: 'cenoura',
   sub: 'Atravesse campos, tocas e copas das árvores para salvar a Princesa Cenoura do castelo do Raposo.',
   subDesafio: 'Todos largam juntos nas mesmas fases: quem fizer mais pontos antes de perder as vidas vence.',
+  subJunto: {
+    versus: 'Todos correm na mesma fase, ao mesmo tempo, vendo os outros coelhos: quem tocar primeiro no mastro (ou puxar a alavanca) vence.',
+    coop: 'A equipe atravessa as quatro fases junta, com vidas em comum: quando alguém chega no mastro, todos passam de fase.',
+  },
   largura: W,
   altura: H,
   cor: '#0e1811',

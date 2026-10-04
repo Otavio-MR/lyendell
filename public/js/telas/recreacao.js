@@ -7,8 +7,9 @@ import { abrirSalaQuiz, telaQuiz, teclaQuiz } from './quiz.js';
 import { SuavizadorCobras } from '../cobras-suave.js';
 import { tabuleiroDamas, nomeCor } from './damas.js';
 import { criarTelaCidade } from './cidade.js';
+import { criarTelaFesta } from './festa.js';
 import { telaMesa } from './mesa.js';
-import { desafioNoJogo, telaDesafio, abrirDesafio, JOGOS_DESAFIO } from './desafio.js';
+import { telaJunto, abrirJunto, JOGOS_JUNTO } from './junto.js';
 import { segredosDoJogo, segredosDescobertos, SEGREDOS, NOME_JOGO, comoFazer } from '../segredos.js';
 import { efeito } from '../bobo-efeitos.js';
 
@@ -21,6 +22,7 @@ import { ARCADE } from '../jogos/lista.js';
 // Cada jogo e os modos que ele tem (os botões do cartão). Versus: uns contra os outros. Co-op: todos do mesmo lado.
 const raposa = id => ({ nome: 'Contra a Raposa', dica: 'Co-op: sozinho ou em dupla contra o computador', abrir: () => criarPartida(id, { modo: 'raposa' }) });
 const AO_VIVO = [
+  { id: 'festa', nome: 'Festa na Toca', icone: 'estrela', texto: 'Tabuleiro com minijogos, no estilo do Mario Party: ande pelo Jardim da Toca, ganhe minijogos e junte cenouras douradas. De 1 a 4 (o resto, coelhos da casa).', novo: true, modos: [{ nome: 'Abrir festa', abrir: () => criarPartida('festa', { rodadas: 10, cpus: true }) }] },
   { id: 'cidade', nome: 'Lyendell Dorme', icone: 'lua', texto: 'De 4 a 15 pessoas: à noite os Raposos atacam, de dia a cidade vota em quem executar. 20 classes, cada uma do seu time.', modos: [{ nome: 'Abrir sala', abrir: () => criarPartida('cidade') }] },
   { id: 'quiz', nome: 'Quiz de Lyendell', icone: 'pergunta', texto: 'Perguntas sobre a Casa Luckham, coelhos, Minecraft e regras de RP. Todos contra todos, dois times ou em equipe contra a meta.', modos: [{ nome: 'Abrir sala', abrir: abrirSalaQuiz }] },
   { id: 'cobras', nome: 'Cobrinha ao vivo', icone: 'cobra', texto: 'De 2 a 4 cobras no mesmo tabuleiro: todos contra todos, 2 contra 2 ou a Colheita (co-op). O modo se escolhe na sala.', modos: [{ nome: 'Abrir sala', abrir: () => criarPartida('cobras') }] },
@@ -29,21 +31,26 @@ const AO_VIVO = [
   { id: 'damas', nome: 'Damas', icone: 'damas', texto: 'Damas brasileiras: a captura é obrigatória e a dama anda longe.', modos: [{ nome: 'Versus', abrir: () => criarPartida('damas') }, raposa('damas')] },
   { id: 'ppt', nome: 'Pedra, Papel e Tesoura', icone: 'tesoura', texto: 'Melhor de três. A mão do outro só aparece quando os dois escolhem.', modos: [{ nome: 'Versus', abrir: () => criarPartida('ppt') }] },
 ];
-const corrida = jogo => ({ nome: 'Versus', dica: 'Corrida: a mesma partida para todos, ao mesmo tempo', abrir: () => abrirDesafio(jogo, 'versus') });
-const meta = jogo => ({ nome: 'Co-op', dica: 'Meta da equipe: os pontos de todos somam', abrir: () => abrirDesafio(jogo, 'coop') });
+// Versus e co-op: todos no MESMO jogo, ao mesmo tempo (a dificuldade sobe com o número de pessoas).
+const versus = jogo => ({ nome: 'Versus', dica: 'Todos no mesmo jogo, cada um por si', abrir: () => abrirJunto(jogo, 'versus') });
+const coop = jogo => ({ nome: 'Co-op', dica: 'Todos no mesmo jogo, do mesmo lado', abrir: () => abrirJunto(jogo, 'coop') });
 const SOZINHO = [
-  ...Object.entries(ARCADE).map(([id, j]) => ({ href: j.rota, nome: j.nome, icone: j.icone, texto: j.texto, novo: true, modos: [corrida(id), meta(id)] })),
-  { href: '#/recreacao/pac-coelho', nome: 'Pac-Coelho', icone: 'coelho', texto: 'Coma as moedas, fuja das raposas e pegue a cenoura.', modos: [corrida('pacman'), meta('pacman')] },
-  { href: '#/recreacao/cobrinha', nome: 'Cobrinha', icone: 'cobra', texto: 'Coma as cenouras sem bater nas bordas nem em si mesma.', modos: [corrida('cobrinha'), meta('cobrinha')] },
-  { href: '#/recreacao/2048', nome: '2048', icone: 'blocos', texto: 'Deslize e junte os blocos iguais até chegar no 2048.', modos: [corrida('2048'), meta('2048')] },
+  ...Object.entries(ARCADE).map(([id, j]) => ({ href: j.rota, nome: j.nome, icone: j.icone, texto: j.texto, novo: true, modos: [versus(id), coop(id)] })),
+  { href: '#/recreacao/pac-coelho', nome: 'Pac-Coelho', icone: 'coelho', texto: 'Coma as moedas, fuja das raposas e pegue a cenoura.', modos: [versus('pacman'), coop('pacman')] },
+  { href: '#/recreacao/cobrinha', nome: 'Cobrinha', icone: 'cobra', texto: 'Coma as cenouras sem bater nas bordas nem em si mesma.',
+    modos: [{ nome: 'Versus', dica: 'Cobrinha ao vivo: todas as cobras no mesmo tabuleiro', abrir: () => criarPartida('cobras', { modo: 'todos' }) },
+      { nome: 'Co-op', dica: 'A Colheita: todos juntos atrás da meta de cenouras', abrir: () => criarPartida('cobras', { modo: 'colheita' }) }] },
+  { href: '#/recreacao/2048', nome: '2048', icone: 'blocos', texto: 'Deslize e junte os blocos iguais até chegar no 2048.', modos: [versus('2048'), coop('2048')] },
   { href: '#/recreacao/campo-minado', nome: 'Campo Minado', icone: 'minado', texto: 'Abra o campo sem pisar nas armadilhas. Vale o menor tempo.',
-    modos: [{ ...corrida('minado'), dica: 'Corrida no mesmo campo: quem limpar primeiro' }, { nome: 'Co-op', dica: 'Todos abrem o mesmo campo juntos', abrir: () => criarPartida('minado', { dificuldade: 'facil' }) }] },
+    modos: [{ nome: 'Versus', dica: 'O mesmo campo: quem abrir mais casas vence', abrir: () => criarPartida('minado', { dificuldade: 'facil', modo: 'versus' }) },
+      { nome: 'Co-op', dica: 'Todos abrem o mesmo campo juntos', abrir: () => criarPartida('minado', { dificuldade: 'facil', modo: 'coop' }) }] },
   { href: '#/recreacao/quebra-cabeca', nome: 'Quebra-cabeça', icone: 'peca', texto: 'Monte uma foto da galeria no menor tempo.',
-    modos: [{ ...corrida('quebra'), dica: 'Corrida: mesma foto, mesmo embaralhado' }, { nome: 'Co-op', dica: 'Todos montam a mesma imagem juntos', abrir: () => criarPartida('quebra', {}) }] },
+    modos: [{ nome: 'Versus', dica: 'A mesma imagem: quem puser mais peças no lugar vence', abrir: () => criarPartida('quebra', { modo: 'versus' }) },
+      { nome: 'Co-op', dica: 'Todos montam a mesma imagem juntos', abrir: () => criarPartida('quebra', { modo: 'coop' }) }] },
   { href: '#/recreacao/memoria', nome: 'Jogo da Memória', icone: 'cartas', texto: 'Ache os pares com o menor número de jogadas.',
     modos: [{ nome: 'Versus', dica: 'Cada um na sua vez: quem achar mais pares', abrir: () => criarPartida('memoria', { modo: 'versus' }) }, { nome: 'Co-op', dica: 'A equipe contra a meta de jogadas', abrir: () => criarPartida('memoria', { modo: 'coop' }) }] },
 ];
-const ICONE_JOGO = { velha: 'velha', ppt: 'tesoura', quiz: 'pergunta', lig4: 'lig4', cobras: 'cobra', damas: 'damas', cidade: 'lua', minado: 'minado', quebra: 'peca', memoria: 'cartas' };
+const ICONE_JOGO = { festa: 'estrela', velha: 'velha', ppt: 'tesoura', quiz: 'pergunta', lig4: 'lig4', cobras: 'cobra', damas: 'damas', cidade: 'lua', minado: 'minado', quebra: 'peca', memoria: 'cartas' };
 const MESAS_TELA = new Set(['minado', 'quebra', 'memoria']);
 const ICONE_SOLO = { pacman: 'coelho', cobrinha: 'cobra', quebra: 'peca', memoria: 'cartas', minado: 'minado', 2048: 'blocos', ...Object.fromEntries(Object.entries(ARCADE).map(([id, j]) => [id, j.icone])) };
 // Jogos de dois em que cada um joga na sua vez (no pedra, papel e tesoura, os dois escolhem ao mesmo tempo).
@@ -118,7 +125,7 @@ export function recreacao() {
       h('h3', { class: 'jogos-titulo' }, 'Ao vivo'),
       AO_VIVO.map(j => h('div', { class: 'jogo-cartao' },
         h('span', { class: 'jogo-icone' }, icone(j.icone)),
-        h('div', { class: 'jogo-texto' }, h('strong', null, j.nome, h('span', { class: 'ao-vivo' }, 'ao vivo')), h('small', null, j.texto)),
+        h('div', { class: 'jogo-texto' }, h('strong', null, j.nome, h('span', { class: 'ao-vivo' }, 'ao vivo'), j.novo && h('span', { class: 'jogo-novo' }, 'novo')), h('small', null, j.texto)),
         h('div', { class: 'jogo-botoes' },
           j.modos.map((m, k) => modoBotao(m, k === 0, minha)),
           j.id === 'quiz' && pode('recreacao.perguntas') && h('a', { class: 'btn btn-pequeno', href: '#/recreacao/perguntas' }, icone('editar'), h('span', null, 'Perguntas'))))),
@@ -167,7 +174,7 @@ export function recreacao() {
         else if (s.status === 'esperando') acao = botao('Entrar', { classe: 'btn-ouro btn-pequeno', desativado: !!rt.minhaSala || s.jogadores.length >= s.max, onclick: () => entrarNaPartida(s.id) });
         else acao = h('a', { class: 'btn btn-pequeno', href: `#/recreacao/sala/${s.id}` }, icone('olho'), h('span', null, 'Assistir'));
         return h('div', { class: 'sala-linha' },
-          h('span', { class: 'jogo-icone pequeno' }, icone(ICONE_JOGO[s.jogo] || JOGOS_DESAFIO[s.opcoes?.jogo]?.icone || 'jogos')),
+          h('span', { class: 'jogo-icone pequeno' }, icone(ICONE_JOGO[s.jogo] || (s.jogo === 'junto' ? JOGOS_JUNTO[s.opcoes?.jogo]?.icone : JOGOS_DESAFIO[s.opcoes?.jogo]?.icone) || 'jogos')),
           h('div', { class: 'sala-texto' },
             h('strong', null, s.nomeJogo),
             h('small', null, descricaoSala(s), s.espectadores ? ` · ${s.espectadores} assistindo` : '')),
@@ -337,7 +344,7 @@ function painelRanking() {
   let tamanho = '3x3';
   let tamanhoMem = '4x4';
   let dificuldade = 'facil';
-  const ABAS = [['quiz', 'Quiz'], ['cidade', 'Lyendell Dorme'], ['cobras', 'Cobrinha ao vivo'], ['velha', 'Jogo da Velha'], ['ppt', 'Pedra, Papel e Tesoura'], ['lig4', 'Lig 4'],
+  const ABAS = [['festa', 'Festa na Toca'], ['quiz', 'Quiz'], ['cidade', 'Lyendell Dorme'], ['cobras', 'Cobrinha ao vivo'], ['velha', 'Jogo da Velha'], ['ppt', 'Pedra, Papel e Tesoura'], ['lig4', 'Lig 4'],
     ['damas', 'Damas'], ['pacman', 'Pac-Coelho'], ['cobrinha', 'Cobrinha'], ['quebra', 'Quebra-cabeça'], ['memoria', 'Memória'],
     ['minado', 'Campo Minado'], ['2048', '2048'], ...Object.entries(ARCADE).map(([id, j]) => [id, j.nome])];
   const eu = estado.eu.nome;
@@ -372,6 +379,8 @@ function painelRanking() {
       ];
     } else if (aba === 'cobrinha') {
       conteudo = tabela([['Cenouras', l => l.pontos]], dados.cobrinha);
+    } else if (aba === 'festa') {
+      conteudo = tabela([['Vitórias', l => l.vitorias], ['Festas', l => l.partidas], ['Douradas', l => l.douradas]], dados.festa || []);
     } else if (aba === 'cidade') {
       conteudo = tabela([['Vitórias', l => l.vitorias], ['Partidas', l => l.partidas], ['Chegou vivo', l => l.sobreviveu]], dados.cidade || []);
     } else if (aba === 'cobras') {
@@ -426,6 +435,13 @@ export function sala(id) {
         : h('div', { class: 'carregando-tela' }, h('span', { class: 'giro' })));
       return;
     }
+    if (s.jogo === 'festa') {
+      if (!telaFesta) telaFesta = criarTelaFesta(id, { sair: acoesQuiz.sair, sairJa: sair });
+      telaFesta.atualizar(s);
+      if (raiz.firstChild !== telaFesta.el) trocar(raiz, telaFesta.el);
+      if (!document.hidden) tituloOriginal();
+      return;
+    }
     if (s.jogo === 'cidade') {
       // A tela da cidade é criada uma vez e só atualiza (o chat e o que está sendo digitado não somem).
       if (!telaCidade) telaCidade = criarTelaCidade(id, { sair: acoesQuiz.sair, sairJa: sair });
@@ -434,8 +450,8 @@ export function sala(id) {
       if (!document.hidden) tituloOriginal();
       return;
     }
-    if (s.jogo === 'desafio') {
-      trocar(raiz, telaDesafio(s, { sair: acoesQuiz.sair, sairJa: sair }));
+    if (s.jogo === 'junto') {
+      trocar(raiz, telaJunto(s, { sair: acoesQuiz.sair, sairJa: sair }));
       if (!document.hidden) tituloOriginal();
       return;
     }
@@ -683,6 +699,7 @@ export function sala(id) {
   /* Cobrinha ao vivo: o tabuleiro (canvas) é o mesmo durante a partida e só é redesenhado a cada quadro. */
   // A tela desenha 60 vezes por segundo, deslizando as cobras entre os quadros do servidor (veja cobras-suave.js).
   let telaCidade = null;
+  let telaFesta = null;
   let visorCobras = null;
   let quadroCobras = null;
   let fimLargada = 0;
@@ -956,6 +973,7 @@ export function sala(id) {
     clearInterval(relogioPing);
     cancelAnimationFrame(laco);
     telaCidade?.parar();
+    telaFesta?.parar();
     document.removeEventListener('keydown', aoTeclar);
   });
 
@@ -1180,14 +1198,8 @@ export function cobrinha() {
 
   let cobra, direcao, fila, comida, pontos, passoMs, situacao, timer;
   let recorde = null;
-  // Desafio: as cenouras aparecem nos mesmos lugares para todos; não dá para pausar.
-  const ds = desafioNoJogo('cobrinha', {
-    aoLargar: () => { if (situacao === 'pronto') comecar(); },
-    aoAcabar: () => { if (situacao !== 'fim') { situacao = 'fim'; clearTimeout(timer); mostrarSobre(); } },
-  });
-  const sorte = ds ? ds.sorte : Math.random;
-  // Códigos secretos (no desafio não valem: todos jogam igual).
-  const seg = segredosDoJogo('cobrinha', { bloqueado: !!ds, aoMudar: () => { if (cobra) desenharTudo(); } });
+  const sorte = Math.random;
+  const seg = segredosDoJogo('cobrinha', { aoMudar: () => { if (cobra) desenharTudo(); } });
   const ritmo = () => (seg.ativo('cobra-turbo') ? Math.max(40, passoMs * 0.55) : passoMs);
 
   function novoJogo() {
@@ -1211,7 +1223,6 @@ export function cobrinha() {
   }
 
   function comecar() {
-    if (ds && (!ds.largou() || ds.acabou())) return;
     if (situacao === 'fim') novoJogo();
     if (situacao === 'jogando') return;
     situacao = 'jogando';
@@ -1221,7 +1232,7 @@ export function cobrinha() {
   }
 
   function pausar() {
-    if (ds || situacao !== 'jogando') return;
+    if (situacao !== 'jogando') return;
     situacao = 'pausado';
     clearTimeout(timer);
     mostrarSobre();
@@ -1250,7 +1261,6 @@ export function cobrinha() {
     if (come) {
       pontos++;
       pontosEl.textContent = pontos;
-      ds?.progresso(pontos);
       passoMs = Math.max(58, 135 - pontos * 2.5);
       novaComida();
       if (!comida) { fimDeJogo(); return; } // encheu o tabuleiro
@@ -1264,7 +1274,6 @@ export function cobrinha() {
   async function fimDeJogo() {
     situacao = 'fim';
     clearTimeout(timer);
-    ds?.terminar(pontos);
     desenharTudo(true);
     mostrarSobre();
     if (!pontos) return;
@@ -1287,9 +1296,7 @@ export function cobrinha() {
     if (situacao === 'jogando') { sobre.hidden = true; return; }
     sobre.hidden = false;
     const toque = matchMedia('(pointer: coarse)').matches;
-    if (situacao === 'pronto' && ds) {
-      trocar(sobre, h('div', { class: 'cobra-caixa' }, h('h2', null, 'Prepare-se!'), h('p', null, 'O desafio começa junto para todos.')));
-    } else if (situacao === 'pronto') {
+    if (situacao === 'pronto') {
       trocar(sobre, h('div', { class: 'cobra-caixa' },
         h('h2', null, 'Cobrinha'),
         h('p', null, toque ? 'Deslize o dedo no tabuleiro ou use as setas abaixo.' : 'Use as setas ou W A S D. Espaço pausa.'),
@@ -1301,7 +1308,7 @@ export function cobrinha() {
         h('h2', null, 'Fim de jogo'),
         h('p', { class: 'cobra-placar' }, `${pontos} ${pontos === 1 ? 'cenoura' : 'cenouras'}`),
         extra && h('p', { class: 'cobra-recorde' }, icone('trofeu'), extra),
-        ds ? ds.botoesFim(() => { novoJogo(); comecar(); }) : botao('Jogar de novo', { classe: 'btn-ouro', onclick: () => { novoJogo(); comecar(); } })));
+        botao('Jogar de novo', { classe: 'btn-ouro', onclick: () => { novoJogo(); comecar(); } })));
     }
   }
 
@@ -1329,7 +1336,7 @@ export function cobrinha() {
       e.preventDefault();
       if (situacao === 'jogando') pausar(); else comecar();
     }
-    if (e.code === 'Enter' && situacao === 'fim' && !ds) { e.preventDefault(); novoJogo(); comecar(); }
+    if (e.code === 'Enter' && situacao === 'fim') { e.preventDefault(); novoJogo(); comecar(); }
   };
   document.addEventListener('keydown', aoTeclar);
 
@@ -1369,22 +1376,22 @@ export function cobrinha() {
         : h('p', { class: 'painel-vazio' }, 'Ninguém jogou ainda. Seja o primeiro!'));
     }).catch(() => {});
   }
-  if (!ds) carregarRanking();
+  carregarRanking();
   novoJogo();
 
   return h('div', { class: 'pagina' },
-    cabecalho({ titulo: ds ? 'Cobrinha: desafio' : 'Cobrinha', icone: 'cobra', voltar: { href: '#/recreacao', texto: 'Recreação' }, sub: ds ? 'As cenouras aparecem nos mesmos lugares para todos. Coma o máximo antes de acabar o tempo!' : 'Cada cenoura faz a cobra crescer e andar mais rápido.' }),
+    cabecalho({ titulo: 'Cobrinha', icone: 'cobra', voltar: { href: '#/recreacao', texto: 'Recreação' }, sub: 'Cada cenoura faz a cobra crescer e andar mais rápido.' }),
     h('div', { class: 'jogo-solo' },
       h('div', { class: 'jogo-area' },
         h('div', { class: 'cobra-placar-linha' },
           h('span', null, 'Cenouras: ', pontosEl),
           contadorPlateia(),
-          !ds && h('span', null, icone('trofeu'), ' Seu recorde: ', recordeEl)),
+          h('span', null, icone('trofeu'), ' Seu recorde: ', recordeEl)),
         h('div', { class: 'cobra-moldura' }, tela, sobre),
         h('div', { class: 'dpad' },
           seta('cima', [0, -1], 'Para cima'), seta('voltar', [-1, 0], 'Para a esquerda'),
           seta('frente', [1, 0], 'Para a direita'), seta('baixo', [0, 1], 'Para baixo'))),
-      ds ? ds.painel : h('aside', { class: 'painel jogo-lateral' },
+      h('aside', { class: 'painel jogo-lateral' },
         h('div', { class: 'painel-cab' }, h('h2', null, icone('trofeu'), 'Melhores')),
         ranking)));
 }
@@ -1400,12 +1407,8 @@ export function quebraCabeca() {
   let fonteAtual = null;
   let cronometro = null;
   let transmissao = null; // { info, estado() } enquanto monta uma imagem
-  // Desafio (corrida): a mesma foto, embaralhada do mesmo jeito para todos.
-  let largar = null;
-  let acabar = null;
-  const ds = desafioNoJogo('quebra', { aoLargar: () => largar?.(), aoAcabar: () => acabar?.() });
   let redesenharQuebra = null;
-  const seg = segredosDoJogo('quebra', { bloqueado: !!ds, aoMudar: () => redesenharQuebra?.() });
+  const seg = segredosDoJogo('quebra', { aoMudar: () => redesenharQuebra?.() });
   aoSair(() => {
     clearInterval(cronometro);
     pararTransmissao();
@@ -1451,7 +1454,6 @@ export function quebraCabeca() {
       fonteAtual = src;
     } catch {
       aviso('Não consegui abrir essa imagem. Escolha outra.', 'erro');
-      if (ds) { urlImagem = null; fonteAtual = src; jogar(titulo); return; }
       escolher();
       return;
     }
@@ -1459,10 +1461,10 @@ export function quebraCabeca() {
   }
 
   function jogar(titulo) {
-    const n = ds ? ds.opcoes.n : Number(tamanhoEscolhido[0]);
+    const n = Number(tamanhoEscolhido[0]);
     const variante = `${n}x${n}`;
     const total = n * n;
-    let pecas = embaralhar(total, ds?.sorte);
+    let pecas = embaralhar(total);
     seg.novaPartida();
     let selecionada = null;
     let movimentos = 0;
@@ -1500,19 +1502,8 @@ export function quebraCabeca() {
     };
     if (rt.conectado) transmitir('quebra', transmissao.info);
 
-    const noLugar = () => pecas.filter((p, i) => p === i).length;
-    if (ds) {
-      largar = () => {
-        if (comeco || resolvido) return;
-        comeco = Date.now();
-        cronometro = setInterval(() => { tempoEl.textContent = relogio(segundos()); if (transmissao) enviarQuadro(transmissao.estado()); }, 1000);
-      };
-      acabar = () => { resolvido = true; clearInterval(cronometro); };
-      if (ds.largou()) largar();
-    }
-
     function trocarPecas(a, b) {
-      if (resolvido || a === b || (ds && !ds.largou())) return;
+      if (resolvido || a === b) return;
       if (!comeco) {
         comeco = Date.now();
         cronometro = setInterval(() => {
@@ -1527,7 +1518,6 @@ export function quebraCabeca() {
       desenhar();
       for (const i of [a, b]) tabuleiro.children[i].classList.add('trocou');
       if (pecas.every((p, i) => p === i)) terminou();
-      else ds?.progresso(noLugar());
     }
 
     function tocar(i) {
@@ -1568,7 +1558,6 @@ export function quebraCabeca() {
     async function terminou() {
       resolvido = true;
       clearInterval(cronometro);
-      ds?.terminar(total, true);
       setTimeout(() => { if (transmissao) enviarQuadro(transmissao.estado(), true); }, 80);
       const s = Math.max(1, Math.round(segundos()));
       tempoEl.textContent = relogio(s);
@@ -1577,11 +1566,10 @@ export function quebraCabeca() {
       trocar(resultado,
         h('h2', null, 'Montado!'),
         h('p', null, `${relogio(s)} · ${movimentos} ${movimentos === 1 ? 'troca' : 'trocas'} · ${variante}`),
-        h('div', { class: 'qc-resultado-acoes' }, ds ? ds.botoesFim(() => jogar(titulo)) : [
+        h('div', { class: 'qc-resultado-acoes' },
           botao('Jogar de novo', { classe: 'btn-ouro', onclick: () => jogar(titulo) }),
-          botao('Outra imagem', { onclick: escolher })]));
+          botao('Outra imagem', { onclick: escolher })));
       if (seg.ativo('festa')) efeito('confete');
-      if (ds) return;
       if (!seg.valeRecorde()) { resultado.insertBefore(h('p', { class: 'cobra-recorde' }, icone('estrela'), 'Modo secreto ligado: esta partida não vale recorde.'), resultado.children[2]); return; }
       try {
         const r = await post('/api/recreacao/recordes', { jogo: 'quebra', variante, pontos: s, detalhe: `${movimentos} trocas` });
@@ -1602,8 +1590,8 @@ export function quebraCabeca() {
     }
 
     desenhar();
-    if (!ds) carregarRanking();
-    trocar(raiz, cab(ds ? `Desafio: ${titulo}. Quem montar primeiro vence!` : titulo),
+    carregarRanking();
+    trocar(raiz, cab(titulo),
       h('div', { class: 'jogo-solo' },
         h('div', { class: 'jogo-area' },
           h('div', { class: 'cobra-placar-linha' },
@@ -1618,16 +1606,15 @@ export function quebraCabeca() {
               previa.hidden = !previa.hidden;
               e.currentTarget.querySelector('span').textContent = previa.hidden ? 'Ver a imagem' : 'Esconder a imagem';
             } }),
-            !ds && botao('Embaralhar de novo', { icone: 'ajustes', classe: 'btn-pequeno', onclick: () => jogar(titulo) }),
-            !ds && botao('Outra imagem', { icone: 'imagem', classe: 'btn-pequeno', onclick: escolher }))),
-        ds ? ds.painel : h('aside', { class: 'painel jogo-lateral' },
+            botao('Embaralhar de novo', { icone: 'ajustes', classe: 'btn-pequeno', onclick: () => jogar(titulo) }),
+            botao('Outra imagem', { icone: 'imagem', classe: 'btn-pequeno', onclick: escolher }))),
+        h('aside', { class: 'painel jogo-lateral' },
           h('div', { class: 'painel-cab' }, h('h2', null, icone('trofeu'), `Melhores ${variante}`)),
           ranking,
           h('p', { class: 'suave qc-dica' }, 'Toque numa peça e depois em outra para trocar as duas de lugar. No computador, também dá para arrastar.'))));
   }
 
-  if (ds) montar(ds.opcoes.src, ds.opcoes.titulo || 'Desafio');
-  else escolher();
+  escolher();
   return raiz;
 }
 

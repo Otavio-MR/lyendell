@@ -282,7 +282,7 @@ Um salão com **chat ao vivo**, a lista de quem está online e os jogos:
   longe.
 
 Os três de fliperama (`public/js/arcade.js` com cada jogo em `public/js/jogos/`) têm som (dá para
-desligar no alto-falante), botões na tela para o celular, ranking, desafio versus e co-op e quem assiste.
+desligar no alto-falante), botões na tela para o celular, ranking, versus e co-op ao vivo e quem assiste.
 
 Os jogos novos (Damas, Campo Minado e 2048) são por vez ou rodam inteiros no navegador: nada fica
 indo e vindo pela internet o tempo todo, então não travam mesmo com a conexão ruim.
@@ -296,21 +296,48 @@ Cada jogo tem os modos que fazem sentido, nos botões do cartão do jogo no sal�
 | Quiz | todos contra todos, ou dois times | em equipe: a sala inteira contra a meta de 60% de acertos |
 | Cobrinha ao vivo | todos contra todos, ou 2 contra 2 | Colheita: juntos, comer as cenouras da meta antes do tempo (quem bate renasce) |
 | Velha, Lig 4 e Damas | um contra o outro | contra a Raposa (o computador), sozinho ou em dupla, um lance cada |
-| Pac-Coelho, Cobrinha, 2048, Barris, Super Coelho e Travessia | desafio: todos jogam a mesma partida (a mesma sorte) ao mesmo tempo; vence quem fizer mais em 3 minutos | desafio: os pontos de todos somam para a meta da equipe; quem perde joga de novo e continua somando |
-| Campo Minado | corrida no mesmo campo (com a casa do meio já aberta): vence quem limpar primeiro, e quem explode está fora | todos abrem o mesmo campo; se alguém pisar numa armadilha, a equipe perde |
-| Quebra-cabeça | corrida com a mesma foto e o mesmo embaralhado | todos montam a mesma imagem, trocando as peças |
+| Barris, Super Coelho e Travessia | todos no mesmo mundo ao mesmo tempo, vendo os coelhos dos outros: nos Barris e no Super Coelho vence quem chegar primeiro na Princesa (3 vidas); na Travessia, quem sobrar vivo (1 vida) | o mesmo mundo, com vidas da equipe (2 + 1 por pessoa): nos Barris e no Super Coelho, quando alguém chega a fase passa para todos; na Travessia, todos precisam cruzar a linha de chegada |
+| Pac-Coelho | o mesmo labirinto (o servidor roda as raposas): cada Lírio, raposa e cenoura vale para quem pegou; pego perde 10% e volta; vence quem tiver mais quando os Lírios acabarem | o mesmo labirinto com vidas da equipe (3 + 1 por pessoa); limpar tudo e todos vencem |
+| 2048 | cada um no seu tabuleiro, mas juntar 64 ou mais joga pedras no tabuleiro dos outros; vence quem sobrar | todos mexem no mesmo tabuleiro até a meta (maior com mais gente) |
+| Campo Minado | todos no mesmo campo: cada casa aberta fica com a cor de quem abriu e as bandeiras são de cada um; quem pisa numa armadilha está fora; vence quem abrir mais casas | todos abrem o mesmo campo; se alguém pisar numa armadilha, a equipe perde |
+| Quebra-cabeça | todos na mesma imagem: peça que vai para o lugar certo fica presa e conta para quem pôs; vence quem pôs mais | todos montam a mesma imagem, trocando as peças |
 | Jogo da Memória | cada um na sua vez (achou o par, joga de novo); vence quem achar mais pares | a equipe, um de cada vez, acha todos os pares sem passar da meta de jogadas |
 
 Pedra, Papel e Tesoura continua só versus, e o Lyendell Dorme já é por times. "Jogando agora" mostra
-o modo de cada sala. No desafio, cada um joga no próprio navegador (por isso não trava) e o placar
-da sala anda ao vivo; sair da tela do jogo no meio encerra a sua partida (vale o que fez até ali).
+o modo de cada sala. Ninguém joga "por pontos" separado: todos jogam juntos a mesma partida, e quanto
+mais gente, mais difícil (x1,15 com 2, x1,30 com 3, x1,45 com 4...: barris e carroças mais rápidos,
+mais raposas, mais armadilhas no Campo Minado, quebra-cabeça maior, meta maior na Colheita). Nos jogos
+de fliperama cada navegador roda o mesmo mundo (mesma semente e o mesmo relógio) e o servidor só decide
+quem pegou primeiro, quem caiu e quem chegou; o Pac-Coelho e o 2048 rodam no servidor. Cada coelho
+aparece com o visual do Club Coelho.
+
+### Festa na Toca
+
+Um tabuleiro com minijogos, no estilo do Mario Party, de 1 a 4 pessoas (os lugares vazios podem ser
+coelhos da casa, que jogam sozinhos). Todo mundo joga o dado para ver a ordem; em cada rodada cada um
+joga o dado e anda pelo Jardim da Toca:
+
+- **Casa azul** dá 3 cenouras, **vermelha** tira 3, **sorte** sorteia algo bom ou ruim, **Raposo**
+  apronta (rouba cenouras, cobra imposto de todos...), e a **loja** vende itens (Dado Duplo, Dado
+  Triplo e o Apito Dourado, que leva para perto da cenoura dourada).
+- Ao passar pela **cenoura dourada** dá para comprá-la por 20 cenouras; depois ela muda de lugar.
+- Nas bifurcações quem joga escolhe o caminho.
+- No fim de cada rodada tem um **minijogo** (todos contra todos, ou times azul e vermelho conforme as
+  casas em que cada um parou). Quem vence ganha cenouras.
+- As 3 últimas rodadas valem o dobro, e no fim saem 3 estrelas bônus (uma cenoura dourada cada).
+- Vence quem tiver mais cenouras douradas (desempata nas cenouras). Dá para escolher 10, 15 ou 20
+  rodadas. Quem sai no meio vira um coelho da casa e a festa continua.
+
+As cenouras da festa viram cenouras do Club Coelho (um quinto delas, até 40), e a festa tem aba no
+ranking (vitórias, festas e douradas). O código está em `src/festa.js` (as regras),
+`public/js/telas/festa.js` (o tabuleiro) e `public/js/festa-minijogos.js` (os minijogos).
 
 ### Códigos secretos
 
 Os jogos de uma pessoa só escondem códigos: uma sequência de setas (no teclado, deslizando o dedo ou
 nas setinhas da tela) ou uma palavra escrita no teclado. O código liga um modo secreto, e repetir o
 código desliga. Os que facilitam deixam a partida sem recorde; os de enfeite e os que dificultam
-valem. No desafio (versus e co-op) os códigos não funcionam, para todos jogarem igual.
+valem. Nos jogos juntos (versus e co-op) os códigos não funcionam, para todos jogarem igual.
 
 | Jogo | Código | O que faz |
 |---|---|---|

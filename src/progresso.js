@@ -61,9 +61,9 @@ function infoNivel(xp = 0) {
 const MISSOES = [
   // Para todo mundo
   { chave: 'chat5', tipos: ['chat'], meta: 5, xp: 30, perm: 'recreacao.usar', texto: 'Converse no chat da cidade: 5 mensagens (spam, repetidas e "kkkk" não contam)' },
-  { chave: 'partida3', tipos: ['partida'], meta: 3, xp: 40, perm: 'recreacao.usar', texto: 'Termine 3 partidas com mais gente (ao vivo, mesas ou desafios)' },
+  { chave: 'partida3', tipos: ['partida'], meta: 3, xp: 40, perm: 'recreacao.usar', texto: 'Termine 3 partidas com mais gente (ao vivo, mesas ou jogos juntos)' },
   { chave: 'vitoria1', tipos: ['vitoria'], meta: 1, xp: 50, perm: 'recreacao.usar', texto: 'Vença uma partida com mais gente' },
-  { chave: 'coop1', tipos: ['coop'], meta: 1, xp: 40, perm: 'recreacao.usar', texto: 'Jogue uma partida em equipe (co-op): quiz em equipe, Colheita, contra a Raposa, mesa ou desafio co-op' },
+  { chave: 'coop1', tipos: ['coop'], meta: 1, xp: 40, perm: 'recreacao.usar', texto: 'Jogue uma partida em equipe (co-op): quiz em equipe, Colheita, contra a Raposa, mesa ou jogo junto co-op' },
   { chave: 'quiz5', tipos: ['quiz_acerto'], meta: 5, xp: 40, perm: 'recreacao.usar', texto: 'Acerte 5 perguntas no Quiz de Lyendell' },
   { chave: 'solo2', tipos: ['solo'], meta: 2, xp: 25, perm: 'recreacao.usar', texto: 'Jogue 2 vezes sozinho (Pac-Coelho, Cobrinha, 2048, Barris do Raposo, Super Coelho, Travessia, Campo Minado, Quebra-cabeça ou Memória)' },
   { chave: 'clube1', tipos: ['clube_jogo'], meta: 1, xp: 30, perm: 'recreacao.usar', texto: 'Pesque no Lago ou dance no Salão de Dança do Club Coelho' },
@@ -174,6 +174,7 @@ const CONQUISTAS = [
   { chave: 'segredo7', nome: 'Caçador de segredos', desc: 'Descobriu 7 códigos secretos.', icone: 'olho', stat: 'segredos', meta: 7, tipos: ['segredo'] },
   { chave: 'segredo14', nome: 'Mestre dos segredos', desc: 'Descobriu 14 códigos secretos dos joguinhos.', icone: 'coroa', stat: 'segredos', meta: 14, tipos: ['segredo'] },
   { chave: 'segredo23', nome: 'Lenda do fliperama', desc: 'Descobriu todos os 23 códigos secretos dos joguinhos.', icone: 'coroa', stat: 'segredos', meta: 23, tipos: ['segredo'] },
+  { chave: 'festa1', nome: 'Rei da Festa', desc: 'Venceu uma Festa na Toca.', icone: 'cenoura', stat: 'festaVitorias', meta: 1, tipos: ['vitoria'] },
   { chave: 'clube1', nome: 'Sócio do clube', desc: 'Entrou no Club Coelho.', icone: 'balao', stat: 'clube', meta: 1, tipos: ['clube'] },
   { chave: 'clube10', nome: 'Coelho estiloso', desc: 'Juntou 10 itens no Club Coelho.', icone: 'estrela', stat: 'clubeItens', meta: 10, tipos: ['clube_compra'] },
   { chave: 'toca10', nome: 'Toca dos sonhos', desc: 'Decorou a toca do clube com 10 móveis.', icone: 'casa', stat: 'clubeMoveis', meta: 10, tipos: ['clube_toca'] },
@@ -216,6 +217,7 @@ const STATS = {
   propostasAprovadas: id => n("SELECT COUNT(*) AS n FROM propostas WHERE autor_id = ? AND situacao = 'aprovada'", id),
   segredos: id => n('SELECT COUNT(*) AS n FROM segredos WHERE usuario_id = ?', id),
   clube: id => n('SELECT COUNT(*) AS n FROM clube WHERE usuario_id = ?', id),
+  festaVitorias: id => n("SELECT COUNT(*) AS n FROM resultados WHERE jogo = 'festa' AND venceu = 1 AND usuario_id = ?", id),
   clubeItens: id => n('SELECT COUNT(*) AS n FROM clube c, json_each(c.itens) j WHERE c.usuario_id = ?', id),
   clubeMoveis: id => n('SELECT json_array_length(toca, \'$.moveis\') AS n FROM clube WHERE usuario_id = ?', id),
   peixes: id => n('SELECT peixes AS n FROM clube WHERE usuario_id = ?', id),

@@ -1,4 +1,4 @@
-// Mesas compartilhadas na tela: Campo Minado (co-op), Quebra-cabeça (co-op) e Memória (versus e co-op).
+// Mesas compartilhadas na tela: Campo Minado, Quebra-cabeça e Memória, cada um com versus e co-op.
 // O tabuleiro fica no servidor (src/mesa.js); aqui só se desenha e se manda o clique de cada um.
 
 import { h, trocar, icone, botao, cabecalho, avatar, get, pode, confirmar } from '../core.js';
@@ -12,11 +12,21 @@ const MODOS_MEMORIA = {
   versus: { nome: 'Versus: quem acha mais pares', texto: 'Cada um vira duas cartas na sua vez. Achou o par, joga de novo. Vence quem achar mais pares.' },
   coop: { nome: 'Co-op: a equipe contra a meta', texto: 'Todos jogam juntos, cada um na sua vez. A equipe precisa achar todos os pares sem passar da meta de jogadas.' },
 };
+const MODOS_MINADO = {
+  versus: { nome: 'Versus: quem abre mais casas', texto: 'Todos abrem o mesmo campo ao mesmo tempo. Cada casa aberta é sua; quem pisa numa armadilha está fora. Vence quem abrir mais.' },
+  coop: { nome: 'Co-op: a equipe limpa o campo', texto: 'Todos abrem o mesmo campo. Cuidado: se alguém pisar numa armadilha, a equipe inteira perde.' },
+};
+const MODOS_QUEBRA = {
+  versus: { nome: 'Versus: quem põe mais peças', texto: 'A mesma imagem para todos: cada peça que você põe no lugar certo fica presa e é sua. Vence quem puser mais.' },
+  coop: { nome: 'Co-op: a equipe monta junta', texto: 'Todos montam a mesma imagem, trocando as peças de lugar.' },
+};
+const MODOS = { minado: MODOS_MINADO, quebra: MODOS_QUEBRA, memoria: MODOS_MEMORIA };
 const SUB = {
-  minado: () => 'Co-op: todos abrem o mesmo campo. Cuidado: se alguém pisar numa armadilha, a equipe inteira perde.',
-  quebra: () => 'Co-op: todos montam a mesma imagem, trocando as peças de lugar.',
+  minado: s => MODOS_MINADO[s.opcoes?.modo || 'coop'].texto,
+  quebra: s => MODOS_QUEBRA[s.opcoes?.modo || 'coop'].texto,
   memoria: s => MODOS_MEMORIA[s.opcoes?.modo || 'versus'].texto,
 };
+const versus = s => s.opcoes?.modo === 'versus';
 const ICONE = { minado: 'minado', quebra: 'peca', memoria: 'cartas' };
 
 // A imagem recortada do quebra-cabeça fica guardada (recortar é demorado).
@@ -54,20 +64,22 @@ function espera(s, { jogador, souDono }) {
   const seg = (lista, atual, aoEscolher) => h('div', { class: 'segmentado' }, lista.map(([k, nome]) => h('button', {
     type: 'button', class: `seg ${k === atual ? 'ativo' : ''}`.trim(), disabled: !souDono, onclick: () => aoEscolher(k),
   }, nome)));
+  const modos = h('div', { class: 'modos-escolha' }, Object.entries(MODOS[s.jogo]).map(([k, m]) => h('button', {
+    type: 'button', class: `modo-opcao ${k === o.modo ? 'ativo' : ''}`.trim(), disabled: !souDono, onclick: () => mudar({ modo: k }),
+  }, h('strong', null, m.nome), h('small', null, m.texto))));
   let opcoes;
+  const n = s.jogadores.length;
   if (s.jogo === 'minado') {
-    opcoes = seg(Object.entries(DIFICULDADES).map(([k, d]) => [k, `${d.nome} (${d.col}x${d.lin}, ${d.minas})`]), o.dificuldade, k => mudar({ dificuldade: k }));
+    opcoes = [modos, seg(Object.entries(DIFICULDADES).map(([k, d]) => [k, `${d.nome} (${d.col}x${d.lin}, ${d.minas})`]), o.dificuldade, k => mudar({ dificuldade: k })),
+      n > 1 && h('p', { class: 'suave' }, `Com ${n} pessoas o campo tem ${Math.round(12 * (n - 1))}% mais armadilhas.`)];
   } else if (s.jogo === 'memoria') {
-    opcoes = [
-      h('div', { class: 'modos-escolha' }, Object.entries(MODOS_MEMORIA).map(([k, m]) => h('button', {
-        type: 'button', class: `modo-opcao ${k === o.modo ? 'ativo' : ''}`.trim(), disabled: !souDono, onclick: () => mudar({ modo: k }),
-      }, h('strong', null, m.nome), h('small', null, m.texto)))),
-      seg([['4x4', '4x4 (8 pares)'], ['4x6', '4x6 (12 pares)'], ['6x6', '6x6 (18 pares)']], o.tamanho, k => mudar({ tamanho: k })),
-    ];
+    opcoes = [modos, seg([['4x4', '4x4 (8 pares)'], ['4x6', '4x6 (12 pares)'], ['6x6', '6x6 (18 pares)']], o.tamanho, k => mudar({ tamanho: k }))];
   } else {
-    opcoes = [seg([[3, '3x3'], [4, '4x4'], [5, '5x5']], o.n, k => mudar({ n: k })), fotosDoQuebra(s, souDono, mudar)];
+    opcoes = [modos, seg([[3, '3x3'], [4, '4x4'], [5, '5x5']], o.n, k => mudar({ n: k })),
+      n >= 3 && h('p', { class: 'suave' }, `Com ${n} pessoas a imagem tem pelo menos ${n >= 5 ? '5x5' : '4x4'} peças.`),
+      fotosDoQuebra(s, souDono, mudar)];
   }
-  const basta = s.jogo === 'memoria' && o.modo === 'versus' ? s.jogadores.length >= 2 : s.jogadores.length >= 1;
+  const basta = o.modo === 'versus' ? s.jogadores.length >= 2 : s.jogadores.length >= 1;
   return h('div', { class: 'quiz-espera painel' },
     h('div', { class: 'painel-cab' }, h('h2', null, icone('usuarios'), `Na sala: ${s.jogadores.length} de ${s.max}`)),
     h('div', { class: 'quiz-na-sala' }, s.jogadores.map(p => h('div', { class: `quiz-pessoa ${p.conectado ? '' : 'ausente'}`.trim() },
@@ -78,7 +90,7 @@ function espera(s, { jogador, souDono }) {
     h('div', { class: 'quiz-espera-acao' },
       souDono
         ? [botao(basta ? 'Começar' : 'Esperando mais gente...', { classe: 'btn-ouro btn-grande', icone: 'frente', desativado: !basta, onclick: () => enviar('sala:comecar', { id: s.id }) }),
-          h('p', { class: 'suave' }, s.jogo === 'memoria' && o.modo === 'versus' ? 'Versus precisa de pelo menos 2 pessoas (até 6).' : 'Dá para jogar sozinho, mas a graça é chamar mais gente (até 6).')]
+          h('p', { class: 'suave' }, o.modo === 'versus' ? 'Versus precisa de pelo menos 2 pessoas (até 6).' : 'Dá para jogar sozinho, mas a graça é chamar mais gente (até 6).')]
         : jogador
           ? h('p', { class: 'quiz-aguarde' }, h('span', { class: 'giro giro-p' }), ' Esperando quem abriu a sala começar...')
           : [s.jogadores.length < s.max && !rt.minhaSala && botao('Entrar nesta sala', { classe: 'btn-ouro', onclick: () => entrarNaPartida(s.id) }),
@@ -102,8 +114,10 @@ export function fotosDoQuebra(s, souDono, mudar) {
 /* Campo Minado: o mesmo campo para todos. */
 function campoMinado(s, e) {
   const d = DIFICULDADES[e.d];
-  const podeJogar = s.eu >= 0 && s.status === 'jogando' && !s.jogadores[s.eu].saiu;
-  const grade = h('div', { class: `minado-grade ${s.status === 'fim' ? 'terminou' : ''}`.trim(), style: { '--col': d.col, '--lin': d.lin } });
+  const vs = versus(s);
+  const estouFora = vs && s.eu >= 0 && e.fora?.[s.eu];
+  const podeJogar = s.eu >= 0 && s.status === 'jogando' && !s.jogadores[s.eu].saiu && !estouFora;
+  const grade = h('div', { class: `minado-grade ${s.status === 'fim' ? 'terminou' : ''} ${vs ? 'versus' : ''}`.trim(), style: { '--col': d.col, '--lin': d.lin } });
   let segurar = null;
   let segurou = false;
   const jogar = (casa, tipo) => podeJogar && enviar('sala:jogar', { id: s.id, jogada: { tipo, casa } });
@@ -111,6 +125,8 @@ function campoMinado(s, e) {
     const el = h(podeJogar ? 'button' : 'div', { type: podeJogar ? 'button' : null, 'data-i': i, class: 'minado-casa fechada' });
     pintarCasa(el, c);
     if (e.ultimo?.casa === i) { el.classList.add('ultimo'); el.style.setProperty('--quem', CORES[e.ultimo.i % CORES.length]); }
+    const dono = vs && e.q ? parseInt(e.q[i], 36) : NaN;
+    if (!Number.isNaN(dono)) { el.classList.add('de-alguem'); el.style.setProperty('--dono', CORES[dono % CORES.length]); }
     grade.append(el);
   });
   grade.addEventListener('click', ev => {
@@ -136,6 +152,8 @@ function campoMinado(s, e) {
   return h('div', { class: 'jogo-area' },
     h('div', { class: 'cobra-placar-linha' },
       h('span', null, icone('minado'), ' ', h('strong', null, e.restam)),
+      vs && s.eu >= 0 && h('span', null, 'Suas casas: ', h('strong', null, e.casas?.[s.eu] || 0)),
+      estouFora && s.status === 'jogando' && h('span', { class: 'mesa-fora' }, 'Você pisou numa armadilha: assistindo'),
       h('span', null, icone('relogio'), ' ', h('strong', { 'data-desde': s.status === 'jogando' ? Date.now() - e.seg * 1000 : null }, relogio(e.seg))),
       h('span', { class: 'suave' }, `${d.nome} · botão direito ou segurar o dedo põe bandeira`)),
     h('div', { class: `minado-moldura ${d.col > 16 ? 'largo' : ''}`.trim() }, grade));
@@ -145,14 +163,15 @@ function campoMinado(s, e) {
 function quebraCabeca(s, e, redesenhar) {
   const url = imagemDoQuebra(e.src, redesenhar);
   const podeJogar = s.eu >= 0 && s.status === 'jogando' && !s.jogadores[s.eu].saiu;
+  const presa = i => versus(s) && e.deQuem && e.deQuem[i] !== -1;
   if (escolhida != null && (escolhida >= e.p.length || !podeJogar)) escolhida = null;
   const tabuleiro = h('div', { class: `qc-tabuleiro ${e.fim ? 'resolvido' : ''}`.trim(), style: { '--n': e.n } },
     !url ? h('div', { class: 'carregando-tela' }, h('span', { class: 'giro' }))
-      : e.p.map((p, i) => h(podeJogar ? 'button' : 'div', {
-        type: podeJogar ? 'button' : null,
-        class: ['qc-peca', i === escolhida && 'selecionada', p === i && 'no-lugar', e.ultimo && (e.ultimo.a === i || e.ultimo.b === i) && 'trocada'].filter(Boolean).join(' '),
-        style: { ...estiloPeca(url, e.n, p), '--quem': CORES[(e.ultimo?.i ?? 0) % CORES.length] },
-        onclick: podeJogar ? () => {
+      : e.p.map((p, i) => h(podeJogar && !presa(i) ? 'button' : 'div', {
+        type: podeJogar && !presa(i) ? 'button' : null,
+        class: ['qc-peca', i === escolhida && 'selecionada', p === i && 'no-lugar', presa(i) && e.deQuem[i] >= 0 && 'presa', e.ultimo && (e.ultimo.a === i || e.ultimo.b === i) && 'trocada'].filter(Boolean).join(' '),
+        style: { ...estiloPeca(url, e.n, p), '--quem': CORES[(e.ultimo?.i ?? 0) % CORES.length], '--dono': presa(i) && e.deQuem[i] >= 0 ? CORES[e.deQuem[i] % CORES.length] : null },
+        onclick: podeJogar && !presa(i) ? () => {
           if (escolhida == null) { escolhida = i; redesenhar(); return; }
           if (escolhida !== i) enviar('sala:jogar', { id: s.id, jogada: { tipo: 'trocar', a: escolhida, b: i } });
           escolhida = null;
@@ -162,7 +181,7 @@ function quebraCabeca(s, e, redesenhar) {
   return h('div', { class: 'jogo-area' },
     h('div', { class: 'cobra-placar-linha' },
       h('span', null, icone('relogio'), ' ', h('strong', { 'data-desde': s.status === 'jogando' ? Date.now() - e.seg * 1000 : null }, relogio(e.seg))),
-      h('span', null, 'Trocas: ', h('strong', null, e.movs)),
+      versus(s) && s.eu >= 0 ? h('span', null, 'Suas peças: ', h('strong', null, e.certas?.[s.eu] || 0)) : h('span', null, 'Trocas: ', h('strong', null, e.movs)),
       h('span', { class: 'suave' }, `${e.titulo || 'Imagem'} · clique numa peça e depois em outra para trocar`)),
     h('div', { class: 'qc-moldura' }, tabuleiro));
 }
@@ -194,16 +213,23 @@ function lateral(s, e) {
     h('ol', { class: 'cobras-lista' }, s.jogadores.map((p, i) => h('li', { class: `${i === s.eu ? 'eu-linha' : ''} ${p.saiu ? 'fora' : ''} ${s.jogo === 'memoria' && e.vez === i && s.status === 'jogando' ? 'na-vez' : ''}`.replace(/\s+/g, ' ').trim() },
       h('span', { class: 'cobras-cor', style: { background: CORES[i % CORES.length] } }),
       h('span', { class: 'cobras-nome' }, h('strong', null, p.nome), h('small', null, p.saiu ? 'saiu' : !p.conectado ? 'caiu' : i === s.eu ? 'você' : '')),
-      e.vencedores?.includes(i) && s.jogo === 'memoria' && e.modo === 'versus' && h('span', { class: 'coroa' }, icone('coroa')),
+      e.vencedores?.includes(i) && versus(s) && h('span', { class: 'coroa' }, icone('coroa')),
+      s.jogo === 'minado' && versus(s) && e.fora?.[i] && h('small', { class: 'mesa-fora' }, 'fora'),
       s.jogo === 'memoria' && h('span', { class: 'cobras-pontos', title: 'Pares achados' }, e.pares[i] || 0),
-      s.jogo === 'quebra' && h('span', { class: 'cobras-pontos', title: 'Trocas feitas' }, e.porPessoa?.[i] || 0)))),
+      s.jogo === 'minado' && versus(s) && h('span', { class: 'cobras-pontos', title: 'Casas abertas' }, e.casas?.[i] || 0),
+      s.jogo === 'quebra' && h('span', { class: 'cobras-pontos', title: versus(s) ? 'Peças postas no lugar' : 'Trocas feitas' }, versus(s) ? e.certas?.[i] || 0 : e.porPessoa?.[i] || 0)))),
     s.espectadores > 0 && h('p', { class: 'espectadores' }, icone('olho'), `${s.espectadores} assistindo`));
 }
 
 function fim(s, e, { jogador, souDono }) {
   let titulo;
   let venci = false;
-  if (s.jogo === 'minado') {
+  if (versus(s) && s.jogo !== 'memoria') {
+    const v = e.vencedores || [];
+    venci = v.includes(s.eu);
+    const oque = s.jogo === 'minado' ? 'abriu mais casas' : 'pôs mais peças';
+    titulo = v.length === 1 ? (venci ? `Você ${oque} e venceu!` : `${s.jogadores[v[0]].nome} ${oque} e venceu!`) : 'Empate!';
+  } else if (s.jogo === 'minado') {
     venci = e.fim === 'ganhou';
     titulo = venci ? `Campo limpo! A equipe venceu em ${relogio(e.seg)}.` : `${s.jogadores[e.quemExplodiu]?.nome || 'Alguém'} pisou numa armadilha! A equipe perdeu.`;
   } else if (s.jogo === 'quebra') {

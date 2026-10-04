@@ -262,8 +262,8 @@ export function pararTransmissao() {
 // Faixa "você tem uma partida em andamento" quando a pessoa sai da tela do jogo sem sair da partida.
 export function atualizarBarra() {
   const s = rt.minhaSala && rt.partidas.get(rt.minhaSala);
-  const jogandoDesafio = s?.jogo === 'desafio' && location.hash.startsWith('#/recreacao/') && !location.hash.startsWith('#/recreacao/sala');
-  const mostrar = s && (s.status === 'jogando' || (s.grupo && s.status === 'esperando')) && !estouNaSala(s.id) && !!estado.eu && !jogandoDesafio;
+  const jogandoJunto = s?.jogo === 'junto' && location.hash.startsWith('#/recreacao/') && !location.hash.startsWith('#/recreacao/sala');
+  const mostrar = s && (s.status === 'jogando' || (s.grupo && s.status === 'esperando')) && !estouNaSala(s.id) && !!estado.eu && !jogandoJunto;
   let barra = document.getElementById('partida-ativa');
   if (!mostrar) { barra?.remove(); return; }
   let minhaVez;

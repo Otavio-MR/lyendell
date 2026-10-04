@@ -410,7 +410,7 @@ function fichaMoradoresOuNobres(livro, reg, nobres) {
       tipo: ['       Registro de', nobres ? '         Nobres' : '       Moradores'],
       numero: numeroDoRegistro(reg), titulo: v('nome') || v('nickname'),
     }),
-    ...paginasDosCampos(livro, reg, nobres ? rodapePadrao(reg) : rodapeMoradores(reg)),
+    ...paginasDosCampos(livro, reg, nobres ? rodapePadrao(reg) : rodapeMoradores(reg), { ficha: true }),
   ];
 }
 
@@ -421,7 +421,7 @@ function fichaOutros(livro, reg) {
       cor: '3', fecho: '§2', tipo: ['       Registro de', '         Outros'],
       numero: numeroDoRegistro(reg), titulo: v('nickname') || v('nome'),
     }),
-    ...paginasDosCampos(livro, reg, rodapePadrao(reg)),
+    ...paginasDosCampos(livro, reg, rodapePadrao(reg), { ficha: true }),
   ];
 }
 
@@ -463,12 +463,19 @@ function fichaGenerica(nomeModulo, livro, reg) {
   return [capa, ...paginasDosCampos(livro, reg, rodapePadrao(reg))];
 }
 
+// Nas fichas de Moradores, Nobres e Outros (o modelo da Casa) só vão os dados da pessoa: o que é do
+// Tabelionato (data de chegada, situação, observações) fica só no site, e "Nome do personagem" vira "Nome".
+const SO_DO_SITE = new Set(['data de chegada', 'chegada', 'situacao', 'observacoes', 'observacao', 'obs']);
+const fichaSemCampo = c => SO_DO_SITE.has(normalizar(c.nome).replace(/:\s*$/, '').trim()) || SO_DO_SITE.has(normalizar(c.id || ''));
+const rotuloDaFicha = nome => nome.replace(/\s+do personagem\s*:?\s*$/i, '');
+
 // As páginas de dentro: cada campo do formulário (na ordem e com o nome dele) e o valor logo abaixo.
 // Imagem não cabe no livro do Minecraft; campo que o formulário não tem não aparece.
-function paginasDosCampos(livro, reg, rodape) {
+function paginasDosCampos(livro, reg, rodape, { ficha = false } = {}) {
   const blocos = [];
-  for (const c of livro.campos) {
-    if (c.tipo === 'imagem') continue;
+  for (const c0 of livro.campos) {
+    if (c0.tipo === 'imagem' || (ficha && fichaSemCampo(c0))) continue;
+    const c = ficha ? { ...c0, nome: rotuloDaFicha(c0.nome) } : c0;
     if (c.tipo === 'secao') { blocos.push([`§8✦ ${umaLinha(c.nome).toUpperCase()} ✦§4`]); continue; }
     const valor = String(valorFormatado(c, reg)).replace(/§/g, '');
     const linhasValor = valor ? valor.split('\n').map(p => (p.trim() ? `§0${p.trim()}§4` : '')) : [''];

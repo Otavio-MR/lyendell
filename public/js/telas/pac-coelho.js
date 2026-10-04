@@ -3,8 +3,10 @@
 
 import { h, trocar, icone, botao, cabecalho, aviso, get, post, pode, aoSair, estado, num } from '../core.js';
 import { rt, ouvir, transmitir, enviarQuadro, pararTransmissao } from '../tempo-real.js';
-import { desafioNoJogo } from './desafio.js';
+import { juntoNoJogo } from '../junto.js';
 import { segredosDoJogo } from '../segredos.js';
+import { desenharParte } from '../roupas-coelho.js';
+import { sombrear } from '../desenho-coelho.js';
 
 const MAPA = [
   '############################',
@@ -187,7 +189,8 @@ function criarDesenhoPac() {
     g.stroke();
   }
 
-  function desenharCoelho(cx, cy, dir, abertura, tamanho = 1, giro = 0) {
+  // cores (junto): { orelha, claro, escuro, contorno } no lugar das cores do coelho dourado.
+  function desenharCoelho(cx, cy, dir, abertura, tamanho = 1, giro = 0, cores = null) {
     const r = T * 0.62 * tamanho;
     if (r <= 0.5) return;
     g.save();
@@ -201,7 +204,7 @@ function criarDesenhoPac() {
       g.save();
       g.translate(ox, oy);
       g.rotate(rot);
-      g.fillStyle = paleta === 'neve' ? '#dfe7ef' : '#d4a52c';
+      g.fillStyle = cores ? cores.orelha : paleta === 'neve' ? '#dfe7ef' : '#d4a52c';
       g.beginPath();
       g.ellipse(0, -r * 0.45, r * 0.26, r * 0.62, 0, 0, Math.PI * 2);
       g.fill();
@@ -212,14 +215,19 @@ function criarDesenhoPac() {
       g.restore();
     }
     const brilho = g.createRadialGradient(-r * 0.35, -r * 0.35, r * 0.1, 0, 0, r);
-    brilho.addColorStop(0, paleta === 'neve' ? '#ffffff' : '#f8e79a');
-    brilho.addColorStop(1, paleta === 'neve' ? '#a9b8c8' : '#c99a22');
+    brilho.addColorStop(0, cores ? cores.claro : paleta === 'neve' ? '#ffffff' : '#f8e79a');
+    brilho.addColorStop(1, cores ? cores.escuro : paleta === 'neve' ? '#a9b8c8' : '#c99a22');
     g.fillStyle = brilho;
     g.beginPath();
     g.moveTo(0, 0);
     g.arc(0, 0, r, abertura, Math.PI * 2 - abertura);
     g.closePath();
     g.fill();
+    if (cores?.contorno) {
+      g.strokeStyle = cores.contorno;
+      g.lineWidth = 2.4;
+      g.stroke();
+    }
     g.fillStyle = '#1b1403';
     g.beginPath();
     g.arc(r * 0.12, -r * 0.5, r * 0.13, 0, Math.PI * 2);
@@ -340,7 +348,105 @@ function criarDesenhoPac() {
     }
   }
 
-  return { tela, desenhar, definirPaleta: p => { paleta = p; } };
+  /* Junto: vários coelhos, cada um com a cor de quem joga, o pelo e o chapéu do Club Coelho e o nome em cima. */
+
+  // O chapéu (a parte "cabeca" da roupa) fica sempre em pé, virado para o lado em que o coelho anda.
+  function desenharChapeu(cx, cy, dir, id, pelo, t) {
+    const r = T * 0.62;
+    const k = (r * 0.8) / 9.5; // a cabeça do coelho do Club tem uns 9,5 de raio
+    g.save();
+    g.translate(cx, cy);
+    g.scale(mesma(dir, ESQ) ? -k : k, k);
+    g.translate(-11, 27 - (r * 0.15) / k);
+    try { desenharParte(g, 'cabeca', id, t, pelo); } catch { /* item que este navegador não conhece */ }
+    g.restore();
+  }
+
+  function desenharSeta(cx, cy, d) {
+    const r = T * 0.62 + 6;
+    g.save();
+    g.translate(cx + d[0] * r, cy + d[1] * r);
+    g.rotate(Math.atan2(d[1], d[0]));
+    g.fillStyle = 'rgba(255, 250, 225, 0.85)';
+    g.beginPath();
+    g.moveTo(4, 0);
+    g.lineTo(-3, -4);
+    g.lineTo(-3, 4);
+    g.closePath();
+    g.fill();
+    g.restore();
+  }
+
+  function desenharEtiqueta(c) {
+    const texto = c.nome.length > 12 ? `${c.nome.slice(0, 11)}…` : c.nome;
+    g.font = `700 ${Math.round(T * 0.44)}px system-ui, sans-serif`;
+    const w = g.measureText(texto).width + 10;
+    const alt = T * 0.62;
+    const x = Math.max(w / 2 + 1, Math.min(W - w / 2 - 1, px(c.x)));
+    const y = Math.max(alt / 2 + 1, px(c.y) - T * 1.25);
+    g.fillStyle = 'rgba(6, 11, 7, 0.8)';
+    g.beginPath();
+    if (g.roundRect) g.roundRect(x - w / 2, y - alt / 2, w, alt, alt / 2);
+    else g.rect(x - w / 2, y - alt / 2, w, alt);
+    g.fill();
+    if (c.eu) {
+      g.strokeStyle = '#f4dd80';
+      g.lineWidth = 1.5;
+      g.stroke();
+    }
+    g.fillStyle = c.cor;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(texto, x, y + 0.5);
+  }
+
+  // c = { x, y, dir, estado (0 vivo, 1 protegido, 2 e 5 pego, 3 fora), andando, cor, pelo, chapeu, nome, eu, querDir }
+  function desenharCoelhoJunto(c, t) {
+    const pelo = /^#[0-9a-f]{6}$/i.test(c.pelo || '') ? c.pelo : '#d4a52c';
+    const cores = { orelha: pelo, claro: sombrear(pelo, 0.45), escuro: sombrear(pelo, -0.22), contorno: c.cor };
+    const pego = c.estado === 2 || c.estado === 5;
+    let abertura = c.andando ? 0.06 + 0.36 * Math.abs(Math.sin(t * 16)) : 0.3;
+    let giro = 0;
+    g.save();
+    if (pego) {
+      g.globalAlpha = Math.floor(t * 8) % 2 ? 0.25 : 0.9; // pisca enquanto não volta
+      abertura = 0.9;
+      giro = t * 5;
+    } else if (c.estado === 1) {
+      g.globalAlpha = 0.45 + 0.35 * Math.abs(Math.sin(t * 9)); // protegido: meio transparente
+    }
+    emVolta(c.x, x => {
+      desenharCoelho(px(x), px(c.y), c.dir, abertura, 1, giro, cores);
+      if (c.chapeu && !pego) desenharChapeu(px(x), px(c.y), c.dir, c.chapeu, pelo, t);
+    });
+    g.restore();
+    if (c.eu && c.querDir && !pego && !mesma(c.querDir, c.dir)) desenharSeta(px(c.x), px(c.y), c.querDir);
+  }
+
+  // e = { moedas, situacao, susto, cenoura, raposas, coelhos: [c | null], popups: [{ x, y, texto, cor }], piscar }
+  function desenharJunto(e, t) {
+    g.drawImage(e.piscar && Math.floor(t * 5) % 2 ? fundoClaro : fundo, 0, 0, W, H);
+    desenharMoedas(e, t);
+    if (e.cenoura) desenharCenoura(px(13.5), px(17));
+    for (const r of e.raposas) emVolta(r.x, x => desenharRaposa(r, px(x), px(r.y), e, t));
+    // O meu coelho por último (por cima dos outros).
+    const vistos = e.coelhos.filter(c => c && c.estado !== 3 && c.estado !== 4);
+    const ordem = [...vistos.filter(c => !c.eu), ...vistos.filter(c => c.eu)];
+    for (const c of ordem) desenharCoelhoJunto(c, t);
+    for (const c of ordem) desenharEtiqueta(c);
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.font = `700 ${T * 0.62}px Cinzel, serif`;
+    for (const p of e.popups) {
+      g.lineWidth = 3;
+      g.strokeStyle = 'rgba(6, 11, 7, 0.85)';
+      g.strokeText(p.texto, px(p.x), px(p.y));
+      g.fillStyle = p.cor;
+      g.fillText(p.texto, px(p.x), px(p.y));
+    }
+  }
+
+  return { tela, desenhar, desenharJunto, definirPaleta: p => { paleta = p; } };
 }
 
 /* ─── Transmissão (quem assiste recebe o estado resumido) ─── */
@@ -412,6 +518,9 @@ export function assistirPac() {
 
 export function pacCoelho() {
   if (!pode('recreacao.usar')) { const e = new Error('Sem acesso à Recreação.'); e.status = 403; throw e; }
+  // Aberto de uma sala junto (versus ou co-op): o jogo roda no servidor.
+  const junto = pacJunto();
+  if (junto) return junto;
 
   const desenho = criarDesenhoPac();
   const tela = desenho.tela;
@@ -444,17 +553,11 @@ export function pacCoelho() {
   let quadro = null;
   let ultimo = 0;
   let vel = velocidades(1);
-  // Desafio: todos largam juntos; não dá para pausar (o tempo corre igual para todos).
-  const ds = desafioNoJogo('pacman', {
-    aoLargar: () => { if (situacao === 'inicio') comecar(); },
-    aoAcabar: () => { if (situacao !== 'fim') { situacao = 'fim'; mostrarSobre(); } },
-  });
-  const sorte = ds ? ds.sorte : Math.random;
+  const sorte = Math.random;
   // Códigos secretos: Konami (+5 vidas), "buuu" (susto nas raposas) e "neve" (coelho branco).
   let konamiUsado = false;
   let buuuNoNivel = 0;
   const seg = segredosDoJogo('pacman', {
-    bloqueado: !!ds,
     aoMudar: (chave, ligado) => { if (chave === 'pac-neve') desenho.definirPaleta(ligado ? 'neve' : null); },
     aoUsar: chave => {
       if (situacao === 'fim') return false;
@@ -526,7 +629,6 @@ export function pacCoelho() {
 
   function somar(n) {
     pontos += n;
-    ds?.progresso(pontos);
     if (!vidaExtra && pontos >= 10000) {
       vidaExtra = true;
       vidas++;
@@ -751,7 +853,6 @@ export function pacCoelho() {
 
   async function fimDeJogo() {
     situacao = 'fim';
-    ds?.terminar(pontos);
     mostrarSobre();
     if (!pontos) return;
     if (!seg.valeRecorde()) { mostrarSobre('Modo secreto: esta partida não vale recorde.'); return; }
@@ -811,7 +912,6 @@ export function pacCoelho() {
   }
 
   function comecar() {
-    if (ds && (!ds.largou() || ds.acabou())) return;
     if (situacao === 'fim') { novoJogo(); }
     if (situacao === 'inicio') situacao = 'pronto';
     if (situacao === 'pausado') situacao = retomar || 'jogando';
@@ -820,7 +920,7 @@ export function pacCoelho() {
 
   let retomar = null;
   function pausar() {
-    if (ds || !['jogando', 'pronto'].includes(situacao)) return;
+    if (!['jogando', 'pronto'].includes(situacao)) return;
     retomar = situacao;
     situacao = 'pausado';
     mostrarSobre();
@@ -830,9 +930,7 @@ export function pacCoelho() {
     if (!['inicio', 'pausado', 'fim'].includes(situacao)) { sobre.hidden = true; return; }
     sobre.hidden = false;
     const toque = matchMedia('(pointer: coarse)').matches;
-    if (situacao === 'inicio' && ds) {
-      trocar(sobre, h('div', { class: 'cobra-caixa' }, h('h2', null, 'Prepare-se!'), h('p', null, 'O desafio começa junto para todos.')));
-    } else if (situacao === 'inicio') {
+    if (situacao === 'inicio') {
       trocar(sobre, h('div', { class: 'cobra-caixa' },
         h('h2', null, 'Pac-Coelho'),
         h('p', null, 'Coma todos os Lírios e fuja das raposas.'),
@@ -846,7 +944,7 @@ export function pacCoelho() {
         h('p', { class: 'cobra-placar' }, `${num(pontos)} pontos`),
         h('p', null, `Chegou ao nível ${nivel}.`),
         extra && h('p', { class: 'cobra-recorde' }, icone('trofeu'), extra),
-        ds ? ds.botoesFim(() => { novoJogo(); comecar(); }) : botao('Jogar de novo', { classe: 'btn-ouro', onclick: () => { novoJogo(); comecar(); } })));
+        botao('Jogar de novo', { classe: 'btn-ouro', onclick: () => { novoJogo(); comecar(); } })));
     }
   }
 
@@ -863,7 +961,7 @@ export function pacCoelho() {
       e.preventDefault();
       if (situacao === 'jogando' || situacao === 'pronto') pausar(); else comecar();
     }
-    if (e.code === 'Enter' && !ds && (situacao === 'fim' || situacao === 'inicio')) { e.preventDefault(); if (situacao === 'fim') novoJogo(); comecar(); }
+    if (e.code === 'Enter' && (situacao === 'fim' || situacao === 'inicio')) { e.preventDefault(); if (situacao === 'fim') novoJogo(); comecar(); }
   };
   document.addEventListener('keydown', aoTeclar);
 
@@ -912,11 +1010,11 @@ export function pacCoelho() {
   const bolinha = (cor, tam) => h('span', { class: 'pac-bola', style: { '--cor': cor, '--tam': tam } });
 
   novoJogo();
-  if (!ds) carregarRanking();
+  carregarRanking();
   quadro = requestAnimationFrame(passo);
 
   return h('div', { class: 'pagina' },
-    cabecalho({ titulo: ds ? 'Pac-Coelho: desafio' : 'Pac-Coelho', icone: 'coelho', voltar: { href: '#/recreacao', texto: 'Recreação' }, sub: ds ? 'Todos no mesmo labirinto, ao mesmo tempo. Faça o máximo de pontos antes de acabar o tempo!' : 'O coelho da Casa Luckham atrás dos Lírios, com as raposas no encalço.' }),
+    cabecalho({ titulo: 'Pac-Coelho', icone: 'coelho', voltar: { href: '#/recreacao', texto: 'Recreação' }, sub: 'O coelho da Casa Luckham atrás dos Lírios, com as raposas no encalço.' }),
     h('div', { class: 'jogo-solo' },
       h('div', { class: 'jogo-area pac-area' },
         h('div', { class: 'cobra-placar-linha' },
@@ -924,13 +1022,13 @@ export function pacCoelho() {
           h('span', null, 'Nível ', nivelEl),
           vidasEl,
           plateiaEl,
-          !ds && h('span', null, icone('trofeu'), ' ', recordeEl)),
+          h('span', null, icone('trofeu'), ' ', recordeEl)),
         h('div', { class: 'cobra-moldura pac-moldura' }, tela, sobre),
         h('div', { class: 'dpad' },
           seta('cima', CIMA, 'Para cima'), seta('voltar', ESQ, 'Para a esquerda'),
           seta('frente', DIR, 'Para a direita'), seta('baixo', BAIXO, 'Para baixo'))),
       h('aside', { class: 'jogo-lateral pac-lateral' },
-        ds ? ds.painel : h('section', { class: 'painel' },
+        h('section', { class: 'painel' },
           h('div', { class: 'painel-cab' }, h('h2', null, icone('trofeu'), 'Melhores')),
           ranking),
         h('section', { class: 'painel' },
@@ -941,4 +1039,282 @@ export function pacCoelho() {
             legenda(h('span', { class: 'pac-cenoura' }, '🥕'), 'Cenoura', 'aparece duas vezes por nível embaixo da toca. Vale bônus.'),
             RAPOSAS.map(r => legenda(bolinha(r.cor, '14px'), r.nome, r.jeito)),
             legenda(icone('coelho'), 'Vida extra', 'aos 10.000 pontos.'))))));
+}
+
+/* ─── Junto: todos no mesmo labirinto (o jogo roda no servidor: src/junto-pac.js) ─── */
+
+// As casas com Lírio na ordem do mapa e o mapa em 6 bits por letra (o mesmo do servidor).
+const LISTA_MOEDAS = [];
+for (let y = 0; y < LINHAS; y++) for (let x = 0; x < COLS; x++) if (MAPA[y][x] === '.' || MAPA[y][x] === 'o') LISTA_MOEDAS.push(y * COLS + x);
+const BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+const tipoMoeda = k => (MAPA[Math.floor(k / COLS)][k % COLS] === '.' ? 1 : 2);
+function moedasDe(m) {
+  const moedas = new Uint8Array(COLS * LINHAS);
+  LISTA_MOEDAS.forEach((k, j) => { if ((BASE64.indexOf(m[Math.floor(j / 6)]) >> (j % 6)) & 1) moedas[k] = tipoMoeda(k); });
+  return moedas;
+}
+function moedasCheias() {
+  const moedas = new Uint8Array(COLS * LINHAS);
+  for (const k of LISTA_MOEDAS) moedas[k] = tipoMoeda(k);
+  return moedas;
+}
+const DIR_DO_NOME = { cima: CIMA, esquerda: ESQ, baixo: BAIXO, direita: DIR };
+const CORES_RAPOSAS = [...RAPOSAS.map(r => r.cor), '#b8361f']; // a 5ª (Brasa) vem com 3 ou mais
+const ATRASO_MS = 90; // desenha um pouquinho no passado para ter sempre dois quadros entre os quais andar
+
+// Mistura duas posições (o túnel conta; um salto grande, como voltar para o começo, não é misturado).
+function misturar(a, b, k) {
+  let dx = b[0] - a[0];
+  if (Math.abs(dx) > COLS / 2) dx -= Math.sign(dx) * COLS;
+  const dy = b[1] - a[1];
+  if (Math.abs(dx) > 3 || Math.abs(dy) > 3) return k < 0.5 ? [a[0], a[1]] : [b[0], b[1]];
+  return [a[0] + dx * k, a[1] + dy * k];
+}
+
+function pacJunto() {
+  const ganchos = {};
+  const jt = juntoNoJogo('pacman', { aoLargar: () => ganchos.largar?.(), aoAcabar: s => ganchos.acabar?.(s) });
+  if (!jt) return null;
+  const coop = jt.modo === 'coop';
+  const toque = matchMedia('(pointer: coarse)').matches;
+  const desenho = criarDesenhoPac();
+  const tela = desenho.tela;
+  const sobre = h('div', { class: 'cobra-sobre', hidden: true });
+  const aviso_ = h('div', { class: 'assistir-aviso', hidden: true });
+  const meusPontosEl = h('strong', null, '0');
+  const liriosEl = h('strong', null, num(LISTA_MOEDAS.length));
+  const vidasEl = h('span', { class: 'pac-vidas', title: 'Vidas da equipe' });
+  const placar = h('div');
+  const visual = jt.jogadores.map(p => ({ pelo: p.visual?.pelo || null, chapeu: p.visual?.roupa?.cabeca || null }));
+
+  let moedas = moedasCheias();
+  const quadros = []; // { t (ms de jogo), q, moedas }
+  let base = Infinity;  // chegada - t: liga o relógio do servidor ao daqui
+  let ultimo = null;
+  let fimEm = 0;
+  let acabou = false;
+  let querDir = null;   // a última direção que eu pedi
+  let animacao = 0;
+  const inicio = performance.now();
+
+  /* Quadros do servidor */
+
+  function receber(q, acertarRelogio = true) {
+    if (!q || !Array.isArray(q.c) || !Array.isArray(q.r)) return;
+    if (q.m) moedas = moedasDe(q.m);
+    const agora = performance.now();
+    const t = (Number(q.t) || 0) * 1000;
+    // A chegada mais cedo é a mais certa (a rede só atrasa); sobe devagar se o servidor engasgar.
+    if (acertarRelogio && q.s === 'jogando') base = Math.min(agora - t, base + 2);
+    const f = { t, q, moedas };
+    const ult = quadros[quadros.length - 1];
+    if (ult && t < ult.t) return;
+    if (ult && t === ult.t) quadros[quadros.length - 1] = f; // o mesmo passo (veio depois de um comando)
+    else quadros.push(f);
+    if (quadros.length > 40) quadros.shift();
+    if (q.s === 'fim' && !fimEm) fimEm = agora;
+    ultimo = q;
+    atualizarLado(q);
+  }
+
+  // O estado do desenho no momento "agora - atraso", entre os dois quadros em volta.
+  function montar(agora) {
+    if (!quadros.length) return null;
+    let ia = quadros.length - 1;
+    let b = null;
+    let k = 0;
+    if (base !== Infinity && !acabou) {
+      const alvoT = agora - base - ATRASO_MS;
+      ia = 0;
+      for (let j = quadros.length - 1; j >= 0; j--) {
+        if (quadros[j].t <= alvoT) { ia = j; b = quadros[j + 1] || null; break; }
+      }
+    }
+    const a = quadros[ia];
+    if (b) k = Math.max(0, Math.min(1, (agora - base - ATRASO_MS - a.t) / (b.t - a.t || 1)));
+    const qa = a.q;
+    const qb = b?.q;
+    const anterior = quadros[ia - 1]?.q;
+    const coelhos = qa.c.map((c, i) => {
+      if (!c) return null;
+      const cb = qb?.c?.[i];
+      const [x, y] = cb && k > 0 ? misturar(c, cb, k) : [c[0], c[1]];
+      const outro = cb || anterior?.c?.[i];
+      const jog = jt.jogadores[i] || {};
+      return {
+        x, y, dir: DIRS[c[2]] || ESQ, estado: c[3],
+        andando: c[3] <= 1 && qa.s === 'jogando' && !!outro && (outro[0] !== c[0] || outro[1] !== c[1]),
+        cor: jog.cor || '#e8c24a', nome: jog.nome || `Jogador ${i + 1}`, pelo: visual[i]?.pelo, chapeu: visual[i]?.chapeu,
+        eu: i === jt.eu, querDir: i === jt.eu && querDir ? DIR_DO_NOME[querDir] : null,
+      };
+    });
+    const raposas = qa.r.map((r, i) => {
+      const rb = qb?.r?.[i];
+      const [x, y] = rb && k > 0 ? misturar(r, rb, k) : [r[0], r[1]];
+      return { x, y, dir: DIRS[r[2]] || ESQ, modo: MODOS[r[3]] || 'normal', assustada: !!r[4], cor: CORES_RAPOSAS[i] || '#e2572f' };
+    });
+    const popups = (qa.pp || []).map(([x, y, valor, i]) => ({
+      x, y, texto: valor < 0 ? `-${num(-valor)}` : num(valor), cor: valor < 0 ? '#e2572f' : jt.jogadores[i]?.cor || '#9fe0f0',
+    }));
+    return {
+      moedas: a.moedas, situacao: qa.s, susto: Number(qa.su) || 0, cenoura: !!qa.ce, raposas, coelhos, popups,
+      piscar: qa.f === 'limpou' && agora - fimEm < 2000,
+    };
+  }
+
+  /* O lado da tela: pontos, vidas da equipe e o que está acontecendo comigo */
+
+  const SITUACAO = ['jogando', 'voltou agora', 'foi pego', 'fora', 'saiu', 'foi pego'];
+  let chaveLado = '';
+  function atualizarLado(q) {
+    const eu = q.c[jt.eu];
+    meusPontosEl.textContent = num(eu ? eu[4] : 0);
+    liriosEl.textContent = num(Math.max(0, LISTA_MOEDAS.length - (Number(q.mv) || 0)));
+    const chave = JSON.stringify([q.c.map(c => (c ? [c[3], c[4]] : null)), q.v]);
+    if (chave === chaveLado) return;
+    chaveLado = chave;
+    if (coop) trocar(vidasEl, Array.from({ length: Math.max(0, Math.min(12, q.v ?? 0)) }, () => icone('coelho')));
+    const linhas = jt.jogadores.map((p, i) => {
+      const c = q.c[i];
+      return { i, nome: p.nome, cor: p.cor, pontos: c ? c[4] : 0, estado: c ? c[3] : 4 };
+    });
+    const ordem = coop ? linhas : [...linhas].sort((x, y) => y.pontos - x.pontos || x.i - y.i);
+    const lista = h('ol', { class: 'desafio-lista' }, ordem.map(l =>
+      h('li', { class: `${l.i === jt.eu ? 'eu-linha' : ''} ${l.estado === 3 || l.estado === 4 ? 'fora' : ''}`.trim() },
+        h('span', { class: 'cobras-cor', style: { background: l.cor } }),
+        h('span', { class: 'desafio-nome' }, l.nome, h('small', null, SITUACAO[l.estado] || '')),
+        h('strong', null, num(l.pontos)))));
+    if (coop) {
+      const total = linhas.reduce((s, l) => s + l.pontos, 0);
+      trocar(placar,
+        h('div', { class: 'desafio-meta' },
+          h('div', { class: 'desafio-meta-texto' }, icone('coracao'), ' Vidas da equipe: ', h('strong', null, String(q.v ?? 0))),
+          h('div', { class: 'desafio-meta-texto' }, 'Pontos da equipe: ', h('strong', null, num(total)))),
+        lista);
+    } else {
+      trocar(placar, lista);
+    }
+  }
+
+  // Avisos em cima do labirinto: antes da largada, pego e fora.
+  let avisoVisto = null;
+  function atualizarAvisos() {
+    let caixa = false;
+    let texto = null;
+    if (!acabou && !jt.largou()) caixa = true;
+    else if (!acabou && ultimo) {
+      const eu = ultimo.c[jt.eu];
+      if (eu && (eu[3] === 2 || eu[3] === 5)) texto = eu[3] === 5 ? 'Você foi pego! A equipe ficou sem vidas.' : 'Você foi pego! Voltando...';
+      else if (eu && eu[3] === 3) texto = 'Você está fora: assistindo';
+    }
+    const chave = `${caixa}|${texto}`;
+    if (chave === avisoVisto) return;
+    avisoVisto = chave;
+    sobre.hidden = !caixa;
+    if (caixa) {
+      trocar(sobre, h('div', { class: 'cobra-caixa' },
+        h('h2', null, 'Prepare-se!'),
+        h('p', null, coop ? 'Todos juntos, do mesmo lado: limpem o labirinto com as vidas da equipe.' : 'Todos juntos, cada um por si: quem comer mais Lírios vence.'),
+        h('p', null, 'O seu coelho tem o contorno na sua cor ', h('span', { class: 'cobras-cor', style: { background: jt.jogadores[jt.eu]?.cor } }), ' e o nome com borda dourada.'),
+        h('p', { class: 'suave' }, toque ? 'Deslize o dedo no labirinto ou use as setas abaixo.' : 'Use as setas ou W A S D.')));
+    }
+    aviso_.hidden = !texto;
+    if (texto) aviso_.textContent = texto;
+  }
+
+  /* Comandos: a direção vai para o servidor */
+
+  function mandar() {
+    if (!querDir || acabou || jt.tempo() < -0.4) return; // antes da largada fica guardada
+    jt.evento({ tipo: 'dir', d: querDir });
+  }
+  function virar(nome) {
+    if (acabou) return;
+    querDir = nome;
+    mandar();
+  }
+  ganchos.largar = () => mandar();
+  ganchos.acabar = () => { acabou = true; atualizarAvisos(); };
+
+  const aoTeclar = e => {
+    if (e.target.closest?.('input, textarea, select, [contenteditable]') || document.querySelector('.modal-fundo')) return;
+    const d = TECLAS[e.code];
+    if (!d) return;
+    e.preventDefault();
+    const nome = nomeDir(d);
+    if (e.repeat && nome === querDir) return; // segurando a tecla: só manda de novo se mudou
+    virar(nome);
+  };
+  document.addEventListener('keydown', aoTeclar);
+  let toqueInicio = null;
+  tela.addEventListener('pointerdown', e => { toqueInicio = { x: e.clientX, y: e.clientY }; });
+  tela.addEventListener('pointerup', e => {
+    if (!toqueInicio) return;
+    const dx = e.clientX - toqueInicio.x;
+    const dy = e.clientY - toqueInicio.y;
+    toqueInicio = null;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 18) return;
+    virar(nomeDir(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? DIR : ESQ) : (dy > 0 ? BAIXO : CIMA)));
+  });
+
+  /* Desenho a 60 quadros por segundo */
+
+  function laco(agora) {
+    animacao = requestAnimationFrame(laco);
+    try {
+      // Fui pego: a direção guardada some (o servidor também esquece).
+      const eu = ultimo?.c?.[jt.eu];
+      if (eu && eu[3] >= 2) querDir = null;
+      const e = montar(agora);
+      if (e) desenho.desenharJunto(e, (agora - inicio) / 1000);
+      atualizarAvisos();
+    } catch (err) {
+      console.error('Pac-Coelho junto:', err); // um erro não pode travar o jogo
+    }
+  }
+
+  jt.aoQuadro = q => { try { receber(q); } catch (e) { console.error('Pac-Coelho junto:', e); } };
+  receber(jt.estado()?.quadro, false);
+  animacao = requestAnimationFrame(laco);
+  aoSair(() => {
+    cancelAnimationFrame(animacao);
+    jt.aoQuadro = () => {};
+    document.removeEventListener('keydown', aoTeclar);
+  });
+  atualizarAvisos();
+
+  const seta = (ic, d, rotulo) => h('button', { class: `dpad-${ic}`, type: 'button', 'aria-label': rotulo, onpointerdown: e => { e.preventDefault(); virar(nomeDir(d)); } }, icone(ic));
+  const legenda = (el, nome, texto) => h('li', null, el, h('span', null, h('strong', null, nome), ' ', texto));
+  const bolinha = (cor, tam) => h('span', { class: 'pac-bola', style: { '--cor': cor, '--tam': tam } });
+
+  return h('div', { class: 'pagina' },
+    cabecalho({
+      titulo: `Pac-Coelho: ${coop ? 'co-op' : 'versus'}`, icone: 'coelho', voltar: { href: '#/recreacao', texto: 'Recreação' },
+      sub: coop ? 'Todos no mesmo labirinto para limpar os Lírios juntos, com as vidas da equipe.' : 'Todos no mesmo labirinto: vence quem comer mais Lírios. As raposas caçam quem estiver mais perto.',
+    }),
+    h('div', { class: 'jogo-solo' },
+      h('div', { class: 'jogo-area pac-area' },
+        h('div', { class: 'cobra-placar-linha' },
+          h('span', null, 'Seus pontos: ', meusPontosEl),
+          h('span', null, 'Lírios: ', liriosEl),
+          coop && vidasEl),
+        h('div', { class: 'cobra-moldura pac-moldura' }, tela, sobre, aviso_),
+        h('div', { class: 'dpad' },
+          seta('cima', CIMA, 'Para cima'), seta('voltar', ESQ, 'Para a esquerda'),
+          seta('frente', DIR, 'Para a direita'), seta('baixo', BAIXO, 'Para baixo'))),
+      h('aside', { class: 'jogo-lateral pac-lateral' },
+        jt.painel,
+        h('section', { class: 'painel' },
+          h('div', { class: 'painel-cab' }, h('h2', null, icone(coop ? 'usuarios' : 'trofeu'), coop ? 'Equipe' : 'Pontos')),
+          placar),
+        h('section', { class: 'painel' },
+          h('div', { class: 'painel-cab' }, h('h2', null, icone('pergunta'), 'Como jogar')),
+          h('ul', { class: 'pac-legenda' },
+            legenda(bolinha('#d8b13a', '8px'), 'Lírio', 'vale 10 pontos para quem comer.'),
+            legenda(bolinha('#e8c24a', '16px'), 'Lírio grande', 'vale 50 e assusta todas as raposas: quem pegar uma leva 200, 400, 800, 1600.'),
+            legenda(h('span', { class: 'pac-cenoura' }, '🥕'), 'Cenoura', 'aparece duas vezes embaixo da toca: quem chegar primeiro leva.'),
+            legenda(bolinha('#e2572f', '14px'), 'Raposas', `cada uma caça o coelho mais perto dela.${jt.n >= 3 ? ' Com 3 ou mais jogadores, vem também a Brasa.' : ''}`),
+            coop
+              ? legenda(icone('coelho'), 'Pego', 'gasta uma vida da equipe e volta em 2 segundos. Sem vidas, fica de fora.')
+              : legenda(icone('coelho'), 'Pego', 'perde 10% dos pontos e volta em 2 segundos.'))))));
 }
