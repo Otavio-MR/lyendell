@@ -3,10 +3,21 @@
 // de quadros e a prévia do sprite enviado. Quem tem "sprites.editar" troca; sem sprite, vale o desenho de sempre.
 import { h, trocar, icone, botao, cabecalho, vazio, aviso, aoSair, api, confirmar, interruptor, pode } from '../core.js';
 import { carregarSprites, aoMudarSprites, todasAsPecas, desenharSprite, spriteDe } from '../sprites.js';
+import { desenharCoelho } from '../desenho-coelho.js';
+
+// O coelho de guia atrás das roupas (meio apagado).
+function guia(g, peca) {
+  if (!peca.guiaCoelho) return;
+  g.save();
+  g.globalAlpha *= 0.3;
+  desenharCoelho(g, 0, 0, { semSprite: true });
+  g.restore();
+}
 
 // Cada módulo daqui exporta SPRITES e registra as suas peças quando é importado.
 const FONTES = [
   () => import('../desenho-coelho.js'),
+  () => import('../roupas-coelho.js'),
   () => import('../jogos/travessia.js'),
   () => import('../jogos/barris.js'),
   () => import('../desenho-cobra.js'),
@@ -18,6 +29,9 @@ const FONTES = [
   () => import('../clube-salas.js'),
   () => import('../clube-minijogos.js'),
   () => import('./cidade-mundo.js'),
+  () => import('../jogos/corrida.js'),
+  () => import('./arena.js'),
+  () => import('./batalha.js'),
 ];
 
 const ESCALAS = [1, 2, 3, 4];
@@ -92,7 +106,7 @@ export async function telaSprites() {
     return raiz;
   }
   const pecas = todasAsPecas();
-  const ORDEM = ['Todos os jogos', 'Travessia', 'Barris do Raposo', 'Super Coelho', 'Pac-Coelho', 'Cobrinha', 'Festa na Toca', 'Festa: minijogos', 'Club Coelho', 'Club Coelho: minijogos', 'Lyendell Dorme'];
+  const ORDEM = ['Todos os jogos', 'Roupas e acessórios', 'Travessia', 'Barris do Raposo', 'Super Coelho', 'Pac-Coelho', 'Cobrinha', 'Festa na Toca', 'Festa: minijogos', 'Club Coelho', 'Club Coelho: minijogos', 'Lyendell Dorme', 'Corrida do Coelho', 'Arena da Toca', 'Batalha da Toca'];
   const lugar = j => (ORDEM.includes(j) ? ORDEM.indexOf(j) : ORDEM.length);
   const jogos = [...new Set(pecas.map(p => p.jogo || 'Outros'))].sort((a, b) => lugar(a) - lugar(b));
   let jogo = jogos[0];
@@ -112,10 +126,10 @@ export async function telaSprites() {
     const s = sprites[chave];
     const antes = h('canvas', { class: 'sprites-previa', width: 160, height: 160, title: 'O desenho de sempre' });
     const depois = h('canvas', { class: 'sprites-previa', width: 160, height: 160, title: 'O seu sprite' });
-    telas.push({ c: antes, desenhar: (g, t) => caberNaCaixa(g, peca, 160, 160, gg => peca.previa?.(gg, anim.id, t)) });
+    telas.push({ c: antes, desenhar: (g, t) => caberNaCaixa(g, peca, 160, 160, gg => { guia(gg, peca); peca.previa?.(gg, anim.id, t); }) });
     telas.push({ c: depois, desenhar: (g, t) => {
       let tem = false;
-      caberNaCaixa(g, peca, 160, 160, gg => { tem = desenharSprite(gg, peca.chave, anim.id, 0, 0, { t, cor: '#c99a6b', ancora: peca.ancora }); });
+      caberNaCaixa(g, peca, 160, 160, gg => { guia(gg, peca); tem = desenharSprite(gg, peca.chave, anim.id, 0, 0, { t, cor: '#c99a6b', ancora: peca.ancora }); });
       if (!tem) {
         g.fillStyle = 'rgba(255,255,255,0.35)'; g.font = '700 13px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
         g.fillText('sem sprite', 80, 80);

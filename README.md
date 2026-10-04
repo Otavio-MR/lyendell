@@ -280,6 +280,10 @@ Um salão com **chat ao vivo**, a lista de quem está online e os jogos:
 - **Travessia** (no estilo do Crossy Road): pulinhos por campos, estradas de carroças, rios com troncos
   e trilhos de trem, até onde o coelho aguentar. Ficar parado demais chama o gavião. Vale a fileira mais
   longe.
+- **Corrida do Coelho** (no estilo do dinossauro do Chrome): o coelho corre sozinho e cada vez mais rápido;
+  Espaço, ↑ ou um toque pulam pedras, troncos, caixotes de cenouras e espinheiros (segurando, o pulo vai
+  mais alto), e ↓ abaixa dos gaviões (de noite, morcegos) ou faz descer rápido no ar. A cada 800 m o dia
+  vira noite e o placar pisca a cada 100 m. Vale os metros, com 10 m de bônus por Lírio pego.
 
 Os três de fliperama (`public/js/arcade.js` com cada jogo em `public/js/jogos/`) têm som (dá para
 desligar no alto-falante), botões na tela para o celular, ranking, versus e co-op ao vivo e quem assiste.
@@ -296,9 +300,12 @@ Cada jogo tem os modos que fazem sentido, nos botões do cartão do jogo no sal�
 | Quiz | todos contra todos, ou dois times | em equipe: a sala inteira contra a meta de 60% de acertos |
 | Cobrinha ao vivo | todos contra todos, ou 2 contra 2 | Colheita: juntos, comer as cenouras da meta antes do tempo (quem bate renasce) |
 | Velha, Lig 4 e Damas | um contra o outro | contra a Raposa (o computador), sozinho ou em dupla, um lance cada |
+| Corrida do Coelho | todos no mesmo caminho, lado a lado (cada um na sua raia), com os mesmos obstáculos: uma vida só, vence quem sobrar correndo | a equipe corre junta até a chegada (1000 m + 250 m por pessoa), com vidas da equipe: quem bate volta caindo do céu ao lado dos outros |
 | Barris, Super Coelho e Travessia | todos no mesmo mundo ao mesmo tempo, vendo os coelhos dos outros: nos Barris e no Super Coelho vence quem chegar primeiro na Princesa (3 vidas); na Travessia, quem sobrar vivo (1 vida) | o mesmo mundo, com vidas da equipe (2 + 1 por pessoa): nos Barris e no Super Coelho, quando alguém chega a fase passa para todos; na Travessia, todos precisam cruzar a linha de chegada |
 | Pac-Coelho | o mesmo labirinto (o servidor roda as raposas): cada Lírio, raposa e cenoura vale para quem pegou; pego perde 10% e volta; vence quem tiver mais quando os Lírios acabarem | o mesmo labirinto com vidas da equipe (3 + 1 por pessoa); limpar tudo e todos vencem |
 | 2048 | cada um no seu tabuleiro, mas juntar 64 ou mais joga pedras no tabuleiro dos outros; vence quem sobrar | todos mexem no mesmo tabuleiro até a meta (maior com mais gente) |
+| Arena da Toca | cartas e torres (o servidor roda a partida): sozinho contra o Raposo, um contra um com 2 pessoas, dois contra dois com 3 ou 4 (faltando um, o Raposo completa a dupla); mais coroas vence | todos do mesmo lado contra o Raposo (2 Raposos com 3 ou 4 pessoas), que ganha mais cenouras, torres e tropas mais fortes com mais gente |
+| Batalha da Toca | todos caem na mesma ilha (12 com os Raposos, os robôs); cada um por si, o último de pé vence (se for um robô, ninguém vence) | as pessoas são uma equipe só contra esquadrões de Raposos, sem fogo amigo; a equipe vence se for a última de pé |
 | Campo Minado | todos no mesmo campo: cada casa aberta fica com a cor de quem abriu e as bandeiras são de cada um; quem pisa numa armadilha está fora; vence quem abrir mais casas | todos abrem o mesmo campo; se alguém pisar numa armadilha, a equipe perde |
 | Quebra-cabeça | todos na mesma imagem: peça que vai para o lugar certo fica presa e conta para quem pôs; vence quem pôs mais | todos montam a mesma imagem, trocando as peças |
 | Jogo da Memória | cada um na sua vez (achou o par, joga de novo); vence quem achar mais pares | a equipe, um de cada vez, acha todos os pares sem passar da meta de jogadas |
@@ -310,6 +317,53 @@ mais raposas, mais armadilhas no Campo Minado, quebra-cabeça maior, meta maior 
 de fliperama cada navegador roda o mesmo mundo (mesma semente e o mesmo relógio) e o servidor só decide
 quem pegou primeiro, quem caiu e quem chegou; o Pac-Coelho e o 2048 rodam no servidor. Cada coelho
 aparece com o visual do Club Coelho.
+
+### Arena da Toca
+
+Estilo Clash Royale, em `#/recreacao/arena` (servidor: `src/junto-arena.js`; navegador: `public/js/telas/arena.js`):
+
+- Arena em pé (18 x 32 casas) com o rio no meio e duas pontes; cada lado tem 2 torres e a Toca do Rei, que só
+  acorda quando apanha ou quando uma torre do lado cai. Torre derrubada = 1 coroa; a Toca do Rei vale 3 e acaba na hora.
+- Cenouras de energia: começam em 5, vão até 10, voltam 1 a cada 2,8 s (em dobro no último minuto). 3 minutos;
+  empatado, 1 minuto de morte súbita; depois perde quem tem a torre mais fraca (ou empate).
+- 13 cartas (custo de 1 a 7): Ratinhos, Enxame de Esquilos, Coelho Espadachim, Coelhos Arqueiros, Chuva de Bolotas,
+  Javali (pula o rio, só construções), Coruja e Corvo Mago (voam), Ouriço (espinhos em volta), Bomba de Cenoura,
+  Torre de Vigia, Urso Gigante e Carvalho Ancião (tanques que só batem em construções). Baralho de 8 escolhido antes
+  (fica guardado no navegador), mão de 4 e a próxima, girando como no Clash.
+- Tropas só no próprio lado (ou no "bolso" de uma torre caída); feitiços em qualquer lugar. Arraste a carta para a
+  arena, ou toque na carta e depois no lugar (1 a 4 e Esc no teclado). Funciona no celular.
+- O servidor roda a partida (20 passos por segundo, sempre igual para a mesma semente e os mesmos comandos); os
+  navegadores só mandam as cartas e desenham os quadros, misturando dois seguidos. Dá para assistir pela tela da arena.
+- O Raposo (o computador) defende o que atravessa o rio, usa feitiço em grupos, monta empurrões atrás de um tanque e
+  não deixa as cenouras sobrarem. Quem sai no meio deixa o lugar para ele. Resultado guardado como `junto_arena_<modo>`.
+
+### Batalha da Toca
+
+Battle royale de cima, no estilo do Free Fire (`#/recreacao/batalha`). Um balão cruza a ilha e cada um
+pula quando quiser, planando um pouco até o chão. A ilha tem rio (atravessa devagar), pontes, mar em
+volta e lugares com nome: Vila Cenoura, Moinho, Porto (com píer), Castelo Velho, Pomar e Toca Funda,
+com casas (portas e janelas: janela não deixa passar gente, mas passa tiro), árvores, pedras e caixotes
+que seguram os tiros. No chão (sempre o mesmo para a mesma semente) tem armas com raridade (comum,
+incomum, rara, épica e lendária, cada uma com mais dano): Estilingue (pistola), Besta (fuzil),
+Escopeta (7 balins, forte de perto), Arco longo (de longe, e enxerga mais) e Metralhadora de bolotas
+(automática); munição, bandagem (cura aos poucos), poção de escudo, granada de cenoura e mochila (o
+dobro de espaço). Cabem duas armas. A área segura fecha em 6 fases, com aviso e a próxima área no mapa;
+fora dela a vida cai cada vez mais rápido.
+
+- Computador: W A S D anda, o mouse mira, clique atira (segure nas automáticas), E pega, R recarrega,
+  1 e 2 (ou a rodinha) trocam de arma, Q bandagem, C poção, G granada, Espaço pula do balão, M mapa,
+  F tela cheia. Celular: o lado esquerdo da tela anda, o direito mira e atira (empurrando mais), e há
+  botões para pular, pegar, recarregar, trocar e granada.
+- "Jogar (com robôs)" abre uma sala só sua e começa na hora; "Chamar o pessoal" abre a sala para até 10.
+  Faltando gente, os Raposos (robôs) completam 12: eles saqueiam, fogem da área, procuram esconderijo e
+  atiram com tempo de reação e erro de mira que diminuem com a dificuldade. No co-op, as pessoas são uma
+  equipe e os Raposos vêm em esquadrões.
+- O servidor (`src/junto-batalha.js`) roda tudo a 20 passos por segundo: os tiros são projéteis que
+  voam, espalham e perdem força com a distância. Cada um recebe um quadro só com o que está perto (o
+  mapa vai uma vez, os itens quando aparecem): menos de 1,5 KB por quadro. O navegador prevê o próprio
+  coelho e desenha os outros entre dois quadros.
+- Pontos no placar = eliminações. Conquistas: Toca Suprema (ficar de pé até o fim) e Caçador de
+  Raposos (5 eliminações numa partida).
 
 ### Festa na Toca
 

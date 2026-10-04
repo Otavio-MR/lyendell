@@ -27,6 +27,21 @@ export const JOGOS_JUNTO = {
     versus: 'Todos no mesmo labirinto: vence quem comer mais Lírios. As raposas caçam quem estiver mais perto.',
     coop: 'Todos no mesmo labirinto para limpar os Lírios juntos, com as vidas da equipe.',
   },
+  corrida: {
+    nome: 'Corrida do Coelho', icone: 'coelho', rota: '#/recreacao/corrida', max: 8,
+    versus: 'Todos correm no mesmo caminho, com os mesmos obstáculos. Uma vida só: vence quem durar mais.',
+    coop: 'A equipe corre junta até a chegada; as vidas são da equipe e quem cai volta correndo.',
+  },
+  arena: {
+    nome: 'Arena da Toca', icone: 'escudo', rota: '#/recreacao/arena', max: 4,
+    versus: 'Cartas e torres: derrube as torres do outro lado. Sozinho, você enfrenta o Raposo; com 3 ou 4, é 2 contra 2.',
+    coop: 'Todos do mesmo lado contra o Raposo, que fica mais forte com mais gente.',
+  },
+  batalha: {
+    nome: 'Batalha da Toca', icone: 'espada', rota: '#/recreacao/batalha', max: 10,
+    versus: 'Todos caem na ilha, pegam armas e itens; a área segura fecha e o último de pé vence. Faltando gente, entram robôs.',
+    coop: 'A equipe cai junta contra esquadrões de robôs; vence se a equipe for a última de pé.',
+  },
   2048: {
     nome: '2048', icone: 'blocos', rota: '#/recreacao/2048', max: 6,
     versus: 'Batalha: cada um no seu tabuleiro, todos na tela. Juntar blocos grandes joga pedras no tabuleiro dos outros; vence quem sobrar.',
@@ -102,7 +117,7 @@ function espera(s, { jogador, souDono, def }) {
       type: 'button', class: `seg ${k === o.fase ? 'ativo' : ''}`.trim(), disabled: !souDono, onclick: () => mudar({ fase: k }),
     }, nome))));
   }
-  const basta = o.modo === 'versus' ? n >= 2 : n >= 1;
+  const basta = n >= (s.min ?? (o.modo === 'versus' ? 2 : 1)); // Arena e Batalha começam com 1 (os robôs completam)
   return h('div', { class: 'quiz-espera painel' },
     h('div', { class: 'painel-cab' }, h('h2', null, icone('usuarios'), `Na sala: ${n} de ${s.max}`)),
     h('div', { class: 'quiz-na-sala' }, s.jogadores.map(p => h('div', { class: `quiz-pessoa ${p.conectado ? '' : 'ausente'}`.trim() },

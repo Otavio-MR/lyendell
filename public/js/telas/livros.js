@@ -1,3 +1,4 @@
+import { ehLivroDeCartaz, dadosDoCartaz, desenharCartaz, baixarCartaz } from '../cartaz.js';
 import {
   estado, get, post, put, del, h, trocar, icone, pode, ehCrianca, cabecalho, vazio, botao, botaoIcone, modal, modalForm, confirmar,
   aviso, tentar, campo, interruptor, enviarImagem, dataHora, dataCurta, num, normalizar, ErroApi,
@@ -224,6 +225,7 @@ export async function livro(m, id, abrir = null) {
   const filtros = {};
   let busca = '';
   let filtroPagamento = '';
+  let vista = 'cartazes'; // livro de Procurados: os cartazes ou a tabela
   let d;
 
   async function carregar() {
@@ -276,6 +278,14 @@ export async function livro(m, id, abrir = null) {
         }, resumoCobranca(r.cobranca))),
       h('td', { class: 'suave', 'data-rotulo': 'Registrado em' }, dataCurta(r.criado_em))))));
 
+    // Livro de Procurados: os registros como cartazes de procurado (clique abre o registro).
+    const cartazes = regs => h('div', { class: 'cartazes' }, regs.map(r => {
+      const c = h('canvas', { class: 'cartaz', width: 600, height: 860, 'aria-label': `Cartaz de ${tituloDe(l, r.dados)}` });
+      desenharCartaz(c, dadosDoCartaz(l, r.dados));
+      return h('button', { type: 'button', class: 'cartaz-botao', onclick: () => ver(r) }, c,
+        r.situacao && r.situacao !== 'aprovado' && h('span', { class: `cartaz-situacao ${r.situacao}` }, r.situacao === 'pendente' ? 'Aguardando aprovação' : 'Recusado'));
+    }));
+
     function filtrar() {
       const q = normalizar(busca.trim());
       visiveis = d.registros.filter(r =>
@@ -287,7 +297,7 @@ export async function livro(m, id, abrir = null) {
         ? `${num(total)} ${total === 1 ? 'registro' : 'registros'}`
         : `${num(visiveis.length)} de ${num(total)}`;
       trocar(lista, visiveis.length
-        ? tabela(visiveis)
+        ? (ehLivroDeCartaz(l) && vista === 'cartazes' ? cartazes(visiveis) : tabela(visiveis))
         : h('p', { class: 'tabela-vazia' }, total ? 'Nada encontrado com esses filtros.' : 'Nenhum registro neste livro ainda.'));
     }
 
@@ -329,6 +339,9 @@ export async function livro(m, id, abrir = null) {
         h('option', { value: '' }, 'Pagamentos: todos'),
         h('option', { value: 'atrasado', selected: filtroPagamento === 'atrasado' }, 'Com atraso'),
         h('option', { value: 'emdia', selected: filtroPagamento === 'emdia' }, 'Em dia')),
+        ehLivroDeCartaz(l) && h('div', { class: 'segmentado' }, [['cartazes', 'Cartazes'], ['tabela', 'Tabela']].map(([v, n]) => h('button', {
+          type: 'button', class: `seg ${vista === v ? 'ativo' : ''}`.trim(), onclick: () => { vista = v; desenhar(); },
+        }, n))),
         contador,
         botao('Baixar .book', {
           icone: 'baixar', classe: 'btn-pequeno',
@@ -373,7 +386,10 @@ function verRegistro(m, d, r, recarregar, reabrir) {
       h('div', { class: 'doc-valor' }, valorCompleto(c, v, r.dados))));
   }
 
+  const cartaz = ehLivroDeCartaz(l) ? h('canvas', { class: 'cartaz cartaz-doc', width: 600, height: 860 }) : null;
+  if (cartaz) desenharCartaz(cartaz, dadosDoCartaz(l, r.dados));
   const doc = h('article', { class: 'documento' },
+    cartaz,
     !aprovado && h('p', { class: `doc-situacao ${r.situacao}` },
       r.situacao === 'pendente'
         ? `Aguardando aprovação ${MODULOS[m].aprovador}`
@@ -407,6 +423,7 @@ function verRegistro(m, d, r, recarregar, reabrir) {
       }),
       h('span', { class: 'espaco' }),
       aprovado && l.cobranca && botao('Pagamentos', { icone: 'moeda', onclick: () => verPagamentos(r.id, recarregar) }),
+      cartaz && botao('Baixar cartaz', { icone: 'imagem', titulo: 'Baixa o cartaz de procurado como imagem (PNG)', onclick: () => baixarCartaz(dadosDoCartaz(l, r.dados)) }),
       botao('Baixar .book', {
         icone: 'baixar', titulo: 'Baixa este registro como livro para o mod Scribble',
         onclick: () => livroDeRegistro(MODULOS[m].titulo, l, r, estado.eu.nome).baixar(),

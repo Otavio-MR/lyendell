@@ -310,8 +310,8 @@ export function telaArcade(def) {
   const controles = h('div', { class: 'arcade-controles' },
     h('div', { class: `arcade-cruz ${c.cima || c.baixo ? 'com-cima' : ''}`.trim() },
       c.cima && botaoToque('cima', icone('cima'), 'b-cima', 'Para cima'),
-      botaoToque('esq', icone('voltar'), 'b-esq', 'Para a esquerda'),
-      botaoToque('dir', icone('frente'), 'b-dir', 'Para a direita'),
+      !c.semLados && botaoToque('esq', icone('voltar'), 'b-esq', 'Para a esquerda'), // semLados: jogos que só pulam e abaixam
+      !c.semLados && botaoToque('dir', icone('frente'), 'b-dir', 'Para a direita'),
       c.baixo && botaoToque('baixo', icone('baixo'), 'b-baixo', 'Para baixo')),
     h('div', { class: 'arcade-acoes' },
       c.acao && botaoToque('acao', h('span', null, c.acao), 'b-acao', c.acao),

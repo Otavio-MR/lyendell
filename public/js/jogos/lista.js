@@ -15,4 +15,9 @@ export const ARCADE = {
     texto: 'Pule pelas estradas, rios e trilhos sem ser atropelado. Até onde o coelho chega?',
     carregar: () => import('./travessia.js'),
   },
+  corrida: {
+    nome: 'Corrida do Coelho', icone: 'coelho', rota: '#/recreacao/corrida', unidade: 'Metros',
+    texto: 'Corra sem parar, pule as pedras e abaixe dos gaviões. Quanto mais longe, mais rápido fica.',
+    carregar: () => import('./corrida.js'),
+  },
 };

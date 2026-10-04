@@ -38,6 +38,12 @@ const versus = jogo => ({ nome: 'Versus', dica: 'Todos no mesmo jogo, cada um po
 const coop = jogo => ({ nome: 'Co-op', dica: 'Todos no mesmo jogo, do mesmo lado', abrir: () => abrirJunto(jogo, 'coop') });
 const SOZINHO = [
   ...Object.entries(ARCADE).map(([id, j]) => ({ href: j.rota, nome: j.nome, icone: j.icone, texto: j.texto, novo: true, modos: [versus(id), coop(id)] })),
+  { href: '#/recreacao/arena', nome: 'Arena da Toca', icone: 'escudo', novo: true, texto: 'Cartas, cenouras de energia e torres, no estilo do Clash Royale. Sozinho contra o Raposo ou ao vivo.',
+    modos: [{ nome: 'Versus', dica: 'Um contra um (ou 2 contra 2); faltando gente, o Raposo joga', abrir: () => abrirJunto('arena', 'versus') },
+      { nome: 'Co-op', dica: 'Todos juntos contra o Raposo', abrir: () => abrirJunto('arena', 'coop') }] },
+  { href: '#/recreacao/batalha', nome: 'Batalha da Toca', icone: 'espada', novo: true, texto: 'Caia na ilha, pegue armas e seja o último de pé, no estilo do Free Fire. Com robôs completando.',
+    modos: [{ nome: 'Versus', dica: 'Todos contra todos (robôs completam)', abrir: () => abrirJunto('batalha', 'versus') },
+      { nome: 'Co-op', dica: 'A equipe contra esquadrões de robôs', abrir: () => abrirJunto('batalha', 'coop') }] },
   { href: '#/recreacao/pac-coelho', nome: 'Pac-Coelho', icone: 'coelho', texto: 'Coma as moedas, fuja das raposas e pegue a cenoura.', modos: [versus('pacman'), coop('pacman')] },
   { href: '#/recreacao/cobrinha', nome: 'Cobrinha', icone: 'cobra', texto: 'Coma as cenouras sem bater nas bordas nem em si mesma.',
     modos: [{ nome: 'Versus', dica: 'Cobrinha ao vivo: todas as cobras no mesmo tabuleiro', abrir: () => criarPartida('cobras', { modo: 'todos' }) },

@@ -1,3 +1,5 @@
+import { registrarPecas, desenharSprite } from './sprites.js';
+
 // As roupas e os acessórios do coelho (Club Coelho e Lyendell Dorme), desenhados à mão no canvas.
 // Tudo nas coordenadas do coelho de desenho-coelho.js: olhando para a direita, pés em (0, 0), corpo em
 // (0, -13), cabeça em (11, -27), olho em (15, -28), focinho em (20, -24.5).
@@ -455,9 +457,14 @@ export function roupaDoAcessorio(a) {
 }
 
 // Desenha uma parte da roupa (se existir). pelo: cor da patinha que segura o item.
-export function desenharParte(g, parte, id, t = 0, pelo = '#e9dcc3') {
+export function desenharParte(g, parte, id, t = 0, pelo = '#e9dcc3', { semSprite = false } = {}) {
   const f = id && DESENHOS[parte]?.[id];
   if (!f) return;
+  // Sprite enviado: a imagem inteira do item no lugar do desenho (a patinha que segura continua por cima).
+  if (!semSprite && desenharSprite(g, `roupa.${id}`, 'parado', 0, 0, { t })) {
+    if (parte === 'mao') el(g, 14.5, -12, 3.2, 2.8, pelo);
+    return;
+  }
   if (parte === 'corpo') {
     g.save();
     g.beginPath();
@@ -475,3 +482,65 @@ export function desenharParte(g, parte, id, t = 0, pelo = '#e9dcc3') {
   }
   f(g, t);
 }
+
+/* ─── Sprites: cada roupa e acessório pode virar uma imagem ─── */
+
+const NOMES_ROUPA = {
+  laco: 'Laço rosa',
+  chapeu: 'Chapéu de palha',
+  flores: 'Coroa de flores',
+  gorro: 'Gorro de lã',
+  bone: 'Boné dourado',
+  cozinheiro: 'Chapéu de cozinheiro',
+  fones: 'Fones de ouvido',
+  bruxa: 'Chapéu de bruxa',
+  pirata: 'Chapéu de pirata',
+  cartola: 'Cartola',
+  viking: 'Capacete viking',
+  tiara: 'Tiara de pérolas',
+  coroa: 'Coroa da Casa',
+  oculos: 'Óculos redondos',
+  bigode: 'Bigode',
+  tapaolho: 'Tapa-olho',
+  escuros: 'Óculos escuros',
+  monoculo: 'Monóculo',
+  mascara: 'Máscara de baile',
+  cachecol: 'Cachecol',
+  gravata: 'Gravata-borboleta',
+  perolas: 'Colar de pérolas',
+  medalha: 'Medalha da Casa Luckham',
+  mochila: 'Mochila de aventura',
+  capa: 'Capa real',
+  asas: 'Asas de fada',
+  avental: 'Avental',
+  camiseta: 'Camiseta da Casa',
+  moletom: 'Moletom roxo',
+  colete: 'Colete de couro',
+  vestido: 'Vestido florido',
+  smoking: 'Smoking',
+  armadura: 'Armadura de cavaleiro',
+  balao: 'Balão',
+  sorvete: 'Sorvete',
+  lanterna: 'Lanterna',
+  vara: 'Vara de pescar',
+  espada: 'Espada de madeira',
+  bandeira: 'Bandeira da Casa Luckham',
+  varinha: 'Varinha mágica',
+  violao: 'Violão',
+  cafe: 'Xícara de café',
+};
+const ONDE = { cabeca: 'na cabeça', rosto: 'no rosto', pescoco: 'no pescoço', costas: 'nas costas (atrás do coelho)', corpo: 'no corpo', mao: 'na patinha da frente' };
+
+// O quadro de cada roupa é o do coelho inteiro (44 x 56, pé embaixo no meio, olhando para a direita):
+// desenhe o item no lugar dele em cima do coelho, como no molde, e deixe o resto transparente.
+export const SPRITES = PARTES.flatMap(parte => Object.keys(DESENHOS[parte]).map(id => {
+  const anima = DESENHOS[parte][id].length >= 2; // os desenhos que usam o tempo (fumacinha, brilho, asas...)
+  return {
+    chave: `roupa.${id}`, jogo: 'Roupas e acessórios', nome: NOMES_ROUPA[id] || id,
+    desc: `Vai ${ONDE[parte]}. O quadro é do tamanho do coelho inteiro: desenhe só o item, no mesmo lugar do molde, com o resto transparente.`,
+    largura: 44, altura: 56, ancora: 'pe', guiaCoelho: true,
+    animacoes: [anima ? { id: 'parado', nome: 'Animado', quadros: 4, fps: 6 } : { id: 'parado', nome: 'Parado', quadros: 1, fps: 1 }],
+    previa: (g, anim, t) => desenharParte(g, parte, id, t, '#e9dcc3', { semSprite: true }),
+  };
+}));
+registrarPecas(SPRITES);

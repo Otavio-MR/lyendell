@@ -209,7 +209,7 @@ async function ganhar(id, n) {
 // Cada joguinho da Recreação também dá cenouras para o clube (pelo resultado, no máximo 40 por partida).
 const CENOURAS_POR_JOGO = {
   pacman: p => p / 1000, cobrinha: p => p, 2048: p => p / 400, barris: p => p / 400, supercoelho: p => p / 500,
-  travessia: p => p / 2, quebra: () => 10, memoria: () => 10, minado: () => 12,
+  travessia: p => p / 2, corrida: p => p / 25, quebra: () => 10, memoria: () => 10, minado: () => 12,
 };
 async function ganharDeJogo(id, jogo, pontos) {
   const f = CENOURAS_POR_JOGO[jogo];

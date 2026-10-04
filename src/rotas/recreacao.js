@@ -28,7 +28,7 @@ const melhoresPontos = jogo => db.all(
   'SELECT usuario_nome AS nome, MAX(pontos) AS pontos FROM recordes WHERE jogo = ? GROUP BY usuario_nome ORDER BY pontos DESC LIMIT 10', jogo);
 
 r.get('/ranking', async (req, res) => {
-  const [velha, ppt, lig4, damas, cobras, festaRanking, cidade, cobrinha, pacman, jogo2048, barris, supercoelho, travessia, quiz, ...outros] = await Promise.all([
+  const [velha, ppt, lig4, damas, cobras, festaRanking, cidade, cobrinha, pacman, jogo2048, barris, supercoelho, travessia, corrida, quiz, ...outros] = await Promise.all([
     rankingAoVivo('velha'),
     rankingAoVivo('ppt'),
     rankingAoVivo('lig4'),
@@ -51,6 +51,7 @@ r.get('/ranking', async (req, res) => {
     melhoresPontos('barris'),
     melhoresPontos('supercoelho'),
     melhoresPontos('travessia'),
+    melhoresPontos('corrida'),
     // Vitória no quiz só conta em partida com pelo menos duas pessoas.
     db.all(`
       SELECT usuario_nome AS nome, SUM(posicao = 1 AND jogadores > 1) AS vitorias, SUM(acertos) AS acertos,
@@ -70,7 +71,7 @@ r.get('/ranking', async (req, res) => {
   const memoria = outros.slice(TAMANHOS.length, TAMANHOS.length + Object.keys(MEMORIA).length);
   const minado = outros.slice(TAMANHOS.length + Object.keys(MEMORIA).length);
   res.json({
-    velha, ppt, lig4, damas, cobras, festa: festaRanking, cidade, cobrinha, pacman, quiz, 2048: jogo2048, barris, supercoelho, travessia,
+    velha, ppt, lig4, damas, cobras, festa: festaRanking, cidade, cobrinha, pacman, quiz, 2048: jogo2048, barris, supercoelho, travessia, corrida,
     quebra: Object.fromEntries(TAMANHOS.map((t, i) => [t, quebra[i]])),
     memoria: Object.fromEntries(Object.keys(MEMORIA).map((t, i) => [t, memoria[i]])),
     minado: Object.fromEntries(Object.keys(MINADO).map((t, i) => [t, minado[i]])),
@@ -79,8 +80,9 @@ r.get('/ranking', async (req, res) => {
 
 // Resultado de um jogo que roda no navegador.
 // Cobrinha: cenouras comidas. Pac-Coelho, 2048, Barris do Raposo e Super Coelho: pontos. Travessia: fileiras.
+// Corrida do Coelho: metros (com o bônus dos Lírios).
 // Quebra-cabeça e Campo Minado: segundos; Memória: jogadas (nesses três, menor é melhor).
-const LIMITES = { cobrinha: 400, pacman: 5_000_000, 2048: 10_000_000, barris: 5_000_000, supercoelho: 5_000_000, travessia: 100_000 };
+const LIMITES = { cobrinha: 400, pacman: 5_000_000, 2048: 10_000_000, barris: 5_000_000, supercoelho: 5_000_000, travessia: 100_000, corrida: 1_000_000 };
 
 r.post('/recordes', async (req, res) => {
   const jogo = req.body?.jogo;

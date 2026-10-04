@@ -777,6 +777,11 @@ function agendarJunto(s) {
 
 const quemVeJunto = s => new Set([...s.jogadores.map(p => p.id), ...s.espectadores]);
 function enviarQuadroJunto(s) {
+  if (junto.temQuadroPara(s.estado)) {
+    // Cada um recebe o seu quadro (só o que está perto do seu coelho); quem assiste vai como -1.
+    for (const id of quemVeJunto(s)) paraUsuario(id, 'junto:quadro', { id: s.id, q: junto.quadroPara(s.estado, indiceNa(s, id)) });
+    return;
+  }
   const q = junto.quadro(s.estado);
   for (const id of quemVeJunto(s)) paraUsuario(id, 'junto:quadro', { id: s.id, q });
 }
@@ -980,7 +985,7 @@ function terminarCidade(s) {
 // e o servidor repassa para quem está assistindo. Nada disso vai para o banco.
 const SOLO = {
   pacman: 'Pac-Coelho', cobrinha: 'Cobrinha', quebra: 'Quebra-cabeça', memoria: 'Jogo da Memória', minado: 'Campo Minado', 2048: '2048',
-  barris: 'Barris do Raposo', supercoelho: 'Super Coelho', travessia: 'Travessia',
+  barris: 'Barris do Raposo', supercoelho: 'Super Coelho', travessia: 'Travessia', corrida: 'Corrida do Coelho',
 };
 const transmissoes = new Map(); // id de quem joga -> transmissão
 

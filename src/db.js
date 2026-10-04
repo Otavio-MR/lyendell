@@ -450,7 +450,7 @@ CREATE TABLE IF NOT EXISTS diario (
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 22;
+const VERSAO = 23;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -528,6 +528,8 @@ async function migrar() {
   if (versao < 21) await darPermissoes({ 'Família Nobre': ['juramento.marcar'], 'Tabeliã': ['juramento.marcar'] });
   // v22: a Família Nobre troca os desenhos dos jogos pelos sprites que fizer (#/recreacao/sprites).
   if (versao < 22) await darPermissoes({ 'Família Nobre': ['sprites.editar'] });
+  // v23: os Procurados ganham o cartaz (vivo, morto ou vivo ou morto) e a recompensa em Lírios.
+  if (versao < 23) await cartazDosProcurados();
   // v20: o campo "Nickname" vira "Endereço" em todos os livros (no RP o nick é o endereço da pessoa).
   if (versao < 20) await nickVirouEndereco();
   // v19: propostas do povo para o Congresso (todo morador manda; a Senadora avalia).
@@ -666,6 +668,29 @@ async function nickVirouEndereco() {
       }
     }
     if (mudou) await db.run('UPDATE livros SET campos = ? WHERE id = ?', JSON.stringify(campos), l.id);
+  }
+}
+
+// v23: no livro Procurados da Guarda, a recompensa vira número (em Lírios) e entra o "Vivo ou morto" do cartaz.
+// O que já estava escrito na recompensa vira número quando dá (ex.: "500 Lírios" vira 500).
+async function cartazDosProcurados() {
+  for (const l of await db.all("SELECT id, campos FROM livros WHERE modulo = 'guarda'")) {
+    const campos = JSON.parse(l.campos);
+    const rec = campos.find(c => c.id === 'recompensa');
+    if (!rec || campos.some(c => c.id === 'condicao')) continue;
+    if (rec.tipo === 'texto') {
+      rec.tipo = 'numero';
+      if (chaveNome(rec.nome) === 'recompensa') rec.nome = 'Recompensa (Lírios)';
+      for (const r of await db.all('SELECT id, dados FROM registros WHERE livro_id = ?', l.id)) {
+        const d = JSON.parse(r.dados);
+        if (d.recompensa == null || typeof d.recompensa === 'number') continue;
+        const n = Number(String(d.recompensa).replace(/[^\d]/g, ''));
+        d.recompensa = Number.isFinite(n) && String(d.recompensa).match(/\d/) ? n : null;
+        await db.run('UPDATE registros SET dados = ? WHERE id = ?', JSON.stringify(d), r.id);
+      }
+    }
+    campos.splice(campos.indexOf(rec) + 1, 0, { id: 'condicao', nome: 'Vivo ou morto', tipo: 'selecao', destaque: true, opcoes: ['Vivo', 'Morto', 'Vivo ou Morto'], ajuda: 'O que aparece no cartaz de procurado.' });
+    await db.run('UPDATE livros SET campos = ? WHERE id = ?', JSON.stringify(campos), l.id);
   }
 }
 

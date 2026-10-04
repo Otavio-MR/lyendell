@@ -45,8 +45,19 @@ export function textoDoFimJunto(s) {
   const e = s.estado;
   const v = e.vencedores || [];
   if (e.modo === 'coop') return v.length ? 'A equipe conseguiu! Todos venceram juntos.' : 'Não foi desta vez: a equipe ficou sem vidas.';
-  if (v.length !== 1) return 'Empate! Ninguém ficou na frente sozinho.';
-  const quem = v[0] === s.eu ? 'Você' : s.jogadores[v[0]].nome;
+  // Jogos com robôs (Arena e Batalha): ninguém de verdade venceu quer dizer que o Raposo (ou um robô) venceu.
+  const comRobos = e.jogo === 'arena' || e.jogo === 'batalha';
+  if (!v.length) {
+    if (comRobos && e.fim !== 'empate') return e.jogo === 'arena' ? 'O Raposo venceu desta vez!' : 'Um Raposo foi o último de pé. Fica para a próxima!';
+    return 'Empate! Ninguém ficou na frente sozinho.';
+  }
+  const nomeDe = i => (i === s.eu ? 'Você' : s.jogadores[i]?.nome || 'Alguém');
+  if (v.length > 1) {
+    // 2 contra 2 na Arena: a dupla vence junta.
+    if (comRobos) return `${v.map(nomeDe).join(' e ')} venceram juntos!`;
+    return 'Empate! Ninguém ficou na frente sozinho.';
+  }
+  const quem = nomeDe(v[0]);
   return { chegou: `${quem} chegou primeiro e venceu!`, sobrou: `${quem} foi quem sobrou e venceu!` }[e.fim] || `${quem} venceu!`;
 }
 

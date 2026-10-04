@@ -24,6 +24,15 @@ const JOGOS = {
   supercoelho: { nome: 'Super Coelho', max: 4, minutos: 15, fasesVersus: 4, versus: { vidas: 3, fim: 'chegada' }, coop: { vidas: [3, 1], regra: 'qualquer', fases: 4 } },
   pacman: { nome: 'Pac-Coelho', max: 4, minutos: 8, servidor: './junto-pac' },
   2048: { nome: '2048', max: 6, minutos: 5, servidor: './junto-2048' },
+  // Corrida do Coelho (estilo o dinossauro do Chrome): cada navegador roda o mesmo caminho; no co-op todos
+  // precisam cruzar a chegada (a distância cresce com a gente).
+  corrida: { nome: 'Corrida do Coelho', max: 8, minutos: 6, versus: { vidas: 1, fim: 'sobrevivente' }, coop: { vidas: [2, 1], regra: 'todos', fases: 1 } },
+  // Arena da Toca (estilo Clash Royale): cartas, cenouras de energia e torres. O servidor roda a partida;
+  // sozinho (ou faltando gente) joga contra o Raposo.
+  arena: { nome: 'Arena da Toca', max: 4, minimo: 1, minutos: 5, servidor: './junto-arena' },
+  // Batalha da Toca (estilo Free Fire): todos caem na ilha, pegam armas e o último de pé vence. O servidor
+  // roda a partida e completa com robôs.
+  batalha: { nome: 'Batalha da Toca', max: 10, minimo: 1, minutos: 8, servidor: './junto-batalha' },
 };
 const MOTORES = {};
 const motor = jogo => (JOGOS[jogo].servidor ? (MOTORES[jogo] ??= require(JOGOS[jogo].servidor)) : null);
@@ -35,7 +44,7 @@ function opcoes(o = {}) {
   if (jogo === 'supercoelho') r.fase = Math.max(0, Math.min(JOGOS.supercoelho.fasesVersus - 1, Math.floor(Number(o.fase) || 0)));
   return r;
 }
-const minimo = o => (o.modo === 'versus' ? 2 : 1);
+const minimo = o => JOGOS[o.jogo].minimo ?? (o.modo === 'versus' ? 2 : 1);
 const maximo = o => JOGOS[o.jogo].max;
 const nomeDo = o => `${JOGOS[o.jogo].nome} (${o.modo === 'coop' ? 'co-op' : 'versus'})`;
 const dificuldade = n => Math.round((1 + 0.15 * Math.max(0, n - 1)) * 100) / 100;
@@ -204,6 +213,9 @@ function passo(e, dt, agora = Date.now()) {
   return mudou;
 }
 const quadro = e => (e.sim ? motor(e.jogo).quadro(e.sim) : null);
+// Jogos do servidor com um quadro para cada um (só o que está perto dele, ex.: Batalha da Toca). i = -1: quem assiste.
+const temQuadroPara = e => !!(e.sim && motor(e.jogo).quadroPara);
+const quadroPara = (e, i) => motor(e.jogo).quadroPara(e.sim, i);
 
 // Os tempos vão como "daqui a quantos ms" (o relógio de cada navegador pode estar adiantado ou atrasado).
 function visao(e, agora = Date.now()) {
@@ -217,5 +229,5 @@ function visao(e, agora = Date.now()) {
 }
 
 module.exports = {
-  JOGOS, ErroJunto, LARGADA_MS, opcoes, minimo, maximo, nomeDo, dificuldade, novo, evento, verificar, sair, passo, temPasso, quadro, visao,
+  JOGOS, ErroJunto, LARGADA_MS, opcoes, minimo, maximo, nomeDo, dificuldade, novo, evento, verificar, sair, passo, temPasso, quadro, temQuadroPara, quadroPara, visao,
 };
