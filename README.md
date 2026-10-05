@@ -403,7 +403,8 @@ só não manda avisos. O código: `src/notificacoes.js`, `src/rotas/notificacoes
 ### Procurados na tela inicial
 
 Os cartazes de quem está **Procurado** ou **Banido da Capital** (registros aprovados do livro Procurados)
-aparecem na tela inicial para todos; o cartaz de banido diz "BANIDO DA CAPITAL" e "PROIBIDO NA CAPITAL".
+aparecem na tela inicial para todos, de qualquer cargo (mesmo quem não abre os livros da Guarda; para esses vai
+só o que está no cartaz, e o clique mostra o cartaz grande para baixar); o cartaz de banido diz "BANIDO DA CAPITAL" e "PROIBIDO NA CAPITAL".
 Capturados e perdoados saem de lá (continuam no livro, com o carimbo).
 
 ### Sprites dos jogos

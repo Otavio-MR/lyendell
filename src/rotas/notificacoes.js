@@ -15,7 +15,7 @@ r.get('/', async (req, res) => {
   res.json({
     ativo: notif.ativo(),
     chave: notif.chaves.publica,
-    tipos: Object.entries(notif.TIPOS).filter(([, t]) => req.usuario.permissoes.has(t.perm)).map(([id, t]) => ({ id, nome: t.nome })),
+    tipos: Object.entries(notif.TIPOS).filter(([, t]) => !t.perm || req.usuario.permissoes.has(t.perm)).map(([id, t]) => ({ id, nome: t.nome })),
     inscrito: !!minha,
     escolhidos: minha ? notif.tiposValidos(JSON.parse(minha.tipos || 'null')) : notif.PADRAO,
     aparelhos: (await db.get('SELECT COUNT(*) AS n FROM push_inscricoes WHERE usuario_id = ?', req.usuario.id)).n,

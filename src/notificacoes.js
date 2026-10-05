@@ -8,7 +8,7 @@ const { carregarUsuario } = require('./auth');
 // Os tipos de aviso que cada um escolhe receber, e quem pode receber cada um.
 const TIPOS = {
   anuncios: { nome: 'Anúncios novos no mural', perm: 'anuncios.ver' },
-  procurados: { nome: 'Procurados e banidos da Capital', perm: 'guarda.ver' },
+  procurados: { nome: 'Procurados e banidos da Capital', perm: null }, // aviso público, como os cartazes da tela inicial
   leis: { nome: 'Leis de Lyendell publicadas', perm: 'leis.ver' },
   atividades: { nome: 'Atividades novas (pedidos de ajuda)', perm: 'atividades.ver' },
 };
@@ -64,7 +64,7 @@ function avisar(tipo, carga, { exceto = null } = {}) {
       if (!tiposValidos(JSON.parse(insc.tipos || 'null')).includes(tipo)) continue;
       if (!permissoes.has(insc.usuario_id)) {
         const u = await carregarUsuario(insc.usuario_id).catch(() => null);
-        permissoes.set(insc.usuario_id, !!u && u.ativo && (u.is_root || u.permissoes.has(TIPOS[tipo].perm)));
+        permissoes.set(insc.usuario_id, !!u && u.ativo && (u.is_root || !TIPOS[tipo].perm || u.permissoes.has(TIPOS[tipo].perm)));
       }
       if (!permissoes.get(insc.usuario_id)) continue;
       if (await enviarUma(insc, { tipo, icone: '/img/brasao.png', ...carga })) n++;

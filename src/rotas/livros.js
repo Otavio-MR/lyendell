@@ -508,8 +508,11 @@ async function revisar(req, situacao, motivo) {
 }
 
 // Tela inicial: os cartazes de quem está sendo procurado ou foi banido da Capital (registros aprovados).
+// É um aviso público: todo mundo logado vê, de qualquer cargo (mesmo sem acesso aos livros da Guarda).
+// Por isso só vão os campos do cartaz (nome, retrato, crime, recompensa, vivo ou morto e situação).
+const CAMPOS_DO_CARTAZ = ['nome', 'retrato', 'crime', 'recompensa', 'condicao', 'situacao'];
+const doCartaz = c => CAMPOS_DO_CARTAZ.includes(c.id) || c.tipo === 'imagem' || (c.tipo === 'selecao' && (c.opcoes || []).some(o => /vivo ou morto/i.test(o)));
 r.get('/procurados', async (req, res) => {
-  if (!pode(req, 'guarda.ver')) return res.json({ cartazes: [] });
   const cartazes = [];
   for (const l of (await db.all("SELECT * FROM livros WHERE modulo = 'guarda' ORDER BY ordem, id")).map(x => ({ ...x, campos: JSON.parse(x.campos) }))) {
     if (!ehLivroDeCartaz(l)) continue;
@@ -517,9 +520,11 @@ r.get('/procurados', async (req, res) => {
     for (const r0 of regs) {
       const dados = JSON.parse(r0.dados);
       const sit = normal(dados.situacao);
-      if (sit.startsWith('procurad') || sit.startsWith('banid')) cartazes.push({ livro: l.id, id: r0.id, dados });
+      if (!sit.startsWith('procurad') && !sit.startsWith('banid')) continue;
+      const campos = l.campos.filter(doCartaz);
+      cartazes.push({ livro: l.id, id: r0.id, dados: Object.fromEntries(campos.map(c => [c.id, dados[c.id] ?? null])) });
     }
-    if (!cartazes.livro) cartazes.livro = { id: l.id, nome: l.nome, campos: l.campos };
+    if (!cartazes.livro) cartazes.livro = { id: l.id, nome: l.nome, campos: l.campos.filter(doCartaz), podeAbrir: pode(req, 'guarda.ver') };
   }
   res.json({ livro: cartazes.livro || null, cartazes: cartazes.slice(0, 24) });
 });

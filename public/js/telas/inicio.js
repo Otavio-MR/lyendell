@@ -1,9 +1,9 @@
-import { estado, get, h, icone, chipCargo, chipCrianca, barra, num, pacotes, relativo, dataCurta, seloNivel, avatarPessoa, normalizar, pode, avatar } from '../core.js';
+import { estado, get, h, icone, modal, botao, chipCargo, chipCrianca, barra, num, pacotes, relativo, dataCurta, seloNivel, avatarPessoa, normalizar, pode, avatar } from '../core.js';
 import { MENU_CRIANCA, falaDoDia, curiosidadeDoDia } from '../crianca.js';
 import { barraNivel } from './pessoas.js';
 import { MODULOS } from './livros.js';
 import { conviteNotificacoes } from '../notificacoes.js';
-import { dadosDoCartaz, desenharCartaz } from '../cartaz.js';
+import { dadosDoCartaz, desenharCartaz, baixarCartaz } from '../cartaz.js';
 
 function saudacao() {
   const hora = new Date().getHours();
@@ -98,7 +98,7 @@ function painelComunidade(pr, { crianca = false } = {}) {
 
 // A toca da criança: o coelho da Casa conversa com ela, as portas grandes levam aos lugares
 // e o resto (números, anúncios, registros) fica para os grandes.
-function inicioCrianca(d, pr) {
+function inicioCrianca(d, pr, procurados) {
   const eu = estado.eu;
   const portas = [
     pode('recreacao.usar') && ['/recreacao', 'jogos', 'Jogos e amigos esperando'],
@@ -122,6 +122,7 @@ function inicioCrianca(d, pr) {
         h('span', { class: 'cr-porta-icone' }, icone(ic)),
         h('strong', null, MENU_CRIANCA[rota]),
         h('small', null, texto)))),
+    painelProcurados(procurados, { crianca: true }),
     pr && painelProgresso(pr, { crianca: true }),
     h('section', { class: 'painel cr-curiosidade' },
       h('span', { class: 'cr-curiosidade-icone' }, icone('estrela')),
@@ -137,16 +138,25 @@ function inicioCrianca(d, pr) {
 }
 
 // Os cartazes de quem a Guarda está procurando ou baniu da Capital (todos veem; clique abre o registro).
-function painelProcurados(p) {
+function painelProcurados(p, { crianca = false } = {}) {
   if (!p?.livro || !p.cartazes.length) return null;
   const banidos = p.cartazes.filter(c => /^banid/i.test(normalizar(c.dados.situacao || ''))).length;
-  const titulo = banidos === p.cartazes.length ? 'Banidos da Capital' : banidos ? 'Procurados e banidos da Capital' : 'Procurados pela Guarda';
+  const titulo = crianca ? 'Procurados pela Guarda (fique de olho!)' : banidos === p.cartazes.length ? 'Banidos da Capital' : banidos ? 'Procurados e banidos da Capital' : 'Procurados pela Guarda';
+  // Quem não abre os livros da Guarda vê o cartaz grande (e pode baixar).
+  const verGrande = c => {
+    const tela = h('canvas', { class: 'cartaz cartaz-doc', width: 600, height: 860 });
+    const d = dadosDoCartaz(p.livro, c.dados);
+    desenharCartaz(tela, d);
+    const m = modal({ corpo: tela, tamanho: 'pequeno', rodape: [botao('Baixar cartaz', { icone: 'imagem', onclick: () => baixarCartaz(d) }), botao('Fechar', { onclick: () => m.fechar() })] });
+  };
   return h('section', { class: 'painel procurados-inicio' },
-    h('header', { class: 'painel-cab' }, h('h2', null, icone('alvo'), titulo), h('a', { href: `#/guarda/${p.livro.id}` }, 'Ver todos')),
+    h('header', { class: 'painel-cab' }, h('h2', null, icone('alvo'), titulo), p.livro.podeAbrir && h('a', { href: `#/guarda/${p.livro.id}` }, 'Ver todos')),
     h('div', { class: 'procurados-faixa' }, p.cartazes.map(c => {
       const tela = h('canvas', { class: 'cartaz', width: 600, height: 860 });
       desenharCartaz(tela, dadosDoCartaz(p.livro, c.dados));
-      return h('a', { class: 'cartaz-botao', href: `#/guarda/${p.livro.id}/registro/${c.id}` }, tela);
+      return p.livro.podeAbrir
+        ? h('a', { class: 'cartaz-botao', href: `#/guarda/${p.livro.id}/registro/${c.id}` }, tela)
+        : h('button', { type: 'button', class: 'cartaz-botao', onclick: () => verGrande(c) }, tela);
     })));
 }
 
@@ -156,7 +166,7 @@ export async function inicio() {
     get('/api/procurados').catch(() => null), conviteNotificacoes().catch(() => null),
   ]);
   const eu = estado.eu;
-  if (eu.crianca) return inicioCrianca(d, pr);
+  if (eu.crianca) return inicioCrianca(d, pr, procurados);
   const n = d.numeros;
 
   const numeros = [
