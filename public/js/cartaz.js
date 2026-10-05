@@ -152,7 +152,11 @@ export async function desenharCartaz(canvas, d) {
   g.save();
   g.shadowColor = 'rgba(0,0,0,0.15)';
   g.shadowOffsetY = 2;
-  textoCabe(g, 'PROCURADO', L / 2, 128, L - 90, 92, `bold ${titulo}`, tinta);
+  const banido = norm(d.situacao).startsWith('banid');
+  if (banido) {
+    textoCabe(g, 'BANIDO', L / 2, 100, L - 90, 80, `bold ${titulo}`, '#5a1810');
+    textoCabe(g, 'DA CAPITAL', L / 2, 144, L - 140, 40, `bold ${titulo}`, tinta);
+  } else textoCabe(g, 'PROCURADO', L / 2, 128, L - 90, 92, `bold ${titulo}`, tinta);
   g.restore();
 
   // Retrato com moldura
@@ -190,7 +194,7 @@ export async function desenharCartaz(canvas, d) {
   }
 
   // VIVO / MORTO / VIVO OU MORTO
-  const cond = d.condicao.toUpperCase();
+  const cond = banido ? 'PROIBIDO NA CAPITAL' : d.condicao.toUpperCase();
   g.save();
   g.font = `bold 34px ${titulo}`;
   const wCond = g.measureText(cond).width;
@@ -200,7 +204,7 @@ export async function desenharCartaz(canvas, d) {
     const x0 = L / 2 + lado * (wCond / 2 + 14);
     g.beginPath(); g.moveTo(x0, 590); g.lineTo(x0 + lado * 60, 590); g.stroke();
   }
-  g.fillStyle = /morto/i.test(d.condicao) && !/vivo/i.test(d.condicao) ? '#6e1a12' : tinta;
+  g.fillStyle = banido || (/morto/i.test(d.condicao) && !/vivo/i.test(d.condicao)) ? '#6e1a12' : tinta;
   g.fillText(cond, L / 2, 602);
   g.restore();
 
@@ -208,19 +212,24 @@ export async function desenharCartaz(canvas, d) {
   textoCabe(g, d.nome.toUpperCase(), L / 2, 672, L - 100, 58, `bold ${titulo}`, tinta);
 
   // Recompensa
-  const valor = d.recompensa ? formatar(d.recompensa) : 'A COMBINAR';
+  const valor = d.recompensa ? formatar(d.recompensa) : banido ? 'AVISE A GUARDA' : 'A COMBINAR';
   g.font = `bold 50px ${texto}`;
   const wValor = g.measureText(valor).width;
   const total = wValor + 52;
   const x0 = L / 2 - total / 2;
-  lirio(g, x0 + 18, 738, 26, tinta);
-  g.textAlign = 'left';
-  g.fillStyle = tinta;
-  g.fillText(valor, x0 + 52, 752);
+  if (d.recompensa || !banido) {
+    lirio(g, x0 + 18, 738, 26, tinta);
+    g.textAlign = 'left';
+    g.fillStyle = tinta;
+    g.fillText(valor, x0 + 52, 752);
+  } else {
+    g.fillStyle = tinta;
+    textoCabe(g, valor, L / 2, 752, L - 120, 40, `bold ${texto}`, tinta);
+  }
   g.textAlign = 'center';
   g.font = `600 22px ${texto}`;
-  g.fillText(d.recompensa ? 'Lírios de recompensa' : 'Recompensa', L / 2, 784);
-  if (d.crime) textoCabe(g, `Crime: ${d.crime}`, L / 2, 806, L - 120, 20, `italic ${texto}`, 'rgba(58, 36, 18, 0.85)');
+  g.fillText(d.recompensa ? 'Lírios de recompensa' : banido ? 'se vir na Capital' : 'Recompensa', L / 2, 784);
+  if (d.crime) textoCabe(g, `${banido ? 'Motivo' : 'Crime'}: ${d.crime}`, L / 2, 806, L - 120, 20, `italic ${texto}`, 'rgba(58, 36, 18, 0.85)');
   g.font = `bold 15px ${titulo}`;
   g.fillStyle = 'rgba(58, 36, 18, 0.7)';
   g.fillText('GUARDA DO COELHO · CASA LUCKHAM', L / 2, 824);

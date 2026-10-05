@@ -3023,3 +3023,10 @@ body.bt-jogando .desafio-fim { display: none; }
   .arena-colecao { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .arena-carta small { display: none; }
 }
+/* Procurados na tela inicial e notificações */
+.procurados-faixa { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(150px, 180px); gap: 16px; overflow-x: auto; padding: 6px 4px 14px; scroll-snap-type: x proximity; }
+.procurados-faixa .cartaz-botao { scroll-snap-align: start; }
+.notif-painel .notif-tipos { display: grid; gap: 8px; margin: 10px 0; }
+.notif-painel .notif-botoes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.notif-painel p { margin: 0 0 8px; }
+.notif-painel.compacto { border-color: var(--ouro-d); background: linear-gradient(180deg, var(--ouro-fundo), transparent); }

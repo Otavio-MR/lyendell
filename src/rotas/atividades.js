@@ -129,6 +129,10 @@ r.post('/', exigir('atividades.criar'), async (req, res) => {
   a.titulo, a.descricao, a.item, a.meta, a.pacote, a.recompensa_valor, a.recompensa_unidade, a.prazo, req.usuario.id, req.usuario.nome);
   await anotar(req, 'Criou uma atividade', `${a.titulo} (${a.meta} ${a.item})`);
   await progresso.registrar(req.usuario.id, 'atividade');
+  require('../notificacoes').avisar('atividades', {
+    titulo: `Precisamos de ajuda: ${a.titulo}`, corpo: `Meta: ${a.meta} ${a.item}.${a.recompensa_valor ? ` Recompensa: ${a.recompensa_valor} ${a.recompensa_unidade || ''}`.trimEnd() + '.' : ''}`,
+    url: `/#/atividades/${id}`, tag: `atividade-${id}`,
+  }, { exceto: req.usuario.id });
   res.status(201).json({ id });
 });
 

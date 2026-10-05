@@ -1,6 +1,7 @@
 // Meu perfil: foto, capa, cor, moldura, frase, "sobre mim", nick do Minecraft e emblemas, com prévia ao vivo.
 // Mais embaixo: o que o cargo permite fazer e a troca de senha.
 
+import { painelNotificacoes } from '../notificacoes.js';
 import {
   estado, get, post, put, api, del, h, trocar, icone, cabecalho, campo, aviso, tentar, confirmar, avatar, botao, recortarAvatar, reduzirImagem,
 } from '../core.js';
@@ -261,6 +262,7 @@ export async function perfil() {
             ? h('ul', { class: 'lista-check' }, tenho.map(i => h('li', null, icone('check'), i.nome)))
             : h('p', { class: 'suave' }, 'Sem acesso.'));
       }))),
+    painelNotificacoes(),
     h('section', { class: 'painel' },
       h('header', { class: 'painel-cab' }, h('h2', null, icone('cadeado'), 'Trocar senha')),
       formSenha));

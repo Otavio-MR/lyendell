@@ -388,6 +388,24 @@ As cenouras da festa viram cenouras do Club Coelho (um quinto delas, até 40), e
 ranking (vitórias, festas e douradas). O código está em `src/festa.js` (as regras),
 `public/js/telas/festa.js` (o tabuleiro) e `public/js/festa-minijogos.js` (os minijogos).
 
+### Notificações no celular e no PC
+
+Cada pessoa pode ativar avisos no aparelho (Meu perfil, ou o convite na tela inicial) e escolher o que receber:
+anúncios novos, procurados e banidos da Capital (quando o registro é aprovado ou a situação muda, inclusive
+para capturado), Leis de Lyendell publicadas e atividades novas. O aviso chega como notificação do sistema
+mesmo com o site fechado (Web Push, pelo `public/sw.js`). No iPhone, só funciona com o site adicionado à
+Tela de Início. Quem publica não recebe o próprio aviso, e cada aviso só vai para quem pode ver aquilo.
+
+As chaves ficam no `.env` (`VAPID_PUBLICA`, `VAPID_PRIVADA`, `VAPID_CONTATO`; gere com
+`npx web-push generate-vapid-keys`) e precisam estar também no Render. Sem elas, o site funciona e
+só não manda avisos. O código: `src/notificacoes.js`, `src/rotas/notificacoes.js`, `public/js/notificacoes.js`.
+
+### Procurados na tela inicial
+
+Os cartazes de quem está **Procurado** ou **Banido da Capital** (registros aprovados do livro Procurados)
+aparecem na tela inicial para todos; o cartaz de banido diz "BANIDO DA CAPITAL" e "PROIBIDO NA CAPITAL".
+Capturados e perdoados saem de lá (continuam no livro, com o carimbo).
+
 ### Sprites dos jogos
 
 Os joguinhos são desenhados por código, mas cada peça (o coelho, o Raposo, os barris, as cenouras, os

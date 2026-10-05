@@ -172,7 +172,7 @@ const LIVROS_PADRAO = [
       { id: 'condicao', nome: 'Vivo ou morto', tipo: 'selecao', destaque: true, opcoes: ['Vivo', 'Morto', 'Vivo ou Morto'], ajuda: 'O que aparece no cartaz de procurado.' },
       { id: 'visto', nome: 'Última vez visto em', tipo: 'texto' },
       { id: 'perigo', nome: 'Periculosidade', tipo: 'selecao', destaque: true, opcoes: ['Baixa', 'Média', 'Alta'] },
-      { id: 'situacao', nome: 'Situação', tipo: 'selecao', destaque: true, opcoes: ['Procurado', 'Capturado', 'Perdoado'] },
+      { id: 'situacao', nome: 'Situação', tipo: 'selecao', destaque: true, opcoes: ['Procurado', 'Banido da Capital', 'Capturado', 'Perdoado'] },
     ],
   },
   {

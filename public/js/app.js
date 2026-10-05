@@ -24,6 +24,7 @@ import { clube } from './telas/clube.js';
 import { ARCADE } from './jogos/lista.js';
 import { telaSprites } from './telas/sprites.js';
 import { ligarSpritesAoVivo } from './sprites.js';
+import { registrarServiceWorker } from './notificacoes.js';
 
 const app = document.getElementById('app');
 
@@ -70,6 +71,7 @@ const ROTAS = [
   [/^\/(tabelionato|guarda|hospital|congresso|leis)\/aprovacoes$/, m => aprovacoes(m)],
   [/^\/(tabelionato|guarda|hospital|congresso|leis)\/envios$/, m => envios(m)],
   [/^\/(tabelionato|guarda|hospital|congresso)\/(\d+)$/, (m, id) => livro(m, id)],
+  [/^\/(tabelionato|guarda|hospital|congresso)\/(\d+)\/registro\/(\d+)$/, (m, id, reg) => livro(m, id, reg)],
   [/^\/(tabelionato|guarda|hospital|congresso)\/(\d+)\/registro\/(\d+)$/, (m, id, reg) => livro(m, id, reg)],
   [/^\/recreacao\/memoria$/, () => memoria()],
   [/^\/recreacao\/campo-minado$/, () => campoMinado()],
@@ -219,6 +221,7 @@ function montar() {
 
   if (pode('recreacao.usar')) ligar();
   ligarSpritesAoVivo(ouvir); // alguém trocou um sprite: todos recarregam
+  registrarServiceWorker(); // para as notificações no celular/PC
   carregarTrilha();
   rotear();
 }

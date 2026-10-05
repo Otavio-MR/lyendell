@@ -283,6 +283,17 @@ CREATE TABLE IF NOT EXISTS sprites (
   atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Notificações no celular/PC (Web Push): cada aparelho em que a pessoa ativou.
+CREATE TABLE IF NOT EXISTS push_inscricoes (
+  id INTEGER PRIMARY KEY,
+  usuario_id INTEGER NOT NULL,
+  endpoint TEXT NOT NULL UNIQUE,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  tipos TEXT,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS segredos (
   usuario_id INTEGER NOT NULL,
   chave TEXT NOT NULL,
@@ -450,7 +461,7 @@ CREATE TABLE IF NOT EXISTS diario (
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 24;
+const VERSAO = 25;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -532,6 +543,8 @@ async function migrar() {
   if (versao < 23) await cartazDosProcurados();
   // v24: cargo novo, o Game Dev (troca os sprites dos joguinhos).
   if (versao < 24) await criarCargo('Game Dev');
+  // v25: a Situação dos Procurados ganha "Banido da Capital" (cartaz próprio e aparece na tela inicial).
+  if (versao < 25) await banidosDaCapital();
   // v20: o campo "Nickname" vira "Endereço" em todos os livros (no RP o nick é o endereço da pessoa).
   if (versao < 20) await nickVirouEndereco();
   // v19: propostas do povo para o Congresso (todo morador manda; a Senadora avalia).
@@ -648,6 +661,17 @@ async function migrarBobo() {
     await db.run('INSERT INTO cargos (nome, descricao, cor, permissoes, base, ordem) VALUES (?, ?, ?, ?, 0, ?)', bobo.nome, bobo.descricao, bobo.cor, '[]', ordem + 1);
   }
   await darPermissoes({ [bobo.nome]: bobo.permissoes });
+}
+
+async function banidosDaCapital() {
+  for (const l of await db.all("SELECT id, campos FROM livros WHERE modulo = 'guarda'")) {
+    const campos = JSON.parse(l.campos);
+    if (!campos.some(c => c.id === 'condicao')) continue; // só o livro de cartazes (Procurados)
+    const sit = campos.find(c => c.id === 'situacao' && c.tipo === 'selecao');
+    if (!sit || sit.opcoes.includes('Banido da Capital')) continue;
+    sit.opcoes.splice(1, 0, 'Banido da Capital');
+    await db.run('UPDATE livros SET campos = ? WHERE id = ?', JSON.stringify(campos), l.id);
+  }
 }
 
 // Cria um cargo de CARGOS_PADRAO que ainda não existe no banco (no banco novo, o semear já cria).

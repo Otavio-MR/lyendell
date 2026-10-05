@@ -1,0 +1,14 @@
+{
+  "name": "Casa Luckham · Lyendell",
+  "short_name": "Lyendell",
+  "description": "O site da Casa Luckham para a cidade de Lyendell.",
+  "start_url": "/#/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#060a07",
+  "theme_color": "#060a07",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "/img/brasao.png", "sizes": "320x320", "type": "image/png", "purpose": "any" }
+  ]
+}

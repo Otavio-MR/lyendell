@@ -2,6 +2,8 @@ import { estado, get, h, icone, chipCargo, chipCrianca, barra, num, pacotes, rel
 import { MENU_CRIANCA, falaDoDia, curiosidadeDoDia } from '../crianca.js';
 import { barraNivel } from './pessoas.js';
 import { MODULOS } from './livros.js';
+import { conviteNotificacoes } from '../notificacoes.js';
+import { dadosDoCartaz, desenharCartaz } from '../cartaz.js';
 
 function saudacao() {
   const hora = new Date().getHours();
@@ -134,8 +136,25 @@ function inicioCrianca(d, pr) {
     pr && painelComunidade(pr, { crianca: true }));
 }
 
+// Os cartazes de quem a Guarda está procurando ou baniu da Capital (todos veem; clique abre o registro).
+function painelProcurados(p) {
+  if (!p?.livro || !p.cartazes.length) return null;
+  const banidos = p.cartazes.filter(c => /^banid/i.test(normalizar(c.dados.situacao || ''))).length;
+  const titulo = banidos === p.cartazes.length ? 'Banidos da Capital' : banidos ? 'Procurados e banidos da Capital' : 'Procurados pela Guarda';
+  return h('section', { class: 'painel procurados-inicio' },
+    h('header', { class: 'painel-cab' }, h('h2', null, icone('alvo'), titulo), h('a', { href: `#/guarda/${p.livro.id}` }, 'Ver todos')),
+    h('div', { class: 'procurados-faixa' }, p.cartazes.map(c => {
+      const tela = h('canvas', { class: 'cartaz', width: 600, height: 860 });
+      desenharCartaz(tela, dadosDoCartaz(p.livro, c.dados));
+      return h('a', { class: 'cartaz-botao', href: `#/guarda/${p.livro.id}/registro/${c.id}` }, tela);
+    })));
+}
+
 export async function inicio() {
-  const [d, pr] = await Promise.all([get('/api/inicio'), get('/api/auth/progresso').catch(() => null)]);
+  const [d, pr, procurados, convite] = await Promise.all([
+    get('/api/inicio'), get('/api/auth/progresso').catch(() => null),
+    get('/api/procurados').catch(() => null), conviteNotificacoes().catch(() => null),
+  ]);
   const eu = estado.eu;
   if (eu.crianca) return inicioCrianca(d, pr);
   const n = d.numeros;
@@ -164,6 +183,10 @@ export async function inicio() {
         h('div', { class: 'chips' }, cargos))),
 
     avisosDeAprovacao(d.pendencias),
+
+    painelProcurados(procurados),
+
+    convite,
 
     painelNovidades(d.leis, { titulo: 'Novas Leis de Lyendell', icone: 'balanca', href: '#/leis' }),
 

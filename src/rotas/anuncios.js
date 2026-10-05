@@ -36,6 +36,10 @@ r.post('/', exigir('anuncios.publicar'), async (req, res) => {
     a.titulo, a.conteudo, a.importancia, a.imagem, fixado, req.usuario.id, req.usuario.nome);
   await anotar(req, 'Publicou um anúncio', a.titulo);
   await progresso.registrar(req.usuario.id, 'anuncio');
+  require('../notificacoes').avisar('anuncios', {
+    titulo: `${a.importancia === 'urgente' ? 'URGENTE: ' : ''}${a.titulo}`, corpo: `${req.usuario.nome} no Mural de Anúncios: ${a.conteudo.slice(0, 140)}`,
+    url: '/#/anuncios', tag: `anuncio-${id}`,
+  }, { exceto: req.usuario.id });
   res.status(201).json({ id });
 });
 

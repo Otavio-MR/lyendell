@@ -206,6 +206,27 @@ async function limparDados(livro, bruto, anterior = {}) {
 
 const imagensDe = (livro, dados) => livro.campos.filter(c => c.tipo === 'imagem').map(c => dados[c.id]).filter(Boolean);
 
+// Avisos de registro aprovado: Procurados (procurado, banido, capturado) e Leis de Lyendell.
+const normal = s => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+const ehLivroDeCartaz = l => l.campos.some(c => c.tipo === 'selecao' && (c.opcoes || []).some(o => /vivo ou morto/i.test(o)));
+function avisarRegistro(livro, regId, dados, antes = null, quem = null) {
+  const notif = require('../notificacoes');
+  if (livro.modulo === 'leis') {
+    notif.avisar('leis', { titulo: `Lei nova: ${tituloDoRegistro(livro, dados)}`, corpo: `Publicada em "${livro.nome}".`, url: `/#/leis/${livro.id}`, tag: `lei-${regId}` }, { exceto: quem });
+    return;
+  }
+  if (livro.modulo !== 'guarda' || !ehLivroDeCartaz(livro)) return;
+  const sit = normal(dados.situacao);
+  if (antes && normal(antes.situacao) === sit) return; // só avisa quando a situação muda
+  const nome = tituloDoRegistro(livro, dados);
+  const rec = Number(dados.recompensa) > 0 ? ` Recompensa: ${Number(dados.recompensa).toLocaleString('pt-BR')} Lírios.` : '';
+  let carga = null;
+  if (sit.startsWith('procurad')) carga = { titulo: `PROCURADO: ${nome}`, corpo: `${dados.condicao || 'Vivo ou Morto'}.${dados.crime ? ` Crime: ${dados.crime}.` : ''}${rec}` };
+  else if (sit.startsWith('banid')) carga = { titulo: `BANIDO DA CAPITAL: ${nome}`, corpo: `${dados.crime ? `Motivo: ${dados.crime}. ` : ''}Se vir essa pessoa na Capital, avise a Guarda.` };
+  else if (sit.startsWith('captur') && antes) carga = { titulo: `CAPTURADO: ${nome}`, corpo: 'A Guarda do Coelho pegou quem estava sendo procurado.' };
+  if (carga) notif.avisar('procurados', { ...carga, url: `/#/guarda/${livro.id}/registro/${regId}`, tag: `procurado-${regId}` }, { exceto: quem });
+}
+
 function tituloDoRegistro(livro, dados) {
   const c = livro.campos.find(x => (x.tipo === 'texto' || x.tipo === 'selecao') && dados[x.id]);
   return c ? String(dados[c.id]) : 'sem título';
@@ -354,6 +375,7 @@ r.post('/livros/:id/registros', async (req, res) => {
     `${numero ? `nº ${numero}: ` : ''}${tituloDoRegistro(l, dados)}`);
   await progresso.registrar(req.usuario.id, 'registro');
   await progresso.registrar(req.usuario.id, `registro_${l.modulo}`);
+  if (situacao === 'aprovado') avisarRegistro(l, id, dados, null, req.usuario.id);
   res.status(201).json({ id, situacao, numero });
 });
 
@@ -398,6 +420,7 @@ r.put('/registros/:id', async (req, res) => {
     ...imagensDe(livro, reg.dados).filter(u => !novas.has(u)).map(comandoApagarArquivo),
   ]);
   await anotar(req, situacao !== reg.situacao ? `Reenviou para aprovação em "${livro.nome}"` : `Editou um registro em "${livro.nome}"`, tituloDoRegistro(livro, dados));
+  if (situacao === 'aprovado' && livro.modulo === 'guarda') avisarRegistro(livro, reg.id, dados, reg.dados, req.usuario.id);
   res.json({ ok: true, situacao });
 });
 
@@ -484,10 +507,28 @@ async function revisar(req, situacao, motivo) {
   return { reg, livro };
 }
 
+// Tela inicial: os cartazes de quem está sendo procurado ou foi banido da Capital (registros aprovados).
+r.get('/procurados', async (req, res) => {
+  if (!pode(req, 'guarda.ver')) return res.json({ cartazes: [] });
+  const cartazes = [];
+  for (const l of (await db.all("SELECT * FROM livros WHERE modulo = 'guarda' ORDER BY ordem, id")).map(x => ({ ...x, campos: JSON.parse(x.campos) }))) {
+    if (!ehLivroDeCartaz(l)) continue;
+    const regs = await db.all("SELECT id, numero, dados, criado_em FROM registros WHERE livro_id = ? AND situacao = 'aprovado' ORDER BY id DESC", l.id);
+    for (const r0 of regs) {
+      const dados = JSON.parse(r0.dados);
+      const sit = normal(dados.situacao);
+      if (sit.startsWith('procurad') || sit.startsWith('banid')) cartazes.push({ livro: l.id, id: r0.id, dados });
+    }
+    if (!cartazes.livro) cartazes.livro = { id: l.id, nome: l.nome, campos: l.campos };
+  }
+  res.json({ livro: cartazes.livro || null, cartazes: cartazes.slice(0, 24) });
+});
+
 r.post('/registros/:id/aprovar', async (req, res) => {
   const { reg, livro } = await revisar(req, 'aprovado', null);
   await anotar(req, `Aprovou um registro em "${livro.nome}"`, `nº ${reg.numero}: ${tituloDoRegistro(livro, reg.dados)} (enviado por ${reg.criado_por_nome})`);
   await progresso.registrar(req.usuario.id, `revisao_${livro.modulo}`);
+  avisarRegistro(livro, reg.id, reg.dados);
   res.json({ ok: true });
 });
 
