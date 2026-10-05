@@ -161,12 +161,12 @@ r.put('/perfil', exigirLogin, async (req, res) => {
     if (nick && !NICK_MC.test(nick)) throw erro(400, 'Nick do Minecraft inválido (de 3 a 16 letras, números ou _).');
     campos.mc_nick = nick || null;
   }
-  // Aniversário: só o dia e o mês ("MM-DD"); vazio tira.
+  // Aniversário do RP ("MM-DD"): o dia do mês (1 a 31) e o mês, que só diz se é nos meses ímpares ou pares
+  // (1 ano no RP = 1 mês de verdade; o aniversário volta um mês sim e um mês não). Vazio tira.
   if (b.aniversario !== undefined) {
     const a = String(b.aniversario || '').trim();
     const m = /^(\d{2})-(\d{2})$/.exec(a);
-    const diasNoMes = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-    if (a && (!m || +m[1] < 1 || +m[1] > 12 || +m[2] < 1 || +m[2] > diasNoMes[+m[1] - 1])) throw erro(400, 'Dia do aniversário inválido.');
+    if (a && (!m || +m[1] < 1 || +m[1] > 12 || +m[2] < 1 || +m[2] > 31)) throw erro(400, 'Dia do aniversário inválido.');
     campos.aniversario = a || null;
   }
   if (b.emblemas !== undefined) {

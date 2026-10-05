@@ -3041,3 +3041,5 @@ body.bt-jogando .desafio-fim { display: none; }
 .aniversario-pessoa small { color: var(--texto-2); }
 .aniversario-foto { position: relative; }
 .aniversario-bolo { position: absolute; right: -8px; bottom: -4px; font-size: 1.2rem; }
+.aniversario-campo { display: grid; gap: 6px; }
+.aniversario-proximo { color: var(--ouro-l); }

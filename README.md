@@ -402,10 +402,12 @@ só não manda avisos. O código: `src/notificacoes.js`, `src/rotas/notificacoes
 
 ### Aniversários
 
-Em **Meu perfil** cada um pode pôr o dia do aniversário (só dia e mês; o ano não é pedido). No dia (horário
-de Brasília), a pessoa aparece em "Aniversariantes de hoje" na tela inicial de todo mundo, e quem faz
-aniversário vê um parabéns. O dia não aparece em outro lugar. Quem nasceu em 29 de fevereiro comemora no dia
-28 nos anos que não são bissextos.
+No RP, 1 ano é 1 mês de verdade, então o aniversário volta no mesmo dia, **um mês sim e um mês não**. Em
+**Meu perfil** cada um escolhe o dia (1 a 31) e se é nos meses ímpares (janeiro, março, maio...) ou pares
+(fevereiro, abril, junho...); o perfil mostra o próximo aniversário. No dia (horário de Brasília), a pessoa
+aparece em "Aniversariantes de hoje" na tela inicial de todo mundo, e quem faz aniversário vê um parabéns. Dia
+que o mês não tem (ex.: 31 em mês de 30 dias) é comemorado no último dia do mês. O dia não aparece em outro
+lugar. Fica guardado em `usuarios.aniversario` como "MM-DD", em que o mês só diz ímpar (01) ou par (02).
 
 ### Procurados na tela inicial
 

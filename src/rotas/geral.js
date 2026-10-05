@@ -11,12 +11,21 @@ r.use(exigirLogin);
 
 // Resumo da página inicial: só mostra o que a pessoa pode ver.
 // Os aniversariantes de hoje (no horário de Brasília), para todo mundo ver na tela inicial.
+// No RP, 1 ano é 1 mês de verdade: o aniversário volta no mesmo dia, um mês sim e um mês não
+// (o mês guardado só diz se é nos meses ímpares ou pares). Dia que o mês não tem (ex.: 31 em mês de 30)
+// é comemorado no último dia do mês.
+function fazAniversarioHoje(aniversario, dataHoje) {
+  const m = /^(\d{2})-(\d{2})$/.exec(aniversario || '');
+  if (!m) return false;
+  const [ano, mes, dia] = dataHoje.split('-').map(Number);
+  if ((mes - Number(m[1])) % 2 !== 0) return false;
+  const ultimo = new Date(Date.UTC(ano, mes, 0)).getUTCDate();
+  return Number(m[2]) === dia || (Number(m[2]) > ultimo && dia === ultimo);
+}
 async function aniversariantes() {
-  const [, mes, dia] = hoje().split('-');
-  // 29 de fevereiro em ano que não é bissexto: comemora no dia 28.
-  const bissexto = (a => (a % 4 === 0 && a % 100 !== 0) || a % 400 === 0)(Number(hoje().slice(0, 4)));
-  const dias = mes === '02' && dia === '28' && !bissexto ? ['02-28', '02-29'] : [`${mes}-${dia}`];
-  return db.all(`SELECT id, nome, foto, cor FROM usuarios WHERE ativo = 1 AND aniversario IN (${dias.map(() => '?').join(', ')}) ORDER BY nome`, ...dias);
+  const dataHoje = hoje();
+  const todos = await db.all('SELECT id, nome, foto, cor, aniversario FROM usuarios WHERE ativo = 1 AND aniversario IS NOT NULL ORDER BY nome');
+  return todos.filter(u => fazAniversarioHoje(u.aniversario, dataHoje)).map(({ aniversario, ...u }) => u);
 }
 
 r.get('/inicio', async (req, res) => {

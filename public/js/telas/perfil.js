@@ -151,27 +151,48 @@ export async function perfil() {
   const entradaBio = h('textarea', { class: 'input', rows: '4', maxlength: '600', placeholder: 'Conte quem é o seu personagem, do que gosta, o que faz em Lyendell...', oninput: e => alterar('bio', e.target.value) }, r.bio);
   const entradaNick = h('input', { class: 'input', maxlength: '16', value: r.mc_nick, placeholder: 'Ex.: porcoaranha97', oninput: e => alterar('mc_nick', e.target.value.trim()) });
 
-  /* Aniversário (dia e mês; o ano não aparece em lugar nenhum) */
+  /* Aniversário do RP: 1 ano no RP = 1 mês de verdade, então ele volta no mesmo dia, um mês sim e um mês não.
+     Guardado como "MM-DD"; o mês só diz se é nos meses ímpares (01) ou pares (02). */
   const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
-  const DIAS_NO_MES = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-  const [mesAtual = '', diaAtual = ''] = r.aniversario ? r.aniversario.split('-') : [];
-  const escolhaDia = h('select', { class: 'input', 'aria-label': 'Dia do aniversário' });
-  const escolhaMes = h('select', { class: 'input', 'aria-label': 'Mês do aniversário' },
-    h('option', { value: '' }, 'Mês'), MESES.map((m, k) => h('option', { value: String(k + 1).padStart(2, '0'), selected: mesAtual === String(k + 1).padStart(2, '0') }, m)));
-  const preencherDias = () => {
-    const max = escolhaMes.value ? DIAS_NO_MES[Number(escolhaMes.value) - 1] : 31;
-    const antes = escolhaDia.value || diaAtual;
-    trocar(escolhaDia, h('option', { value: '' }, 'Dia'), Array.from({ length: max }, (_, k) => {
+  const [mesSalvo = '', diaSalvo = ''] = r.aniversario ? r.aniversario.split('-') : [];
+  const paridadeSalva = mesSalvo ? (Number(mesSalvo) % 2 ? 'impar' : 'par') : '';
+  const escolhaDia = h('select', { class: 'input', 'aria-label': 'Dia do aniversário' },
+    h('option', { value: '' }, 'Dia'), Array.from({ length: 31 }, (_, k) => {
       const v = String(k + 1).padStart(2, '0');
-      return h('option', { value: v, selected: v === antes }, String(k + 1));
+      return h('option', { value: v, selected: v === diaSalvo }, `dia ${k + 1}`);
     }));
+  const escolhaMeses = h('select', { class: 'input', 'aria-label': 'Em quais meses' },
+    h('option', { value: '' }, 'Quais meses'),
+    h('option', { value: 'impar', selected: paridadeSalva === 'impar' }, 'Meses ímpares (janeiro, março, maio...)'),
+    h('option', { value: 'par', selected: paridadeSalva === 'par' }, 'Meses pares (fevereiro, abril, junho...)'));
+  const proximo = h('small', { class: 'aniversario-proximo' });
+  // O próximo aniversário (hoje conta), para a pessoa conferir se escolheu certo.
+  const mostrarProximo = () => {
+    const dia = Number(escolhaDia.value);
+    const par = escolhaMeses.value;
+    if (!dia || !par) { proximo.textContent = ''; return; }
+    const agora = new Date();
+    for (let k = 0; k < 3; k++) {
+      const d = new Date(agora.getFullYear(), agora.getMonth() + k, 1);
+      if (((d.getMonth() + 1) % 2 === 1) !== (par === 'impar')) continue;
+      const ultimo = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+      const quando = Math.min(dia, ultimo);
+      if (k === 0 && quando < agora.getDate()) continue;
+      proximo.textContent = k === 0 && quando === agora.getDate() ? 'É hoje! Parabéns!' : `Próximo aniversário: ${quando} de ${MESES[d.getMonth()]}.`;
+      return;
+    }
   };
-  preencherDias();
-  const mudarAniversario = () => alterar('aniversario', escolhaDia.value && escolhaMes.value ? `${escolhaMes.value}-${escolhaDia.value}` : '');
-  escolhaMes.addEventListener('change', () => { preencherDias(); mudarAniversario(); });
+  const mudarAniversario = () => {
+    alterar('aniversario', escolhaDia.value && escolhaMeses.value ? `${escolhaMeses.value === 'impar' ? '01' : '02'}-${escolhaDia.value}` : '');
+    mostrarProximo();
+  };
   escolhaDia.addEventListener('change', mudarAniversario);
-  const entradaAniversario = h('div', { class: 'aniversario-escolha' }, escolhaDia, h('span', { class: 'suave' }, 'de'), escolhaMes,
-    h('button', { type: 'button', class: 'link', onclick: () => { escolhaDia.value = ''; escolhaMes.value = ''; preencherDias(); mudarAniversario(); } }, 'tirar'));
+  escolhaMeses.addEventListener('change', mudarAniversario);
+  mostrarProximo();
+  const entradaAniversario = h('div', { class: 'aniversario-campo' },
+    h('div', { class: 'aniversario-escolha' }, escolhaDia, h('span', { class: 'suave' }, 'dos'), escolhaMeses,
+      h('button', { type: 'button', class: 'link', onclick: () => { escolhaDia.value = ''; escolhaMeses.value = ''; mudarAniversario(); } }, 'tirar')),
+    proximo);
 
   /* Emblemas */
   const emblemas = h('div', { class: 'escolha-emblemas' });
@@ -270,7 +291,7 @@ export async function perfil() {
             campo('Frase', entradaFrase, { ajuda: 'Aparece embaixo do seu nome.' }),
             campo('Sobre mim', entradaBio),
             campo('Nick do Minecraft', entradaNick),
-            campo('Aniversário', entradaAniversario, { ajuda: 'Só o dia e o mês. No dia, você aparece nos aniversariantes da tela inicial para todo mundo dar parabéns.' }))),
+            campo('Aniversário no RP', entradaAniversario, { ajuda: '1 ano no RP é 1 mês de verdade: o aniversário volta no mesmo dia, um mês sim e um mês não. No dia, você aparece nos aniversariantes da tela inicial para todo mundo dar parabéns.' }))),
         h('section', { class: 'painel' },
           h('div', { class: 'painel-cab' }, h('h2', null, icone('estrela'), 'Emblemas em destaque')),
           h('p', { class: 'suave perfil-dica' }, 'Escolha até 3 conquistas para mostrar no topo do perfil.'),
