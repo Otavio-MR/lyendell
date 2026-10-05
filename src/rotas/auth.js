@@ -116,7 +116,7 @@ const NICK_MC = /^[A-Za-z0-9_]{3,16}$/;
 const cabecaMc = nick => `https://mc-heads.net/avatar/${nick}/128`;
 
 async function meuPerfil(id) {
-  return db.get('SELECT id, nome, foto, titulo_perfil, bio, cor, capa, moldura, mc_nick, emblemas, xp, sequencia, sequencia_max FROM usuarios WHERE id = ?', id);
+  return db.get('SELECT id, nome, foto, titulo_perfil, bio, cor, capa, moldura, mc_nick, emblemas, aniversario, xp, sequencia, sequencia_max FROM usuarios WHERE id = ?', id);
 }
 
 // Dados da tela "Meu perfil": o que dá para escolher e o que a pessoa já liberou.
@@ -160,6 +160,14 @@ r.put('/perfil', exigirLogin, async (req, res) => {
     const nick = String(b.mc_nick || '').trim();
     if (nick && !NICK_MC.test(nick)) throw erro(400, 'Nick do Minecraft inválido (de 3 a 16 letras, números ou _).');
     campos.mc_nick = nick || null;
+  }
+  // Aniversário: só o dia e o mês ("MM-DD"); vazio tira.
+  if (b.aniversario !== undefined) {
+    const a = String(b.aniversario || '').trim();
+    const m = /^(\d{2})-(\d{2})$/.exec(a);
+    const diasNoMes = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    if (a && (!m || +m[1] < 1 || +m[1] > 12 || +m[2] < 1 || +m[2] > diasNoMes[+m[1] - 1])) throw erro(400, 'Dia do aniversário inválido.');
+    campos.aniversario = a || null;
   }
   if (b.emblemas !== undefined) {
     const ganhas = new Set((await db.all('SELECT chave FROM conquistas_usuario WHERE usuario_id = ?', u.id)).map(c => c.chave));

@@ -122,6 +122,7 @@ function inicioCrianca(d, pr, procurados) {
         h('span', { class: 'cr-porta-icone' }, icone(ic)),
         h('strong', null, MENU_CRIANCA[rota]),
         h('small', null, texto)))),
+    painelAniversarios(d.aniversariantes, { crianca: true }),
     painelProcurados(procurados, { crianca: true }),
     pr && painelProgresso(pr, { crianca: true }),
     h('section', { class: 'painel cr-curiosidade' },
@@ -138,6 +139,20 @@ function inicioCrianca(d, pr, procurados) {
 }
 
 // Os cartazes de quem a Guarda está procurando ou baniu da Capital (todos veem; clique abre o registro).
+// Os aniversariantes de hoje, para todo mundo ver e dar parabéns (some no dia seguinte).
+function painelAniversarios(lista, { crianca = false } = {}) {
+  if (!lista?.length) return null;
+  const eu = estado.eu;
+  const souEu = lista.some(p => p.id === eu.id);
+  return h('section', { class: 'painel aniversarios' },
+    h('header', { class: 'painel-cab' }, h('h2', null, icone('presente'), lista.length === 1 ? 'Aniversariante de hoje' : 'Aniversariantes de hoje')),
+    souEu && h('p', { class: 'aniversario-meu' }, crianca ? 'Feliz aniversário! Hoje o dia é seu!' : `Feliz aniversário, ${eu.nome.split(' ')[0]}! Toda Lyendell comemora com você.`),
+    h('div', { class: 'aniversario-lista' }, lista.map(p => h('a', { class: 'aniversario-pessoa', href: `#/pessoa/${p.id}` },
+      h('span', { class: 'aniversario-foto' }, avatar(p.nome, 'avatar-m', p.foto), h('span', { class: 'aniversario-bolo', 'aria-hidden': 'true' }, '🎂')),
+      h('strong', null, p.nome),
+      h('small', null, p.id === eu.id ? 'É você!' : 'Dê parabéns!')))));
+}
+
 function painelProcurados(p, { crianca = false } = {}) {
   if (!p?.livro || !p.cartazes.length) return null;
   const banidos = p.cartazes.filter(c => /^banid/i.test(normalizar(c.dados.situacao || ''))).length;
@@ -193,6 +208,8 @@ export async function inicio() {
         h('div', { class: 'chips' }, cargos))),
 
     avisosDeAprovacao(d.pendencias),
+
+    painelAniversarios(d.aniversariantes),
 
     painelProcurados(procurados),
 

@@ -461,7 +461,7 @@ CREATE TABLE IF NOT EXISTS diario (
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 25;
+const VERSAO = 26;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -545,6 +545,8 @@ async function migrar() {
   if (versao < 24) await criarCargo('Game Dev');
   // v25: a Situação dos Procurados ganha "Banido da Capital" (cartaz próprio e aparece na tela inicial).
   if (versao < 25) await banidosDaCapital();
+  // v26: o dia do aniversário no perfil ("MM-DD", sem o ano), para os aniversariantes aparecerem na tela inicial.
+  if (versao < 26 && !await colunaExiste('usuarios', 'aniversario')) await db.run('ALTER TABLE usuarios ADD COLUMN aniversario TEXT');
   // v20: o campo "Nickname" vira "Endereço" em todos os livros (no RP o nick é o endereço da pessoa).
   if (versao < 20) await nickVirouEndereco();
   // v19: propostas do povo para o Congresso (todo morador manda; a Senadora avalia).

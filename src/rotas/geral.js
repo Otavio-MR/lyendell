@@ -1,3 +1,4 @@
+const { hoje } = require('../cobranca');
 const express = require('express');
 const { db } = require('../db');
 const { exigir, exigirLogin, pode } = require('../auth');
@@ -9,10 +10,19 @@ const r = express.Router();
 r.use(exigirLogin);
 
 // Resumo da página inicial: só mostra o que a pessoa pode ver.
+// Os aniversariantes de hoje (no horário de Brasília), para todo mundo ver na tela inicial.
+async function aniversariantes() {
+  const [, mes, dia] = hoje().split('-');
+  // 29 de fevereiro em ano que não é bissexto: comemora no dia 28.
+  const bissexto = (a => (a % 4 === 0 && a % 100 !== 0) || a % 400 === 0)(Number(hoje().slice(0, 4)));
+  const dias = mes === '02' && dia === '28' && !bissexto ? ['02-28', '02-29'] : [`${mes}-${dia}`];
+  return db.all(`SELECT id, nome, foto, cor FROM usuarios WHERE ativo = 1 AND aniversario IN (${dias.map(() => '?').join(', ')}) ORDER BY nome`, ...dias);
+}
+
 r.get('/inicio', async (req, res) => {
   const out = { numeros: {} };
   const contarModulo = async m => (await db.get("SELECT COUNT(*) AS n FROM registros r JOIN livros l ON l.id = r.livro_id WHERE l.modulo = ? AND r.situacao = 'aprovado'", m)).n;
-  const tarefas = [pendencias(req).then(p => { out.pendencias = p; })];
+  const tarefas = [pendencias(req).then(p => { out.pendencias = p; }), aniversariantes().then(x => { out.aniversariantes = x; })];
   for (const m of Object.keys(MODULOS)) {
     if (pode(req, `${m}.ver`)) tarefas.push(contarModulo(m).then(n => { out.numeros[m] = n; }));
   }

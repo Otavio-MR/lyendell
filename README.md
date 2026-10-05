@@ -400,6 +400,13 @@ As chaves ficam no `.env` (`VAPID_PUBLICA`, `VAPID_PRIVADA`, `VAPID_CONTATO`; ge
 `npx web-push generate-vapid-keys`) e precisam estar também no Render. Sem elas, o site funciona e
 só não manda avisos. O código: `src/notificacoes.js`, `src/rotas/notificacoes.js`, `public/js/notificacoes.js`.
 
+### Aniversários
+
+Em **Meu perfil** cada um pode pôr o dia do aniversário (só dia e mês; o ano não é pedido). No dia (horário
+de Brasília), a pessoa aparece em "Aniversariantes de hoje" na tela inicial de todo mundo, e quem faz
+aniversário vê um parabéns. O dia não aparece em outro lugar. Quem nasceu em 29 de fevereiro comemora no dia
+28 nos anos que não são bissextos.
+
 ### Procurados na tela inicial
 
 Os cartazes de quem está **Procurado** ou **Banido da Capital** (registros aprovados do livro Procurados)
