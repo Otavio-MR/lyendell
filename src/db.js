@@ -293,6 +293,15 @@ CREATE TABLE IF NOT EXISTS sprites_nomes (
 
 -- Itens novos do Club Coelho (roupas e móveis criados em #/recreacao/sprites, cada um com o seu sprite).
 -- O id no clube é "n" + id (ex.: "n12"). extra: { onde: 'chao' | 'parede' | 'tapete', largura, altura } dos móveis.
+-- Progresso de cada um na Ilha do Club Coelho (faixa do ninja, chave do capitão...): chave e valor em JSON.
+CREATE TABLE IF NOT EXISTS clube_progresso (
+  usuario_id INTEGER NOT NULL,
+  chave TEXT NOT NULL,
+  valor TEXT NOT NULL,
+  atualizado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (usuario_id, chave)
+);
+
 CREATE TABLE IF NOT EXISTS clube_itens (
   id INTEGER PRIMARY KEY,
   tipo TEXT NOT NULL,

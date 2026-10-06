@@ -32,6 +32,7 @@ const FONTES = [
   () => import('../clube-salas.js'),
   () => import('../clube-minijogos.js'),
   () => import('./cidade-mundo.js'),
+  () => import('../ilha/index.js'),
   () => import('../jogos/corrida.js'),
   () => import('./arena.js'),
   () => import('./batalha.js'),

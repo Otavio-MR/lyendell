@@ -77,7 +77,34 @@ const MINIJOGOS = {
   pesca: { max: 60, cenouras: p => p * 3, limite: 40 },   // pontos = peixes pescados
   danca: { max: 60, cenouras: p => p / 400, limite: 100_000 },
 };
+// Os minijogos das salas da Ilha (src/clube-ilha/).
+const ILHA = require('../clube-ilha');
+Object.assign(MINIJOGOS, ILHA.minijogos);
 const ultimoMinijogo = new Map();
+
+// Progresso na Ilha (a faixa do ninja, a chave do capitão...): cada região diz quais chaves existem e
+// como validar (src/clube-ilha/*.js, "progresso").
+r.get('/progresso', async (req, res) => {
+  const linhas = await db.all('SELECT chave, valor FROM clube_progresso WHERE usuario_id = ?', req.usuario.id);
+  const p = {};
+  for (const l of linhas) { try { p[l.chave] = JSON.parse(l.valor); } catch { p[l.chave] = null; } }
+  res.json({ progresso: p });
+});
+r.post('/progresso', async (req, res) => {
+  const chave = String(req.body?.chave || '');
+  const validar = ILHA.progresso[chave];
+  if (!validar) throw erro(400, 'Progresso desconhecido.');
+  const linha = await db.get('SELECT valor FROM clube_progresso WHERE usuario_id = ? AND chave = ?', req.usuario.id, chave);
+  let atual = null;
+  try { atual = linha ? JSON.parse(linha.valor) : null; } catch { atual = null; }
+  const valor = validar(req.body?.valor, atual, req.usuario.id);
+  if (valor === undefined) throw erro(400, 'Esse progresso não vale.');
+  const texto = JSON.stringify(valor);
+  if (texto.length > 2000) throw erro(400, 'Progresso grande demais.');
+  await db.run(`INSERT INTO clube_progresso (usuario_id, chave, valor) VALUES (?, ?, ?)
+    ON CONFLICT (usuario_id, chave) DO UPDATE SET valor = excluded.valor, atualizado_em = datetime('now')`, req.usuario.id, chave, texto);
+  res.json({ ok: true, valor });
+});
 r.post('/minijogo', async (req, res) => {
   const id = req.usuario.id;
   const def = MINIJOGOS[req.body?.jogo];
@@ -86,6 +113,14 @@ r.post('/minijogo', async (req, res) => {
   const agora = Date.now();
   if (agora - (ultimoMinijogo.get(id) || 0) < (Number(process.env.CLUBE_MINIJOGO_MS) || 15_000)) throw erro(429, 'Calma! Espere um pouquinho antes de jogar de novo.');
   ultimoMinijogo.set(id, agora);
+  // Minijogo que só paga uma vez por dia (ex.: o Baú do Capitão): guarda o dia em clube_progresso.
+  if (def.umaVezPorDia) {
+    const chave = `minijogo.${req.body.jogo}.dia`;
+    const ja = await db.get('SELECT valor FROM clube_progresso WHERE usuario_id = ? AND chave = ?', id, chave);
+    if (ja && JSON.parse(ja.valor) === hoje()) throw erro(429, 'Esse presente já foi pego hoje. Volte amanhã!');
+    await db.run(`INSERT INTO clube_progresso (usuario_id, chave, valor) VALUES (?, ?, ?)
+      ON CONFLICT (usuario_id, chave) DO UPDATE SET valor = excluded.valor, atualizado_em = datetime('now')`, id, chave, JSON.stringify(hoje()));
+  }
   const valia = Math.min(def.max, Math.floor(def.cenouras(pontos)));
   const ganhou = await clube.ganhar(id, valia);
   if (req.body.jogo === 'pesca' && pontos) await db.run('UPDATE clube SET peixes = peixes + ? WHERE usuario_id = ?', pontos, id);

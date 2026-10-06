@@ -3058,3 +3058,119 @@ body.bt-jogando .desafio-fim { display: none; }
 .aniversario-campo { display: grid; gap: 6px; }
 .aniversario-proximo { color: var(--ouro-l); }
 .notif-painel .notif-grupo { margin: 6px 0 0; font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--texto-2); font-family: var(--f-titulo); }
+
+/* Ilha: segredos */
+.ilha-seg-faixa { display: inline-flex; align-items: center; gap: 10px; padding: 8px 14px; border-radius: var(--raio-p); background: var(--sup-2); border: 1px solid var(--borda-2); color: var(--texto); }
+.ilha-seg-faixa-cor { width: 46px; height: 12px; border-radius: 3px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.4); position: relative; }
+.ilha-seg-faixa-cor::after { content: ''; position: absolute; right: 8px; top: 8px; width: 6px; height: 12px; background: inherit; border-radius: 2px; transform: rotate(12deg); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35); }
+.ilha-seg-regra { padding: 8px 12px; border-radius: var(--raio-p); background: rgba(232, 194, 74, 0.08); border: 1px dashed var(--ouro); color: var(--texto) !important; max-width: 520px; }
+.ilha-seg-ninja .cobra-caixa, .ilha-seg-missao .cobra-caixa { max-width: 560px; }
+.ilha-seg-fone-modal .modal-corpo { display: grid; place-items: center; }
+.ilha-seg-fone { position: relative; width: min(420px, 100%); padding: 34px 16px 64px; border-radius: 34px; background: linear-gradient(160deg, #24344c, #0f1828 70%); border: 2px solid #3c5272; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08); }
+.ilha-seg-fone-antena { position: absolute; top: -26px; right: 46px; width: 6px; height: 30px; border-radius: 3px; background: #bfc8d4; }
+.ilha-seg-fone-antena::after { content: ''; position: absolute; top: -6px; left: -3px; width: 12px; height: 12px; border-radius: 50%; background: #ff5a5a; box-shadow: 0 0 10px #ff5a5a; animation: ilha-seg-pisca 1.2s infinite; }
+@keyframes ilha-seg-pisca { 50% { opacity: 0.25; } }
+.ilha-seg-fone-tela { max-height: min(60vh, 520px); overflow-y: auto; padding: 12px; border-radius: 16px; background: radial-gradient(circle at 30% 0%, #0b3a5c, #05233d 60%); border: 1px solid #5fd4ff55; box-shadow: inset 0 0 24px rgba(95, 212, 255, 0.15); }
+.ilha-seg-fone-topo { margin: 0; text-align: center; font-family: var(--f-titulo); letter-spacing: 0.14em; font-size: 0.78rem; color: #5fd4ff; }
+.ilha-seg-fone-dica { margin: 4px 0 10px; text-align: center; font-size: 0.85rem; color: #bff0ff; opacity: 0.8; }
+.ilha-seg-fone-grupo { display: grid; gap: 6px; margin-bottom: 12px; }
+.ilha-seg-fone-grupo h3 { margin: 4px 0 2px; font-family: var(--f-titulo); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: #ffe46b; }
+.ilha-seg-fone-sala { display: grid; gap: 2px; text-align: left; padding: 9px 12px; border-radius: 10px; border: 1px solid #5fd4ff33; background: rgba(95, 212, 255, 0.07); color: #e6faff; cursor: pointer; font: inherit; }
+.ilha-seg-fone-sala small { color: #9fcfe0; font-size: 0.8rem; }
+.ilha-seg-fone-sala:hover, .ilha-seg-fone-sala:focus-visible { background: rgba(95, 212, 255, 0.18); border-color: #5fd4ff; outline: none; }
+.ilha-seg-fone-botao { position: absolute; left: 50%; bottom: 16px; width: 38px; height: 38px; margin-left: -19px; border-radius: 50%; background: #1c2a40; border: 2px solid #3c5272; }
+.ilha-seg-jornal-corpo { display: grid; place-items: center; }
+.ilha-seg-jornal { width: min(560px, 100%); padding: 18px 22px 20px; background: linear-gradient(180deg, #efe3c2, #e2d2a8); color: #2a2016; border-radius: 4px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45); font-family: 'EB Garamond', Georgia, serif; transform: rotate(-0.6deg); }
+.ilha-seg-jornal-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding-bottom: 6px; border-bottom: 3px double #2a2016; font-size: 0.8rem; }
+.ilha-seg-jornal-cab strong { font-family: var(--f-titulo); font-size: clamp(1.3rem, 4vw, 1.9rem); letter-spacing: 0.04em; }
+.ilha-seg-jornal-data { margin: 6px 0 0; text-align: center; font-size: 0.8rem; font-style: italic; color: #5b4a30; }
+.ilha-seg-jornal h3 { margin: 8px 0; font-family: var(--f-titulo); font-size: clamp(1.05rem, 3.2vw, 1.4rem); text-align: center; color: #1b1403; }
+.ilha-seg-jornal p { margin: 0 0 10px; line-height: 1.45; color: #2a2016; }
+.ilha-seg-jornal aside { padding: 8px 10px; border: 1px solid #8a6a44; font-size: 0.88rem; font-style: italic; color: #4a3820; background: rgba(255, 255, 255, 0.25); }
+
+/* Ilha: litoral */
+.litoral-botoes { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
+.litoral-botao { min-height: 54px; border-radius: 14px; border: 2px solid #5ab8d8; background: rgba(90, 184, 216, 0.08); color: #bfe9f7; font: 700 1rem "Cinzel", Georgia, serif; cursor: pointer; touch-action: none; user-select: none; -webkit-user-select: none; }
+.litoral-botao:active { background: #5ab8d8; color: #0e1811; }
+@media (pointer: fine) { .litoral-botoes { display: none; } }
+.litoral-piano-caixa { display: grid; gap: 12px; justify-items: center; }
+.litoral-piano { position: relative; display: flex; gap: 3px; padding: 14px 14px 18px; border-radius: 12px; background: linear-gradient(#4f3020, #2a1a0e); box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.5); max-width: 100%; overflow-x: auto; }
+.litoral-tecla { width: 48px; height: 170px; flex: 0 0 auto; border: 1px solid #8a7a6a; border-radius: 0 0 8px 8px; background: linear-gradient(#fffdf6, #e8e0cc); color: #5b4a3f; font: 600 0.72rem "EB Garamond", Georgia, serif; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 8px; cursor: pointer; touch-action: none; }
+.litoral-tecla.preta { width: 32px; height: 106px; margin: 0 -19px; position: relative; z-index: 1; background: linear-gradient(#3a3a44, #111); border-color: #000; }
+.litoral-tecla.apertada { background: linear-gradient(#ffe9a8, #e8c24a); }
+.litoral-tecla.preta.apertada { background: linear-gradient(#8a6a20, #5b4410); }
+@media (max-width: 560px) { .litoral-tecla { width: 34px; height: 140px; } .litoral-tecla.preta { width: 24px; height: 86px; margin: 0 -14px; } }
+.litoral-vista-caixa { display: grid; gap: 10px; }
+.litoral-vista { display: block; width: 100%; aspect-ratio: 600 / 340; border-radius: var(--raio); background: #0a0a10; }
+.litoral-legenda { text-align: center; font-style: italic; color: var(--texto-2); }
+.litoral-bau { display: grid; gap: 10px; }
+.litoral-bau-lista { margin: 0; padding-left: 20px; display: grid; gap: 6px; color: var(--texto-2); }
+
+/* Ilha: centro */
+.ilha-mapa-bloco { position: relative; }
+.ilha-mapa { position: relative; width: 100%; aspect-ratio: 1000 / 600; border-radius: var(--raio); overflow: hidden; border: 1px solid var(--borda-2); background: #1d5a86; }
+.ilha-mapa-tela { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.ilha-mapa-marcos { position: absolute; inset: 0; }
+.ilha-marco { --cor: #e8c24a; position: absolute; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 2px; padding: 0; border: 0; background: none; color: #fbf3e0; font: inherit; cursor: pointer; z-index: 1; }
+.ilha-marco.regiao-neve { --cor: #8fc8ef; }
+.ilha-marco.regiao-litoral { --cor: #5fd0c0; }
+.ilha-marco.regiao-segredos { --cor: #c49af0; }
+.ilha-marco-icone { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: rgba(20, 24, 30, 0.82); border: 2px solid var(--cor); color: var(--cor); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4); transition: transform 0.15s; }
+.ilha-marco-icone .ico { width: 18px; height: 18px; }
+.ilha-marco-nome { font-family: var(--f-titulo); font-size: 0.68rem; line-height: 1.1; padding: 1px 6px; border-radius: 8px; background: rgba(20, 24, 30, 0.72); white-space: nowrap; }
+.ilha-marco-n { position: absolute; top: -6px; right: -8px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: #e05a8a; color: #fff; font-size: 0.7rem; font-weight: 700; display: grid; place-items: center; }
+.ilha-marco:hover, .ilha-marco:focus-visible, .ilha-marco.escolhido { z-index: 3; }
+.ilha-marco:hover .ilha-marco-icone, .ilha-marco:focus-visible .ilha-marco-icone, .ilha-marco.escolhido .ilha-marco-icone { transform: scale(1.18); background: var(--cor); color: #14181e; }
+.ilha-marco.aqui .ilha-marco-icone { animation: ilha-pulso 1.4s ease-in-out infinite; }
+@keyframes ilha-pulso { 0%, 100% { box-shadow: 0 0 0 0 rgba(232, 194, 74, 0.7); } 50% { box-shadow: 0 0 0 8px rgba(232, 194, 74, 0); } }
+.ilha-mapa-info { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; max-width: calc(100% - 16px); padding: 6px 12px; border-radius: var(--raio-p); background: rgba(14, 24, 17, 0.88); border: 1px solid var(--ouro-d); z-index: 4; }
+.ilha-mapa-info div { display: grid; gap: 1px; }
+.ilha-mapa-info strong { font-family: var(--f-titulo); color: var(--ouro-l); }
+.ilha-mapa-info small { color: var(--texto-2); }
+.ilha-mapa-info .ilha-mapa-gente { color: var(--pergaminho); }
+@media (max-width: 640px) {
+  .ilha-marco-icone { width: 26px; height: 26px; }
+  .ilha-marco-icone .ico { width: 14px; height: 14px; }
+  .ilha-marco-nome { display: none; }
+  .ilha-marco.escolhido .ilha-marco-nome, .ilha-marco.aqui .ilha-marco-nome { display: block; }
+  .ilha-mapa-info { position: static; transform: none; margin-top: 6px; max-width: none; }
+}
+.ilha-livro { display: grid; gap: 14px; }
+.ilha-livro-pagina { display: grid; gap: 10px; justify-items: center; text-align: center; padding: 22px 24px; min-height: 220px; border-radius: var(--raio); background: linear-gradient(180deg, #f4ead2, #e9dcc3); color: #3a2a1a; border: 1px solid #b8922a; box-shadow: inset 0 0 30px rgba(120, 80, 30, 0.25); }
+.ilha-livro-pagina h3 { font-family: var(--f-titulo); color: #5b3c22; font-size: 1.25rem; }
+.ilha-livro-pagina p { max-width: 52ch; font-size: 1.05rem; line-height: 1.5; }
+.ilha-livro-nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.ilha-historia { grid-template-columns: minmax(180px, 230px) 1fr; align-items: start; }
+.ilha-capitulos { display: grid; gap: 6px; }
+.ilha-capitulo { text-align: left; padding: 8px 10px; border-radius: var(--raio-p); border: 1px solid var(--borda-2); background: var(--sup-2); color: var(--texto); font: inherit; cursor: pointer; }
+.ilha-capitulo.ativo, .ilha-capitulo:hover { border-color: var(--ouro); color: var(--ouro-l); }
+@media (max-width: 640px) { .ilha-historia { grid-template-columns: 1fr; } }
+.ilha-roteiros { display: grid; gap: 12px; }
+.ilha-falas { display: grid; gap: 8px; padding: 0; margin: 0; list-style: none; }
+.ilha-falas li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; border-radius: var(--raio-p); background: var(--sup-2); border: 1px solid var(--borda-2); }
+
+
+/* Ilha: neve */
+.neve-extra { display: grid; gap: 8px; }
+.neve-botoes { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.neve-botoes.cruz { display: grid; grid-template-columns: repeat(3, 58px); grid-template-areas: '. c .' 'e b d'; gap: 6px; justify-content: center; }
+.neve-botoes.cruz > :nth-child(1) { grid-area: c; }
+.neve-botoes.cruz > :nth-child(2) { grid-area: e; }
+.neve-botoes.cruz > :nth-child(3) { grid-area: b; }
+.neve-botoes.cruz > :nth-child(4) { grid-area: d; }
+.neve-botao { --cor: #8fc8ec; min-width: 58px; height: 52px; padding: 0 14px; border-radius: 14px; border: 2px solid var(--cor); background: rgba(143, 200, 236, 0.08); color: var(--texto); font: 700 1.15rem var(--f-titulo, serif); cursor: pointer; touch-action: none; user-select: none; -webkit-user-select: none; }
+.neve-botao.largo { min-width: 180px; }
+.neve-botao.pequeno { height: 38px; font-size: 0.9rem; }
+.neve-botao.apertado, .neve-botao:active { background: var(--cor); color: #0e1811; }
+.neve-botoes.lixeiras .neve-botao { flex: 1 1 120px; font-size: 0.95rem; }
+.neve-quiz { display: grid; gap: 12px; text-align: center; }
+.neve-quiz-conta { color: var(--texto-2); font-size: 0.85rem; margin: 0; }
+.neve-quiz-pergunta { font-family: var(--f-titulo, serif); color: var(--ouro, #e8c24a); font-size: 1.15rem; margin: 0; }
+.neve-quiz-opcoes { display: grid; gap: 8px; }
+.neve-quiz-opcao { justify-content: center; white-space: normal; min-height: 44px; }
+.neve-quiz-opcao.certa { border-color: #5fbf6a; background: rgba(95, 191, 106, 0.2); }
+.neve-quiz-opcao.errada { border-color: #e05a5a; background: rgba(224, 90, 90, 0.2); }
+.neve-lig4 { display: grid; gap: 12px; }
+.neve-lig4-abertas h3 { font-family: var(--f-titulo, serif); font-size: 0.95rem; color: var(--texto-2); margin: 4px 0; }
+.neve-lig4-linha { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--borda-2); }
+@media (max-width: 560px) { .neve-botao { height: 56px; } .neve-botao.largo { min-width: 0; width: 100%; } }

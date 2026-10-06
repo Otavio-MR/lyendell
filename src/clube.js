@@ -189,13 +189,17 @@ const MAX_MOVEIS = 40;
 // Tudo num quadro de 1000 x 600. "chao": onde dá para andar. "chegada": onde o coelho aparece
 // (vindo de cada lugar). As tocas são "toca:<id do dono>".
 const SALAS = {
-  praca: { nome: 'Praça do Clube', chao: [30, 330, 970, 585], chegada: { padrao: [500, 552], cafe: [205, 365], loja: [500, 352], danca: [795, 365], lago: [70, 480], toca: [905, 480] } },
-  cafe: { nome: 'Café da Cenoura', chao: [60, 360, 940, 585], chegada: { padrao: [500, 545] } },
+  praca: { nome: 'Praça do Clube', chao: [30, 330, 970, 585], chegada: { padrao: [500, 552], cafe: [205, 365], loja: [500, 352], danca: [795, 365], lago: [70, 405], toca: [500, 552], ancoradouro: [70, 520], forte: [930, 405], plaza: [930, 520] } },
+  cafe: { nome: 'Café da Cenoura', chao: [60, 360, 940, 585], chegada: { padrao: [500, 545], leitura: [90, 400] } },
   loja: { nome: 'Armarinho da Dona Felpuda', chao: [60, 380, 940, 585], chegada: { padrao: [500, 545] } },
-  danca: { nome: 'Salão de Dança', chao: [60, 330, 940, 585], chegada: { padrao: [500, 545] } },
+  danca: { nome: 'Salão de Dança', chao: [60, 330, 940, 585], chegada: { padrao: [500, 545], fliperama: [272, 360], caldeira: [654, 362] } },
   lago: { nome: 'Lago Cintilante', chao: [40, 380, 960, 585], chegada: { padrao: [915, 500] } },
   toca: { nome: 'Toca', chao: [90, 330, 910, 585], chegada: { padrao: [500, 548] } },
 };
+// As salas da Ilha (Plaza, Forte Nevado, Praia, Dojo...) vêm de src/clube-ilha/.
+const ILHA = require('./clube-ilha');
+Object.assign(SALAS, ILHA.salas);
+
 const ehToca = sala => /^toca:\d+$/.test(sala);
 const tipoDaSala = sala => (ehToca(sala) ? 'toca' : sala);
 const EMOTES = ['oi', 'coracao', 'risada', 'susto', 'pergunta', 'zzz', 'cenoura', 'estrela', 'dancar', 'sentar', 'cafe'];
@@ -385,6 +389,7 @@ const acoes = {
       Object.assign(p, { x: Math.round(x), y: Math.round(y), tx: Math.round(x), ty: Math.round(y), dancando: e === 'dancar' ? !p.dancando : false, sentado: e === 'sentar' ? !p.sentado : false });
     }
     paraSala(p.sala, 'clube:emote', { id: u.id, e, x: Math.round(p.tx), y: Math.round(p.ty), dancando: p.dancando, sentado: p.sentado });
+    ILHA.aoEmote({ sala: p.sala, e, id: u.id, pessoas: naSala(p.sala), paraSala: (tipo, dados) => paraSala(p.sala, tipo, dados) });
   },
 
   // Quantas pessoas em cada sala e quais tocas estão abertas (para o mapa).

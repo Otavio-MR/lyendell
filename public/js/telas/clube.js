@@ -3,13 +3,16 @@
 // com cenouras e decora a própria toca. As regras e os preços ficam no servidor (src/clube.js); os
 // desenhos em desenho-coelho.js, roupas-coelho.js e clube-salas.js; os minijogos em clube-minijogos.js.
 
-import { h, trocar, icone, botao, cabecalho, modal, get, post, put, aviso, aoSair, estado, pode, num, normalizar } from '../core.js';
+import { h, trocar, icone, botao, cabecalho, modal, get, post, put, aviso, aoSair, estado, pode, num, normalizar, ICONES } from '../core.js';
 import { rt, ouvir, enviar } from '../tempo-real.js';
 import { desenharCoelho, quebrarTexto } from '../desenho-coelho.js';
 import { SALAS, W, H, fundoToca, desenharMovel, MOVEIS, registrarItensNovos } from '../clube-salas.js';
 import { abrirPescaria, abrirDanca } from '../clube-minijogos.js';
 import { PARTES } from '../roupas-coelho.js';
 import { aoMudarSprites, usarNomeDaPeca } from '../sprites.js';
+import { acaoDaIlha, INFO_SALAS } from '../ilha/index.js';
+import { desenharIlhaFixa, desenharIlhaViva, MAPA_W, MAPA_H } from '../ilha/centro-mapa.js';
+import { desenhoDoIcone } from '../icones-mapa.js';
 
 const VEL = 170; // o mesmo do servidor
 const EMOTES = [
@@ -19,9 +22,6 @@ const EMOTES = [
 const EMOJI = Object.fromEntries(EMOTES.map(([k, e]) => [k, e]));
 const NOME_PARTE = { pelo: 'Pelo', cabeca: 'Cabeça', rosto: 'Rosto', pescoco: 'Pescoço', costas: 'Costas', corpo: 'Roupa', mao: 'Na mão' };
 const ABAS_LOJA = [['roupas', 'Roupas'], ['pelos', 'Pelos'], ['moveis', 'Móveis'], ['toca', 'Chão e parede']];
-const SALAS_MAPA = [['praca', 'Praça do Clube', 'A fonte, os bancos e as portas para todo o clube.'], ['cafe', 'Café da Cenoura', 'Um café quentinho e um bolo de cenoura.'],
-  ['loja', 'Armarinho', 'Roupas, acessórios e móveis para a toca.'], ['danca', 'Salão de Dança', 'Pista colorida e a máquina Dança da Toca.'],
-  ['lago', 'Lago Cintilante', 'Pescaria com o velho pescador.']];
 
 function exigirAcesso() {
   if (pode('recreacao.usar')) return;
@@ -217,8 +217,36 @@ export async function clube() {
   tela.addEventListener('pointerup', () => { if (decorando) decorando.arrastando = null; });
   tela.addEventListener('pointerleave', () => { mouse = null; sobre = null; });
 
+  // O que as ações das salas da Ilha (public/js/ilha/) recebem para trabalhar (veja clube-ilha.js).
+  let progressoIlha = null;
+  const ctxIlha = () => ({
+    visual: visualDesenho(eu.visual), eu, sala: tipoSala(), irPara, aviso, enviar, mudarMoedas,
+    async terminarMinijogo(jogo, pontos) {
+      const r = await post('/api/clube/minijogo', { jogo, pontos });
+      mudarMoedas(r.moedas);
+      return r;
+    },
+    progresso: {
+      async ler(chave) {
+        progressoIlha ??= (await get('/api/clube/progresso')).progresso;
+        return chave ? progressoIlha[chave] ?? null : progressoIlha;
+      },
+      async gravar(chave, valor) {
+        const r = await post('/api/clube/progresso', { chave, valor });
+        progressoIlha = { ...(progressoIlha || {}), [chave]: r.valor };
+        return r.valor;
+      },
+    },
+    presentes: () => [...pessoas.values()].map(p => ({ id: p.id, nome: p.nome, x: p.x, y: p.y })),
+  });
+
   function agir(acao) {
     if (acao.startsWith('sala:')) { irPara(acao.slice(5)); return; }
+    const daIlha = acaoDaIlha(acao);
+    if (daIlha) {
+      Promise.resolve().then(() => daIlha[0](ctxIlha(), daIlha[1])).catch(e => aviso(e.message || 'Não deu certo.', 'erro'));
+      return;
+    }
     if (acao === 'loja') abrirLoja();
     else if (acao === 'provador') abrirGuardaRoupa();
     else if (acao === 'tocas') abrirMapa(true);
@@ -572,7 +600,7 @@ export async function clube() {
   function abrirMapa(soTocas = false) {
     const corpo = h('div', { class: 'clube-mapa' }, h('p', { class: 'painel-vazio' }, 'Carregando...'));
     mapaAberto = { corpo, soTocas, busca: '' };
-    const m = modal({ titulo: soTocas ? 'Tocas dos moradores' : 'Mapa do clube', tamanho: 'grande', corpo, aoFechar: () => { mapaAberto = null; } });
+    const m = modal({ titulo: soTocas ? 'Tocas dos moradores' : 'Mapa da Ilha do Club Coelho', tamanho: 'grande', corpo, aoFechar: () => { mapaAberto = null; } });
     mapaAberto.m = m;
     enviar('clube:mapa', {});
   }
@@ -595,11 +623,76 @@ export async function clube() {
     }
     desenharTocas();
     trocar(corpo,
-      !mapaAberto.soTocas && h('div', { class: 'clube-salas' }, SALAS_MAPA.map(([id, nome, desc]) => h('button', { type: 'button', class: `clube-sala-cartao ${sala === id ? 'aqui' : ''}`.trim(), onclick: () => ir(id) },
-        h('strong', null, nome), h('small', null, desc), h('span', { class: 'clube-sala-n' }, icone('usuarios'), ` ${d.contagem[id] || 0}`)))),
+      !mapaAberto.soTocas && mapaDaIlha(d.contagem || {}, ir),
       h('h3', { class: 'clube-subtitulo' }, icone('casa'), 'Tocas'),
       busca, lista);
   });
+
+  // O mapa ilustrado da ilha (veja ilha/centro-mapa.js): o desenho num canvas e, por cima, um botão para cada
+  // sala com lugar no mapa (INFO_SALAS[id].mapa), com o nome e quantas pessoas estão lá. Passar o mouse (ou
+  // tocar uma vez, no celular) mostra o nome e o que tem; clicar (ou tocar de novo) vai para lá.
+  let ilhaFixa = null;
+  function mapaDaIlha(contagem, ir) {
+    const tela = h('canvas', { class: 'ilha-mapa-tela', 'aria-hidden': 'true' });
+    const g = tela.getContext('2d');
+    const info = h('div', { class: 'ilha-mapa-info', 'aria-live': 'polite' });
+    const marcos = h('div', { class: 'ilha-mapa-marcos' });
+    const caixa = h('div', { class: 'ilha-mapa' }, tela, marcos);
+    const lugares = Object.entries(INFO_SALAS).filter(([, i]) => i?.mapa && Number.isFinite(i.mapa.x) && Number.isFinite(i.mapa.y));
+    let escolhido = null;
+    let toque = false;
+    const svgDe = nome => { const s = icone('estrela'); s.innerHTML = ICONES[nome] || desenhoDoIcone(nome); return s; };
+    function mostrar(id) {
+      escolhido = id;
+      for (const b of marcos.children) b.classList.toggle('escolhido', b.dataset.sala === id);
+      if (!id) { trocar(info, h('span', { class: 'suave' }, 'Passe o mouse (ou toque) num lugar para ver o que tem lá.')); return; }
+      const i = INFO_SALAS[id];
+      const n = contagem[id] || 0;
+      trocar(info,
+        h('div', null, h('strong', null, i.nome), h('small', null, i.desc || ''),
+          h('small', { class: 'ilha-mapa-gente' }, sala === id ? 'Você está aqui' : n ? `${n} ${n === 1 ? 'coelho lá' : 'coelhos lá'}` : 'Ninguém lá agora')),
+        sala !== id && botao('Ir para lá', { classe: 'btn-pequeno btn-ouro', icone: 'frente', onclick: () => ir(id) }));
+    }
+    for (const [id, i] of lugares.sort((a, b) => a[1].mapa.y - b[1].mapa.y)) {
+      const n = contagem[id] || 0;
+      const b = h('button', {
+        type: 'button', class: `ilha-marco regiao-${i.regiao || 'centro'} ${sala === id ? 'aqui' : ''}`.trim(), 'data-sala': id,
+        style: { left: `${(i.mapa.x / MAPA_W) * 100}%`, top: `${(i.mapa.y / MAPA_H) * 100}%` },
+        'aria-label': `${i.nome}${n ? `, ${n} ${n === 1 ? 'pessoa' : 'pessoas'}` : ''}`,
+      }, h('span', { class: 'ilha-marco-icone' }, svgDe(i.icone)), h('span', { class: 'ilha-marco-nome' }, i.nome), n ? h('span', { class: 'ilha-marco-n' }, String(n)) : null);
+      b.addEventListener('pointerdown', ev => { toque = ev.pointerType !== 'mouse'; });
+      b.addEventListener('mouseenter', () => mostrar(id));
+      b.addEventListener('focus', () => mostrar(id));
+      b.addEventListener('click', () => {
+        if (toque && escolhido !== id) { mostrar(id); return; }
+        ir(id);
+      });
+      marcos.append(b);
+    }
+    mostrar(lugares.some(([id]) => id === sala) ? sala : null);
+    // O desenho: a parte parada fica guardada; ondas, barco e nuvens animam enquanto o mapa está aberto.
+    if (!ilhaFixa) {
+      ilhaFixa = document.createElement('canvas');
+      ilhaFixa.width = MAPA_W;
+      ilhaFixa.height = MAPA_H;
+      desenharIlhaFixa(ilhaFixa.getContext('2d'));
+    }
+    const comeco = performance.now();
+    const pintar = agora => {
+      if (!caixa.isConnected) { if (performance.now() - comeco > 2000) return; requestAnimationFrame(pintar); return; }
+      const r = tela.getBoundingClientRect();
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const w = Math.max(1, Math.round(r.width * dpr));
+      const hh = Math.max(1, Math.round(r.height * dpr));
+      if (tela.width !== w || tela.height !== hh) { tela.width = w; tela.height = hh; }
+      g.setTransform(w / MAPA_W, 0, 0, hh / MAPA_H, 0, 0);
+      g.drawImage(ilhaFixa, 0, 0, MAPA_W, MAPA_H);
+      try { desenharIlhaViva(g, agora / 1000); } catch (e) { console.error('Mapa da ilha:', e); }
+      requestAnimationFrame(pintar);
+    };
+    requestAnimationFrame(pintar);
+    return h('div', { class: 'ilha-mapa-bloco' }, caixa, info);
+  }
 
   /* ─── Decorar a minha toca ─── */
   function comecarDecorar() {

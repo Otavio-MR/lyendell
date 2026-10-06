@@ -449,6 +449,51 @@ Nas abas "Roupas e acessórios" e "Club Coelho" dá para criar **itens novos par
 O código: `public/js/sprites.js` (carrega e desenha), `public/js/telas/sprites.js` (a página),
 `src/rotas/sprites.js` e a tabela `sprites`. Cada jogo exporta a lista `SPRITES` das suas peças.
 
+### A Ilha do Club Coelho
+
+Os lugares do Club Penguin, na versão dos coelhos da Casa Luckham. O botão **Mapa** do clube abre o mapa
+ilustrado da ilha, com quantos coelhos estão em cada lugar; um clique leva direto para lá. Os "puffles"
+viraram **Pompons**, a EPF virou a **Guarda Secreta do Coelho** e o Rockhopper virou o **Capitão
+Saltarrocha**, com o navio **Saltador**. Os minijogos dão cenouras (com teto por partida e por dia), e o
+progresso de cada um (a faixa do ninja, a chave do navio...) fica na tabela `clube_progresso`.
+
+**Centro.** A Praça agora tem caminhos para o Lago, o Ancoradouro, o Forte Nevado, a Plaza e as Tocas. Em cima
+do Café fica a Sala de Leitura, com a lareira, os livros da história da ilha, a Mancala das Cenouras contra o
+computador e o Livro do Capitão Saltarrocha, que esconde a chave do Quartel do Capitão. Em cima do Salão de
+Dança fica o Fliperama, com máquinas que abrem os jogos da Recreação, e no porão do Salão uma porta desce para a
+Caldeira. A Plaza reúne o Pet Shop dos Pompons (com uma passagem secreta e uma caixa roxa muito estranha), a
+Pizzaria com a Fábrica de Pizzas de Cenoura, o Teatro com cenários que trocam e roteiros para encenar no chat, e o
+Hotel dos Pompons, com Spa e Cobertura com piscina. Ao lado ficam o Parque dos Pompons, com o Lança-Pompom, e a
+Pista de Skate.
+
+**Neve.** No norte ficam o Forte Nevado, com a torre do relógio e a Guerra de Bolas de Neve contra os
+raposinhos, e a Vila de Esqui. De lá se chega à Cabana do Esqui (lareira, o chocolate quente da Dona Cacau e um
+relógio cuco) e ao Sótão, onde a mesa comprida abre uma partida de Lig 4 da Recreação. O teleférico leva à
+Estação de Esqui no topo da montanha, com a Corrida de Trenó contra três coelhos. A Caverna da Mina leva à Mina
+de Ouro (cavar com a britadeira e fugir dos desabamentos), à Piscina Subterrânea com o Resgate dos Pompons e a
+um Lago Secreto cuja cachoeira esconde uma surpresa. Ainda há a Escola, com o Quiz da Ilha, e a Usina de
+Reciclagem, onde se separa o lixo.
+
+**Litoral.** A oeste e ao sul ficam a Floresta, com o acampamento e a fogueira, e a Prainha, com o Pegando Ondas
+(surfe com Giro, Mortal e Agarra). No Ancoradouro tem a Pescaria no Gelo e o barquinho para o Grande Iceberg:
+dizem que, se 10 coelhos dançarem lá ao mesmo tempo, ele balança e vira. Na Praia ficam o Farol, com o piano do
+faroleiro e, no topo, o Mirante com o telescópio e a Aventura a Jato, e o Saltador: o Convés com o Capitão, o
+Ninho do Corvo, o Porão com o Baú de itens raros (um presente de cenouras por dia) e o Quartel do Capitão, com a
+Caça ao Tesouro, que só abre para quem achou a chave no livro da Sala de Leitura.
+
+**Segredos.** Embaixo do Salão de Dança fica a Sala da Caldeira, com jornais antigos da ilha e um tijolo solto.
+O duto leva ao QG da Guarda Secreta do Coelho, com a Missão do dia (decifrar a mensagem, cortar o fio certo e
+achar as diferenças) e o Telefone Espião, que leva a qualquer lugar do mapa. A leste da montanha ficam o Pátio do
+Dojo e o Dojo do Sensei, onde se joga o **Desafio Ninja**, um jogo de cartas de fogo, água e neve (fogo vence
+neve, neve vence água, água vence fogo; ganha quem juntar três do mesmo elemento ou uma de cada, de cores
+diferentes). Cada vitória sobe uma faixa, da branca até a preta: a laranja abre o Dojo do Fogo, a azul o Dojo da
+Água, a roxa o Dojo da Neve (cada um com uma regra a mais) e só a faixa preta descobre o Esconderijo Ninja. Uma
+caixa estranha do Pet Shop leva à Dimensão das Caixas.
+
+O código: `public/js/clube-ilha.js` (o registro das salas), `public/js/ilha/<região>.js` (salas e desenhos),
+`public/js/ilha/<região>-jogos.js` (minijogos), `public/js/ilha/centro-mapa.js` (o mapa) e
+`src/clube-ilha/<região>.js` (o chão, as chegadas, as recompensas e o progresso no servidor).
+
 ### Códigos secretos
 
 Os jogos de uma pessoa só escondem códigos: uma sequência de setas (no teclado, deslizando o dedo ou

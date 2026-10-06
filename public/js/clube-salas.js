@@ -173,20 +173,35 @@ function fundoPraca(g) {
   brilho(g, 880, 70, 90, 'rgba(255,240,180,A)', 0.6);
   el(g, 880, 70, 34, 34, '#fff4c2');
   nuvem(g, 120, 70); nuvem(g, 420, 45, 0.8); nuvem(g, 640, 95, 0.9);
-  el(g, 200, 300, 380, 90, '#86b866');
+  // Lá longe: a montanha nevada (o caminho do Forte) à direita e um pedacinho do mar (o Ancoradouro) à esquerda.
+  forma(g, '#a9b8cc', [640, 300, 760, 150, 830, 205, 905, 118, 1000, 215, 1000, 300]);
+  forma(g, '#f4f8fc', [735, 182, 760, 150, 784, 182, 770, 176, 758, 190]);
+  forma(g, '#f4f8fc', [872, 158, 905, 118, 940, 160, 920, 152, 906, 168, 890, 154]);
+  forma(g, '#f4f8fc', [800, 236, 830, 205, 856, 236]);
+  g.fillStyle = grad(g, 0, 262, 0, 300, [[0, '#4f9ac4'], [1, '#7cc0e0']]);
+  g.fillRect(0, 262, 300, 38);
+  for (let k = 0; k < 6; k++) ret(g, 10 + k * 48, 270 + (k % 3) * 8, 22, 2, 'rgba(255,255,255,0.55)', 1);
+  ret(g, 52, 222, 3, 44, '#6b4a2b');
+  forma(g, '#fbf3e0', [56, 224, 56, 258, 82, 258]);
+  forma(g, '#8a5a32', [36, 264, 84, 264, 76, 274, 44, 274]);
+  el(g, 330, 300, 290, 58, '#86b866');
   el(g, 820, 300, 420, 100, '#79ab5c');
-  for (const [x, r] of [[30, 34], [350, 30], [655, 30], [970, 36]]) arvoreRedonda(g, x, 320, r, '#4f8a3c');
+  for (const [x, r] of [[350, 30], [655, 30], [970, 36]]) arvoreRedonda(g, x, 320, r, '#4f8a3c');
   chaoPedras(g, 300, H);
-  // Grama nas beiradas e os caminhos para o lago e para as tocas.
+  // Grama nas beiradas e os caminhos que saem da praça: Lago e Ancoradouro (esquerda), Forte e Plaza
+  // (direita) e as Tocas (embaixo, no meio).
   g.fillStyle = '#7fb069';
   g.fillRect(0, 300, W, 26);
-  for (const lado of [0, 1]) {
-    g.fillStyle = '#b8a27a';
-    g.beginPath();
-    if (lado === 0) { g.moveTo(0, 430); g.lineTo(120, 445); g.lineTo(120, 515); g.lineTo(0, 530); } else { g.moveTo(W, 430); g.lineTo(W - 120, 445); g.lineTo(W - 120, 515); g.lineTo(W, 530); }
-    g.closePath();
-    g.fill();
-  }
+  const caminho = (cor, pts) => forma(g, cor, pts);
+  caminho('#b8a27a', [0, 355, 136, 378, 136, 432, 0, 452]);           // Lago (terra)
+  caminho('#9c7448', [0, 470, 136, 488, 136, 548, 0, 568]);           // Ancoradouro (tábuas)
+  for (let x = 6; x < 136; x += 15) { g.fillStyle = 'rgba(60,35,15,0.35)'; g.fillRect(x, 472 + x * 0.13, 2, 94 - x * 0.27); }
+  caminho('#c9c3b8', [W, 355, W - 136, 378, W - 136, 432, W, 452]);   // Forte (pedra com neve)
+  for (const [x, y, r] of [[968, 380, 16], [930, 404, 12], [985, 430, 14], [890, 392, 9]]) el(g, x, y, r, r * 0.45, 'rgba(255,255,255,0.9)');
+  caminho('#b8a27a', [W, 470, W - 136, 488, W - 136, 548, W, 568]);   // Plaza
+  for (let k = 0; k < 5; k++) ret(g, W - 128 + k * 26, 510, 14, 6, 'rgba(255,255,255,0.35)', 2);
+  caminho('#c8b48c', [430, 548, 570, 548, 600, H, 400, H]);           // Tocas
+  placa(g, 500, 584, 168, 28, 'Tocas dos moradores', { fundo: '#4f7a45', borda: '#2f4f2a', cor: '#f4dd80', fonte: '700 13px "Cinzel", Georgia, serif' });
   if (!sp(g, 'fachada-cafe', 'parado', 210, 335, { quadro: 0 })) fachadaCafe(g);
   if (!sp(g, 'fachada-armarinho', 'parado', 500, 335, { quadro: 0 })) fachadaArmarinho(g);
   if (!sp(g, 'fachada-salao', 'parado', 790, 335, { quadro: 0 })) fachadaSalao(g);
@@ -326,7 +341,22 @@ function posteCorpo(g, x, y) {
 function setaPlaca(g, x, y, textoPlaca, dir) {
   sombraNoChao(g, x, y + 2, 18);
   if (!sp(g, 'placa-seta', 'parado', x, y, { dir })) setaCorpo(g, x, y, dir);
-  texto(g, textoPlaca, x + dir * 6, y - 69, { fonte: '700 14px "Cinzel", Georgia, serif' });
+  textoNaSeta(g, textoPlaca, x + dir * 6, y - 69);
+}
+// O nome na placa diminui a letra quando não cabe (Ancoradouro, Forte Nevado...).
+function textoNaSeta(g, t, x, y) {
+  let tam = 14;
+  g.font = `700 ${tam}px "Cinzel", Georgia, serif`;
+  while (tam > 10 && g.measureText(t).width > 96) { tam--; g.font = `700 ${tam}px "Cinzel", Georgia, serif`; }
+  texto(g, t, x, y, { fonte: `700 ${tam}px "Cinzel", Georgia, serif` });
+}
+// Poste com duas placas apontando para o mesmo lado (a de cima é a placa de sempre, 40 mais alta).
+function setaDupla(g, x, y, [cima, baixo], dir) {
+  sombraNoChao(g, x, y + 2, 18);
+  for (const [dy, t] of [[-40, cima], [0, baixo]]) {
+    if (!sp(g, 'placa-seta', 'parado', x, y + dy, { dir })) setaCorpo(g, x, y + dy, dir);
+    textoNaSeta(g, t, x + dir * 6, y + dy - 69);
+  }
 }
 function setaCorpo(g, x, y, dir) {
   ret(g, x - 3, y - 80, 6, 80, '#6b4a2b');
@@ -363,8 +393,34 @@ function fundoCafe(g) {
   if (!sp(g, 'cardapio', 'parado', 480, 233, { quadro: 0 })) cardapio(g);
   if (!sp(g, 'prateleira-potes', 'parado', 780, 130, { quadro: 0 })) prateleiraPotes(g);
   chaoTabuas(g, 360, H);
+  if (!sp(g, 'escada-cafe', 'parado', 70, 384, { quadro: 0 })) escadaCafe(g);
   ret(g, 430, 568, 140, 30, '#7a2f2f', 6);
   texto(g, 'Saída', 500, 584, { fonte: '700 13px "Cinzel", Georgia, serif', cor: '#f4dd80' });
+}
+// A escada de madeira encostada na parede da esquerda, subindo para a Sala de Leitura.
+function escadaCafe(g) {
+  el(g, 46, 100, 40, 42, '#2a1a10');
+  ret(g, 6, 100, 80, 74, '#2a1a10');
+  brilho(g, 46, 120, 50, 'rgba(255,200,120,A)', 0.4);
+  g.strokeStyle = '#5b3c22'; g.lineWidth = 6;
+  g.beginPath(); g.moveTo(6, 174); g.lineTo(6, 100); g.arc(46, 100, 40, Math.PI, 0); g.lineTo(86, 174); g.stroke();
+  const degraus = 9;
+  for (let i = 0; i < degraus; i++) {
+    const f0 = i / degraus;
+    const f1 = (i + 1) / degraus;
+    const y0 = 174 + f0 * 206;
+    const y1 = 174 + f1 * 206;
+    const xa = 6 - f0 * 6;
+    const xb = 86 + f1 * 48;
+    ret(g, xa, y0, xb - xa, (y1 - y0) * 0.45, i % 2 ? '#b07e50' : '#a8774a');
+    ret(g, xa, y0 + (y1 - y0) * 0.45, xb - xa, (y1 - y0) * 0.55, '#6b4226');
+  }
+  // Corrimão
+  g.strokeStyle = '#4a2e18'; g.lineWidth = 5;
+  g.beginPath(); g.moveTo(90, 140); g.lineTo(138, 330); g.stroke();
+  for (let k = 0; k <= 4; k++) { const x = 92 + k * 11.5; const y = 148 + k * 45; ret(g, x - 2, y, 4, 40 + k * 4, '#5b3c22'); }
+  placa(g, 46, 40, 92, 26, 'Leitura', { fonte: '700 13px "Cinzel", Georgia, serif' });
+  texto(g, '▲', 46, 62, { cor: '#f4dd80', fonte: '700 12px sans-serif' });
 }
 function janelaCafe(g) {
   // Janela com a praça lá fora
@@ -539,8 +595,39 @@ function fundoDanca(g) {
   g.fillStyle = '#140c22';
   g.fillRect(0, 300, W, 40);
   if (!sp(g, 'cabine-dj', 'parado', 500, 330, { quadro: 0 })) cabineDj(g);
+  if (!sp(g, 'escada-salao', 'parado', 272, 340, { quadro: 0 })) escadaSalao(g);
+  if (!sp(g, 'porta-caldeira', 'parado', 654, 340, { quadro: 0 })) portaCaldeira(g);
   g.fillStyle = '#0a0612';
   g.fillRect(0, 336, W, 6);
+}
+// A escada que sobe para o Fliperama: degraus escuros com a beirada de neon e a porta lá em cima.
+function escadaSalao(g) {
+  ret(g, 226, 112, 92, 106, '#2a1d42', 8);
+  ret(g, 236, 122, 72, 96, '#07040d', 4);
+  const degraus = 7;
+  for (let i = 0; i < degraus; i++) {
+    const f0 = i / degraus;
+    const f1 = (i + 1) / degraus;
+    const y0 = 218 + f0 * 122;
+    const y1 = 218 + f1 * 122;
+    const xa = 236 - f1 * 36;
+    const xb = 308 + f1 * 36;
+    ret(g, xa, y0, xb - xa, y1 - y0, i % 2 ? '#241838' : '#1d132e');
+    ret(g, xa, y0, xb - xa, 3, i % 2 ? '#ff7ad9' : '#6be0ff');
+  }
+  for (const lado of [-1, 1]) {
+    g.strokeStyle = '#6be0ff'; g.lineWidth = 3;
+    g.beginPath(); g.moveTo(272 + lado * 40, 200); g.lineTo(272 + lado * 78, 330); g.stroke();
+  }
+}
+// A porta de ferro do porão, que desce para a Sala da Caldeira.
+function portaCaldeira(g) {
+  ret(g, 622, 252, 64, 88, '#3a3f48', 4);
+  ret(g, 628, 258, 52, 82, '#555c66', 3);
+  for (const [x, y] of [[633, 263], [675, 263], [633, 333], [675, 333]]) el(g, x, y, 2, 2, '#2a2e35');
+  for (let k = 0; k < 6; k++) forma(g, k % 2 ? '#1b1b1b' : '#e8c24a', [628 + k * 9, 300, 637 + k * 9, 300, 632 + k * 9, 310, 623 + k * 9, 310]);
+  el(g, 672, 285, 3, 3, '#c9cdd4');
+  placa(g, 654, 240, 80, 20, 'Caldeira', { fundo: '#3a3f48', borda: '#1b1e23', cor: '#ffb070', fonte: '700 11px "Cinzel", Georgia, serif' });
 }
 function cabineDj(g) {
   // Cabine do DJ
@@ -581,6 +668,19 @@ function animarDanca(g, t) {
   g.strokeStyle = '#555'; g.lineWidth = 2;
   g.beginPath(); g.moveTo(500, 0); g.lineTo(500, 34); g.stroke();
   if (!sp(g, 'globo', 'girando', 500, 60, { t })) globo(g, 500, 60, t);
+  // O letreiro do Fliperama pisca, a luz das máquinas sai pela porta e o vapor escapa da porta da Caldeira.
+  const neon = (Math.floor(t * 2.5) % 7) ? 1 : 0.35;
+  g.save();
+  g.globalAlpha = neon;
+  texto(g, 'FLIPERAMA', 272, 98, { cor: '#7fe08a', fonte: '700 17px "Cinzel", Georgia, serif', sombra: 'rgba(127,224,138,0.5)' });
+  g.restore();
+  brilho(g, 272, 98, 80, 'rgba(127,224,138,A)', 0.18 * neon);
+  const cor = ['rgba(255,122,217,A)', 'rgba(107,224,255,A)', 'rgba(255,228,107,A)'][Math.floor(t * 3) % 3];
+  brilho(g, 272, 170, 46, cor, 0.35 + Math.sin(t * 11) * 0.1);
+  for (let k = 0; k < 3; k++) {
+    const f = (t * 0.4 + k / 3) % 1;
+    el(g, 640 + k * 14 + Math.sin(f * 5 + k) * 5, 336 - f * 40, 6 + f * 10, 4 + f * 6, `rgba(220,220,230,${0.4 * (1 - f)})`);
+  }
 }
 function globo(g, x, y, t) {
   el(g, x, y, 28, 28, '#c8ccd4');
@@ -1076,15 +1176,19 @@ export const SALAS = {
       { y: 470, desenhar: fonte },
       { y: 530, desenhar: g => banco(g, 240, 530) }, { y: 530, desenhar: g => banco(g, 760, 530) },
       { y: 375, desenhar: (g, t) => poste(g, 345, 375, t) }, { y: 375, desenhar: (g, t) => poste(g, 655, 375, t) },
-      { y: 470, desenhar: g => setaPlaca(g, 66, 470, 'Lago', -1) }, { y: 470, desenhar: g => setaPlaca(g, 934, 470, 'Tocas', 1) },
-      { y: 590, desenhar: g => canteiro(g, 120, 590) }, { y: 590, desenhar: g => canteiro(g, 880, 590) },
+      { y: 462, desenhar: g => setaDupla(g, 168, 462, ['Lago', 'Ancoradouro'], -1) },
+      { y: 462, desenhar: g => setaDupla(g, 832, 462, ['Forte Nevado', 'Plaza'], 1) },
+      { y: 594, desenhar: g => canteiro(g, 330, 594) }, { y: 594, desenhar: g => canteiro(g, 670, 594) },
     ],
     pontos: [
       { x0: 178, y0: 248, x1: 242, y1: 345, ir: [210, 362], acao: 'sala:cafe', rotulo: 'Café da Cenoura' },
       { x0: 462, y0: 244, x1: 538, y1: 345, ir: [500, 352], acao: 'sala:loja', rotulo: 'Armarinho' },
       { x0: 762, y0: 246, x1: 828, y1: 345, ir: [795, 362], acao: 'sala:danca', rotulo: 'Salão de Dança' },
-      { x0: 0, y0: 380, x1: 122, y1: 525, ir: [45, 480], acao: 'sala:lago', rotulo: 'Lago Cintilante' },
-      { x0: 878, y0: 380, x1: 1000, y1: 525, ir: [955, 480], acao: 'tocas', rotulo: 'Tocas dos moradores' },
+      { x0: 0, y0: 350, x1: 136, y1: 458, ir: [40, 405], acao: 'sala:lago', rotulo: 'Lago Cintilante' },
+      { x0: 0, y0: 462, x1: 136, y1: 575, ir: [40, 520], acao: 'sala:ancoradouro', rotulo: 'Ancoradouro' },
+      { x0: 864, y0: 350, x1: 1000, y1: 458, ir: [960, 405], acao: 'sala:forte', rotulo: 'Forte Nevado' },
+      { x0: 864, y0: 462, x1: 1000, y1: 575, ir: [960, 520], acao: 'sala:plaza', rotulo: 'Plaza' },
+      { x0: 410, y0: 562, x1: 590, y1: 600, ir: [500, 582], acao: 'tocas', rotulo: 'Tocas dos moradores' },
     ],
   },
   cafe: {
@@ -1096,6 +1200,7 @@ export const SALAS = {
     ],
     pontos: [
       { x0: 600, y0: 240, x1: 940, y1: 380, ir: [720, 398], acao: 'cafe', rotulo: 'Pegar um café de cenoura' },
+      { x0: 0, y0: 56, x1: 140, y1: 400, ir: [70, 392], acao: 'sala:leitura', rotulo: 'Subir para a Sala de Leitura' },
       { x0: 420, y0: 560, x1: 580, y1: 600, ir: [500, 585], acao: 'sala:praca', rotulo: 'Voltar à praça' },
     ],
   },
@@ -1122,6 +1227,8 @@ export const SALAS = {
     ],
     pontos: [
       { x0: 690, y0: 196, x1: 780, y1: 345, ir: [735, 362], acao: 'danca', rotulo: 'Jogar Dança da Toca' },
+      { x0: 196, y0: 84, x1: 348, y1: 345, ir: [272, 352], acao: 'sala:fliperama', rotulo: 'Subir para o Fliperama' },
+      { x0: 614, y0: 228, x1: 688, y1: 345, ir: [654, 356], acao: 'sala:caldeira', rotulo: 'Descer para a Sala da Caldeira' },
       { x0: 420, y0: 560, x1: 580, y1: 600, ir: [500, 585], acao: 'sala:praca', rotulo: 'Voltar à praça' },
     ],
   },
@@ -1174,7 +1281,7 @@ export const SPRITES = [
     92, 46, PARADO, g => bancoCorpo(g, 0, 0)),
   peca('poste', 'Poste de luz', 'Os postes da praça. O brilho da lâmpada continua feito pelo jogo.',
     24, 140, animacao('aceso', 'Aceso'), g => posteCorpo(g, 0, 0)),
-  peca('placa-seta', 'Placa de seta', 'As placas "Lago" e "Tocas" da praça. Desenhe a placa apontando para a direita e sem letras: o jogo vira para o lado certo e escreve o nome por cima.',
+  peca('placa-seta', 'Placa de seta', 'As placas de seta da praça (Lago, Ancoradouro, Forte Nevado, Plaza; nos postes com duas, a de cima é a mesma placa 40 mais alta). Desenhe a placa apontando para a direita e sem letras: o jogo vira para o lado certo e escreve o nome por cima.',
     132, 88, PARADO, g => setaCorpo(g, 0, 0, 1)),
   peca('canteiro', 'Canteiro de flores', 'Os canteiros floridos na frente da praça.',
     80, 32, PARADO, g => canteiroCorpo(g, 0, 0)),
@@ -1187,6 +1294,8 @@ export const SPRITES = [
     206, 166, PARADO, g => naOrigem(g, 480, 233, () => cardapio(g))),
   peca('prateleira-potes', 'Prateleira de potes', `A prateleira com os potes de geleia atrás do balcão.${NO_FUNDO}`,
     300, 48, PARADO, g => naOrigem(g, 780, 130, () => prateleiraPotes(g))),
+  peca('escada-cafe', 'Escada do Café', `A escada de madeira na parede da esquerda, que sobe para a Sala de Leitura (com a placa "Leitura").${NO_FUNDO}`,
+    140, 360, PARADO, g => naOrigem(g, 70, 384, () => escadaCafe(g))),
   peca('luminaria-cafe', 'Luminária do Café', 'As luminárias penduradas no teto (a âncora é o ponto do teto). O brilho continua feito pelo jogo.',
     44, 58, animacao('acesa', 'Acesa'), g => luminariaCafe(g, 0), { ancora: 'topo' }),
   peca('balcao-cafe', 'Balcão do Café', 'O balcão com a máquina de café (soltando vapor) e o bolo de cenoura. O cozinheiro é outra peça.',
@@ -1207,6 +1316,10 @@ export const SPRITES = [
   // Salão de Dança
   peca('cabine-dj', 'Cabine do DJ', `A cabine com os dois toca-discos (as letras fazem parte do desenho).${NO_FUNDO}`,
     220, 90, PARADO, g => naOrigem(g, 500, 330, () => cabineDj(g))),
+  peca('escada-salao', 'Escada do Fliperama', `A escada com a beirada de neon que sobe do Salão para o Fliperama, com a porta lá em cima. O letreiro piscando e a luz das máquinas continuam feitos pelo jogo.${NO_FUNDO}`,
+    150, 236, PARADO, g => naOrigem(g, 272, 340, () => escadaSalao(g))),
+  peca('porta-caldeira', 'Porta da Caldeira', `A porta de ferro do porão do Salão, que desce para a Sala da Caldeira (com a placa). O vapor continua feito pelo jogo.${NO_FUNDO}`,
+    84, 112, PARADO, g => naOrigem(g, 654, 340, () => portaCaldeira(g))),
   peca('globo', 'Globo espelhado', 'O globo no teto do Salão. O fio e os raios de luz coloridos continuam feitos pelo jogo.',
     60, 60, animacao('girando', 'Girando', 4, 6), (g, anim, t) => globo(g, 0, 0, t), { ancora: 'centro' }),
   peca('caixa-som', 'Caixa de som', 'As caixas de som dos dois lados da pista, pulsando com a música. A sombra continua feita pelo jogo.',
@@ -1241,3 +1354,10 @@ export const SPRITES = [
   }),
 ];
 registrarPecas(SPRITES);
+
+// As utilidades de desenho, para as regiões da Ilha (public/js/ilha/*.js) desenharem no mesmo estilo.
+export const DESENHO = {
+  el, ret, grad, brilho, texto, forma, placa, nuvem, sombraNoChao, naOrigem,
+  chaoPedras, chaoTabuas, chaoXadrez, chaoGrama, arvoreRedonda, copaRedonda, setaPlaca, setaDupla,
+  banco, poste, canteiro, borboleta,
+};
