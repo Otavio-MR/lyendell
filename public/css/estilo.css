@@ -3174,3 +3174,14 @@ body.bt-jogando .desafio-fim { display: none; }
 .neve-lig4-abertas h3 { font-family: var(--f-titulo, serif); font-size: 0.95rem; color: var(--texto-2); margin: 4px 0; }
 .neve-lig4-linha { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--borda-2); }
 @media (max-width: 560px) { .neve-botao { height: 56px; } .neve-botao.largo { min-width: 0; width: 100%; } }
+/* Pompom de estimação (Pet Shop) */
+.pompom-janela { display: grid; gap: 12px; }
+.pompom-janela p { margin: 0; }
+.pompom-titulo { margin: 4px 0 0; font-size: 0.8rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--texto-2); font-family: var(--f-titulo); }
+.pompom-cores { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
+.pompom-cor { display: grid; justify-items: center; gap: 2px; padding: 8px 4px; border-radius: var(--raio-p); border: 1px solid var(--borda-2); background: var(--sup-2); color: var(--texto); cursor: pointer; }
+.pompom-cor.ativo { border-color: var(--ouro); background: var(--ouro-fundo); }
+.pompom-meu { display: flex; align-items: center; gap: 14px; }
+.pompom-meu > div { display: grid; }
+.pompom-nome { font-family: var(--f-titulo); font-size: 1.3rem; color: var(--ouro-l); }
+.pompom-botoes { display: flex; flex-wrap: wrap; gap: 8px; }

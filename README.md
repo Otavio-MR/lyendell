@@ -464,7 +464,9 @@ Dança fica o Fliperama, com máquinas que abrem os jogos da Recreação, e no p
 Caldeira. A Plaza reúne o Pet Shop dos Pompons (com uma passagem secreta e uma caixa roxa muito estranha), a
 Pizzaria com a Fábrica de Pizzas de Cenoura, o Teatro com cenários que trocam e roteiros para encenar no chat, e o
 Hotel dos Pompons, com Spa e Cobertura com piscina. Ao lado ficam o Parque dos Pompons, com o Lança-Pompom, e a
-Pista de Skate.
+Pista de Skate. No balcão do Pet Shop dá para **adotar um Pompom de estimação** (escolhe a cor e o nome, por 100
+cenouras): ele segue o coelho por todas as salas do clube, e todo mundo vê. Dá para mudar o nome, deixar em casa
+ou trocar por outro (`clube.pompom`, versão 28 do banco).
 
 **Neve.** No norte ficam o Forte Nevado, com a torre do relógio e a Guerra de Bolas de Neve contra os
 raposinhos, e a Vila de Esqui. De lá se chega à Cabana do Esqui (lareira, o chocolate quente da Dona Cacau e um

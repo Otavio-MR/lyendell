@@ -209,13 +209,26 @@ const VEL = 170; // unidades por segundo (o mesmo do navegador)
 
 const json = (t, padrao) => { try { const v = JSON.parse(t || ''); return v && typeof v === 'object' ? v : padrao; } catch { return padrao; } };
 
+// O Pompom de estimação: cada um adota um no Pet Shop (cor e nome) e ele segue o coelho pelo clube.
+const CORES_POMPOM = ['rosa', 'azul', 'amarelo', 'verde', 'roxo', 'preto', 'branco', 'laranja'];
+const PRECO_POMPOM = 100;
+function lerPompom(texto) {
+  const p = json(texto, null);
+  if (!p || !CORES_POMPOM.includes(p.cor)) return null;
+  return { cor: p.cor, nome: String(p.nome || 'Pompom').slice(0, 20), passear: p.passear !== false };
+}
+const limparNomePompom = n => String(n || '').replace(/[\u0000-\u001f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 20);
+// O visual que os outros veem leva o pompom junto (quando ele está passeando).
+const comPompom = (visual, pompom) => (pompom?.passear ? { ...visual, pompom: { cor: pompom.cor, nome: pompom.nome } } : visual);
+
 async function perfil(id) {
   await pronto();
   await db.run(`INSERT INTO clube (usuario_id, moedas, itens) VALUES (?, ?, ?) ON CONFLICT (usuario_id) DO NOTHING`,
     id, INICIAIS.moedas, JSON.stringify(INICIAIS.itens));
   const l = await db.get('SELECT * FROM clube WHERE usuario_id = ?', id);
   return {
-    moedas: Number(l.moedas), visual: validarVisual(json(l.visual, {}), json(l.itens, {})), itens: json(l.itens, {}),
+    moedas: Number(l.moedas), visual: comPompom(validarVisual(json(l.visual, {}), json(l.itens, {})), lerPompom(l.pompom)), itens: json(l.itens, {}),
+    pompom: lerPompom(l.pompom),
     toca: tocaPadrao(json(l.toca, {})), presente: l.presente, peixes: Number(l.peixes || 0),
   };
 }
@@ -437,5 +450,6 @@ function iniciar(opcoes) { ctx = { ...ctx, ...opcoes }; }
 
 module.exports = {
   CATALOGO, ITEM, PARTES, ROUPA, SALAS, EMOTES, INICIAIS, PRESENTE, TETO_DIA, MAX_MOVEIS, ONDE_MOVEL, ErroClube,
+  CORES_POMPOM, PRECO_POMPOM, lerPompom, limparNomePompom, comPompom,
   pronto, recarregarItens, catalogoPublico, pecaDoItem, perfil, validarVisual, visualDesenho, validarToca, ganhar, ganharDeJogo, acoes, sair, fechou, mudouVisual, mudouToca, iniciar, posicaoAgora,
 };

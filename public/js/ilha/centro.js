@@ -1870,10 +1870,10 @@ export const ACOES_CENTRO = {
     ctx.enviar('clube:emote', { e: 'coracao' });
     ctx.aviso(sorteio(['O pompom fez "prrr" de felicidade!', 'Que fofura! O pompom pulou de alegria.', 'O pompom fechou os olhinhos e pediu mais carinho.', 'Os pompons fizeram uma rodinha em volta de você!']));
   },
-  adotar(ctx) {
-    const cor = sorteio(CORES);
-    ctx.enviar('clube:emote', { e: 'coracao' });
-    ctx.aviso(`Você conheceu ${sorteio(NOMES_POMPOM)}, o pompom ${COR_DO_NOME[cor]}! A tratadora diz que ele pode visitar você sempre que quiser.`);
+  // Adotar de verdade: o pompom fica salvo e segue o coelho por todo o clube (veja pompom-adotar.js).
+  async adotar(ctx) {
+    const { abrirAdocao } = await import('./pompom-adotar.js');
+    await abrirAdocao(ctx);
   },
   portaSecreta(ctx) {
     ctx.aviso('O cartaz estava solto... ele gira e mostra uma passagem secreta!');

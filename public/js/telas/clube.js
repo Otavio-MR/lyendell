@@ -11,6 +11,11 @@ import { abrirPescaria, abrirDanca } from '../clube-minijogos.js';
 import { PARTES } from '../roupas-coelho.js';
 import { aoMudarSprites, usarNomeDaPeca } from '../sprites.js';
 import { acaoDaIlha, INFO_SALAS } from '../ilha/index.js';
+import { desenharPompom, CORES_POMPOM } from '../ilha/neve.js';
+
+// O Pompom de estimação segue o coelho (visual.pompom = { cor, nome }, adotado no Pet Shop).
+const IDS_POMPOM = ['rosa', 'azul', 'amarelo', 'verde', 'roxo', 'preto', 'branco', 'laranja'];
+const corPompom = id => CORES_POMPOM[IDS_POMPOM.indexOf(id)] || CORES_POMPOM[0];
 import { desenharIlhaFixa, desenharIlhaViva, MAPA_W, MAPA_H } from '../ilha/centro-mapa.js';
 import { desenhoDoIcone } from '../icones-mapa.js';
 
@@ -330,6 +335,21 @@ export async function clube() {
         }
       }
       const agoraMs = Date.now();
+      // Os pompons: vão atrás do dono, um pouco atrasados, pulando quando ele anda.
+      for (const p of pessoas.values()) {
+        const pet = p.visual?.pompom;
+        if (!pet) { p.pet = null; continue; }
+        const alvoX = p.x - (p.d || 1) * 38;
+        const alvoY = p.y + 6;
+        if (!p.pet) p.pet = { x: alvoX, y: alvoY, d: p.d || 1 };
+        const k = Math.min(1, dt * 3.5);
+        const dx = alvoX - p.pet.x;
+        p.pet.x += dx * k;
+        p.pet.y += (alvoY - p.pet.y) * k;
+        if (Math.abs(dx) > 2) p.pet.d = dx > 0 ? 1 : -1;
+        const pet0 = p.pet;
+        camada.push({ y: pet0.y, f: () => desenharPompom(g, pet0.x, pet0.y, t + (p.id % 5), corPompom(pet.cor), 'pulando', 1.05) });
+      }
       for (const p of pessoas.values()) {
         camada.push({
           y: p.y,

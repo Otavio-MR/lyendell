@@ -491,7 +491,7 @@ CREATE TABLE IF NOT EXISTS diario (
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 27;
+const VERSAO = 28;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -579,6 +579,8 @@ async function migrar() {
   if (versao < 26 && !await colunaExiste('usuarios', 'aniversario')) await db.run('ALTER TABLE usuarios ADD COLUMN aniversario TEXT');
   // v27: quem troca os sprites também renomeia as peças e cria itens novos para o Club Coelho
   // (as tabelas sprites_nomes e clube_itens já vêm do esquema; aqui só o índice dos itens que estão à venda).
+  // v28: o Pompom de estimação do Club Coelho (cor, nome e se está passeando).
+  if (versao < 28 && !await colunaExiste('clube', 'pompom')) await db.run('ALTER TABLE clube ADD COLUMN pompom TEXT');
   if (versao < 27) await db.run("CREATE INDEX IF NOT EXISTS clube_itens_ativos ON clube_itens (ativo)");
   // v20: o campo "Nickname" vira "Endereço" em todos os livros (no RP o nick é o endereço da pessoa).
   if (versao < 20) await nickVirouEndereco();

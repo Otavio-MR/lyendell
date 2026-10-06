@@ -24,7 +24,8 @@ r.get('/', async (req, res) => {
     if (changes) { presente = clube.PRESENTE; eu = await clube.perfil(id); }
   }
   res.json({
-    eu: { moedas: eu.moedas, visual: eu.visual, itens: eu.itens, toca: eu.toca, peixes: eu.peixes },
+    eu: { moedas: eu.moedas, visual: eu.visual, itens: eu.itens, toca: eu.toca, peixes: eu.peixes, pompom: eu.pompom },
+    pompom: { cores: clube.CORES_POMPOM, preco: clube.PRECO_POMPOM },
     presente, catalogo: clube.catalogoPublico(), tetoDia: clube.TETO_DIA,
     salas: Object.fromEntries(Object.entries(clube.SALAS).map(([k, s]) => [k, { nome: s.nome, chao: s.chao }])),
   });
@@ -57,8 +58,43 @@ r.put('/visual', async (req, res) => {
   const eu = await clube.perfil(id);
   const visual = clube.validarVisual(req.body || {}, eu.itens);
   await db.run('UPDATE clube SET visual = ? WHERE usuario_id = ?', JSON.stringify(visual), id);
-  clube.mudouVisual(id, visual);
-  res.json({ visual });
+  const comPompom = clube.comPompom(visual, eu.pompom);
+  clube.mudouVisual(id, comPompom);
+  res.json({ visual: comPompom });
+});
+
+// Adotar um Pompom no Pet Shop (ou trocar o que tem por outro): escolhe a cor e o nome, custa cenouras.
+r.post('/pompom', async (req, res) => {
+  const id = req.usuario.id;
+  const cor = String(req.body?.cor || '');
+  if (!clube.CORES_POMPOM.includes(cor)) throw erro(400, 'Escolha a cor do pompom.');
+  const nome = clube.limparNomePompom(req.body?.nome);
+  if (!nome) throw erro(400, 'Dê um nome para o pompom.');
+  const { changes } = await db.run('UPDATE clube SET moedas = moedas - ? WHERE usuario_id = ? AND moedas >= ?', clube.PRECO_POMPOM, id, clube.PRECO_POMPOM);
+  if (!changes) throw erro(400, `Faltam cenouras: adotar um pompom custa ${clube.PRECO_POMPOM}.`);
+  await db.run('UPDATE clube SET pompom = ? WHERE usuario_id = ?', JSON.stringify({ cor, nome, passear: true }), id);
+  const eu = await clube.perfil(id);
+  clube.mudouVisual(id, eu.visual);
+  progresso.registrar(id, 'clube_compra');
+  res.status(201).json({ moedas: eu.moedas, pompom: eu.pompom, visual: eu.visual });
+});
+
+// Mudar o nome do pompom ou deixar ele em casa (de graça).
+r.put('/pompom', async (req, res) => {
+  const id = req.usuario.id;
+  const eu = await clube.perfil(id);
+  if (!eu.pompom) throw erro(400, 'Você ainda não adotou um pompom. Passe no Pet Shop da Plaza!');
+  const novo = { ...eu.pompom };
+  if (req.body?.nome !== undefined) {
+    const nome = clube.limparNomePompom(req.body.nome);
+    if (!nome) throw erro(400, 'Dê um nome para o pompom.');
+    novo.nome = nome;
+  }
+  if (req.body?.passear !== undefined) novo.passear = !!req.body.passear;
+  await db.run('UPDATE clube SET pompom = ? WHERE usuario_id = ?', JSON.stringify(novo), id);
+  const atual = await clube.perfil(id);
+  clube.mudouVisual(id, atual.visual);
+  res.json({ pompom: atual.pompom, visual: atual.visual });
 });
 
 // Redecorar a minha toca.
