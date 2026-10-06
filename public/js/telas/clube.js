@@ -6,10 +6,10 @@
 import { h, trocar, icone, botao, cabecalho, modal, get, post, put, aviso, aoSair, estado, pode, num, normalizar } from '../core.js';
 import { rt, ouvir, enviar } from '../tempo-real.js';
 import { desenharCoelho, quebrarTexto } from '../desenho-coelho.js';
-import { SALAS, W, H, fundoToca, desenharMovel, MOVEIS } from '../clube-salas.js';
+import { SALAS, W, H, fundoToca, desenharMovel, MOVEIS, registrarItensNovos } from '../clube-salas.js';
 import { abrirPescaria, abrirDanca } from '../clube-minijogos.js';
 import { PARTES } from '../roupas-coelho.js';
-import { aoMudarSprites } from '../sprites.js';
+import { aoMudarSprites, usarNomeDaPeca } from '../sprites.js';
 
 const VEL = 170; // o mesmo do servidor
 const EMOTES = [
@@ -33,7 +33,17 @@ function exigirAcesso() {
 export async function clube() {
   exigirAcesso();
   const dados = await get('/api/clube');
-  const cat = new Map(dados.catalogo.map(i => [i.id, i]));
+  const cat = new Map();
+  // O catálogo: os itens novos (roupas e móveis feitos na tela de sprites) entram como peças, e o nome de
+  // cada item acompanha o nome da peça (quem troca os sprites pode renomear).
+  function usarCatalogo(lista) {
+    dados.catalogo = lista;
+    cat.clear();
+    for (const i of lista) cat.set(i.id, i);
+    registrarItensNovos(lista.filter(i => i.novo));
+    for (const i of lista) if (i.peca) usarNomeDaPeca(i, 'nome', i.peca, i.nomePadrao ?? i.nome);
+  }
+  usarCatalogo(dados.catalogo);
   const eu = dados.eu;
   const meuId = estado.eu.id;
 
@@ -130,6 +140,14 @@ export async function clube() {
   });
   escutar('clube:visual', ({ id, visual }) => { const p = pessoas.get(id); if (p) p.visual = visual; });
   escutar('clube:toca', m => { if (sala === `toca:${m.toca.dono}`) toca = m.toca; });
+  // Alguém mexeu nos sprites: pode ter item novo na loja (ou saído dela). O catálogo vem de novo.
+  let pedidoCatalogo = null;
+  escutar('sprites', () => {
+    clearTimeout(pedidoCatalogo);
+    pedidoCatalogo = setTimeout(() => {
+      get('/api/clube').then(d => { if (Array.isArray(d?.catalogo)) usarCatalogo(d.catalogo); }).catch(() => {});
+    }, 400);
+  });
 
   function novaPessoa(p) {
     return { ...p, passo: 0, andando: false, fala: null, emote: null, cafeAte: 0 };
@@ -425,14 +443,24 @@ export async function clube() {
     c.repintar = () => pintar(0);
     return c;
   }
+  // As miniaturas abertas (loja, guarda-roupa, decorar): desenhadas de novo quando um sprite chega ou muda.
+  const previas = new Set();
   function previaItem(item, tam = 84) {
     const c = h('canvas', { class: 'clube-previa', width: tam * 2, height: tam * 2, style: { width: `${tam}px`, height: `${tam}px` } });
+    const pintar = () => pintarPrevia(c, item, tam);
+    pintar();
+    previas.add({ c, pintar, desde: Date.now() });
+    return c;
+  }
+  function pintarPrevia(c, item, tam) {
     const cg = c.getContext('2d');
+    cg.setTransform(1, 0, 0, 1, 0, 0);
+    cg.clearRect(0, 0, c.width, c.height);
     cg.setTransform(2, 0, 0, 2, 0, 0);
     if (item.tipo === 'movel') {
       const info = MOVEIS[item.id] || { w: 80, h: 80 };
       const k = Math.min(1, (tam - 12) / Math.max(info.w, info.h));
-      cg.translate(tam / 2, info.parede ? tam / 2 : tam - 8);
+      cg.translate(tam / 2, info.parede || info.chao ? tam / 2 : tam - 8);
       cg.scale(k, k);
       desenharMovel(cg, item.id, 0, 0, 0, 1);
     } else if (item.tipo === 'piso' || item.tipo === 'parede') {
@@ -449,7 +477,6 @@ export async function clube() {
       cg.scale(escala, escala);
       desenharCoelho(cg, 0, 0, { pelo: corDoPelo(v), roupa: roupaDe(v), t: 1 });
     }
-    return c;
   }
 
   /* ─── Guarda-roupa ─── */
@@ -475,7 +502,7 @@ export async function clube() {
       desenharGrade();
     }
     function desenharGrade() {
-      const lista = dados.catalogo.filter(i => i.tipo === aba && tem(i.id));
+      const lista = dados.catalogo.filter(i => i.tipo === aba && tem(i.id) && i.sprite !== false);
       trocar(grade,
         aba !== 'pelo' && h('button', { type: 'button', class: `clube-item ${!eu.visual[aba] ? 'ativo' : ''}`.trim(), onclick: () => vestir(aba, null) },
           h('span', { class: 'clube-item-nada' }, icone('x')), h('span', null, 'Nada')),
@@ -522,7 +549,8 @@ export async function clube() {
     }
     function desenharGrade() {
       trocar(saldo, 'Você tem ', h('strong', null, `🥕 ${num(eu.moedas)}`), ' cenouras. Ganhe mais jogando na Recreação, pescando no Lago ou dançando no Salão.');
-      const lista = dados.catalogo.filter(i => doTipo[aba](i) && i.preco > 0).sort((a, b) => a.preco - b.preco);
+      // Item novo só aparece com o sprite enviado e enquanto está na loja (venda).
+      const lista = dados.catalogo.filter(i => doTipo[aba](i) && i.preco > 0 && i.venda !== false).sort((a, b) => a.preco - b.preco);
       trocar(grade, lista.map(i => {
         const qtd = eu.itens[i.id] || 0;
         const jaTem = i.tipo !== 'movel' && qtd > 0;
@@ -680,9 +708,13 @@ export async function clube() {
   if (rt.conectado) enviar('clube:entrar', { sala: querSala });
   quadro = requestAnimationFrame(desenhar);
   // Chegou ou mudou um sprite (veja clube-salas.js): o fundo guardado da sala é desenhado de novo.
-  const tirarSprites = aoMudarSprites(() => { chaveCenario = ''; });
+  const tirarSprites = aoMudarSprites(() => {
+    chaveCenario = '';
+    for (const p of [...previas]) { if (p.c.isConnected) p.pintar(); else if (Date.now() - p.desde > 3000) previas.delete(p); }
+  });
   aoSair(() => {
     tirarSprites();
+    clearTimeout(pedidoCatalogo);
     cancelAnimationFrame(quadro);
     clearTimeout(salvarVisual);
     document.removeEventListener('keydown', aoTeclar);

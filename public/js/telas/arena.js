@@ -12,7 +12,7 @@ import { h, trocar, icone, botao, cabecalho, aoSair, estado, pode, aviso } from 
 import { rt, ouvir, enviar, criarPartida } from '../tempo-real.js';
 import { juntoNoJogo, CORES_JUNTO } from '../junto.js';
 import { abrirJunto } from './junto.js';
-import { registrarPecas, desenharSprite, aoMudarSprites } from '../sprites.js';
+import { registrarPecas, desenharSprite, aoMudarSprites, usarNomeDaPeca } from '../sprites.js';
 import { desenharCoelho, desenharRaposa, elipse, sombrear } from '../desenho-coelho.js';
 
 /* ─── As regras que o navegador precisa saber (as mesmas de src/junto-arena.js) ─── */
@@ -556,6 +556,8 @@ export const SPRITES = [
   },
 ];
 registrarPecas(SPRITES);
+// O nome de cada carta acompanha o nome da peça (quem troca os sprites pode renomear): a tropa ou o feitiço.
+for (const c of CARTAS) usarNomeDaPeca(c, 'nome', `arena.${c.un || c.k}`);
 
 function pintarGrama(g, x, y, cx, cy) {
   g.fillStyle = (cx + cy) % 2 ? '#3f7a34' : '#468a3a';

@@ -2812,6 +2812,20 @@ a.juramento-pessoa:hover { border-color: var(--ouro-d); color: var(--texto); }
 .sprites-num { display: grid; gap: 2px; font-size: 0.8rem; color: var(--texto-2); }
 .sprites-num input { width: 100%; }
 @media (max-width: 480px) { .sprites-anims { grid-template-columns: 1fr; } }
+/* Nome da peça (renomear) e itens novos do Club Coelho */
+.sprites-nome { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-width: 0; }
+.sprites-nome h2 { margin: 0; overflow-wrap: anywhere; }
+.sprites-nome.editando { flex: 1 1 100%; }
+.sprites-nome-entrada { flex: 1 1 220px; max-width: 360px; }
+.sprites-novo-item { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+.sprites-novo-item > div { display: grid; gap: 2px; }
+.sprites-item { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 0 0 12px; padding: 10px 12px;
+  border-radius: var(--raio-p); border: 1px solid var(--borda-2); background: var(--sup-2); font-size: 0.9rem; }
+.sprites-item-selo { display: inline-flex; align-items: center; gap: 6px; color: var(--ouro-l); font-weight: 700; }
+.sprites-item-situacao { flex: 1 1 200px; }
+.sprites-item.espera .sprites-item-situacao { color: var(--ouro-l); }
+.sprites-item.fora .sprites-item-situacao { color: var(--texto-2); }
+.sprites-item-tamanho { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 /* Cartazes de procurado */
 .cartazes { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 18px; padding: 4px 0 12px; }
 .cartaz-botao { position: relative; padding: 0; border: 0; background: none; cursor: pointer; display: block; border-radius: 4px;
@@ -3043,3 +3057,4 @@ body.bt-jogando .desafio-fim { display: none; }
 .aniversario-bolo { position: absolute; right: -8px; bottom: -4px; font-size: 1.2rem; }
 .aniversario-campo { display: grid; gap: 6px; }
 .aniversario-proximo { color: var(--ouro-l); }
+.notif-painel .notif-grupo { margin: 6px 0 0; font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--texto-2); font-family: var(--f-titulo); }

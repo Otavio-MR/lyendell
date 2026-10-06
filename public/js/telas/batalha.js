@@ -9,7 +9,7 @@ import { rt, ouvir, enviar, criarPartida } from '../tempo-real.js';
 import { juntoNoJogo, CORES_JUNTO } from '../junto.js';
 import { abrirJunto } from './junto.js';
 import { desenharCoelho, elipse, sombrear, sorte } from '../desenho-coelho.js';
-import { registrarPecas, desenharSprite, aoMudarSprites } from '../sprites.js';
+import { registrarPecas, desenharSprite, aoMudarSprites, nomeDe as nomeDaPeca, nomeTrocado, usarNomeDaPeca } from '../sprites.js';
 
 /* ─── As mesmas regras do servidor (src/junto-batalha.js) ─── */
 
@@ -37,21 +37,24 @@ const RARIDADE_F = ['comum', 'incomum', 'rara', 'épica', 'lendária'];
 const ARMA = 0, MUN = 1, BAND = 2, POC = 3, GRAN = 4, MOCH = 5;
 const AVIAO = 0, CAINDO = 1, VIVO = 2, FORA = 3;
 const OBSTACULOS = ['arvore', 'pedra', 'caixa', 'parede', 'janela', 'moinho', 'torre', 'feno'];
-const CAUSA = [...ARMAS.map(a => a.nome), 'Granada de cenoura', 'área segura', 'Patada', 'saiu'];
+// O que tirou alguém da batalha (pelo número que vem do servidor). Os nomes acompanham os das peças.
+const causa = a => [...ARMAS.map(x => x.nome), nomeDaPeca('batalha.granada', 'Granada de cenoura'), 'área segura', 'Patada', 'saiu'][a];
 const COR_TERRENO = ['#1d5079', '#d6bf86', '#4b7a37', '#3d80ad', '#8a6239'];
 const CHAVE_TERRENO = ['batalha.mar', 'batalha.areia', 'batalha.grama', 'batalha.agua', 'batalha.ponte'];
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const relogio = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const nomeArma = (t, r) => `${ARMAS[t].nome} ${(ARMAS[t].f ? RARIDADE_F : RARIDADE_M)[r]}`;
+// Item renomeado na tela de sprites: o nome novo, com a quantidade entre parênteses quando é mais de um.
+const comNome = (chave, um, varios, n) => (nomeTrocado(chave) ? `${nomeDaPeca(chave, um)}${n > 1 ? ` (${n})` : ''}` : n > 1 ? varios : um);
 function nomeItem(it) {
   const [, , , k, t, rq] = it;
   if (k === ARMA) return nomeArma(t, rq);
   if (k === MUN) return `${rq} ${MUNICOES[t]}`;
-  if (k === BAND) return rq > 1 ? `${rq} Bandagens` : 'Bandagem';
-  if (k === POC) return 'Poção de escudo';
-  if (k === GRAN) return rq > 1 ? `${rq} Granadas de cenoura` : 'Granada de cenoura';
-  return 'Mochila';
+  if (k === BAND) return comNome('batalha.bandagem', 'Bandagem', `${rq} Bandagens`, rq);
+  if (k === POC) return comNome('batalha.pocao', 'Poção de escudo', 'Poção de escudo', 1);
+  if (k === GRAN) return comNome('batalha.granada', 'Granada de cenoura', `${rq} Granadas de cenoura`, rq);
+  return comNome('batalha.mochila', 'Mochila', 'Mochila', 1);
 }
 
 /* ─── Desenhos (cada um com a âncora em 0, 0; o jogo põe no lugar, gira e espelha) ─── */
@@ -407,6 +410,8 @@ export const SPRITES = [
   peca('explosao', 'Explosão', 'A explosão da granada de cenoura (acontece uma vez, do começo ao fim).', 240, 240, [{ id: 'explodindo', nome: 'Explodindo', quadros: 6, fps: 10 }], (g, a, t) => pintarExplosao(g, (t * 1.6) % 1)),
 ];
 registrarPecas(SPRITES);
+// O nome de cada arma (no saque, na mão e no placar de quem tirou quem) acompanha o nome da peça.
+for (const a of ARMAS) usarNomeDaPeca(a, 'nome', `batalha.${a.id}`);
 
 /* ─── O mapa (vem do servidor uma vez) e as colisões (iguais às do servidor) ─── */
 
@@ -1255,7 +1260,7 @@ function telaJogo(jt) {
         a === 6 ? [h('strong', null, nomeDe(v)), ' ficou fora da área']
           : a === 8 ? [h('strong', null, nomeDe(v)), ' saiu']
             : m < 0 || m === v ? [h('strong', null, nomeDe(v)), ' caiu']
-              : [h('strong', null, nomeDe(m)), h('em', null, ` ${CAUSA[a] || ''} `), h('strong', null, nomeDe(v))])));
+              : [h('strong', null, nomeDe(m)), h('em', null, ` ${causa(a) || ''} `), h('strong', null, nomeDe(v))])));
     }
     if (!eu) return;
     const chave = JSON.stringify([eu.v, eu.e, eu.a, eu.w, eu.m, eu.bd, eu.pc, eu.gr, eu.mo, eu.rc > 0, eu.cu > 0, eu.es]);

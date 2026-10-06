@@ -125,6 +125,9 @@ r.post('/:id/recados', async (req, res) => {
     progresso.registrar(req.usuario.id, 'recado');
     // Avisa a dona ou o dono do perfil na hora, se estiver no site.
     progresso.avisar(u.id, [{ tipo: 'recado', de: req.usuario.nome, deId: req.usuario.id, texto: u.crianca ? paraCriancas(t) : t }]);
+    require('../notificacoes').avisar('recados', {
+      titulo: `Recado de ${req.usuario.nome}`, corpo: (u.crianca ? paraCriancas(t) : t).slice(0, 160), url: `/#/pessoa/${u.id}`, tag: `recado-${id}`,
+    }, { para: [u.id] });
   }
   res.status(201).json({ id });
 });

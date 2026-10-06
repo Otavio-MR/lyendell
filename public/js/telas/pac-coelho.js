@@ -7,7 +7,7 @@ import { juntoNoJogo } from '../junto.js';
 import { segredosDoJogo } from '../segredos.js';
 import { desenharParte } from '../roupas-coelho.js';
 import { sombrear } from '../desenho-coelho.js';
-import { registrarPecas, desenharSprite, temSprite, aoMudarSprites } from '../sprites.js';
+import { registrarPecas, desenharSprite, temSprite, aoMudarSprites, nomeDe } from '../sprites.js';
 
 const MAPA = [
   '############################',
@@ -1222,10 +1222,10 @@ export function pacCoelho() {
         h('section', { class: 'painel' },
           h('div', { class: 'painel-cab' }, h('h2', null, icone('pergunta'), 'Como jogar')),
           h('ul', { class: 'pac-legenda' },
-            legenda(bolinha('#d8b13a', '8px'), 'Lírio', 'vale 10 pontos.'),
-            legenda(bolinha('#e8c24a', '16px'), 'Lírio grande', 'vale 50 e deixa as raposas com medo: aí dá para pegá-las (200, 400, 800, 1600).'),
-            legenda(h('span', { class: 'pac-cenoura' }, '🥕'), 'Cenoura', 'aparece duas vezes por nível embaixo da toca. Vale bônus.'),
-            RAPOSAS.map(r => legenda(bolinha(r.cor, '14px'), r.nome, r.jeito)),
+            legenda(bolinha('#d8b13a', '8px'), nomeDe('pacman.lirio', 'Lírio'), 'vale 10 pontos.'),
+            legenda(bolinha('#e8c24a', '16px'), nomeDe('pacman.lirio-grande', 'Lírio grande'), 'vale 50 e deixa as raposas com medo: aí dá para pegá-las (200, 400, 800, 1600).'),
+            legenda(h('span', { class: 'pac-cenoura' }, '🥕'), nomeDe('pacman.cenoura', 'Cenoura'), 'aparece duas vezes por nível embaixo da toca. Vale bônus.'),
+            RAPOSAS.map((r, k) => legenda(bolinha(r.cor, '14px'), nomeDe(CHAVES_RAPOSAS[k], r.nome), r.jeito)),
             legenda(icone('coelho'), 'Vida extra', 'aos 10.000 pontos.'))))));
 }
 
@@ -1498,10 +1498,10 @@ function pacJunto() {
         h('section', { class: 'painel' },
           h('div', { class: 'painel-cab' }, h('h2', null, icone('pergunta'), 'Como jogar')),
           h('ul', { class: 'pac-legenda' },
-            legenda(bolinha('#d8b13a', '8px'), 'Lírio', 'vale 10 pontos para quem comer.'),
-            legenda(bolinha('#e8c24a', '16px'), 'Lírio grande', 'vale 50 e assusta todas as raposas: quem pegar uma leva 200, 400, 800, 1600.'),
-            legenda(h('span', { class: 'pac-cenoura' }, '🥕'), 'Cenoura', 'aparece duas vezes embaixo da toca: quem chegar primeiro leva.'),
-            legenda(bolinha('#e2572f', '14px'), 'Raposas', `cada uma caça o coelho mais perto dela.${jt.n >= 3 ? ' Com 3 ou mais jogadores, vem também a Brasa.' : ''}`),
+            legenda(bolinha('#d8b13a', '8px'), nomeDe('pacman.lirio', 'Lírio'), 'vale 10 pontos para quem comer.'),
+            legenda(bolinha('#e8c24a', '16px'), nomeDe('pacman.lirio-grande', 'Lírio grande'), 'vale 50 e assusta todas as raposas: quem pegar uma leva 200, 400, 800, 1600.'),
+            legenda(h('span', { class: 'pac-cenoura' }, '🥕'), nomeDe('pacman.cenoura', 'Cenoura'), 'aparece duas vezes embaixo da toca: quem chegar primeiro leva.'),
+            legenda(bolinha('#e2572f', '14px'), 'Raposas', `cada uma caça o coelho mais perto dela.${jt.n >= 3 ? ` Com 3 ou mais jogadores, vem também a ${nomeDe('pacman.raposa-brasa', 'Brasa')}.` : ''}`),
             coop
               ? legenda(icone('coelho'), 'Pego', 'gasta uma vida da equipe e volta em 2 segundos. Sem vidas, fica de fora.')
               : legenda(icone('coelho'), 'Pego', 'perde 10% dos pontos e volta em 2 segundos.'))))));

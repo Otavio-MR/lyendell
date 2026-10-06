@@ -4,6 +4,7 @@
 // e os pontos de clique (portas, balcão, pescaria...). Não usa nada da página: dá para testar no Node.
 
 import { desenharCoelho, sorte } from './desenho-coelho.js';
+import { registrarRoupasNovas } from './roupas-coelho.js';
 import { registrarPecas, desenharSprite, temSprite } from './sprites.js';
 
 export const W = 1000;
@@ -813,7 +814,8 @@ const ANIM_PARADO = { id: 'parado', nome: 'Parado', quadros: 1, fps: 1 };
 const animDoMovel = id => PECA_MOVEL[id]?.anim || ANIM_PARADO;
 
 export function desenharMovel(g, id, x, y, v = 0, t = 0) {
-  const f = DESENHO_MOVEL[id];
+  if (ehMovelNovo(id)) { desenharMovelNovo(g, id, x, y, v, t); return; }
+  const f = Object.hasOwn(DESENHO_MOVEL, id) && DESENHO_MOVEL[id];
   if (!f) return;
   g.save();
   g.translate(x, y);
@@ -823,6 +825,59 @@ export function desenharMovel(g, id, x, y, v = 0, t = 0) {
   if (!sp(g, `movel-${id}`, animDoMovel(id).id, 0, 0, { t })) f(g, t);
   POR_CIMA_DO_MOVEL[id]?.(g, t);
   g.restore();
+}
+
+/* ─── Móveis novos (criados na tela de sprites, só com o sprite) ─── */
+// id "n12". O tamanho e se fica na parede ou no chão vêm do catálogo (registrarItensNovos). Sem o sprite,
+// aparece uma caixinha tracejada com "?" no lugar (o item nem é vendido antes de ter o sprite).
+export function ehMovelNovo(id) { return typeof id === 'string' && /^n\d+$/.test(id); }
+const ancoraMovelNovo = info => (info.parede || info.chao ? 'centro' : 'pe');
+
+function desenharMovelNovo(g, id, x, y, v, t) {
+  const info = Object.hasOwn(MOVEIS, id) ? MOVEIS[id] : { w: 60, h: 60 };
+  g.save();
+  g.translate(x, y);
+  if (v) g.scale(-1, 1);
+  if (!info.parede && !info.chao) sombraNoChao(g, 0, 2, Math.max(10, info.w * 0.42));
+  if (!sp(g, `movel-${id}`, 'parado', 0, 0, { t, largura: info.w, altura: info.h, ancora: ancoraMovelNovo(info) })) {
+    const topo = info.parede || info.chao ? -info.h / 2 : -info.h;
+    ret(g, -info.w / 2, topo, info.w, info.h, 'rgba(232,194,74,0.12)', 6);
+    g.strokeStyle = 'rgba(232,194,74,0.7)';
+    g.lineWidth = 2;
+    g.setLineDash?.([6, 4]);
+    g.strokeRect?.(-info.w / 2, topo, info.w, info.h);
+    g.setLineDash?.([]);
+    g.fillStyle = 'rgba(232,194,74,0.9)';
+    g.font = `700 ${Math.max(12, Math.min(40, Math.round(Math.min(info.w, info.h) * 0.5)))}px sans-serif`;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText?.('?', 0, topo + info.h / 2);
+  }
+  g.restore();
+}
+
+// Registra os móveis novos do catálogo ({ id: 'n12', tipo: 'movel', nome, largura, altura, onde }): o
+// tamanho para clicar e arrastar na toca e a peça dos sprites (para o molde e o envio na tela de sprites).
+// As roupas novas vão junto para roupas-coelho.js.
+export function registrarItensNovos(itens = []) {
+  registrarRoupasNovas(itens);
+  const pecas = [];
+  for (const i of itens) {
+    if (i?.tipo !== 'movel' || !ehMovelNovo(i.id)) continue;
+    const w = Math.max(10, Math.min(400, Number(i.largura) || 80));
+    const hh = Math.max(10, Math.min(400, Number(i.altura) || 80));
+    const info = { w, h: hh };
+    if (i.onde === 'parede' || i.parede) info.parede = true;
+    else if (i.onde === 'tapete' || i.chao) info.chao = true;
+    MOVEIS[i.id] = info;
+    const ondeFica = info.parede ? 'Móvel de parede das tocas (o meio do desenho fica onde a pessoa pôs).'
+      : info.chao ? 'Fica no chão da toca, por baixo de tudo e de todos, como um tapete (o meio do desenho fica onde a pessoa pôs).'
+        : 'Móvel das tocas, com o pé no chão (embaixo, no meio do quadro). Quem decora pode virar para o outro lado. A sombra o jogo faz.';
+    pecas.push(peca(`movel-${i.id}`, i.nome,
+      `Item novo do Club Coelho. ${ondeFica} Não tem desenho de sempre: sem o sprite, o móvel não é vendido e aparece como uma caixinha com "?". Pode ter vários quadros lado a lado para animar.`,
+      w, hh, [{ id: 'parado', nome: 'Parado', quadros: 1, fps: 6 }], () => {}, { ancora: ancoraMovelNovo(info), itemNovo: i }));
+  }
+  registrarPecas(pecas);
 }
 
 // O que o jogo desenha por cima do móvel mesmo com sprite (luz, ponteiros).

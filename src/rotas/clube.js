@@ -12,8 +12,6 @@ const { erro } = require('../util');
 const r = express.Router();
 r.use(exigir('recreacao.usar'));
 
-const catalogoPublico = clube.CATALOGO.map(({ id, tipo, nome, preco, cor, parede, chao }) => ({ id, tipo, nome, preco, cor, parede, chao }));
-
 // O meu perfil no clube, o catálogo e as salas. O presente do dia entra aqui (uma vez por dia).
 r.get('/', async (req, res) => {
   const id = req.usuario.id;
@@ -27,16 +25,18 @@ r.get('/', async (req, res) => {
   }
   res.json({
     eu: { moedas: eu.moedas, visual: eu.visual, itens: eu.itens, toca: eu.toca, peixes: eu.peixes },
-    presente, catalogo: catalogoPublico, tetoDia: clube.TETO_DIA,
+    presente, catalogo: clube.catalogoPublico(), tetoDia: clube.TETO_DIA,
     salas: Object.fromEntries(Object.entries(clube.SALAS).map(([k, s]) => [k, { nome: s.nome, chao: s.chao }])),
   });
 });
 
-// Comprar um item da loja (roupa e pelo uma vez só; móvel pode ter vários).
+// Comprar um item da loja (roupa e pelo uma vez só; móvel pode ter vários). Item novo só com o sprite enviado
+// e enquanto está na loja.
 r.post('/comprar', async (req, res) => {
   const id = req.usuario.id;
-  const item = clube.ITEM[req.body?.item];
-  if (!item || item.preco === 0) throw erro(400, 'Esse item não está à venda.');
+  await clube.pronto();
+  const item = Object.hasOwn(clube.ITEM, String(req.body?.item)) ? clube.ITEM[req.body.item] : null;
+  if (!item || item.preco === 0 || item.venda === false) throw erro(400, 'Esse item não está à venda.');
   const eu = await clube.perfil(id);
   const qtd = eu.itens[item.id] || 0;
   if (item.tipo !== 'movel' && qtd > 0) throw erro(400, 'Você já tem esse item.');

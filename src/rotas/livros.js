@@ -227,6 +227,24 @@ function avisarRegistro(livro, regId, dados, antes = null, quem = null) {
   if (carga) notif.avisar('procurados', { ...carga, url: `/#/guarda/${livro.id}/registro/${regId}`, tag: `procurado-${regId}` }, { exceto: quem });
 }
 
+// Registro mandado para aprovação: avisa quem aprova naquele módulo (a Tabeliã, o Comandante, o Diretor do
+// Hospital, a Senadora, o Lorde Comandante...). E quando é aprovado ou recusado, avisa quem mandou.
+const PAGINA_DO_MODULO = { leis: 'leis/livros' };
+function avisarParaAprovar(livro, dados, quem) {
+  require('../notificacoes').avisar('aprovacoes', {
+    titulo: `Para aprovar: ${livro.nome}`, corpo: `${quem.nome} mandou "${tituloDoRegistro(livro, dados)}".`,
+    url: `/#/${livro.modulo}/aprovacoes`, tag: `aprovar-${livro.modulo}`,
+  }, { exceto: quem.id, perm: `${livro.modulo}.aprovar` });
+}
+function avisarQuemMandou(livro, reg, aprovado, revisor, motivo) {
+  if (!reg.criado_por || reg.criado_por === revisor.id) return;
+  require('../notificacoes').avisar('meus_envios', {
+    titulo: aprovado ? `Registro aprovado: ${tituloDoRegistro(livro, reg.dados)}` : `Registro recusado: ${tituloDoRegistro(livro, reg.dados)}`,
+    corpo: aprovado ? `${revisor.nome} aprovou o seu registro em "${livro.nome}".` : `${revisor.nome} recusou o seu registro em "${livro.nome}"${motivo ? `: ${motivo}` : '.'}`,
+    url: aprovado ? `/#/${PAGINA_DO_MODULO[livro.modulo] || livro.modulo}` : `/#/${livro.modulo}/envios`, tag: `envio-${reg.id}`,
+  }, { para: [reg.criado_por] });
+}
+
 function tituloDoRegistro(livro, dados) {
   const c = livro.campos.find(x => (x.tipo === 'texto' || x.tipo === 'selecao') && dados[x.id]);
   return c ? String(dados[c.id]) : 'sem título';
@@ -376,6 +394,7 @@ r.post('/livros/:id/registros', async (req, res) => {
   await progresso.registrar(req.usuario.id, 'registro');
   await progresso.registrar(req.usuario.id, `registro_${l.modulo}`);
   if (situacao === 'aprovado') avisarRegistro(l, id, dados, null, req.usuario.id);
+  else avisarParaAprovar(l, dados, req.usuario);
   res.status(201).json({ id, situacao, numero });
 });
 
@@ -421,6 +440,7 @@ r.put('/registros/:id', async (req, res) => {
   ]);
   await anotar(req, situacao !== reg.situacao ? `Reenviou para aprovação em "${livro.nome}"` : `Editou um registro em "${livro.nome}"`, tituloDoRegistro(livro, dados));
   if (situacao === 'aprovado' && livro.modulo === 'guarda') avisarRegistro(livro, reg.id, dados, reg.dados, req.usuario.id);
+  if (situacao === 'pendente' && reg.situacao === 'recusado') avisarParaAprovar(livro, dados, req.usuario);
   res.json({ ok: true, situacao });
 });
 
@@ -534,6 +554,7 @@ r.post('/registros/:id/aprovar', async (req, res) => {
   await anotar(req, `Aprovou um registro em "${livro.nome}"`, `nº ${reg.numero}: ${tituloDoRegistro(livro, reg.dados)} (enviado por ${reg.criado_por_nome})`);
   await progresso.registrar(req.usuario.id, `revisao_${livro.modulo}`);
   avisarRegistro(livro, reg.id, reg.dados);
+  avisarQuemMandou(livro, reg, true, req.usuario);
   res.json({ ok: true });
 });
 
@@ -542,6 +563,7 @@ r.post('/registros/:id/recusar', async (req, res) => {
   const { reg, livro } = await revisar(req, 'recusado', motivo);
   await anotar(req, `Recusou um registro em "${livro.nome}"`, `${tituloDoRegistro(livro, reg.dados)} (enviado por ${reg.criado_por_nome})${motivo ? `: ${motivo}` : ''}`);
   await progresso.registrar(req.usuario.id, `revisao_${livro.modulo}`);
+  avisarQuemMandou(livro, reg, false, req.usuario, motivo);
   res.json({ ok: true });
 });
 

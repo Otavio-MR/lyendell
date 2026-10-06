@@ -2103,6 +2103,11 @@ export default {
     teclado: 'Setas ou WASD: um pulinho para cada lado (Espaço também pula para frente). Não fique parado!',
     toque: 'Toque na tela para pular para frente ou deslize o dedo para os lados e para trás (ou use as setas).',
   },
+  // As linhas do "como jogar" cujo nome acompanha o nome da peça (quem troca os sprites pode renomear).
+  pecasComoJogar: {
+    'Cenoura dourada': 'travessia.cenoura',
+    'Gavião': 'travessia.gaviao',
+  },
   comoJogar: [
     ['🐰', 'Pulinhos', 'Para frente, para os lados ou para trás, uma casinha por vez.'],
     ['🐴', 'Estradas', 'Carroças, mercadores e carroças de feno não param para coelho nenhum.'],

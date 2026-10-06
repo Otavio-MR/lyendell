@@ -92,13 +92,19 @@ export function painelNotificacoes({ compacto = false, aoMudar } = {}) {
     const bloqueado = Notification.permission === 'denied';
     trocar(el,
       cab(ligado),
-      !ligado && h('p', { class: 'suave' }, 'Receba um aviso no celular ou no computador quando sair um anúncio, alguém for procurado ou banido da Capital, uma lei nova ou um pedido de ajuda. Chega mesmo com o site fechado.'),
+      !ligado && h('p', { class: 'suave' }, 'Receba um aviso no celular ou no computador quando sair um anúncio, alguém for procurado ou banido da Capital, uma lei nova, um pedido de ajuda ou um recado para você, e também os avisos do seu cargo (como registros para aprovar). Chega mesmo com o site fechado.'),
       bloqueado && h('p', { class: 'nota' }, icone('alerta'), 'O navegador está bloqueando as notificações deste site. Libere nas configurações do site (o cadeado ao lado do endereço) e volte aqui.'),
       ehIphone() && !instalado() && h('p', { class: 'suave' }, 'No iPhone, primeiro adicione o site à Tela de Início (Compartilhar > Adicionar à Tela de Início) e abra por lá.'),
-      (!compacto || ligado) && h('div', { class: 'notif-tipos' }, d.tipos.map(t => interruptor(t.nome, escolhidos.has(t.id), async v => {
-        if (v) escolhidos.add(t.id); else escolhidos.delete(t.id);
-        if (ligado) await api('PUT', '/api/notificacoes/tipos', { endpoint: insc.endpoint, tipos: [...escolhidos] }).catch(x => aviso(x.message, 'erro'));
-      }))),
+      (!compacto || ligado) && h('div', { class: 'notif-tipos' },
+        // Os de todo morador e, separados, os do cargo da pessoa (cada cargo vê os seus).
+        [['Para todos', d.tipos.filter(t => !t.cargo)], ['Do seu cargo', d.tipos.filter(t => t.cargo)]].filter(([, l]) => l.length).map(([titulo, lista]) => [
+          h('h3', { class: 'notif-grupo' }, titulo),
+          lista.map(t => interruptor(t.nome, escolhidos.has(t.id), async v => {
+            if (v) escolhidos.add(t.id); else escolhidos.delete(t.id);
+            if (ligado) await api('PUT', '/api/notificacoes/tipos', { endpoint: insc.endpoint, tipos: [...escolhidos] }).catch(x => aviso(x.message, 'erro'));
+          })),
+        ]),
+        h('small', { class: 'suave' }, 'Mensagens do chat não viram notificação.')),
       h('div', { class: 'notif-botoes' },
         ligado
           ? [botao('Mandar um teste', { icone: 'enviar', onclick: async () => {

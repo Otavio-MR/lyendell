@@ -283,6 +283,27 @@ CREATE TABLE IF NOT EXISTS sprites (
   atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- O nome que quem troca os sprites deu a uma peça (ex.: "arena.urso"). Vale em todo lugar onde o nome aparece.
+CREATE TABLE IF NOT EXISTS sprites_nomes (
+  chave TEXT PRIMARY KEY,
+  nome TEXT NOT NULL,
+  por_nome TEXT,
+  atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Itens novos do Club Coelho (roupas e móveis criados em #/recreacao/sprites, cada um com o seu sprite).
+-- O id no clube é "n" + id (ex.: "n12"). extra: { onde: 'chao' | 'parede' | 'tapete', largura, altura } dos móveis.
+CREATE TABLE IF NOT EXISTS clube_itens (
+  id INTEGER PRIMARY KEY,
+  tipo TEXT NOT NULL,
+  nome TEXT NOT NULL,
+  preco INTEGER NOT NULL DEFAULT 0,
+  extra TEXT NOT NULL DEFAULT '{}',
+  ativo INTEGER NOT NULL DEFAULT 1,
+  criado_por_nome TEXT,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- Notificações no celular/PC (Web Push): cada aparelho em que a pessoa ativou.
 CREATE TABLE IF NOT EXISTS push_inscricoes (
   id INTEGER PRIMARY KEY,
@@ -461,7 +482,7 @@ CREATE TABLE IF NOT EXISTS diario (
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 26;
+const VERSAO = 27;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -547,6 +568,9 @@ async function migrar() {
   if (versao < 25) await banidosDaCapital();
   // v26: o dia do aniversário no perfil ("MM-DD", sem o ano), para os aniversariantes aparecerem na tela inicial.
   if (versao < 26 && !await colunaExiste('usuarios', 'aniversario')) await db.run('ALTER TABLE usuarios ADD COLUMN aniversario TEXT');
+  // v27: quem troca os sprites também renomeia as peças e cria itens novos para o Club Coelho
+  // (as tabelas sprites_nomes e clube_itens já vêm do esquema; aqui só o índice dos itens que estão à venda).
+  if (versao < 27) await db.run("CREATE INDEX IF NOT EXISTS clube_itens_ativos ON clube_itens (ativo)");
   // v20: o campo "Nickname" vira "Endereço" em todos os livros (no RP o nick é o endereço da pessoa).
   if (versao < 20) await nickVirouEndereco();
   // v19: propostas do povo para o Congresso (todo morador manda; a Senadora avalia).

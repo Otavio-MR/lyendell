@@ -390,11 +390,20 @@ ranking (vitórias, festas e douradas). O código está em `src/festa.js` (as re
 
 ### Notificações no celular e no PC
 
-Cada pessoa pode ativar avisos no aparelho (Meu perfil, ou o convite na tela inicial) e escolher o que receber:
-anúncios novos, procurados e banidos da Capital (quando o registro é aprovado ou a situação muda, inclusive
-para capturado), Leis de Lyendell publicadas e atividades novas. O aviso chega como notificação do sistema
-mesmo com o site fechado (Web Push, pelo `public/sw.js`). No iPhone, só funciona com o site adicionado à
-Tela de Início. Quem publica não recebe o próprio aviso, e cada aviso só vai para quem pode ver aquilo.
+Cada pessoa pode ativar avisos no aparelho (Meu perfil, ou o convite na tela inicial). O aviso chega como
+notificação do sistema mesmo com o site fechado (Web Push, pelo `public/sw.js`); no iPhone, só com o site
+adicionado à Tela de Início. **O que cada um recebe depende do cargo**, e dá para desligar cada tipo:
+
+| Para quem | Avisos |
+|---|---|
+| Todo mundo | anúncios novos, procurados e banidos da Capital (aprovado ou mudou de situação, inclusive capturado), Leis de Lyendell publicadas, atividades novas, recados no seu mural, e os seus registros e propostas aprovados ou recusados |
+| Quem aprova (Tabeliã, Comandante da Guarda, Diretor do Hospital, Senadora, Lorde Comandante e Família Nobre nas Leis) | registro mandado para aprovação no módulo dele, e de novo quando é corrigido depois de recusado |
+| Senadora | proposta nova do povo para avaliar |
+| Quem cria ou gerencia atividades | entrega para conferir |
+| Game Dev e Família Nobre | sprite trocado por outra pessoa (começa desligado) |
+
+Mensagem do chat não vira notificação. Quem fez algo não recebe o próprio aviso, e cada aviso só vai para
+quem pode ver aquilo. Um tipo novo (ou de um cargo novo que a pessoa ganhou) já chega ligado.
 
 As chaves ficam no `.env` (`VAPID_PUBLICA`, `VAPID_PRIVADA`, `VAPID_CONTATO`; gere com
 `npx web-push generate-vapid-keys`) e precisam estar também no Render. Sem elas, o site funciona e
@@ -432,6 +441,10 @@ blocos, os móveis do Club Coelho...) pode virar um sprite feito à mão. Quem t
   pelo de cada um) e "suavizar" (desligado = pixel art nítida).
 - O sprite vale na hora para todo mundo. Sem sprite, ou com "Voltar ao desenho de sempre", o jogo
   desenha como antes. Os sprites só mudam o desenho: nunca o tamanho das colisões nem as regras.
+
+Quem tem a permissão dos sprites também **renomeia as peças**: o lápis ao lado do nome de cada peça em #/recreacao/sprites troca o nome (até 40 letras), e o nome novo vale em todo lugar onde ele aparece: na loja, no guarda-roupa e na toca do Club Coelho, nas cartas da Arena da Toca, nas armas e itens da Batalha da Toca, nas raposas e nos Lírios do Pac-Coelho, no "como jogar" do Super Coelho, dos Barris e da Travessia e nos acessórios do Lyendell Dorme. "Voltar ao nome original" desfaz.
+
+Nas abas "Roupas e acessórios" e "Club Coelho" dá para criar **itens novos para o Club Coelho**: uma roupa ou acessório (cabeça, rosto, pescoço, costas, corpo ou mão) ou um móvel da toca (em pé no chão, na parede ou deitado como tapete, com largura e altura), com nome e preço em cenouras (de 0 a 5000). O item vira uma peça na lista, pronta para "Baixar molde" e "Enviar PNG", e só aparece no Armarinho depois que o sprite chega. Dá para mudar o nome e o preço e "Tirar da loja" quando quiser: quem já comprou continua com o item e pode usar. Os nomes ficam na tabela `sprites_nomes` e os itens novos na `clube_itens` (versão 27 do banco).
 
 O código: `public/js/sprites.js` (carrega e desenha), `public/js/telas/sprites.js` (a página),
 `src/rotas/sprites.js` e a tabela `sprites`. Cada jogo exporta a lista `SPRITES` das suas peças.

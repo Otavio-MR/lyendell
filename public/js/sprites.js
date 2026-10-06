@@ -8,9 +8,17 @@
 // Cada jogo descreve as suas peças numa lista SPRITES (chave, nome, tamanho no jogo, âncora, animações e uma
 // prévia com o desenho de sempre) e chama registrarPecas(SPRITES). A tela de sprites mostra essas listas.
 // Não mexe na página quando é importado: dá para importar nos testes do Node (lá nunca há sprite).
+//
+// Nomes: quem troca os sprites pode renomear uma peça, e o nome novo vale onde o nome dela aparece nos jogos.
+// nomeDe('arena.urso', 'Urso Gigante') devolve o nome escolhido (ou o de sempre); usarNomeDaPeca(obj, 'nome',
+// chave) deixa obj.nome sempre igual ao nome da peça (e volta ao de sempre quando o nome é apagado).
+// Os itens novos do Club Coelho (roupas e móveis criados na tela de sprites) vêm junto: itensNovosDoClube().
 
 const PECAS = new Map(); // chave da peça -> { chave, nome, largura, altura, ancora, animacoes: [{ id, nome, quadros, fps }] }
 let enviados = {};       // "peca.animacao" -> { src, quadros, fps, tingir, suave, img }
+let nomes = {};          // chave da peça -> o nome que quem troca os sprites deu (vale em todo lugar)
+let nomesProntos = false;
+let itensClube = [];     // os itens novos do Club Coelho (cada um é uma peça: "roupa.n12", "clube.movel-n12")
 let pedido = null;
 const ouvintes = new Set();
 const noNavegador = typeof document !== 'undefined' && typeof Image !== 'undefined';
@@ -27,7 +35,11 @@ export function carregarSprites(forcar = false) {
   if (pedido && !forcar) return pedido;
   pedido = fetch('/api/sprites', { credentials: 'same-origin' })
     .then(r => (r.ok ? r.json() : { sprites: {} }))
-    .then(({ sprites = {}, podeEditar = false }) => {
+    .then(({ sprites = {}, podeEditar = false, nomes: n = {}, itens = [] }) => {
+      nomes = n && typeof n === 'object' ? n : {};
+      nomesProntos = true;
+      itensClube = Array.isArray(itens) ? itens : [];
+      aplicarNomes();
       const novos = {};
       for (const [chave, s] of Object.entries(sprites)) {
         const velho = enviados[chave];
@@ -41,10 +53,35 @@ export function carregarSprites(forcar = false) {
       enviados = novos;
       cacheTinta.clear();
       avisar();
-      return { sprites: enviados, podeEditar };
+      return { sprites: enviados, podeEditar, nomes, itens: itensClube };
     })
-    .catch(() => { pedido = null; return { sprites: enviados, podeEditar: false }; });
+    .catch(() => { pedido = null; return { sprites: enviados, podeEditar: false, nomes, itens: itensClube }; });
   return pedido;
+}
+
+// O nome de uma peça: o que quem troca os sprites escolheu, ou o de sempre (padrao). Depois de carregar.
+export function nomeDe(chave, padrao) {
+  if (noNavegador && !pedido) carregarSprites();
+  const n = chave ? nomes[chave] : null;
+  return typeof n === 'string' && n ? n : padrao;
+}
+export const nomeTrocado = chave => !!(chave && typeof nomes[chave] === 'string' && nomes[chave]);
+export const itensNovosDoClube = () => itensClube;
+
+// Liga um texto do jogo ao nome de uma peça: obj[campo] passa a ser o nome escolhido (e volta ao de sempre
+// quando o nome é apagado). Ex.: usarNomeDaPeca(carta, 'nome', 'arena.urso'). padrao: o nome de sempre
+// (sem ele, vale o que está em obj[campo] agora). Só troca depois que os nomes chegaram do servidor.
+const ligados = [];
+export function usarNomeDaPeca(obj, campo, chave, padrao) {
+  if (!obj || !chave) return;
+  const antes = ligados.find(l => l.obj === obj && l.campo === campo);
+  if (antes) { antes.chave = chave; if (padrao !== undefined) antes.padrao = padrao; } else ligados.push({ obj, campo, chave, padrao: padrao ?? obj[campo] });
+  if (ligados.length > 2000) ligados.splice(0, ligados.length - 2000);
+  aplicarNomes();
+}
+function aplicarNomes() {
+  if (!nomesProntos) return;
+  for (const l of ligados) l.obj[l.campo] = nomeDe(l.chave, l.padrao);
 }
 
 // Avisa quem quiser saber (a tela de sprites, o fundo já desenhado de algum jogo...).
@@ -131,12 +168,16 @@ export function desenharSprite(g, chave, anim, x, y, o = {}) {
 
 // Só para os testes no Node: finge sprites carregados ({ "peca.animacao": { quadros, fps, largura, altura } }).
 // O "img" falso tem o tamanho da tira; um canvas falso que anota drawImage mostra se o jogo usou o sprite.
-export function _spritesDeTeste(mapa = {}) {
+// opcoes.nomes: nomes de peças trocados ({ "arena.urso": "Ursão" }).
+export function _spritesDeTeste(mapa = {}, opcoes = {}) {
+  nomes = opcoes.nomes || {};
+  nomesProntos = true;
+  aplicarNomes();
   enviados = {};
   for (const [chave, s] of Object.entries(mapa)) {
     const quadros = s.quadros || 1;
     enviados[chave] = { src: `/teste/${chave}.png`, quadros, fps: s.fps || 8, tingir: false, suave: false,
       img: { complete: true, naturalWidth: (s.largura || 32) * quadros, naturalHeight: s.altura || 32 } };
   }
-  pedido = Promise.resolve({ sprites: enviados, podeEditar: false });
+  pedido = Promise.resolve({ sprites: enviados, podeEditar: false, nomes, itens: itensClube });
 }

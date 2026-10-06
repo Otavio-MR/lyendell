@@ -12,6 +12,7 @@ const { db } = require('./db');
 const { hoje } = require('./cobranca');
 const antispam = require('./antispam');
 const progresso = require('./progresso');
+const nomesSprites = require('./sprites-nomes');
 
 class ErroClube extends Error {}
 
@@ -118,6 +119,66 @@ const PARTES = ['cabeca', 'rosto', 'pescoco', 'costas', 'corpo', 'mao'];
 const ROUPA = new Set([...PARTES, 'pelo']);
 const gratis = i => i.preco === 0;
 
+/* ─── Nomes das peças e itens novos ───────────────── */
+// Cada roupa e cada móvel é uma peça dos sprites ("roupa.<id>" e "clube.movel-<id>"): o nome que quem troca
+// os sprites der à peça vale também na loja, no guarda-roupa e na toca. Pelos, chãos e paredes não são peças.
+// Os itens novos (tabela clube_itens, id "n12") entram no catálogo como os de sempre; só são vendidos depois
+// que o sprite deles é enviado (sem sprite, não teria o que desenhar) e enquanto estão "na loja" (ativo).
+
+const ONDE_MOVEL = ['chao', 'parede', 'tapete'];
+const pecaDoItem = i => (PARTES.includes(i.tipo) ? `roupa.${i.id}` : i.tipo === 'movel' ? `clube.movel-${i.id}` : null);
+for (const i of CATALOGO) { i.nomePadrao = i.nome; i.peca = pecaDoItem(i); }
+
+function aplicarNomes() {
+  for (const i of CATALOGO) if (!i.novo) i.nome = nomesSprites.nomeDe(i.peca, i.nomePadrao);
+}
+nomesSprites.aoMudar(aplicarNomes);
+
+const json0 = t => { try { const v = JSON.parse(t || ''); return v && typeof v === 'object' ? v : {}; } catch { return {}; } };
+// O item novo como entra no catálogo (o mesmo formato dos de sempre, com o que o desenho precisa).
+function itemNovo(l, comSprite) {
+  const extra = json0(l.extra);
+  const i = { id: `n${l.id}`, tipo: l.tipo, nome: l.nome, nomePadrao: l.nome, preco: Number(l.preco) || 0, novo: true, ativo: !!l.ativo, sprite: false };
+  i.peca = pecaDoItem(i);
+  i.sprite = comSprite.has(i.peca);
+  i.venda = i.ativo && i.sprite;
+  if (i.tipo === 'movel') {
+    i.onde = ONDE_MOVEL.includes(extra.onde) ? extra.onde : 'chao';
+    i.largura = Math.max(10, Math.min(400, Math.round(Number(extra.largura) || 80)));
+    i.altura = Math.max(10, Math.min(400, Math.round(Number(extra.altura) || 80)));
+    if (i.onde === 'parede') i.parede = true;
+    if (i.onde === 'tapete') i.chao = true;
+  }
+  return i;
+}
+
+// Lê de novo os itens novos (quando um é criado ou mudado, e quando o sprite de um deles muda).
+async function recarregarItens() {
+  const linhas = await db.all('SELECT * FROM clube_itens ORDER BY id');
+  const comSprite = new Set((await db.all("SELECT chave FROM sprites WHERE chave LIKE 'roupa.n%' OR chave LIKE 'clube.movel-n%'"))
+    .map(l => l.chave.split('.').slice(0, 2).join('.')));
+  for (let k = CATALOGO.length - 1; k >= 0; k--) if (CATALOGO[k].novo) { delete ITEM[CATALOGO[k].id]; CATALOGO.splice(k, 1); }
+  for (const l of linhas) {
+    if (!PARTES.includes(l.tipo) && l.tipo !== 'movel') continue;
+    const i = itemNovo(l, comSprite);
+    CATALOGO.push(i);
+    ITEM[i.id] = i;
+  }
+}
+let cargaItens = null;
+// Antes de usar o catálogo: os nomes das peças e os itens novos já carregados (uma vez só).
+function pronto() {
+  cargaItens ??= recarregarItens().catch(e => { cargaItens = null; throw e; });
+  return Promise.all([nomesSprites.pronto(), cargaItens]);
+}
+
+// O catálogo que vai para o navegador.
+function catalogoPublico() {
+  return CATALOGO.map(({ id, tipo, nome, nomePadrao, preco, cor, parede, chao, peca, novo, venda, sprite, onde, largura, altura }) => (
+    novo ? { id, tipo, nome, nomePadrao, preco, parede, chao, peca, novo, venda, sprite, onde, largura, altura }
+      : { id, tipo, nome, nomePadrao, preco, cor, parede, chao, peca }));
+}
+
 const INICIAIS = { moedas: 300, itens: { cadeira: 1, tapete: 1, planta: 1 } };
 const PRESENTE = 50;              // cenouras do presente do dia
 const TETO_DIA = Number(process.env.CLUBE_TETO_DIA) || 400; // o máximo que se ganha jogando por dia
@@ -145,6 +206,7 @@ const VEL = 170; // unidades por segundo (o mesmo do navegador)
 const json = (t, padrao) => { try { const v = JSON.parse(t || ''); return v && typeof v === 'object' ? v : padrao; } catch { return padrao; } };
 
 async function perfil(id) {
+  await pronto();
   await db.run(`INSERT INTO clube (usuario_id, moedas, itens) VALUES (?, ?, ?) ON CONFLICT (usuario_id) DO NOTHING`,
     id, INICIAIS.moedas, JSON.stringify(INICIAIS.itens));
   const l = await db.get('SELECT * FROM clube WHERE usuario_id = ?', id);
@@ -340,7 +402,8 @@ const acoes = {
 
 // O coelho de cada um, pronto para desenhar nos jogos (cor do pelo e a roupa por partes).
 async function visualDesenho(id) {
-  const l = await db.get('SELECT visual, itens FROM clube WHERE usuario_id = ?', id);
+  await pronto();
+  const l =await db.get('SELECT visual, itens FROM clube WHERE usuario_id = ?', id);
   const v = validarVisual(json(l?.visual, {}), json(l?.itens, {}));
   const roupa = {};
   for (const p of PARTES) if (v[p]) roupa[p] = v[p];
@@ -368,6 +431,6 @@ function fechou(id, ws) {
 function iniciar(opcoes) { ctx = { ...ctx, ...opcoes }; }
 
 module.exports = {
-  CATALOGO, ITEM, PARTES, ROUPA, SALAS, EMOTES, INICIAIS, PRESENTE, TETO_DIA, MAX_MOVEIS, ErroClube,
-  perfil, validarVisual, visualDesenho, validarToca, ganhar, ganharDeJogo, acoes, sair, fechou, mudouVisual, mudouToca, iniciar, posicaoAgora,
+  CATALOGO, ITEM, PARTES, ROUPA, SALAS, EMOTES, INICIAIS, PRESENTE, TETO_DIA, MAX_MOVEIS, ONDE_MOVEL, ErroClube,
+  pronto, recarregarItens, catalogoPublico, pecaDoItem, perfil, validarVisual, visualDesenho, validarToca, ganhar, ganharDeJogo, acoes, sair, fechou, mudouVisual, mudouToca, iniciar, posicaoAgora,
 };

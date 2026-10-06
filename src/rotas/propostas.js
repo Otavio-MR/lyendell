@@ -103,6 +103,8 @@ r.post('/', exigir('congresso.propor'), async (req, res) => {
   for (const quem of await avaliadores()) {
     if (quem !== req.usuario.id) avisar(quem, `Proposta nova do povo: ${p.tipo} "${p.titulo}", de ${req.usuario.nome}.`);
   }
+  require('../notificacoes').avisar('propostas', { titulo: `Proposta nova: ${p.titulo}`, corpo: `${req.usuario.nome} mandou ${p.tipo} para o Congresso avaliar.`, url: '/#/congresso/propostas', tag: `proposta-${id}` },
+    { exceto: req.usuario.id, perm: 'congresso.aprovar' });
   res.status(201).json({ id });
 });
 
@@ -155,6 +157,11 @@ r.post('/:id/avaliar', exigir('congresso.aprovar'), async (req, res) => {
   if (p.autor_id !== req.usuario.id) {
     avisar(p.autor_id, viavel ? `Boa notícia: a Senadora levou a sua proposta ${aspas(p)} para a pauta do Congresso!`
       : `A Senadora achou a sua proposta ${aspas(p)} inviável. Veja o motivo nas Propostas do povo.`);
+    require('../notificacoes').avisar('meus_envios', {
+      titulo: viavel ? `Sua proposta vai para a pauta: ${p.titulo}` : `Sua proposta foi achada inviável: ${p.titulo}`,
+      corpo: viavel ? 'A Senadora levou a sua proposta para o Congresso votar.' : 'Veja o motivo nas Propostas do povo.',
+      url: '/#/congresso/propostas', tag: `proposta-${p.id}`,
+    }, { para: [p.autor_id] });
   }
   res.json({ ok: true, situacao });
 });
@@ -186,6 +193,11 @@ r.post('/:id/decidir', exigir('congresso.aprovar'), async (req, res) => {
       rejeitada: `Sua proposta ${aspas(p)} foi rejeitada no Congresso.`,
       adiada: `A votação da sua proposta ${aspas(p)} foi adiada; ela continua na pauta.`,
     }[resultado]);
+    require('../notificacoes').avisar('meus_envios', {
+      titulo: { aprovada: `Proposta APROVADA: ${p.titulo}`, rejeitada: `Proposta rejeitada: ${p.titulo}`, adiada: `Votação adiada: ${p.titulo}` }[resultado],
+      corpo: { aprovada: 'O Congresso aprovou a sua proposta!', rejeitada: 'O Congresso rejeitou a sua proposta.', adiada: 'Ela continua na pauta do Congresso.' }[resultado],
+      url: '/#/congresso/propostas', tag: `proposta-${p.id}`,
+    }, { para: [p.autor_id] });
   }
   res.json({ ok: true, situacao });
 });

@@ -6,7 +6,7 @@
 import { h, trocar } from '../core.js';
 import { enviar } from '../tempo-real.js';
 import { PELOS, sorte, elipse, sombrear, desenharCoelho, desenharRaposa, desenharFantasma, desenharArvore, quebrarTexto } from '../desenho-coelho.js';
-import { registrarPecas, desenharSprite, temSprite, aoMudarSprites } from '../sprites.js';
+import { registrarPecas, desenharSprite, temSprite, aoMudarSprites, usarNomeDaPeca } from '../sprites.js';
 
 export { desenharCoelho };
 
@@ -20,6 +20,8 @@ export const CENTRO = { x: 800, y: 520 };
 export { PELOS };
 export const NOMES_PELO = ['Creme', 'Caramelo', 'Chocolate', 'Neve', 'Café', 'Mel', 'Cinza', 'Rosado'];
 export const ACESSORIOS = { nenhum: 'Nada', laco: 'Laço', chapeu: 'Chapéu de palha', flores: 'Coroa de flores', cachecol: 'Cachecol', oculos: 'Óculos', coroa: 'Coroa' };
+// O nome de cada acessório acompanha o nome da roupa nos sprites (quem troca os sprites pode renomear).
+for (const id of Object.keys(ACESSORIOS)) if (id !== 'nenhum') usarNomeDaPeca(ACESSORIOS, id, `roupa.${id}`);
 export const EMOTES = { oi: '👋', coracao: '❤️', risada: '😂', susto: '😱', pergunta: '❓', zzz: '💤' };
 // Cor de cada toca (a bandeirinha), pela ordem de quem entrou.
 const CORES = ['#d8b13a', '#d8674a', '#5aa0d8', '#b77be6', '#7fb069', '#e48ab8', '#4fa39b', '#e0884a', '#8f9ad8', '#c46bd8', '#9bc25a', '#d85a7a', '#5ac2d8', '#b0905a', '#e0d05a'];

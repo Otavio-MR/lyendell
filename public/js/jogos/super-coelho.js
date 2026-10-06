@@ -3495,6 +3495,14 @@ export default {
     teclado: 'Setas ou A/D para andar, Espaço, Z ou seta para cima para pular (segure para ir mais alto), X ou Shift para correr e jogar fogo, seta para baixo para agachar.',
     toque: 'Setas para andar e agachar, Pular para pular (segure para ir mais alto) e Correr para correr e jogar fogo.',
   },
+  // As linhas do "como jogar" cujo nome acompanha o nome da peça (quem troca os sprites pode renomear).
+  pecasComoJogar: {
+    'Cenoura': 'supercoelho.cenoura',
+    'Flor de Fogo': 'supercoelho.flor-de-fogo',
+    'Estrela': 'supercoelho.estrela',
+    'Trevo': 'supercoelho.trevo',
+    'Raposo': 'supercoelho.raposo',
+  },
   comoJogar: [
     ['🐰', 'Super Coelho', 'chega ao mastro no fim de cada fase. Segure Correr para ir mais rápido e pular mais longe.'],
     ['❓', 'Blocos', 'bata a cabeça por baixo: saem Lírios (200 pontos) e poderes. Grande, o coelho quebra tijolos.'],

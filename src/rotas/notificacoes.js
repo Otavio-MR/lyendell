@@ -15,22 +15,23 @@ r.get('/', async (req, res) => {
   res.json({
     ativo: notif.ativo(),
     chave: notif.chaves.publica,
-    tipos: Object.entries(notif.TIPOS).filter(([, t]) => !t.perm || req.usuario.permissoes.has(t.perm)).map(([id, t]) => ({ id, nome: t.nome })),
+    // Cada cargo vê os seus: os gerais de todo morador e, depois, os do cargo (marcados com cargo: true).
+    tipos: notif.tiposDe(req.usuario).map(id => ({ id, nome: notif.TIPOS[id].nome, cargo: !!notif.TIPOS[id].cargo })),
     inscrito: !!minha,
-    escolhidos: minha ? notif.tiposValidos(JSON.parse(minha.tipos || 'null')) : notif.PADRAO,
+    escolhidos: minha ? notif.ligadosDe(req.usuario, minha.tipos) : notif.PADRAO.filter(t => notif.podeTipo(req.usuario, t)),
     aparelhos: (await db.get('SELECT COUNT(*) AS n FROM push_inscricoes WHERE usuario_id = ?', req.usuario.id)).n,
   });
 });
 
 r.post('/inscrever', async (req, res) => {
   if (!notif.ativo()) throw erro(503, 'As notificações ainda não foram ligadas no servidor.');
-  if (!await notif.inscrever(req.usuario.id, req.body?.inscricao, req.body?.tipos)) throw erro(400, 'Este navegador mandou uma inscrição inválida.');
+  if (!await notif.inscrever(req.usuario, req.body?.inscricao, req.body?.tipos)) throw erro(400, 'Este navegador mandou uma inscrição inválida.');
   res.status(201).json({ ok: true });
 });
 
 r.put('/tipos', async (req, res) => {
   const endpoint = String(req.body?.endpoint || '');
-  await db.run('UPDATE push_inscricoes SET tipos = ? WHERE endpoint = ? AND usuario_id = ?', JSON.stringify(notif.tiposValidos(req.body?.tipos)), endpoint, req.usuario.id);
+  await db.run('UPDATE push_inscricoes SET tipos = ? WHERE endpoint = ? AND usuario_id = ?', notif.guardarEscolha(req.usuario, req.body?.tipos), endpoint, req.usuario.id);
   res.json({ ok: true });
 });
 

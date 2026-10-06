@@ -197,6 +197,11 @@ r.post('/:id/contribuicoes', exigir('atividades.participar'), async (req, res) =
   ]);
   await anotar(req, 'Registrou uma entrega', `${quantidade} ${a.item} em "${a.titulo}"`);
   if (gestor(req, a)) await progresso.registrar(req.usuario.id, 'entrega'); // já nasce conferida
+  // Entrega de quem não cuida da atividade: avisa quem criou e quem gerencia as atividades, para conferir.
+  else require('../notificacoes').avisar('entregas', {
+    titulo: `Entrega para conferir: ${a.titulo}`, corpo: `${req.usuario.nome} entregou ${quantidade} ${a.item}${nota ? ` (${nota})` : ''}.`,
+    url: `/#/atividades/${a.id}`, tag: `entrega-${a.id}`,
+  }, { exceto: req.usuario.id, para: [a.criado_por], perm: 'atividades.gerenciar' });
   res.status(201).json({ ok: true });
 });
 

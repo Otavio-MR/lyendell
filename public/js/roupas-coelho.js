@@ -458,7 +458,13 @@ export function roupaDoAcessorio(a) {
 
 // Desenha uma parte da roupa (se existir). pelo: cor da patinha que segura o item.
 export function desenharParte(g, parte, id, t = 0, pelo = '#e9dcc3', { semSprite = false } = {}) {
-  const f = id && DESENHOS[parte]?.[id];
+  // Item novo do Club Coelho (id "n12"): só existe o sprite; sem ele, não desenha nada.
+  if (ehRoupaNova(id)) {
+    if (semSprite || !DESENHOS[parte]) return;
+    if (desenharSprite(g, `roupa.${id}`, 'parado', 0, 0, { t, largura: 44, altura: 56, ancora: 'pe' }) && parte === 'mao') el(g, 14.5, -12, 3.2, 2.8, pelo);
+    return;
+  }
+  const f = id && Object.hasOwn(DESENHOS[parte] || {}, id) && DESENHOS[parte][id];
   if (!f) return;
   // Sprite enviado: a imagem inteira do item no lugar do desenho (a patinha que segura continua por cima).
   if (!semSprite && desenharSprite(g, `roupa.${id}`, 'parado', 0, 0, { t })) {
@@ -544,3 +550,19 @@ export const SPRITES = PARTES.flatMap(parte => Object.keys(DESENHOS[parte]).map(
   };
 }));
 registrarPecas(SPRITES);
+
+/* ─── Roupas novas (criadas na tela de sprites, só com o sprite) ─── */
+
+export function ehRoupaNova(id) { return typeof id === 'string' && /^n\d+$/.test(id); }
+
+// Registra as peças das roupas novas do Club Coelho ({ id: 'n12', tipo: 'cabeca', nome, ... }), para a tela
+// de sprites (molde e envio) e para o desenho saber o tamanho do quadro. Os móveis ficam em clube-salas.js.
+export function registrarRoupasNovas(itens = []) {
+  registrarPecas(itens.filter(i => ehRoupaNova(i?.id) && DESENHOS[i.tipo]).map(i => ({
+    chave: `roupa.${i.id}`, jogo: 'Roupas e acessórios', nome: i.nome, itemNovo: i,
+    desc: `Item novo do Club Coelho: vai ${ONDE[i.tipo]}. Não tem desenho de sempre: sem o sprite, o item não aparece (nem na loja). O quadro é do tamanho do coelho inteiro (44 x 56, pé embaixo no meio, olhando para a direita): desenhe só o item, no lugar dele em cima do coelho de guia, com o resto transparente. Pode ter vários quadros lado a lado para animar.`,
+    largura: 44, altura: 56, ancora: 'pe', guiaCoelho: true,
+    animacoes: [{ id: 'parado', nome: 'Parado', quadros: 1, fps: 6 }],
+    previa: () => {},
+  })));
+}

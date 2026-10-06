@@ -2088,6 +2088,10 @@ export default {
     teclado: 'Setas ou WASD para andar e subir escadas, Espaço (ou Z) para pular os barris. P pausa.',
     toque: 'Use as setas para andar e subir escadas e o botão Pular para saltar os barris.',
   },
+  // As linhas do "como jogar" cujo nome acompanha o nome da peça (quem troca os sprites pode renomear).
+  pecasComoJogar: {
+    'Marreta': 'barris.marreta',
+  },
   comoJogar: [
     ['🐰', 'Coelho', 'suba as escadas até a Princesa Cenoura, lá no alto.'],
     ['🛢️', 'Barris', 'o Raposo joga barris vigas abaixo. Pule por cima de um: +100.'],

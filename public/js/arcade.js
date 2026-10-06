@@ -8,6 +8,7 @@
 //   { id, nome, icone, sub, subJunto: { versus, coop }, largura, altura, cor,
 //     controles: { cima, baixo, pular: 'Pular', acao: 'Correr' | null, deslizar, cimaPula },
 //     instrucoes: { teclado, toque }, comoJogar: [[emoji, nome, texto], ...],
+//     pecasComoJogar: { nome: 'chave.da.peca' } (opcional: o nome da linha segue o nome da peça do sprite),
 //     criar(ctx) -> jogo, desenharFoto(g, foto, t) }
 // ctx = { sorte, segredo(chave), som(nome), junto, largura, altura } (junto: null quando a pessoa joga sozinha)
 // jogo = { pontos, acabou, atualizar(dt, entrada), desenhar(g, t), resumo(), foto(),
@@ -18,6 +19,7 @@ import { h, trocar, icone, botao, cabecalho, aviso, get, post, pode, aoSair, est
 import { rt, ouvir, transmitir, enviarQuadro, pararTransmissao } from './tempo-real.js';
 import { juntoNoJogo, sorteJunto, textoDoFimJunto } from './junto.js';
 import { segredosDoJogo } from './segredos.js';
+import { nomeDe } from './sprites.js';
 
 const PASSO = 1 / 60;
 const TECLAS = {
@@ -428,7 +430,7 @@ export function telaArcade(def) {
         h('section', { class: 'painel' },
           h('div', { class: 'painel-cab' }, h('h2', null, icone('pergunta'), 'Como jogar')),
           h('ul', { class: 'pac-legenda arcade-legenda' },
-            (def.comoJogar || []).map(([emoji, nome, texto]) => h('li', null, h('span', { class: 'arcade-emoji' }, emoji), h('span', null, h('strong', null, nome), ' ', texto))))))));
+            (def.comoJogar || []).map(([emoji, nome, texto]) => h('li', null, h('span', { class: 'arcade-emoji' }, emoji), h('span', null, h('strong', null, nomeDe(def.pecasComoJogar?.[nome], nome)), ' ', texto))))))));
 }
 
 /* ─── Quem assiste: o mesmo desenho, com o último quadro recebido ─── */
