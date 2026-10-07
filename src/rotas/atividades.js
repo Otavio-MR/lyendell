@@ -162,7 +162,7 @@ function avisarAliados(req, id, a) {
   require('../notificacoes').avisar('aliados', {
     titulo: `Precisamos de ajuda: ${a.titulo}`, corpo: `Meta: ${a.meta} ${a.item}. Aberta para Convidados e Aliados.`,
     url: `/#/atividades/${id}`, tag: `atividade-${id}`,
-  }, { exceto: req.usuario.id, perm: 'aliados.ver' });
+  }, { exceto: req.usuario.id, perm: 'aliados.ver', semPerm: 'atividades.ver' });
 }
 
 r.put('/:id', async (req, res) => {

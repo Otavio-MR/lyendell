@@ -248,7 +248,7 @@ function avisarAliados(livro, regId, dados, quem = null) {
   const url = livro.modulo === 'leis' ? `/#/leis/${livro.id}/registro/${regId}` : `/#/${livro.modulo}/${livro.id}/registro/${regId}`;
   require('../notificacoes').avisar('aliados', {
     titulo: `${MODULOS[livro.modulo]}: ${tituloDoRegistro(livro, dados)}`, corpo: `Novo registro em "${livro.nome}".`, url, tag: `aliados-registro-${regId}`,
-  }, { exceto: quem, perm: 'aliados.ver' });
+  }, { exceto: quem, perm: 'aliados.ver', semPerm: livro.modulo === 'leis' ? 'leis.ver' : null });
 }
 
 // Registro mandado para aprovação: avisa quem aprova naquele módulo (a Tabeliã, o Comandante, o Diretor do

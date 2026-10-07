@@ -495,7 +495,7 @@ CREATE TABLE IF NOT EXISTS diario (
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 29;
+const VERSAO = 30;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -587,6 +587,9 @@ async function migrar() {
   if (versao < 28 && !await colunaExiste('clube', 'pompom')) await db.run('ALTER TABLE clube ADD COLUMN pompom TEXT');
   if (versao < 27) await db.run("CREATE INDEX IF NOT EXISTS clube_itens_ativos ON clube_itens (ativo)");
   if (versao < 29) await convidadosEAliados();
+  // v30: os Aliados passam a ver a cidade (mapa, anúncios, Congresso, Juramento, Leis, Galeria, Comunidade) e a jogar na Recreação.
+  if (versao < 30) await db.run('UPDATE cargos SET descricao = ? WHERE nome = ? AND descricao = ?', CARGOS_PADRAO.find(c => c.nome === 'Aliados').descricao, 'Aliados', 'Convidados e aliados de outras casas. Não são moradores: veem só o que for marcado para Convidados e Aliados.');
+  if (versao < 30) await darPermissoes({ Aliados: ['aliados.ver', 'anuncios.ver', 'congresso.ver', 'leis.ver', 'galeria.ver', 'recreacao.usar'] });
   // v20: o campo "Nickname" vira "Endereço" em todos os livros (no RP o nick é o endereço da pessoa).
   if (versao < 20) await nickVirouEndereco();
   // v19: propostas do povo para o Congresso (todo morador manda; a Senadora avalia).

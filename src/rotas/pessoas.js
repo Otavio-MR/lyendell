@@ -1,7 +1,7 @@
 // Comunidade: a lista de quem usa o site, o perfil público de cada um e o mural de recados.
 const express = require('express');
 const { db } = require('../db');
-const { exigirLogin, exigirMorador, checarMorador, pode } = require('../auth');
+const { exigirLogin, checarMorador, pode } = require('../auth');
 const progresso = require('../progresso');
 const { erro, texto, idDaRota } = require('../util');
 
@@ -43,13 +43,9 @@ function publico(u, cargos = []) {
   };
 }
 
-// A Comunidade é dos moradores: os Aliados (convidados de outras casas) aparecem nela, mas não a abrem.
-// Eles só abrem o próprio perfil e o próprio mural.
-function moradorOuEu(req) {
-  if (Number(req.params.id) !== req.usuario.id) checarMorador(req);
-}
+// A Comunidade: os Aliados (convidados de outras casas) veem todo mundo, mas só os moradores mandam recados.
 
-r.get('/', exigirMorador, async (req, res) => {
+r.get('/', async (req, res) => {
   const [lista, cargos] = await Promise.all([
     db.all(`SELECT ${CAMPOS_PUBLICOS} FROM usuarios WHERE ativo = 1 ORDER BY xp DESC, chave`),
     cargosPorUsuario(),
@@ -66,7 +62,6 @@ async function buscarPessoa(req, id = idDaRota(req)) {
 }
 
 r.get('/:id', async (req, res) => {
-  moradorOuEu(req);
   const u = await buscarPessoa(req);
   // Quem abre o próprio perfil já recebe as conquistas que alcançou antes delas existirem.
   if (u.id === req.usuario.id) await progresso.conferirConquistas(u.id);
@@ -112,7 +107,6 @@ r.get('/:id', async (req, res) => {
 /* ─── Mural de recados ────────────────────────────── */
 
 r.get('/:id/recados', async (req, res) => {
-  moradorOuEu(req);
   const u = await buscarPessoa(req);
   const recados = await db.all(`SELECT r.*, a.foto AS autor_foto, a.cor AS autor_cor, a.moldura AS autor_moldura
     FROM recados r LEFT JOIN usuarios a ON a.id = r.autor_id WHERE r.perfil_id = ? ORDER BY r.id DESC LIMIT 60`, u.id);
@@ -123,7 +117,7 @@ r.get('/:id/recados', async (req, res) => {
 const ultimoRecado = new Map(); // anti-flood: um recado a cada 10 segundos por pessoa
 
 r.post('/:id/recados', async (req, res) => {
-  moradorOuEu(req);
+  checarMorador(req); // os Aliados só leem
   const u = await buscarPessoa(req);
   const t = texto(req.body?.texto, 300);
   if (!t) throw erro(400, 'Escreva o recado.');

@@ -36,7 +36,7 @@ Todo usuário é morador (menos os Aliados, veja "Convidados e Aliados"). Os car
 | Lorde Comandante | Faz as Leis de Lyendell junto com a Família Nobre: escreve, publica, edita e revoga |
 | Bobo da Corte | A Caixa de Pegadinhas, só dele: prega peças no pessoal e conta piadas na praça (veja "Bobo da Corte") |
 | Game Dev | Troca os desenhos dos joguinhos pelos próprios sprites, e a troca vale para todo mundo (veja "Sprites dos jogos") |
-| Aliados | Convidados e aliados de outras casas. **Não são moradores**: veem só o que for marcado para Convidados e Aliados (veja "Convidados e Aliados") |
+| Aliados | Convidados e aliados de outras casas. **Não são moradores**: veem a cidade, jogam e conversam na Recreação e no Club Coelho, mas não publicam nem editam nada (veja "Convidados e Aliados") |
 | Morador | Ver tudo (menos o Hospital), ajudar nas atividades, usar a Recreação e mandar propostas ao Congresso |
 
 Qualquer usuário pode ser marcado como **criança** (veja "Personagem criança" mais abaixo): mesmo com cargo, só olha, brinca e ajuda.
@@ -54,23 +54,26 @@ não consegue, por exemplo, dar a si mesma o poder de criar usuários.
 ### Convidados e Aliados
 
 O cargo **Aliados** é para convidados e aliados de outras casas. Eles **não são moradores**:
-quem tem esse cargo não recebe as permissões do Morador (nada de Recreação, Club Coelho, Mapa,
-Comunidade, Juramento, Galeria nem livros). Eles veem só:
+quem tem esse cargo não recebe as permissões do Morador. Eles **só veem, não mandam nem editam nada**:
 
-- o próprio perfil (Meu perfil, trocar a senha) e os avisos públicos da tela inicial
-  (os cartazes de procurados e banidos e os aniversariantes);
-- os anúncios e as atividades marcados como **Visível para Convidados e Aliados** (nas atividades
-  marcadas eles também ajudam e registram entregas);
-- os livros (Tabelionato, Guarda, Hospital, Congresso e Leis de Lyendell) marcados como
-  **Visível para Convidados e Aliados** na configuração do livro: leem os registros aprovados e
-  baixam o .book, mas nunca registram, editam ou aprovam. O módulo só aparece no menu deles quando
-  tem pelo menos um livro marcado.
+- a tela inicial (anúncios, novidades das leis, cartazes de procurados e banidos, aniversariantes)
+  e o próprio perfil (Meu perfil, trocar a senha);
+- o Mapa de Lyendell, os Anúncios, o Congresso (livros e propostas), o Juramento, as Leis de
+  Lyendell, a Galeria e a Comunidade (perfis e murais, sem deixar recado, nem no próprio mural);
+- a Recreação e o Club Coelho: ali eles **jogam e conversam** como todo mundo;
+- as atividades marcadas como **Visível para Convidados e Aliados** (nelas também ajudam e
+  registram entregas);
+- os livros do Tabelionato, da Guarda e do Hospital marcados como **Visível para Convidados e
+  Aliados** na configuração do livro: leem os registros aprovados e baixam o .book. O módulo só
+  aparece no menu deles quando tem pelo menos um livro marcado.
 
-Quem publica o anúncio ou a atividade, ou configura o livro, marca a caixinha. Na lista, o que
-está marcado ganha a etiqueta **Aliados**, para os moradores saberem o que os convidados veem.
+Eles nunca publicam anúncios, mandam propostas, enviam fotos, registram, editam ou aprovam.
+Quem publica a atividade, ou configura o livro, marca a caixinha. Na lista, o que está marcado
+ganha a etiqueta **Aliados**, para os moradores saberem o que os convidados veem.
 Os Aliados aparecem na Comunidade com a etiqueta do cargo, mas não entram na conta dos moradores
-(na tela Cargos, o Morador conta só os moradores) nem no Juramento. Eles podem ligar as notificações
-de "Novidades para Convidados e Aliados" (anúncio, atividade ou registro aprovado em livro marcado).
+(na tela Cargos, o Morador conta só os moradores) nem no Juramento. Nas notificações, eles recebem
+os anúncios e as leis como todo mundo, e "Novidades para Convidados e Aliados" para as atividades
+e os registros aprovados em livros marcados.
 
 Na tela **Cargos**, o administrador pode marcar qualquer cargo como **Não é morador (não recebe
 as permissões do Morador)**. Quem tem um cargo assim e outro cargo junto (ex.: Aliados e Guarda)

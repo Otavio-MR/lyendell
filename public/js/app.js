@@ -34,11 +34,11 @@ const app = document.getElementById('app');
 const MENU = [
   { secao: 'Cidade', itens: [
     { rota: '/', nome: 'Início', icone: 'casa' },
-    { rota: '/comunidade', nome: 'Comunidade', icone: 'usuarios', morador: true },
-    { rota: '/mapa', nome: 'Mapa de Lyendell', icone: 'mapa', morador: true },
+    { rota: '/comunidade', nome: 'Comunidade', icone: 'usuarios' },
+    { rota: '/mapa', nome: 'Mapa de Lyendell', icone: 'mapa' },
     { rota: '/anuncios', nome: 'Mural de Anúncios', icone: 'megafone', perm: ['anuncios.ver', 'aliados.ver'] },
     { rota: '/congresso', nome: 'Congresso', icone: 'coluna', modulo: 'congresso' },
-    { rota: '/juramento', nome: 'Juramento', icone: 'bandeira', perm: ['tabelionato.ver'] },
+    { rota: '/juramento', nome: 'Juramento', icone: 'bandeira', perm: ['tabelionato.ver', 'aliados.ver'] },
     { rota: '/leis', nome: 'Leis de Lyendell', icone: 'balanca', modulo: 'leis' },
     { rota: '/atividades', nome: 'Mural de Atividades', icone: 'tarefas', perm: ['atividades.ver', 'aliados.ver'] },
     { rota: '/galeria', nome: 'Galeria', icone: 'imagem', perm: ['galeria.ver'] },

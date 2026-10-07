@@ -221,7 +221,7 @@ function inicioAliado(d, procurados, convite) {
         h('p', { class: 'sobrelinha' }, 'Cidade de Lyendell · Casa Luckham'),
         h('h1', { class: 'pag-titulo bv-titulo' }, `${saudacao()}, ${eu.nome}`),
         h('div', { class: 'chips' }, eu.cargos.map(chipCargo)))),
-    h('p', { class: 'nota' }, icone('alianca'), h('span', null, 'Você é Aliado da Casa Luckham: aqui aparece o que foi aberto para Convidados e Aliados.')),
+    h('p', { class: 'nota' }, icone('alianca'), h('span', null, 'Você é Aliado da Casa Luckham: pode ver a cidade, jogar e conversar na Recreação e no Club Coelho, mas não publica nem edita nada.')),
     avisosDeAprovacao(d.pendencias),
     painelAniversarios(d.aniversariantes),
     painelProcurados(procurados),
@@ -232,7 +232,7 @@ function inicioAliado(d, procurados, convite) {
       h('a', { class: 'numero', href: m === 'leis' ? '#/leis' : `#/${m}` },
         h('span', { class: 'numero-icone' }, icone(info.icone)),
         h('strong', null, info.titulo),
-        h('span', null, 'Livros abertos para você')))) : null,
+        h('span', null, pode(`${m}.ver`) ? 'Ler' : 'Livros abertos para você')))) : null,
     gradeMurais(d));
 }
 

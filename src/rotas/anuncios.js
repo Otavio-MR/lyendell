@@ -29,7 +29,7 @@ function avisarAliados(req, id, a) {
   require('../notificacoes').avisar('aliados', {
     titulo: `${a.importancia === 'urgente' ? 'URGENTE: ' : ''}${a.titulo}`, corpo: `${req.usuario.nome} no Mural de Anúncios: ${a.conteudo.slice(0, 140)}`,
     url: '/#/anuncios', tag: `anuncio-${id}`,
-  }, { exceto: req.usuario.id, perm: 'aliados.ver' });
+  }, { exceto: req.usuario.id, perm: 'aliados.ver', semPerm: 'anuncios.ver' });
 }
 
 // Quem lê os anúncios vê todos; os Aliados, só os marcados para Convidados e Aliados.

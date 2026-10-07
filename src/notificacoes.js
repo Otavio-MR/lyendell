@@ -96,7 +96,8 @@ async function enviarUma(insc, carga) {
 //   perm: só quem tem essa permissão (ex.: "guarda.aprovar" para o registro da Guarda).
 //   Com "para" e "perm" juntos, vale quem está em um OU no outro (ex.: quem criou a atividade ou quem gerencia).
 // carga: { titulo, corpo, url, tag }. Não espera nem derruba quem chamou.
-function avisar(tipo, carga, { exceto = null, para = null, perm = null } = {}) {
+//   semPerm: pula quem tem essa permissão (ex.: o aviso dos Aliados não repete o de anúncios para quem já lê todos).
+function avisar(tipo, carga, { exceto = null, para = null, perm = null, semPerm = null } = {}) {
   if ((!ativo && !modoTeste) || !TIPOS[tipo]) return;
   const alvo = para ? new Set(para.filter(x => x != null)) : null;
   (async () => {
@@ -108,6 +109,7 @@ function avisar(tipo, carga, { exceto = null, para = null, perm = null } = {}) {
       if (!usuarios.has(insc.usuario_id)) usuarios.set(insc.usuario_id, await carregarUsuario(insc.usuario_id).catch(() => null));
       const u = usuarios.get(insc.usuario_id);
       if (!u || !u.ativo) continue;
+      if (semPerm && !u.is_root && u.permissoes.has(semPerm)) continue;
       if (alvo || perm) {
         const naLista = alvo?.has(insc.usuario_id);
         const temPerm = perm && (u.is_root || u.permissoes.has(perm));

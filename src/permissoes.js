@@ -179,8 +179,8 @@ const CARGOS_PADRAO = [
   // Convidados e aliados de outras casas: "exclui_base" faz quem tem este cargo NÃO ser morador
   // (não recebe as permissões do Morador). Só veem o que for marcado para Convidados e Aliados.
   { nome: 'Aliados', cor: '#5aa0d8', exclui_base: true,
-    descricao: 'Convidados e aliados de outras casas. Não são moradores: veem só o que for marcado para Convidados e Aliados.',
-    permissoes: ['aliados.ver'] },
+    descricao: 'Convidados e aliados de outras casas. Não são moradores: veem a cidade (mapa, anúncios, Congresso, Juramento, Leis, Galeria e Comunidade), jogam e conversam na Recreação e no Club Coelho, mas não publicam nem editam nada. Os livros do Tabelionato, da Guarda e do Hospital e as atividades, só os marcados para Convidados e Aliados.',
+    permissoes: ['aliados.ver', 'anuncios.ver', 'congresso.ver', 'leis.ver', 'galeria.ver', 'recreacao.usar'] },
 ];
 
 module.exports = { CATALOGO, TODAS, VALIDAS, PERMITIDAS_CRIANCA, CARGOS_PADRAO, DESCRICOES, EXCLUSIVAS, MODULOS, SO_DO_BOBO, SO_DOS_ALIADOS };

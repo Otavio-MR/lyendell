@@ -1,6 +1,6 @@
 // Comunidade: todo mundo que usa o site e o perfil público de cada um (com conquistas e mural de recados).
 
-import { estado, get, post, del, h, trocar, icone, botao, botaoIcone, cabecalho, vazio, avatarPessoa, seloNivel, barra, chipCargo, chipCrianca, ehCrianca, confirmar, tentar, aviso, num, relativo, dataCurta, dataHora, normalizar, aoSair, pode } from '../core.js';
+import { estado, get, post, del, h, trocar, icone, botao, botaoIcone, cabecalho, vazio, avatarPessoa, seloNivel, barra, chipCargo, chipCrianca, ehCrianca, confirmar, tentar, aviso, num, relativo, dataCurta, dataHora, normalizar, aoSair, pode, ehMorador } from '../core.js';
 import { rt, ouvir } from '../tempo-real.js';
 import { botaoPegadinha } from './bobo.js';
 
@@ -137,7 +137,7 @@ export async function pessoa(id) {
       h('div', { class: 'perfil-coluna' },
         h('section', { class: 'painel' },
           h('div', { class: 'painel-cab' }, h('h2', null, icone('chat'), 'Mural de recados')),
-          formRecado,
+          ehMorador() ? formRecado : h('p', { class: 'suave' }, 'Os Aliados leem o mural, mas não deixam recados.'),
           mural))),
     h('section', { class: 'painel' },
       h('div', { class: 'painel-cab' }, h('h2', null, icone('estrela'), 'Conquistas'), h('small', { class: 'suave' }, `${ganhas.length} de ${d.conquistas.length}`)),

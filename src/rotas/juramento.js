@@ -11,7 +11,8 @@ const { pessoasRegistradas } = require('../moradores');
 const { erro, idDaRota } = require('../util');
 
 const r = express.Router();
-r.use(exigirLogin, exigir('tabelionato.ver'));
+// Quem vê o Tabelionato e os Aliados (que só leem a lista).
+r.use(exigirLogin, (req, res, next) => next(pode(req, 'tabelionato.ver') || pode(req, 'aliados.ver') ? undefined : erro(403, 'Você não tem permissão para isso.')));
 
 const JURAM = /morador|nobre/i;
 const hoje = () => new Date().toISOString().slice(0, 10);
