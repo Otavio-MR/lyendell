@@ -2,6 +2,7 @@
 // fechado. O que cada um recebe depende do cargo: todo morador recebe os avisos gerais (anúncios, procurados,
 // leis, atividades, recados no mural, os próprios envios aprovados ou recusados), e cada cargo ganha os seus
 // (a Tabeliã, os registros para aprovar no Tabelionato; a Senadora, as propostas do povo; e assim por diante).
+// Os Aliados (que não são moradores) recebem as novidades marcadas para Convidados e Aliados.
 // Mensagem do chat não vira notificação (é coisa demais e incomodaria).
 // As chaves (VAPID_PUBLICA, VAPID_PRIVADA, VAPID_CONTATO) ficam no .env e no Render; sem elas, nada é enviado.
 const webpush = require('web-push');
@@ -18,6 +19,8 @@ const TIPOS = {
   atividades: { nome: 'Atividades novas (pedidos de ajuda)', perm: 'atividades.ver' },
   recados: { nome: 'Recados no seu mural' },
   meus_envios: { nome: 'Seus registros e propostas aprovados ou recusados' },
+  // Para os Aliados (convidados de outras casas): anúncios, atividades e registros marcados para eles.
+  aliados: { nome: 'Novidades para Convidados e Aliados', perm: 'aliados.ver' },
   // Dos cargos
   aprovacoes: { nome: 'Registros esperando a sua aprovação', algum: APROVAR, cargo: true },
   propostas: { nome: 'Propostas do povo para avaliar', perm: 'congresso.aprovar', cargo: true },

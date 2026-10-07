@@ -72,7 +72,8 @@ CREATE TABLE IF NOT EXISTS cargos (
   cor TEXT NOT NULL DEFAULT '#d8b13a',
   permissoes TEXT NOT NULL DEFAULT '[]',
   base INTEGER NOT NULL DEFAULT 0,
-  ordem INTEGER NOT NULL DEFAULT 0
+  ordem INTEGER NOT NULL DEFAULT 0,
+  exclui_base INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS usuario_cargos (
@@ -99,7 +100,8 @@ CREATE TABLE IF NOT EXISTS livros (
   campos TEXT NOT NULL DEFAULT '[]',
   cobranca TEXT,
   ordem INTEGER NOT NULL DEFAULT 0,
-  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  aliados INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS registros (
@@ -169,7 +171,8 @@ CREATE TABLE IF NOT EXISTS anuncios (
   autor_id INTEGER,
   autor_nome TEXT NOT NULL DEFAULT '',
   criado_em TEXT NOT NULL DEFAULT (datetime('now')),
-  editado_em TEXT
+  editado_em TEXT,
+  aliados INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS atividades (
@@ -186,7 +189,8 @@ CREATE TABLE IF NOT EXISTS atividades (
   criado_por INTEGER,
   criado_por_nome TEXT NOT NULL DEFAULT '',
   criado_em TEXT NOT NULL DEFAULT (datetime('now')),
-  concluido_em TEXT
+  concluido_em TEXT,
+  aliados INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS participantes (
@@ -491,7 +495,7 @@ CREATE TABLE IF NOT EXISTS diario (
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 28;
+const VERSAO = 29;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -582,6 +586,7 @@ async function migrar() {
   // v28: o Pompom de estimação do Club Coelho (cor, nome e se está passeando).
   if (versao < 28 && !await colunaExiste('clube', 'pompom')) await db.run('ALTER TABLE clube ADD COLUMN pompom TEXT');
   if (versao < 27) await db.run("CREATE INDEX IF NOT EXISTS clube_itens_ativos ON clube_itens (ativo)");
+  if (versao < 29) await convidadosEAliados();
   // v20: o campo "Nickname" vira "Endereço" em todos os livros (no RP o nick é o endereço da pessoa).
   if (versao < 20) await nickVirouEndereco();
   // v19: propostas do povo para o Congresso (todo morador manda; a Senadora avalia).
@@ -718,8 +723,20 @@ async function criarCargo(nome) {
   if (!await db.get('SELECT id FROM cargos WHERE nome = ?', c.nome)) {
     const { ordem } = await db.get('SELECT COALESCE(MAX(ordem), 0) AS ordem FROM cargos');
     await db.run('INSERT INTO cargos (nome, descricao, cor, permissoes, base, ordem) VALUES (?, ?, ?, ?, 0, ?)', c.nome, c.descricao, c.cor, '[]', ordem + 1);
+    // A coluna exclui_base só existe a partir da v29 (os cargos criados antes disso não usam).
+    if (c.exclui_base) await db.run('UPDATE cargos SET exclui_base = 1 WHERE nome = ?', c.nome);
   }
   await darPermissoes({ [c.nome]: c.permissoes });
+}
+
+// v29: Convidados e Aliados. Cargo que "não é morador" (quem tem não recebe as permissões do Morador),
+// o cargo Aliados e a marca "Visível para Convidados e Aliados" nos anúncios, nas atividades e nos livros.
+async function convidadosEAliados() {
+  if (!await colunaExiste('cargos', 'exclui_base')) await db.run('ALTER TABLE cargos ADD COLUMN exclui_base INTEGER NOT NULL DEFAULT 0');
+  for (const tabela of ['anuncios', 'atividades', 'livros']) {
+    if (!await colunaExiste(tabela, 'aliados')) await db.run(`ALTER TABLE ${tabela} ADD COLUMN aliados INTEGER NOT NULL DEFAULT 0`);
+  }
+  await criarCargo('Aliados');
 }
 
 // v20: campo do nick ainda com o nome antigo "Nickname" passa a se chamar "Endereço" (os renomeados à mão ficam).
@@ -898,8 +915,8 @@ async function resolverReferencias() {
 async function semear() {
   if (!(await db.get('SELECT COUNT(*) AS n FROM cargos')).n) {
     await db.lote(CARGOS_PADRAO.map((c, i) => [
-      'INSERT INTO cargos (nome, descricao, cor, permissoes, base, ordem) VALUES (?, ?, ?, ?, ?, ?)',
-      c.nome, c.descricao, c.cor, JSON.stringify(c.permissoes), c.base ? 1 : 0, i,
+      'INSERT INTO cargos (nome, descricao, cor, permissoes, base, ordem, exclui_base) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      c.nome, c.descricao, c.cor, JSON.stringify(c.permissoes), c.base ? 1 : 0, i, c.exclui_base ? 1 : 0,
     ]));
   }
 

@@ -1,6 +1,6 @@
 const express = require('express');
 const { db } = require('../db');
-const { exigir, exigirLogin, pode } = require('../auth');
+const { exigir, exigirLogin, pode, checar, soAliados } = require('../auth');
 const { anotar } = require('../diario');
 const progresso = require('../progresso');
 const { erro, linha, texto, idDaRota, inteiro, dataValida } = require('../util');
@@ -21,6 +21,21 @@ const SQL = `
   FROM atividades`;
 
 const gestor = (req, a) => pode(req, 'atividades.gerenciar') || a.criado_por === req.usuario.id;
+
+// Convidados e Aliados: quem não vê as atividades, mas vê a parte dos Aliados, enxerga só as marcadas
+// para eles, e nelas pode ajudar e registrar entregas (mesmo sem "atividades.participar").
+function soMarcadas(req) {
+  const so = soAliados(req, 'atividades.ver');
+  if (!so) checar(req, 'atividades.ver');
+  return so;
+}
+function conferirVisivel(req, a) {
+  if (soMarcadas(req) && !a.aliados) throw erro(404, 'Atividade não encontrada.');
+}
+const podeParticipar = (req, a) => pode(req, 'atividades.participar') || (!!a.aliados && pode(req, 'aliados.ver'));
+function checarParticipar(req, a) {
+  if (!podeParticipar(req, a)) checar(req, 'atividades.participar');
+}
 
 async function buscar(req, id = idDaRota(req)) {
   const a = await db.get(`${SQL} WHERE atividades.id = ?`, id);
@@ -50,6 +65,8 @@ function ler(req, atual = {}) {
     recompensa_valor: valor,
     recompensa_unidade: linha(b.recompensa_unidade ?? atual.recompensa_unidade, 40),
     prazo: b.prazo !== undefined ? dataValida(b.prazo) : (atual.prazo ?? null),
+    // "Visível para Convidados e Aliados": os Aliados (que não são moradores) também veem e ajudam.
+    aliados: b.aliados !== undefined ? (b.aliados ? 1 : 0) : (atual.aliados ? 1 : 0),
   };
 }
 
@@ -59,23 +76,25 @@ const comandosAjustarStatus = id => [
   [`UPDATE atividades SET status = 'aberta', concluido_em = NULL WHERE id = ? AND status = 'concluida' AND ${TOTAL} < meta`, id],
 ];
 
-r.get('/', exigir('atividades.ver'), async (req, res) => {
+r.get('/', async (req, res) => {
   const { status } = req.query;
+  const marcadas = soMarcadas(req) ? 'AND atividades.aliados = 1' : '';
   const [lista, grupos, minhas] = await Promise.all([
     STATUS.includes(status)
-      ? db.all(`${SQL} WHERE atividades.status = ? ORDER BY atividades.id DESC`, status)
-      : db.all(`${SQL} ORDER BY CASE atividades.status WHEN 'aberta' THEN 0 WHEN 'concluida' THEN 1 ELSE 2 END, atividades.id DESC`),
-    db.all('SELECT status, COUNT(*) AS n FROM atividades GROUP BY status'),
+      ? db.all(`${SQL} WHERE atividades.status = ? ${marcadas} ORDER BY atividades.id DESC`, status)
+      : db.all(`${SQL} WHERE 1 = 1 ${marcadas} ORDER BY CASE atividades.status WHEN 'aberta' THEN 0 WHEN 'concluida' THEN 1 ELSE 2 END, atividades.id DESC`),
+    db.all(`SELECT status, COUNT(*) AS n FROM atividades WHERE 1 = 1 ${marcadas} GROUP BY status`),
     db.all('SELECT atividade_id FROM participantes WHERE usuario_id = ?', req.usuario.id),
   ]);
   const contagem = Object.fromEntries(STATUS.map(s => [s, 0]));
   for (const g of grupos) contagem[g.status] = g.n;
   const participo = new Set(minhas.map(x => x.atividade_id));
-  res.json({ atividades: lista.map(a => ({ ...a, participando: participo.has(a.id) })), contagem });
+  res.json({ atividades: lista.map(a => ({ ...a, aliados: !!a.aliados, participando: participo.has(a.id) })), contagem });
 });
 
-r.get('/:id', exigir('atividades.ver'), async (req, res) => {
+r.get('/:id', async (req, res) => {
   const a = await buscar(req);
+  conferirVisivel(req, a);
   const [participantes, contribuicoes] = await Promise.all([
     db.all(`SELECT p.usuario_id, p.usuario_nome, p.compromisso, p.entrou_em, u.foto
       FROM participantes p LEFT JOIN usuarios u ON u.id = p.usuario_id WHERE p.atividade_id = ? ORDER BY p.entrou_em`, a.id),
@@ -109,9 +128,10 @@ r.get('/:id', exigir('atividades.ver'), async (req, res) => {
   res.json({
     atividade: {
       ...a,
+      aliados: !!a.aliados,
       gestor: ehGestor,
       participando: participantes.some(p => p.usuario_id === req.usuario.id),
-      podeParticipar: pode(req, 'atividades.participar'),
+      podeParticipar: podeParticipar(req, a),
     },
     divisao,
     contribuicoes: contribuicoes.map(c => ({
@@ -124,17 +144,26 @@ r.get('/:id', exigir('atividades.ver'), async (req, res) => {
 
 r.post('/', exigir('atividades.criar'), async (req, res) => {
   const a = ler(req);
-  const { id } = await db.run(`INSERT INTO atividades (titulo, descricao, item, meta, pacote, recompensa_valor, recompensa_unidade, prazo, criado_por, criado_por_nome)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  a.titulo, a.descricao, a.item, a.meta, a.pacote, a.recompensa_valor, a.recompensa_unidade, a.prazo, req.usuario.id, req.usuario.nome);
+  const { id } = await db.run(`INSERT INTO atividades (titulo, descricao, item, meta, pacote, recompensa_valor, recompensa_unidade, prazo, criado_por, criado_por_nome, aliados)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  a.titulo, a.descricao, a.item, a.meta, a.pacote, a.recompensa_valor, a.recompensa_unidade, a.prazo, req.usuario.id, req.usuario.nome, a.aliados);
   await anotar(req, 'Criou uma atividade', `${a.titulo} (${a.meta} ${a.item})`);
   await progresso.registrar(req.usuario.id, 'atividade');
   require('../notificacoes').avisar('atividades', {
     titulo: `Precisamos de ajuda: ${a.titulo}`, corpo: `Meta: ${a.meta} ${a.item}.${a.recompensa_valor ? ` Recompensa: ${a.recompensa_valor} ${a.recompensa_unidade || ''}`.trimEnd() + '.' : ''}`,
     url: `/#/atividades/${id}`, tag: `atividade-${id}`,
   }, { exceto: req.usuario.id });
+  if (a.aliados) avisarAliados(req, id, a);
   res.status(201).json({ id });
 });
+
+// Aviso para os Aliados quando uma atividade passa a ser visível para eles.
+function avisarAliados(req, id, a) {
+  require('../notificacoes').avisar('aliados', {
+    titulo: `Precisamos de ajuda: ${a.titulo}`, corpo: `Meta: ${a.meta} ${a.item}. Aberta para Convidados e Aliados.`,
+    url: `/#/atividades/${id}`, tag: `atividade-${id}`,
+  }, { exceto: req.usuario.id, perm: 'aliados.ver' });
+}
 
 r.put('/:id', async (req, res) => {
   const atual = await buscar(req);
@@ -142,10 +171,11 @@ r.put('/:id', async (req, res) => {
   const a = ler(req, atual);
   const concluido = a.status === 'concluida' ? (atual.concluido_em || new Date().toISOString().slice(0, 19).replace('T', ' ')) : null;
   await db.run(`UPDATE atividades SET titulo = ?, descricao = ?, item = ?, meta = ?, pacote = ?, recompensa_valor = ?,
-    recompensa_unidade = ?, prazo = ?, status = ?, concluido_em = ? WHERE id = ?`,
-  a.titulo, a.descricao, a.item, a.meta, a.pacote, a.recompensa_valor, a.recompensa_unidade, a.prazo, a.status, concluido, atual.id);
+    recompensa_unidade = ?, prazo = ?, status = ?, concluido_em = ?, aliados = ? WHERE id = ?`,
+  a.titulo, a.descricao, a.item, a.meta, a.pacote, a.recompensa_valor, a.recompensa_unidade, a.prazo, a.status, concluido, a.aliados, atual.id);
   const nomes = { aberta: 'Reabriu', concluida: 'Concluiu', encerrada: 'Encerrou' };
   await anotar(req, a.status !== atual.status ? `${nomes[a.status]} uma atividade` : 'Editou uma atividade', a.titulo);
+  if (a.aliados && !atual.aliados && a.status === 'aberta') avisarAliados(req, atual.id, a); // acabou de ser aberta para os Aliados
   res.json({ ok: true });
 });
 
@@ -162,8 +192,9 @@ r.delete('/:id', async (req, res) => {
 });
 
 // "Quero ajudar": assume a responsabilidade, com uma quantidade prometida (opcional).
-r.post('/:id/participar', exigir('atividades.participar'), async (req, res) => {
+r.post('/:id/participar', async (req, res) => {
   const a = await buscar(req);
+  checarParticipar(req, a);
   if (a.status !== 'aberta') throw erro(400, 'Esta atividade não está mais aberta.');
   const compromisso = inteiro(req.body?.compromisso || 0, { min: 0, max: 10_000_000 }) ?? 0;
   const ja = await db.get('SELECT 1 AS sim FROM participantes WHERE atividade_id = ? AND usuario_id = ?', a.id, req.usuario.id);
@@ -174,16 +205,18 @@ r.post('/:id/participar', exigir('atividades.participar'), async (req, res) => {
   res.json({ ok: true });
 });
 
-r.delete('/:id/participar', exigir('atividades.participar'), async (req, res) => {
+r.delete('/:id/participar', async (req, res) => {
   const a = await buscar(req);
+  checarParticipar(req, a);
   await db.run('DELETE FROM participantes WHERE atividade_id = ? AND usuario_id = ?', a.id, req.usuario.id);
   await anotar(req, 'Saiu de uma atividade', a.titulo);
   res.json({ ok: true });
 });
 
 // Registrar entrega: "dei 200 batatas".
-r.post('/:id/contribuicoes', exigir('atividades.participar'), async (req, res) => {
+r.post('/:id/contribuicoes', async (req, res) => {
   const a = await buscar(req);
+  checarParticipar(req, a);
   if (a.status !== 'aberta') throw erro(400, 'Esta atividade não está recebendo entregas agora.');
   const quantidade = inteiro(req.body?.quantidade, { min: 1, max: 10_000_000 });
   if (quantidade == null) throw erro(400, 'Informe quantos itens você entregou.');

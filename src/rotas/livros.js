@@ -1,7 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const { db } = require('../db');
-const { checar, pode, exigirLogin } = require('../auth');
+const { checar, pode, exigirLogin, soAliados } = require('../auth');
 const { anotar } = require('../diario');
 const { urlValida, comandoApagarArquivo } = require('../uploads');
 const progresso = require('../progresso');
@@ -29,7 +29,7 @@ function modulo(nome) {
 }
 
 function formatarLivro(l) {
-  return { ...l, aberto: !!l.aberto, campos: JSON.parse(l.campos), cobranca: l.cobranca ? JSON.parse(l.cobranca) : null };
+  return { ...l, aberto: !!l.aberto, aliados: !!l.aliados, campos: JSON.parse(l.campos), cobranca: l.cobranca ? JSON.parse(l.cobranca) : null };
 }
 
 async function buscarLivro(id) {
@@ -40,6 +40,19 @@ async function buscarLivro(id) {
 
 const podeRegistrar = (req, l) => pode(req, `${l.modulo}.configurar`) || (pode(req, `${l.modulo}.registrar`) && l.aberto);
 
+// Convidados e Aliados: quem não vê o módulo, mas vê a parte dos Aliados, lê os registros aprovados
+// dos livros marcados para eles. Isso nunca deixa registrar, editar ou aprovar (essas continuam pelas permissões).
+const podeLer = (req, l) => pode(req, `${l.modulo}.ver`) || (!!l.aliados && pode(req, 'aliados.ver'));
+function checarLeitura(req, l) {
+  if (!podeLer(req, l)) checar(req, `${l.modulo}.ver`);
+}
+// Quem só enxerga os livros marcados para os Aliados neste módulo (quem não vê nada leva 403).
+function soMarcados(req, m) {
+  const so = soAliados(req, `${m}.ver`);
+  if (!so) checar(req, `${m}.ver`);
+  return so;
+}
+const semLivrosAbertos = () => erro(403, 'Você não tem permissão para isso.');
 function limparCampos(bruto) {
   if (!Array.isArray(bruto)) throw erro(400, 'Lista de campos inválida.');
   if (bruto.length > 60) throw erro(400, 'Um livro pode ter no máximo 60 campos.');
@@ -134,6 +147,8 @@ async function lerLivro(req, atual, mod) {
     descricao: texto(req.body?.descricao ?? atual?.descricao, 240),
     icone: ICONES.includes(req.body?.icone) ? req.body.icone : (atual?.icone || 'livro'),
     aberto: (req.body?.aberto ?? atual?.aberto ?? true) ? 1 : 0,
+    // "Visível para Convidados e Aliados": os Aliados leem os registros aprovados deste livro.
+    aliados: (req.body?.aliados ?? atual?.aliados ?? false) ? 1 : 0,
     campos,
     cobranca: lerCobranca(req.body?.cobranca !== undefined ? req.body.cobranca : atual?.cobranca, campos, mod),
   };
@@ -227,6 +242,15 @@ function avisarRegistro(livro, regId, dados, antes = null, quem = null) {
   if (carga) notif.avisar('procurados', { ...carga, url: `/#/guarda/${livro.id}/registro/${regId}`, tag: `procurado-${regId}` }, { exceto: quem });
 }
 
+// Registro aprovado num livro marcado para Convidados e Aliados: avisa os Aliados.
+function avisarAliados(livro, regId, dados, quem = null) {
+  if (!livro.aliados) return;
+  const url = livro.modulo === 'leis' ? `/#/leis/${livro.id}/registro/${regId}` : `/#/${livro.modulo}/${livro.id}/registro/${regId}`;
+  require('../notificacoes').avisar('aliados', {
+    titulo: `${MODULOS[livro.modulo]}: ${tituloDoRegistro(livro, dados)}`, corpo: `Novo registro em "${livro.nome}".`, url, tag: `aliados-registro-${regId}`,
+  }, { exceto: quem, perm: 'aliados.ver' });
+}
+
 // Registro mandado para aprovação: avisa quem aprova naquele módulo (a Tabeliã, o Comandante, o Diretor do
 // Hospital, a Senadora, o Lorde Comandante...). E quando é aprovado ou recusado, avisa quem mandou.
 const PAGINA_DO_MODULO = { leis: 'leis/livros' };
@@ -253,11 +277,12 @@ function tituloDoRegistro(livro, dados) {
 // Livros de um módulo
 r.get('/modulos/:modulo/livros', async (req, res) => {
   const m = modulo(req.params.modulo);
-  checar(req, `${m}.ver`);
+  const so = soMarcados(req, m);
   const livros = await db.all(`
     SELECT l.*, (SELECT COUNT(*) FROM registros r WHERE r.livro_id = l.id AND r.situacao = 'aprovado') AS total,
       (SELECT COUNT(*) FROM registros r WHERE r.livro_id = l.id AND r.situacao = 'pendente') AS pendentes
-    FROM livros l WHERE l.modulo = ? ORDER BY l.ordem, l.id`, m);
+    FROM livros l WHERE l.modulo = ? ${so ? 'AND l.aliados = 1' : ''} ORDER BY l.ordem, l.id`, m);
+  if (so && !livros.length) throw semLivrosAbertos(); // nenhum livro deste módulo aberto para os Aliados
   const dia = hoje();
   const saida = [];
   for (const l of livros) {
@@ -281,15 +306,17 @@ r.get('/modulos/:modulo/livros', async (req, res) => {
 // de número. É o que todo morador vê; quem escreve as leis usa as telas de livros (gerenciar).
 r.get('/modulos/:modulo/leitura', async (req, res) => {
   const m = modulo(req.params.modulo);
-  checar(req, `${m}.ver`);
-  const livros = (await db.all('SELECT * FROM livros WHERE modulo = ? ORDER BY ordem, id', m)).map(formatarLivro);
+  const so = soMarcados(req, m);
+  const marcados = so ? 'AND l.aliados = 1' : '';
+  const livros = (await db.all(`SELECT * FROM livros l WHERE l.modulo = ? ${marcados} ORDER BY l.ordem, l.id`, m)).map(formatarLivro);
+  if (so && !livros.length) throw semLivrosAbertos();
   const registros = await db.all(`
     SELECT r.id, r.livro_id, r.numero, r.dados, r.criado_em, r.revisado_em, r.atualizado_em
     FROM registros r JOIN livros l ON l.id = r.livro_id
-    WHERE l.modulo = ? AND r.situacao = 'aprovado' ORDER BY r.numero, r.id`, m);
+    WHERE l.modulo = ? AND r.situacao = 'aprovado' ${marcados} ORDER BY r.numero, r.id`, m);
   res.json({
     livros: livros.map(l => ({
-      id: l.id, nome: l.nome, descricao: l.descricao, icone: l.icone, campos: l.campos,
+      id: l.id, nome: l.nome, descricao: l.descricao, icone: l.icone, campos: l.campos, aliados: l.aliados,
       registros: registros.filter(x => x.livro_id === l.id).map(x => ({ ...x, dados: JSON.parse(x.dados) })),
     })),
     gerenciar: ['registrar', 'editar', 'configurar', 'aprovar'].some(a => pode(req, `${m}.${a}`)),
@@ -301,8 +328,8 @@ r.post('/modulos/:modulo/livros', async (req, res) => {
   checar(req, `${m}.configurar`);
   const l = await lerLivro(req, null, m);
   const ordem = ((await db.get('SELECT MAX(ordem) AS o FROM livros WHERE modulo = ?', m)).o ?? 0) + 1;
-  const { id } = await db.run('INSERT INTO livros (modulo, nome, descricao, icone, aberto, campos, cobranca, ordem) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    m, l.nome, l.descricao, l.icone, l.aberto, JSON.stringify(l.campos), l.cobranca ? JSON.stringify(l.cobranca) : null, ordem);
+  const { id } = await db.run('INSERT INTO livros (modulo, nome, descricao, icone, aberto, campos, cobranca, ordem, aliados) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    m, l.nome, l.descricao, l.icone, l.aberto, JSON.stringify(l.campos), l.cobranca ? JSON.stringify(l.cobranca) : null, ordem, l.aliados);
   await anotar(req, `Criou um livro (${MODULOS[m]})`, l.nome);
   res.status(201).json({ id });
 });
@@ -311,8 +338,8 @@ r.put('/livros/:id', async (req, res) => {
   const atual = await buscarLivro(idDaRota(req));
   checar(req, `${atual.modulo}.configurar`);
   const l = await lerLivro(req, atual, atual.modulo);
-  await db.run('UPDATE livros SET nome = ?, descricao = ?, icone = ?, aberto = ?, campos = ?, cobranca = ? WHERE id = ?',
-    l.nome, l.descricao, l.icone, l.aberto, JSON.stringify(l.campos), l.cobranca ? JSON.stringify(l.cobranca) : null, atual.id);
+  await db.run('UPDATE livros SET nome = ?, descricao = ?, icone = ?, aberto = ?, campos = ?, cobranca = ?, aliados = ? WHERE id = ?',
+    l.nome, l.descricao, l.icone, l.aberto, JSON.stringify(l.campos), l.cobranca ? JSON.stringify(l.cobranca) : null, l.aliados, atual.id);
   await anotar(req, `Configurou um livro (${MODULOS[atual.modulo]})`, l.nome);
   res.json({ ok: true });
 });
@@ -321,7 +348,7 @@ r.put('/livros/:id', async (req, res) => {
 r.get('/livros/:id/opcoes', async (req, res) => {
   const { livro, opcoes } = await opcoesDoLivro(idDaRota(req));
   if (!livro) throw erro(404, 'Livro não encontrado.');
-  checar(req, `${livro.modulo}.ver`);
+  checarLeitura(req, livro);
   res.json({ livro: { id: livro.id, nome: livro.nome, modulo: livro.modulo }, opcoes });
 });
 
@@ -348,7 +375,7 @@ r.delete('/livros/:id', async (req, res) => {
 // Registros de um livro
 r.get('/livros/:id/registros', async (req, res) => {
   const l = await buscarLivro(idDaRota(req));
-  checar(req, `${l.modulo}.ver`);
+  checarLeitura(req, l);
   const registros = (await db.all("SELECT * FROM registros WHERE livro_id = ? AND situacao = 'aprovado' ORDER BY numero DESC, id DESC", l.id))
     .map(x => ({ ...x, dados: JSON.parse(x.dados) }));
   const aguardando = await db.get(`
@@ -393,8 +420,10 @@ r.post('/livros/:id/registros', async (req, res) => {
     `${numero ? `nº ${numero}: ` : ''}${tituloDoRegistro(l, dados)}`);
   await progresso.registrar(req.usuario.id, 'registro');
   await progresso.registrar(req.usuario.id, `registro_${l.modulo}`);
-  if (situacao === 'aprovado') avisarRegistro(l, id, dados, null, req.usuario.id);
-  else avisarParaAprovar(l, dados, req.usuario);
+  if (situacao === 'aprovado') {
+    avisarRegistro(l, id, dados, null, req.usuario.id);
+    avisarAliados(l, id, dados, req.usuario.id);
+  } else avisarParaAprovar(l, dados, req.usuario);
   res.status(201).json({ id, situacao, numero });
 });
 
@@ -506,7 +535,7 @@ r.get('/modulos/:modulo/aprovacoes', async (req, res) => {
 
 r.get('/modulos/:modulo/envios', async (req, res) => {
   const m = modulo(req.params.modulo);
-  checar(req, `${m}.ver`);
+  soMarcados(req, m); // os próprios envios: quem vê o módulo ou a parte dos Aliados
   res.json(await registrosNaoAprovados(req, m, "r.situacao <> 'aprovado' AND r.criado_por = ?", req.usuario.id));
 });
 
@@ -544,7 +573,7 @@ r.get('/procurados', async (req, res) => {
       const campos = l.campos.filter(doCartaz);
       cartazes.push({ livro: l.id, id: r0.id, dados: Object.fromEntries(campos.map(c => [c.id, dados[c.id] ?? null])) });
     }
-    if (!cartazes.livro) cartazes.livro = { id: l.id, nome: l.nome, campos: l.campos.filter(doCartaz), podeAbrir: pode(req, 'guarda.ver') };
+    if (!cartazes.livro) cartazes.livro = { id: l.id, nome: l.nome, campos: l.campos.filter(doCartaz), podeAbrir: podeLer(req, l) };
   }
   res.json({ livro: cartazes.livro || null, cartazes: cartazes.slice(0, 24) });
 });
@@ -554,6 +583,7 @@ r.post('/registros/:id/aprovar', async (req, res) => {
   await anotar(req, `Aprovou um registro em "${livro.nome}"`, `nº ${reg.numero}: ${tituloDoRegistro(livro, reg.dados)} (enviado por ${reg.criado_por_nome})`);
   await progresso.registrar(req.usuario.id, `revisao_${livro.modulo}`);
   avisarRegistro(livro, reg.id, reg.dados);
+  avisarAliados(livro, reg.id, reg.dados);
   avisarQuemMandou(livro, reg, true, req.usuario);
   res.json({ ok: true });
 });
@@ -573,7 +603,7 @@ const dataBr = s => s.split('-').reverse().join('/');
 
 async function contextoCobranca(req) {
   const { reg, livro } = await buscarRegistro(req);
-  checar(req, `${livro.modulo}.ver`);
+  checarLeitura(req, livro);
   if (!livro.cobranca) throw erro(400, 'Este livro não tem pagamentos periódicos.');
   if (reg.situacao !== 'aprovado') throw erro(400, 'Este registro ainda não foi aprovado.');
   return { reg, livro };

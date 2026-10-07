@@ -20,7 +20,7 @@ Para desenvolver com recarga automática: `npm run dev`.
 
 ## Níveis de acesso
 
-Todo usuário é morador. Os cargos somam poderes em cima disso, e uma pessoa pode ter mais de um.
+Todo usuário é morador (menos os Aliados, veja "Convidados e Aliados"). Os cargos somam poderes em cima disso, e uma pessoa pode ter mais de um.
 
 | Cargo | O que pode |
 |---|---|
@@ -36,6 +36,7 @@ Todo usuário é morador. Os cargos somam poderes em cima disso, e uma pessoa po
 | Lorde Comandante | Faz as Leis de Lyendell junto com a Família Nobre: escreve, publica, edita e revoga |
 | Bobo da Corte | A Caixa de Pegadinhas, só dele: prega peças no pessoal e conta piadas na praça (veja "Bobo da Corte") |
 | Game Dev | Troca os desenhos dos joguinhos pelos próprios sprites, e a troca vale para todo mundo (veja "Sprites dos jogos") |
+| Aliados | Convidados e aliados de outras casas. **Não são moradores**: veem só o que for marcado para Convidados e Aliados (veja "Convidados e Aliados") |
 | Morador | Ver tudo (menos o Hospital), ajudar nas atividades, usar a Recreação e mandar propostas ao Congresso |
 
 Qualquer usuário pode ser marcado como **criança** (veja "Personagem criança" mais abaixo): mesmo com cargo, só olha, brinca e ajuda.
@@ -49,6 +50,33 @@ Quem está acima de morador também publica anúncios, cria atividades e envia f
 O administrador pode mudar o que cada cargo faz, ou criar cargos novos, na tela **Cargos**.
 Ninguém consegue conceder a outra pessoa um poder que não tem: por isso a Família Nobre
 não consegue, por exemplo, dar a si mesma o poder de criar usuários.
+
+### Convidados e Aliados
+
+O cargo **Aliados** é para convidados e aliados de outras casas. Eles **não são moradores**:
+quem tem esse cargo não recebe as permissões do Morador (nada de Recreação, Club Coelho, Mapa,
+Comunidade, Juramento, Galeria nem livros). Eles veem só:
+
+- o próprio perfil (Meu perfil, trocar a senha) e os avisos públicos da tela inicial
+  (os cartazes de procurados e banidos e os aniversariantes);
+- os anúncios e as atividades marcados como **Visível para Convidados e Aliados** (nas atividades
+  marcadas eles também ajudam e registram entregas);
+- os livros (Tabelionato, Guarda, Hospital, Congresso e Leis de Lyendell) marcados como
+  **Visível para Convidados e Aliados** na configuração do livro: leem os registros aprovados e
+  baixam o .book, mas nunca registram, editam ou aprovam. O módulo só aparece no menu deles quando
+  tem pelo menos um livro marcado.
+
+Quem publica o anúncio ou a atividade, ou configura o livro, marca a caixinha. Na lista, o que
+está marcado ganha a etiqueta **Aliados**, para os moradores saberem o que os convidados veem.
+Os Aliados aparecem na Comunidade com a etiqueta do cargo, mas não entram na conta dos moradores
+(na tela Cargos, o Morador conta só os moradores) nem no Juramento. Eles podem ligar as notificações
+de "Novidades para Convidados e Aliados" (anúncio, atividade ou registro aprovado em livro marcado).
+
+Na tela **Cargos**, o administrador pode marcar qualquer cargo como **Não é morador (não recebe
+as permissões do Morador)**. Quem tem um cargo assim e outro cargo junto (ex.: Aliados e Guarda)
+continua sem as permissões do Morador, mas ganha as do outro cargo. Só quem tem a permissão
+"Ver o que for marcado para Convidados e Aliados" (o administrador e o próprio cargo Aliados) pode
+conceder o cargo Aliados: a Família Nobre não recebe essa permissão.
 
 ## Livros (Tabelionato, Guarda, Hospital, Congresso e Leis de Lyendell)
 

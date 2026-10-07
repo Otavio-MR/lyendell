@@ -5,7 +5,7 @@
 // O GET também manda os prédios (veja rotas/predios.js), para o mapa carregar tudo de uma vez.
 const express = require('express');
 const { db } = require('../db');
-const { exigirLogin, exigir, pode } = require('../auth');
+const { exigirLogin, exigirMorador, exigir, pode } = require('../auth');
 const { anotar } = require('../diario');
 const progresso = require('../progresso');
 const { erro, linha, idDaRota } = require('../util');
@@ -13,7 +13,7 @@ const { pessoasRegistradas, acharPessoas, semChave } = require('../moradores');
 const { formatarPredio, comPessoas } = require('./predios');
 
 const r = express.Router();
-r.use(exigirLogin);
+r.use(exigirLogin, exigirMorador); // o mapa é dos moradores (os Aliados, convidados de outras casas, não veem)
 const editar = exigir('mapa.editar');
 
 const SITUACOES = ['ocupada', 'comercio', 'sem_dono']; // sem dono = sem morador (é a mesma coisa)

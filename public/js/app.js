@@ -1,4 +1,4 @@
-import { estado, get, post, h, trocar, icone, pode, podeAlgum, aviso, avatar, cargoPrincipal, vazio, limparTela, ehCrianca } from './core.js';
+import { estado, get, post, h, trocar, icone, pode, podeAlgum, aviso, avatar, cargoPrincipal, vazio, limparTela, ehCrianca, ehMorador, veModulo } from './core.js';
 import { MENU_CRIANCA, SECOES_CRIANCA } from './crianca.js';
 import { ligar, desligar, ouvir, rt } from './tempo-real.js';
 import { inicio } from './telas/inicio.js';
@@ -28,25 +28,28 @@ import { registrarServiceWorker } from './notificacoes.js';
 
 const app = document.getElementById('app');
 
+// perm: aparece para quem tem alguma dessas permissões. morador: só para os moradores (os Aliados, convidados
+// de outras casas, não veem). modulo: módulo de livros, que aparece para quem vê o módulo ou, para os Aliados,
+// quando ele tem livros marcados para Convidados e Aliados.
 const MENU = [
   { secao: 'Cidade', itens: [
     { rota: '/', nome: 'Início', icone: 'casa' },
-    { rota: '/comunidade', nome: 'Comunidade', icone: 'usuarios' },
-    { rota: '/mapa', nome: 'Mapa de Lyendell', icone: 'mapa' },
-    { rota: '/anuncios', nome: 'Mural de Anúncios', icone: 'megafone', perm: ['anuncios.ver'] },
-    { rota: '/congresso', nome: 'Congresso', icone: 'coluna', perm: ['congresso.ver'] },
+    { rota: '/comunidade', nome: 'Comunidade', icone: 'usuarios', morador: true },
+    { rota: '/mapa', nome: 'Mapa de Lyendell', icone: 'mapa', morador: true },
+    { rota: '/anuncios', nome: 'Mural de Anúncios', icone: 'megafone', perm: ['anuncios.ver', 'aliados.ver'] },
+    { rota: '/congresso', nome: 'Congresso', icone: 'coluna', modulo: 'congresso' },
     { rota: '/juramento', nome: 'Juramento', icone: 'bandeira', perm: ['tabelionato.ver'] },
-    { rota: '/leis', nome: 'Leis de Lyendell', icone: 'balanca', perm: ['leis.ver'] },
-    { rota: '/atividades', nome: 'Mural de Atividades', icone: 'tarefas', perm: ['atividades.ver'] },
+    { rota: '/leis', nome: 'Leis de Lyendell', icone: 'balanca', modulo: 'leis' },
+    { rota: '/atividades', nome: 'Mural de Atividades', icone: 'tarefas', perm: ['atividades.ver', 'aliados.ver'] },
     { rota: '/galeria', nome: 'Galeria', icone: 'imagem', perm: ['galeria.ver'] },
     { rota: '/recreacao', nome: 'Recreação', icone: 'jogos', perm: ['recreacao.usar'] },
     { rota: '/clube', nome: 'Club Coelho', icone: 'balao', perm: ['recreacao.usar'] },
     { rota: '/bobo', nome: 'Caixa de Pegadinhas', icone: 'bobo', perm: ['bobo.pegadinhas'] },
   ] },
   { secao: 'Registros', itens: [
-    { rota: '/tabelionato', nome: 'Tabelionato', icone: 'pergaminho', perm: ['tabelionato.ver'] },
-    { rota: '/guarda', nome: 'Guarda do Coelho', icone: 'escudo', perm: ['guarda.ver'] },
-    { rota: '/hospital', nome: 'Hospital', icone: 'cruz', perm: ['hospital.ver'] },
+    { rota: '/tabelionato', nome: 'Tabelionato', icone: 'pergaminho', modulo: 'tabelionato' },
+    { rota: '/guarda', nome: 'Guarda do Coelho', icone: 'escudo', modulo: 'guarda' },
+    { rota: '/hospital', nome: 'Hospital', icone: 'cruz', modulo: 'hospital' },
   ] },
   { secao: 'Administração', itens: [
     { rota: '/admin/usuarios', nome: 'Usuários', icone: 'usuarios', perm: ['usuarios.ver'] },
@@ -180,7 +183,7 @@ function montar() {
   document.body.classList.toggle('modo-crianca', crianca);
   const nav = h('nav', { class: 'menu', 'aria-label': 'Menu principal' },
     MENU.map(s => {
-      const itens = s.itens.filter(i => !i.perm || podeAlgum(...i.perm));
+      const itens = s.itens.filter(i => (!i.morador || ehMorador()) && (i.modulo ? veModulo(i.modulo) : !i.perm || podeAlgum(...i.perm)));
       if (!itens.length) return null;
       return h('div', { class: 'menu-secao' },
         h('p', { class: 'menu-titulo' }, crianca ? SECOES_CRIANCA[s.secao] || s.secao : s.secao),

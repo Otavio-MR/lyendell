@@ -1,4 +1,4 @@
-import { estado, get, h, icone, modal, botao, chipCargo, chipCrianca, barra, num, pacotes, relativo, dataCurta, seloNivel, avatarPessoa, normalizar, pode, avatar } from '../core.js';
+import { estado, get, h, icone, modal, botao, chipCargo, chipCrianca, chipAliados, barra, num, pacotes, relativo, dataCurta, seloNivel, avatarPessoa, normalizar, pode, avatar, ehMorador, veModulo } from '../core.js';
 import { MENU_CRIANCA, falaDoDia, curiosidadeDoDia } from '../crianca.js';
 import { barraNivel } from './pessoas.js';
 import { MODULOS } from './livros.js';
@@ -147,7 +147,8 @@ function painelAniversarios(lista, { crianca = false } = {}) {
   return h('section', { class: 'painel aniversarios' },
     h('header', { class: 'painel-cab' }, h('h2', null, icone('presente'), lista.length === 1 ? 'Aniversariante de hoje' : 'Aniversariantes de hoje')),
     souEu && h('p', { class: 'aniversario-meu' }, crianca ? 'Feliz aniversário! Hoje o dia é seu!' : `Feliz aniversário, ${eu.nome.split(' ')[0]}! Toda Lyendell comemora com você.`),
-    h('div', { class: 'aniversario-lista' }, lista.map(p => h('a', { class: 'aniversario-pessoa', href: `#/pessoa/${p.id}` },
+    // Os Aliados não abrem a Comunidade: para eles o aniversariante aparece sem o link do perfil.
+    h('div', { class: 'aniversario-lista' }, lista.map(p => h(ehMorador() || p.id === eu.id ? 'a' : 'div', { class: 'aniversario-pessoa', href: ehMorador() || p.id === eu.id ? `#/pessoa/${p.id}` : null },
       h('span', { class: 'aniversario-foto' }, avatar(p.nome, 'avatar-m', p.foto), h('span', { class: 'aniversario-bolo', 'aria-hidden': 'true' }, '🎂')),
       h('strong', null, p.nome),
       h('small', null, p.id === eu.id ? 'É você!' : 'Dê parabéns!')))));
@@ -175,12 +176,74 @@ function painelProcurados(p, { crianca = false } = {}) {
     })));
 }
 
+// Os últimos anúncios e as atividades abertas (para os Aliados, só os marcados para Convidados e Aliados).
+function gradeMurais(d) {
+  return h('div', { class: 'inicio-grade' },
+    d.anuncios && h('section', { class: 'painel' },
+      h('header', { class: 'painel-cab' }, h('h2', null, icone('megafone'), 'Últimos anúncios'), h('a', { href: '#/anuncios' }, 'Ver mural')),
+      d.anuncios.length
+        ? h('div', { class: 'lista-simples' }, d.anuncios.map(a =>
+          h('a', { class: 'anuncio-mini', href: '#/anuncios' },
+            h('div', { class: 'anuncio-mini-topo' },
+              a.fixado ? h('span', { class: 'etiqueta' }, icone('alfinete'), 'Fixado') : null,
+              a.importancia !== 'comum' ? h('span', { class: `etiqueta imp-${a.importancia}` }, a.importancia === 'urgente' ? 'Urgente' : 'Importante') : null,
+              a.aliados && ehMorador() ? chipAliados() : null),
+            h('strong', null, a.titulo),
+            h('p', null, a.conteudo.length > 140 ? `${a.conteudo.slice(0, 140)}…` : a.conteudo),
+            h('small', null, `${a.autor_nome} · ${relativo(a.criado_em)}`))))
+        : h('p', { class: 'painel-vazio' }, 'Nenhum anúncio ainda.')),
+
+    d.atividades && h('section', { class: 'painel' },
+      h('header', { class: 'painel-cab' }, h('h2', null, icone('tarefas'), 'Precisamos de ajuda'), h('a', { href: '#/atividades' }, 'Ver todas')),
+      d.atividades.length
+        ? h('div', { class: 'lista-simples' }, d.atividades.map(a =>
+          h('a', { class: 'ativ-mini', href: `#/atividades/${a.id}` },
+            h('div', { class: 'ativ-mini-topo' },
+              h('strong', null, a.titulo),
+              a.aliados && ehMorador() ? chipAliados() : null,
+              h('span', { class: 'suave' }, `${Math.floor(Math.min(100, (a.total / a.meta) * 100))}%`)),
+            barra(a.total, a.meta),
+            h('small', null, `${num(a.total)} de ${num(a.meta)} ${a.item}`,
+              pacotes(a.meta, a.pacote) ? ` (${pacotes(a.meta, a.pacote)})` : '',
+              a.prazo ? ` · até ${dataCurta(a.prazo)}` : ''))))
+        : h('p', { class: 'painel-vazio' }, 'Nenhuma atividade aberta no momento.')));
+}
+
+// Início dos Aliados (convidados e aliados de outras casas, que não são moradores): os avisos públicos
+// (procurados e aniversariantes) e só o que foi aberto para Convidados e Aliados.
+function inicioAliado(d, procurados, convite) {
+  const eu = estado.eu;
+  const modulos = Object.entries(MODULOS).filter(([m]) => veModulo(m));
+  return h('div', { class: 'pagina inicio' },
+    h('section', { class: 'boas-vindas' },
+      h('img', { src: '/img/brasao.png', alt: '', class: 'bv-brasao' }),
+      h('div', { class: 'bv-texto' },
+        h('p', { class: 'sobrelinha' }, 'Cidade de Lyendell · Casa Luckham'),
+        h('h1', { class: 'pag-titulo bv-titulo' }, `${saudacao()}, ${eu.nome}`),
+        h('div', { class: 'chips' }, eu.cargos.map(chipCargo)))),
+    h('p', { class: 'nota' }, icone('alianca'), h('span', null, 'Você é Aliado da Casa Luckham: aqui aparece o que foi aberto para Convidados e Aliados.')),
+    avisosDeAprovacao(d.pendencias),
+    painelAniversarios(d.aniversariantes),
+    painelProcurados(procurados),
+    convite,
+    painelNovidades(d.leis, { titulo: 'Leis de Lyendell', icone: 'balanca', href: '#/leis' }),
+    painelNovidades(d.congresso, { titulo: 'Novidades do Congresso', icone: 'coluna', href: '#/congresso' }),
+    modulos.length ? h('div', { class: 'numeros' }, modulos.map(([m, info]) =>
+      h('a', { class: 'numero', href: m === 'leis' ? '#/leis' : `#/${m}` },
+        h('span', { class: 'numero-icone' }, icone(info.icone)),
+        h('strong', null, info.titulo),
+        h('span', null, 'Livros abertos para você')))) : null,
+    gradeMurais(d));
+}
+
 export async function inicio() {
+  const aliado = !ehMorador();
   const [d, pr, procurados, convite] = await Promise.all([
-    get('/api/inicio'), get('/api/auth/progresso').catch(() => null),
+    get('/api/inicio'), aliado ? null : get('/api/auth/progresso').catch(() => null),
     get('/api/procurados').catch(() => null), conviteNotificacoes().catch(() => null),
   ]);
   const eu = estado.eu;
+  if (aliado) return inicioAliado(d, procurados, convite);
   if (eu.crianca) return inicioCrianca(d, pr, procurados);
   const n = d.numeros;
 
@@ -228,33 +291,7 @@ export async function inicio() {
         h('strong', null, num(x.valor)),
         h('span', null, x.rotulo)))) : null,
 
-    h('div', { class: 'inicio-grade' },
-      d.anuncios && h('section', { class: 'painel' },
-        h('header', { class: 'painel-cab' }, h('h2', null, icone('megafone'), 'Últimos anúncios'), h('a', { href: '#/anuncios' }, 'Ver mural')),
-        d.anuncios.length
-          ? h('div', { class: 'lista-simples' }, d.anuncios.map(a =>
-            h('a', { class: 'anuncio-mini', href: '#/anuncios' },
-              h('div', { class: 'anuncio-mini-topo' },
-                a.fixado ? h('span', { class: 'etiqueta' }, icone('alfinete'), 'Fixado') : null,
-                a.importancia !== 'comum' ? h('span', { class: `etiqueta imp-${a.importancia}` }, a.importancia === 'urgente' ? 'Urgente' : 'Importante') : null),
-              h('strong', null, a.titulo),
-              h('p', null, a.conteudo.length > 140 ? `${a.conteudo.slice(0, 140)}…` : a.conteudo),
-              h('small', null, `${a.autor_nome} · ${relativo(a.criado_em)}`))))
-          : h('p', { class: 'painel-vazio' }, 'Nenhum anúncio ainda.')),
-
-      d.atividades && h('section', { class: 'painel' },
-        h('header', { class: 'painel-cab' }, h('h2', null, icone('tarefas'), 'Precisamos de ajuda'), h('a', { href: '#/atividades' }, 'Ver todas')),
-        d.atividades.length
-          ? h('div', { class: 'lista-simples' }, d.atividades.map(a =>
-            h('a', { class: 'ativ-mini', href: `#/atividades/${a.id}` },
-              h('div', { class: 'ativ-mini-topo' },
-                h('strong', null, a.titulo),
-                h('span', { class: 'suave' }, `${Math.floor(Math.min(100, (a.total / a.meta) * 100))}%`)),
-              barra(a.total, a.meta),
-              h('small', null, `${num(a.total)} de ${num(a.meta)} ${a.item}`,
-                pacotes(a.meta, a.pacote) ? ` (${pacotes(a.meta, a.pacote)})` : '',
-                a.prazo ? ` · até ${dataCurta(a.prazo)}` : ''))))
-          : h('p', { class: 'painel-vazio' }, 'Nenhuma atividade aberta no momento.'))),
+    gradeMurais(d),
 
     pr && painelComunidade(pr),
 

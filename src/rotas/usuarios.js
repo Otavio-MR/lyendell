@@ -1,7 +1,7 @@
 const express = require('express');
 const { db } = require('../db');
 const { hashSenha, validarSenhaNova } = require('../senhas');
-const { carregarUsuario, montarUsuario, comandoDerrubarSessoes, exigir } = require('../auth');
+const { carregarUsuario, montarUsuario, cargosEfetivos, comandoDerrubarSessoes, exigir } = require('../auth');
 const { anotar } = require('../diario');
 const { comandoApagarArquivo } = require('../uploads');
 const { erro, linha, chaveNome, idDaRota } = require('../util');
@@ -85,13 +85,15 @@ r.get('/', exigir('usuarios.ver'), async (req, res) => {
   res.json({
     usuarios: lista.map(u => {
       const ids = idsDe.get(u.id) || new Set();
-      const completo = montarUsuario(u, todosCargos.filter(c => c.base || ids.has(c.id)));
+      // O cargo base (Morador) vale para todos, menos para quem tem um cargo que não é morador (os Aliados).
+      const completo = montarUsuario(u, cargosEfetivos(todosCargos, ids));
       return {
         ...u,
         is_root: !!u.is_root,
         ativo: !!u.ativo,
         crianca: !!u.crianca,
         cargos: [...ids],
+        morador: completo.morador,
         gerenciavel: podeGerenciar(req.usuario, completo),
       };
     }),

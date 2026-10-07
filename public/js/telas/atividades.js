@@ -1,6 +1,6 @@
 import {
   estado, get, post, put, patch, del, h, trocar, icone, pode, cabecalho, vazio, botao, botaoIcone, modalForm, confirmar,
-  aviso, tentar, campo, barra, avatar, entradaQuantidade, num, pacotes, dataCurta, dataHora, relativo,
+  aviso, tentar, campo, barra, avatar, entradaQuantidade, num, pacotes, dataCurta, dataHora, relativo, chipAliados, ehMorador,
 } from '../core.js';
 import { livroDeAtividade } from '../livro-mc.js';
 
@@ -52,6 +52,7 @@ function cartao(a) {
     h('div', { class: 'ativ-topo' },
       chipStatus(a.status),
       a.participando && h('span', { class: 'etiqueta etiqueta-ok' }, icone('mao'), 'Você ajuda'),
+      a.aliados && ehMorador() && chipAliados(),
       a.prazo && h('span', { class: 'ativ-prazo' }, icone('calendario'), `até ${dataCurta(a.prazo)}`)),
     h('h3', null, a.titulo),
     h('p', { class: 'ativ-meta' }, icone('bau'), `Meta: ${qtdTexto(a.meta, a)}`),
@@ -108,6 +109,7 @@ export async function atividade(id) {
       cabecalho({ titulo: a.titulo, voltar: { href: '#/atividades', texto: 'Mural de Atividades' }, acoes }),
       h('div', { class: 'ativ-info' },
         chipStatus(a.status),
+        a.aliados && ehMorador() && chipAliados(),
         h('span', null, icone('usuario'), `Pedido por ${a.criado_por_nome || 'desconhecido'} ${relativo(a.criado_em)}`),
         a.prazo && h('span', null, icone('calendario'), `Prazo: ${dataCurta(a.prazo)}`)),
       gestao,
@@ -235,8 +237,8 @@ function formEntrega(a, depois) {
 
 function formAtividade(a, depois) {
   const s = a
-    ? { titulo: a.titulo, item: a.item, pacote: a.pacote, descricao: a.descricao, prazo: a.prazo || '', recompensa_valor: a.recompensa_valor ?? '', recompensa_unidade: a.recompensa_unidade }
-    : { titulo: '', item: '', pacote: 64, descricao: '', prazo: '', recompensa_valor: '', recompensa_unidade: 'Lírios' };
+    ? { titulo: a.titulo, item: a.item, pacote: a.pacote, descricao: a.descricao, prazo: a.prazo || '', recompensa_valor: a.recompensa_valor ?? '', recompensa_unidade: a.recompensa_unidade, aliados: !!a.aliados }
+    : { titulo: '', item: '', pacote: 64, descricao: '', prazo: '', recompensa_valor: '', recompensa_unidade: 'Lírios', aliados: false };
   const meta = entradaQuantidade({ pacote: s.pacote, inicial: a?.meta || 0, item: s.item || 'itens' });
 
   modalForm({
@@ -257,6 +259,9 @@ function formAtividade(a, depois) {
           h('input', { class: 'input', type: 'number', min: '0', step: 'any', value: s.recompensa_valor, placeholder: 'Ex.: 300', oninput: e => { s.recompensa_valor = e.target.value; } }),
           h('input', { class: 'input', value: s.recompensa_unidade, maxlength: '40', placeholder: 'Lírios', 'aria-label': 'Unidade da recompensa', oninput: e => { s.recompensa_unidade = e.target.value; } })),
         { ajuda: 'Opcional. Será dividida entre quem ajudou, proporcional ao que cada um entregou.' })),
+      h('label', { class: 'marcador', title: 'Os Aliados (convidados de outras casas) não são moradores e só veem o que for marcado assim.' },
+        h('input', { type: 'checkbox', checked: s.aliados, onchange: e => { s.aliados = e.target.checked; } }),
+        h('span', null, 'Visível para Convidados e Aliados (eles também podem ajudar e registrar entregas)')),
     ],
     aoEnviar: async () => {
       if (!s.titulo.trim()) throw new Error('Dê um título à atividade.');

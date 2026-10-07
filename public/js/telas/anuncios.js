@@ -1,6 +1,6 @@
 import {
   estado, get, post, put, del, h, trocar, icone, pode, cabecalho, vazio, botao, modal, modalForm, confirmar,
-  aviso, tentar, campo, avatar, dataHora, relativo,
+  aviso, tentar, campo, avatar, dataHora, relativo, chipAliados, ehMorador,
 } from '../core.js';
 import { entradaImagem } from './livros.js';
 import { livroDeAnuncio } from '../livro-mc.js';
@@ -19,7 +19,7 @@ export async function anuncios() {
     trocar(raiz, 
       cabecalho({
         titulo: 'Mural de Anúncios', icone: 'megafone',
-        sub: 'Avisos, decretos e novidades da cidade de Lyendell.',
+        sub: ehMorador() ? 'Avisos, decretos e novidades da cidade de Lyendell.' : 'Os avisos da cidade de Lyendell abertos para Convidados e Aliados.',
         acoes: [pode('anuncios.publicar') && botao('Novo anúncio', { icone: 'mais', classe: 'btn-ouro', onclick: () => formAnuncio(null, desenhar) })],
       }),
       lista.length
@@ -37,7 +37,8 @@ function cartao(a, recarregar) {
     h('header', { class: 'anuncio-cab' },
       h('div', { class: 'anuncio-etiquetas' },
         a.fixado && h('span', { class: 'etiqueta etiqueta-ouro' }, icone('alfinete'), 'Fixado'),
-        a.importancia !== 'comum' && h('span', { class: `etiqueta imp-${a.importancia}` }, a.importancia === 'urgente' ? 'Urgente' : 'Importante')),
+        a.importancia !== 'comum' && h('span', { class: `etiqueta imp-${a.importancia}` }, a.importancia === 'urgente' ? 'Urgente' : 'Importante'),
+        a.aliados && ehMorador() && chipAliados()),
       h('h2', null, a.titulo),
       h('p', { class: 'anuncio-autor' }, avatar(a.autor_nome, 'avatar-p', a.autor_foto),
         h('span', null, h('strong', null, a.autor_nome || 'desconhecido'), ' · ',
@@ -67,7 +68,7 @@ function cartao(a, recarregar) {
 }
 
 function formAnuncio(a, depois) {
-  const s = { titulo: a?.titulo || '', conteudo: a?.conteudo || '', importancia: a?.importancia || 'comum', imagem: a?.imagem || '', fixado: false };
+  const s = { titulo: a?.titulo || '', conteudo: a?.conteudo || '', importancia: a?.importancia || 'comum', imagem: a?.imagem || '', fixado: false, aliados: !!a?.aliados };
   const envio = { n: 0 };
   const opcoesImp = h('div', { class: 'segmentado', role: 'radiogroup', 'aria-label': 'Importância' });
   const desenharImp = () => trocar(opcoesImp, ...IMPORTANCIAS.map(([v, n]) =>
@@ -85,6 +86,8 @@ function formAnuncio(a, depois) {
       h('div', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Imagem (opcional)'), entradaImagem(s.imagem, v => { s.imagem = v; }, envio)),
       !a && pode('anuncios.moderar') && h('label', { class: 'marcador' },
         h('input', { type: 'checkbox', onchange: e => { s.fixado = e.target.checked; } }), h('span', null, 'Fixar no topo do mural')),
+      h('label', { class: 'marcador', title: 'Os Aliados (convidados de outras casas) não são moradores e só veem o que for marcado assim.' },
+        h('input', { type: 'checkbox', checked: s.aliados, onchange: e => { s.aliados = e.target.checked; } }), h('span', null, 'Visível para Convidados e Aliados')),
     ],
     aoEnviar: async () => {
       if (envio.n) throw new Error('Espere a imagem terminar de enviar.');

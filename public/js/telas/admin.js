@@ -66,19 +66,27 @@ function formUsuario(u, cargos, concediveis, depois) {
   const eu = u?.id === estado.eu.id;
   const s = { nome: u?.nome || '', senha: '', cargos: new Set(u?.cargos || []), ativo: u ? u.ativo : true, crianca: !!u?.crianca };
   const podeConceder = new Set(concediveis);
+  // Quem tem um cargo que "não é morador" (como os Aliados) não recebe o cargo base (Morador).
+  const naoMorador = () => cargos.some(c => c.exclui_base && s.cargos.has(c.id));
+  let caixaBase = null;
 
   const listaCargos = h('div', { class: 'cargos-escolha' },
     cargos.map(c => {
       const base = c.base;
       const bloqueado = base || !podeConceder.has(c.id) || u?.is_root;
+      const caixa = h('input', {
+        type: 'checkbox', checked: base ? !naoMorador() : s.cargos.has(c.id), disabled: bloqueado,
+        onchange: e => {
+          if (e.target.checked) s.cargos.add(c.id); else s.cargos.delete(c.id);
+          if (caixaBase) caixaBase.checked = !naoMorador();
+        },
+      });
+      if (base) caixaBase = caixa;
       return h('label', { class: `cargo-opcao ${bloqueado ? 'bloqueado' : ''}`.trim(), style: { '--cor': c.cor }, title: !base && !podeConceder.has(c.id) ? 'Este cargo tem poderes que você não tem' : '' },
-        h('input', {
-          type: 'checkbox', checked: base || s.cargos.has(c.id), disabled: bloqueado,
-          onchange: e => { if (e.target.checked) s.cargos.add(c.id); else s.cargos.delete(c.id); },
-        }),
+        caixa,
         h('span', { class: 'cargo-opcao-texto' },
           h('strong', null, c.nome),
-          h('small', null, base ? 'Todo usuário é morador.' : c.descricao)));
+          h('small', null, base ? 'Todo usuário é morador, menos quem tem um cargo que não é morador (como os Aliados).' : c.descricao)));
     }));
 
   const senha = h('input', { class: 'input', type: 'text', autocomplete: 'new-password', maxlength: '100', oninput: e => { s.senha = e.target.value; } });
@@ -149,10 +157,11 @@ export async function cargos() {
         return h('button', { class: 'cargo-card', type: 'button', style: { '--cor': c.cor }, onclick: () => formCargo(c, catalogo, desenhar, !gerenciar, extra) },
           h('div', { class: 'cargo-card-topo' },
             h('h3', null, c.nome),
-            c.base && h('span', { class: 'etiqueta' }, 'Base de todos')),
+            c.base && h('span', { class: 'etiqueta' }, 'Base de todos'),
+            c.exclui_base && h('span', { class: 'etiqueta etiqueta-aliados', title: 'Quem tem este cargo não recebe as permissões do Morador' }, 'Não é morador')),
           h('p', null, c.descricao),
           h('div', { class: 'cargo-card-rodape' },
-            h('span', null, icone('usuarios'), c.base ? 'Todos os usuários' : `${c.usuarios} ${c.usuarios === 1 ? 'pessoa' : 'pessoas'}`),
+            h('span', null, icone('usuarios'), c.base ? `Todos os moradores (${c.usuarios})` : `${c.usuarios} ${c.usuarios === 1 ? 'pessoa' : 'pessoas'}`),
             h('span', null, icone('chave'), `${c.permissoes.length} ${c.permissoes.length === 1 ? 'permissão' : 'permissões'}`)),
           grupos.length ? h('div', { class: 'chips' }, grupos.map(g => h('span', { class: 'chip chip-suave' }, g))) : null);
       })));
@@ -163,7 +172,7 @@ export async function cargos() {
 }
 
 function formCargo(c, catalogo, depois, somenteLeitura = false, { lista = [], exclusivas = [] } = {}) {
-  const s = { nome: c?.nome || '', descricao: c?.descricao || '', cor: c?.cor || '#d8b13a', permissoes: new Set(c?.permissoes || []) };
+  const s = { nome: c?.nome || '', descricao: c?.descricao || '', cor: c?.cor || '#d8b13a', permissoes: new Set(c?.permissoes || []), exclui_base: !!c?.exclui_base };
   const minhas = new Set(estado.eu.permissoes);
   // "Aprovar registros" só pode estar num cargo: se outro já tem, aqui fica travado.
   const donoDe = chave => (exclusivas.includes(chave) ? lista.find(x => x.id !== c?.id && x.permissoes.includes(chave)) : null);
@@ -189,10 +198,16 @@ function formCargo(c, catalogo, depois, somenteLeitura = false, { lista = [], ex
         travada(i.chave) && h('small', { class: 'suave' }, donoDe(i.chave) ? ` (já pertence ao cargo "${donoDe(i.chave).nome}")` : ' (não vale para o Morador)')))));
   });
 
+  // "Não é morador": quem tem o cargo não recebe as permissões do Morador e só vê o que for marcado para
+  // Convidados e Aliados (e o que o próprio cargo der). Só o administrador principal muda; o Morador não tem.
+  const naoMorador = c?.base ? null : interruptor('Não é morador (não recebe as permissões do Morador)', s.exclui_base, v => { s.exclui_base = v; },
+    'Para convidados e aliados de outras casas: quem tem este cargo vê só o que for marcado para Convidados e Aliados, o próprio perfil e os avisos públicos da tela inicial, mais o que este cargo der.');
+  if (naoMorador && (somenteLeitura || !estado.eu.is_root)) naoMorador.querySelectorAll('input, button').forEach(x => { x.disabled = true; });
+
   if (somenteLeitura) {
     const leitura = modal({
       titulo: c.nome, tamanho: 'medio',
-      corpo: [h('p', { class: 'form-intro' }, c.descricao), h('div', { class: 'perm-grade' }, grupos)],
+      corpo: [h('p', { class: 'form-intro' }, c.descricao), c.exclui_base && h('p', { class: 'nota' }, icone('alerta'), 'Quem tem este cargo não é morador: não recebe as permissões do Morador.'), h('div', { class: 'perm-grade' }, grupos)],
       rodape: [h('span', { class: 'espaco' }), botao('Fechar', { onclick: () => leitura.fechar() })],
     });
     return;
@@ -207,7 +222,8 @@ function formCargo(c, catalogo, depois, somenteLeitura = false, { lista = [], ex
         campo('Nome', h('input', { class: 'input', value: s.nome, maxlength: '40', placeholder: 'Ex.: Tesoureiro', oninput: e => { s.nome = e.target.value; } }), { obrigatorio: true }),
         campo('Cor', h('input', { class: 'input input-cor', type: 'color', value: s.cor, oninput: e => { s.cor = e.target.value; } }))),
       campo('Descrição', h('input', { class: 'input', value: s.descricao, maxlength: '200', placeholder: 'O que esse cargo faz', oninput: e => { s.descricao = e.target.value; } })),
-      c?.base && h('p', { class: 'nota' }, icone('alerta'), 'Este é o cargo base: o que marcar aqui vale para TODOS os usuários.'),
+      c?.base && h('p', { class: 'nota' }, icone('alerta'), 'Este é o cargo base: o que marcar aqui vale para TODOS os moradores (todos os usuários, menos quem tem um cargo que não é morador, como os Aliados).'),
+      naoMorador,
       h('div', { class: 'perm-grade' }, grupos),
     ],
     extraRodape: c && !c.base && botao('Apagar cargo', {

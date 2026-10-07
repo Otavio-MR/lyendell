@@ -16,6 +16,12 @@ export const pode = p => !!estado.eu && estado.eu.permissoes.includes(p);
 export const podeAlgum = (...ps) => ps.some(pode);
 // Personagem criança: só olha, brinca e ajuda, e vê o site do jeito de uma criança (veja crianca.js).
 export const ehCrianca = () => !!estado.eu?.crianca;
+// Morador: quem recebe o cargo base. Os Aliados (convidados de outras casas) não são: veem só o que
+// foi marcado para Convidados e Aliados (e os módulos com livros abertos para eles, em aliadosModulos).
+export const ehMorador = () => estado.eu?.morador !== false;
+export const veModulo = m => pode(`${m}.ver`) || (pode('aliados.ver') && (estado.eu?.aliadosModulos || []).includes(m));
+// Etiqueta "Aliados" nos anúncios, atividades e livros visíveis para Convidados e Aliados.
+export const chipAliados = () => h('span', { class: 'etiqueta etiqueta-aliados', title: 'Visível para Convidados e Aliados' }, icone('alianca'), 'Aliados');
 
 /* ─── API ─────────────────────────────────────────── */
 

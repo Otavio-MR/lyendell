@@ -82,21 +82,27 @@ const CATALOGO = [
   { grupo: 'Bobo da Corte', itens: [
     { chave: 'bobo.pegadinhas', nome: 'Pregar peças no pessoal e contar piadas na praça (a Caixa de Pegadinhas, coisa do Bobo da Corte)' },
   ] },
+  { grupo: 'Convidados e Aliados', itens: [
+    { chave: 'aliados.ver', nome: 'Ver o que for marcado para Convidados e Aliados' },
+  ] },
 ];
 
 const TODAS = CATALOGO.flatMap(g => g.itens.map(i => i.chave));
 
 // Personagem criança: mesmo com cargo (até Família Nobre), só olha, brinca, conversa e ajuda nas atividades.
 // Nada de registrar, editar, apagar, aprovar, publicar ou administrar (isso é coisa de gente grande).
+// A parte dos Aliados (convidados de outras casas) também fica de fora.
 const PERMITIDAS_CRIANCA = new Set([
-  ...TODAS.filter(p => p.endsWith('.ver') && p !== 'usuarios.ver' && p !== 'diario.ver'),
+  ...TODAS.filter(p => p.endsWith('.ver') && p !== 'usuarios.ver' && p !== 'diario.ver' && p !== 'aliados.ver'),
   'atividades.participar', 'recreacao.usar', 'bobo.pegadinhas',
 ]);
 // Coisas só do Bobo da Corte: nem a Família Nobre recebe junto com "tudo".
 const SO_DO_BOBO = new Set(['bobo.pegadinhas']);
+// Coisa só dos Aliados (convidados de outras casas): a Família Nobre já vê tudo e não precisa disso.
+const SO_DOS_ALIADOS = new Set(['aliados.ver']);
 const VALIDAS = new Set(TODAS);
 
-// Todo usuário é morador: estas permissões valem para qualquer um.
+// Todo usuário é morador (menos quem tem um cargo que "não é morador", como os Aliados): estas permissões valem para eles.
 const MORADOR = ['tabelionato.ver', 'guarda.ver', 'congresso.ver', 'congresso.propor', 'leis.ver', 'galeria.ver', 'anuncios.ver', 'atividades.ver', 'atividades.participar', 'recreacao.usar'];
 // Quem está acima de morador publica anúncios, cria atividades e envia fotos.
 const MEMBRO = ['anuncios.publicar', 'atividades.criar', 'galeria.enviar'];
@@ -139,7 +145,7 @@ const CARGOS_PADRAO = [
     permissoes: MORADOR },
   { nome: 'Família Nobre', cor: '#d8b13a',
     descricao: DESCRICOES['Família Nobre'][1],
-    permissoes: TODAS.filter(p => p !== 'usuarios.criar' && p !== 'cargos.gerenciar' && !EXCLUSIVAS[p] && !SO_DO_BOBO.has(p)) },
+    permissoes: TODAS.filter(p => p !== 'usuarios.criar' && p !== 'cargos.gerenciar' && !EXCLUSIVAS[p] && !SO_DO_BOBO.has(p) && !SO_DOS_ALIADOS.has(p)) },
   { nome: 'Tabeliã', cor: '#c98b4a',
     descricao: DESCRICOES['Tabeliã'][1],
     permissoes: [...MEMBRO, ...acoes('tabelionato', 'registrar', 'editar', 'apagar', 'configurar', 'pagamentos', 'aprovar'), 'mapa.editar', 'juramento.marcar'] },
@@ -170,6 +176,11 @@ const CARGOS_PADRAO = [
   { nome: 'Game Dev', cor: '#4fc1b8',
     descricao: 'Cuida do visual dos joguinhos: troca os desenhos pelos próprios sprites em Recreação > Sprites dos jogos, e a troca vale para todo mundo.',
     permissoes: [...MEMBRO, 'sprites.editar'] },
+  // Convidados e aliados de outras casas: "exclui_base" faz quem tem este cargo NÃO ser morador
+  // (não recebe as permissões do Morador). Só veem o que for marcado para Convidados e Aliados.
+  { nome: 'Aliados', cor: '#5aa0d8', exclui_base: true,
+    descricao: 'Convidados e aliados de outras casas. Não são moradores: veem só o que for marcado para Convidados e Aliados.',
+    permissoes: ['aliados.ver'] },
 ];
 
-module.exports = { CATALOGO, TODAS, VALIDAS, PERMITIDAS_CRIANCA, CARGOS_PADRAO, DESCRICOES, EXCLUSIVAS, MODULOS, SO_DO_BOBO };
+module.exports = { CATALOGO, TODAS, VALIDAS, PERMITIDAS_CRIANCA, CARGOS_PADRAO, DESCRICOES, EXCLUSIVAS, MODULOS, SO_DO_BOBO, SO_DOS_ALIADOS };

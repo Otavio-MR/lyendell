@@ -1,7 +1,7 @@
 const express = require('express');
 const { db } = require('../db');
 const { hashSenha, verificarSenha, HASH_FALSO, validarSenhaNova } = require('../senhas');
-const { criarSessao, encerrarSessao, comandoDerrubarSessoes, carregarUsuario, perfil, exigirLogin } = require('../auth');
+const { criarSessao, encerrarSessao, comandoDerrubarSessoes, carregarUsuario, perfilCompleto, exigirLogin } = require('../auth');
 const { CATALOGO } = require('../permissoes');
 const { anotar } = require('../diario');
 const { upload, salvarArquivo, comandoApagarArquivo } = require('../uploads');
@@ -54,7 +54,7 @@ r.post('/login', async (req, res) => {
   req.usuario = await carregarUsuario(u.id);
   await db.run("UPDATE usuarios SET ultimo_acesso = datetime('now') WHERE id = ?", u.id);
   await anotar(req, 'Entrou no sistema');
-  res.json(perfil(req.usuario));
+  res.json(await perfilCompleto(req.usuario));
 });
 
 r.post('/logout', async (req, res) => {
@@ -64,7 +64,7 @@ r.post('/logout', async (req, res) => {
 
 r.get('/me', exigirLogin, async (req, res) => {
   await progresso.registrarVisita(req.usuario.id); // primeira visita do dia conta a sequência
-  res.json(perfil(req.usuario));
+  res.json(await perfilCompleto(req.usuario));
 });
 
 r.get('/catalogo', exigirLogin, (req, res) => res.json({ catalogo: CATALOGO }));

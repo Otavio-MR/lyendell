@@ -1029,11 +1029,12 @@ export function resolverPompons(cel, pos, max = 12, limite = 5000) {
   }
   return null;
 }
-export function gerarFasePompons(nivel, rnd = Math.random) {
+// alivio: quando não sai fase com solução, tenta de novo com menos obstáculos (mas os mesmos pompons).
+export function gerarFasePompons(nivel, rnd = Math.random, alivio = 0) {
   const N = N_POMPOM;
   const n = Math.min(4, 1 + Math.floor(nivel / 2));
-  const paredes = 3 + Math.min(9, nivel);
-  const buracos = Math.min(7, nivel);
+  const paredes = Math.max(1, 3 + Math.min(9, nivel) - alivio * 3);
+  const buracos = Math.max(0, Math.min(7, nivel) - alivio * 2);
   const neves = Math.min(4, 1 + Math.floor(nivel / 3));
   const minimo = Math.min(7, 2 + Math.floor(nivel / 2));
   let melhor = null;
@@ -1069,6 +1070,7 @@ export function gerarFasePompons(nivel, rnd = Math.random) {
     if (!melhor || sol.length > melhor.minimo) melhor = fase;
   }
   if (melhor) return melhor;
+  if (alivio < 3) return gerarFasePompons(nivel, rnd, alivio + 1);
   const cel = Array.from({ length: N }, (_, y) => Array.from({ length: N }, (_, x) => (x === 0 || y === 0 || x === N - 1 || y === N - 1 ? 'p' : 'g')));
   cel[0][4] = 's';
   return { cel, pompons: [[4, 6]], minimo: 1, solucao: [[0, -1]] };

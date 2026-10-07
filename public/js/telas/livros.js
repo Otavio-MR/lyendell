@@ -2,11 +2,15 @@ import { ehLivroDeCartaz, dadosDoCartaz, desenharCartaz, baixarCartaz } from '..
 import {
   estado, get, post, put, del, h, trocar, icone, pode, ehCrianca, cabecalho, vazio, botao, botaoIcone, modal, modalForm, confirmar,
   aviso, tentar, campo, interruptor, enviarImagem, dataHora, dataCurta, num, normalizar, ErroApi,
-  textoDuracao, listaDeNomes, relativo,
+  textoDuracao, listaDeNomes, relativo, chipAliados, ehMorador,
 } from '../core.js';
 import { livroDeRegistro, livroDeRegistros } from '../livro-mc.js';
 import { verPagamentos, resumoCobranca } from './pagamentos.js';
 import { nomeInfantil } from '../crianca.js';
+
+// Para os Aliados (convidados de outras casas): só os livros abertos para Convidados e Aliados aparecem.
+const notaAliado = m => !pode(`${m}.ver`) && pode('aliados.ver') && h('p', { class: 'nota' }, icone('alianca'),
+  h('span', null, 'Aqui aparecem só os livros abertos para Convidados e Aliados.'));
 
 // Para a criança: os livros são dos grandes; dá para olhar, mas não pode rabiscar.
 const notaCrianca = () => ehCrianca() && h('p', { class: 'nota nota-crianca' }, icone('coelho'),
@@ -114,6 +118,7 @@ export async function modulo(m) {
       }),
       abasModulo(m, '', contagem),
       notaCrianca(),
+      notaAliado(m),
       livros.length
         ? h('div', { class: 'grade-livros' }, livros.map(l => cartaoLivro(m, l)))
         : vazio('Nenhum livro ainda', configurar ? 'Crie o primeiro livro de registros.' : 'Quando houver livros, eles aparecem aqui.'));
@@ -131,7 +136,8 @@ function cartaoLivro(m, l) {
       h('span', null, h('strong', null, num(l.total)), l.total === 1 ? ' registro' : ' registros'),
       l.pendentes > 0 && h('span', { class: 'etiqueta etiqueta-ouro', title: 'Registros aguardando a sua aprovação' }, icone('relogio'), `${l.pendentes} aguardando`),
       l.atrasados > 0 && h('span', { class: 'etiqueta pg-atrasado', title: 'Registros com pagamento atrasado' }, icone('alerta'), `${l.atrasados} com pagamento atrasado`),
-      !l.aberto && h('span', { class: 'etiqueta', title: 'Só quem comanda o módulo registra aqui' }, icone('cadeado'), 'Restrito')));
+      !l.aberto && h('span', { class: 'etiqueta', title: 'Só quem comanda o módulo registra aqui' }, icone('cadeado'), 'Restrito'),
+      l.aliados && ehMorador() && chipAliados()));
 }
 
 // No Tabelionato, o que o administrador registra é aprovado pela Tabeliã (nem ele aprova o próprio registro).
@@ -142,7 +148,8 @@ const soATabeliaAprova = (m, r) => m === 'tabelionato' && estado.eu.is_root && r
 export function abasModulo(m, atual, contagem = {}) {
   const abas = [['', 'Livros', null]];
   // Congresso: as propostas do povo (o número é o que espera a Senadora, para ela, ou o que está na pauta).
-  if (m === 'congresso') abas.push(['propostas', 'Propostas do povo', contagem.propostas || 0]);
+  // (Os Aliados, convidados de outras casas, não entram nas propostas: são do povo de Lyendell.)
+  if (m === 'congresso' && pode('congresso.ver')) abas.push(['propostas', 'Propostas do povo', contagem.propostas || 0]);
   if (pode(`${m}.aprovar`)) abas.push(['aprovacoes', 'Aguardando aprovação', contagem.aprovacoes || 0]);
   if (contagem.envios || (pode(`${m}.registrar`) && !pode(`${m}.aprovar`))) abas.push(['envios', 'Meus envios', contagem.envios || 0]);
   if (abas.length < 2) return null;
@@ -314,6 +321,7 @@ export async function livro(m, id, abrir = null) {
         ],
       }),
       notaCrianca(),
+      l.aliados && ehMorador() && h('p', { class: 'nota' }, chipAliados(), h('span', null, 'Este livro está aberto para Convidados e Aliados: eles leem os registros aprovados.')),
       !l.aberto && !l.podeRegistrar && pode(`${m}.registrar`)
         ? h('p', { class: 'nota' }, icone('cadeado'), `Livro restrito: só ${info.quemComanda} registra aqui.`)
         : null,
@@ -676,8 +684,8 @@ async function configurarLivro(m, l, aoSalvar, aoApagar) {
     .flat().filter(x => x.id !== l?.id);
 
   const s = l
-    ? { nome: l.nome, descricao: l.descricao, icone: l.icone, aberto: l.aberto, campos: structuredClone(l.campos) }
-    : { nome: '', descricao: '', icone: 'livro', aberto: true, campos: [{ id: idLocal(), nome: 'Nome', tipo: 'texto', obrigatorio: true, destaque: true }] };
+    ? { nome: l.nome, descricao: l.descricao, icone: l.icone, aberto: l.aberto, aliados: !!l.aliados, campos: structuredClone(l.campos) }
+    : { nome: '', descricao: '', icone: 'livro', aberto: true, aliados: false, campos: [{ id: idLocal(), nome: 'Nome', tipo: 'texto', obrigatorio: true, destaque: true }] };
   s.campos.forEach(c => { if (c.tipo === 'selecao' && !c.opcoes) c.opcoes = []; });
   if (m === 'tabelionato') s.cobranca = l?.cobranca ? { ...l.cobranca } : { ativo: false, campo: '', intervalo: 14 };
 
@@ -814,6 +822,8 @@ async function configurarLivro(m, l, aoSalvar, aoApagar) {
       h('div', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Ícone'), grade),
       interruptor('Registro aberto', s.aberto, v => { s.aberto = v; },
         `Ligado: quem tem permissão de registrar no módulo pode registrar aqui. Desligado: só ${MODULOS[m].quemComanda} e a Família Nobre.`),
+      interruptor('Visível para Convidados e Aliados', s.aliados, v => { s.aliados = v; },
+        'Ligado: os Aliados (convidados de outras casas, que não são moradores) leem os registros aprovados deste livro. Eles nunca registram, editam ou aprovam.'),
       h('div', { class: 'cfg-cab' },
         h('h3', null, 'Formulário de registro'),
         h('p', { class: 'suave' }, 'Os campos que aparecem ao fazer um registro. Use seções para dividir o formulário em partes. Se remover um campo, o que já foi preenchido nele deixa de aparecer.')),

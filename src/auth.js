@@ -39,12 +39,28 @@ function comandoDerrubarSessoes(usuarioId, excetoToken) {
     : ['DELETE FROM sessoes WHERE usuario_id = ?', usuarioId];
 }
 
+// Os cargos de alguém: os dele e o cargo base "Morador", que vale para todos, menos para quem tem um cargo
+// que "não é morador" (exclui_base, como os Aliados, convidados de outras casas).
 const SQL_CARGOS = `
-  SELECT id, nome, cor, permissoes, base FROM cargos
-  WHERE base = 1 OR id IN (SELECT cargo_id FROM usuario_cargos WHERE usuario_id = ?)
+  SELECT id, nome, cor, permissoes, base, exclui_base FROM cargos
+  WHERE id IN (SELECT cargo_id FROM usuario_cargos WHERE usuario_id = ?)
+    OR (base = 1 AND NOT EXISTS (SELECT 1 FROM usuario_cargos uc JOIN cargos x ON x.id = uc.cargo_id
+      WHERE uc.usuario_id = ? AND x.exclui_base = 1))
   ORDER BY ordem, id`;
+const cargosDoUsuario = id => db.all(SQL_CARGOS, id, id);
 
-// Soma as permissões dos cargos (o cargo base "Morador" vale para todos).
+// O mesmo, a partir da lista de todos os cargos e dos ids dos cargos da pessoa (ex.: a lista de usuários).
+function cargosEfetivos(todos, ids) {
+  const proprios = todos.filter(c => ids.has(c.id));
+  return proprios.some(c => c.exclui_base) ? proprios : todos.filter(c => c.base || ids.has(c.id));
+}
+
+// Quem não é morador (os Aliados): o SQL de uma pessoa que tem um cargo "não é morador".
+// Use com o apelido "u" para a tabela usuarios. O administrador principal é sempre morador.
+const SQL_NAO_MORADOR = `(u.is_root = 0 AND EXISTS (SELECT 1 FROM usuario_cargos uc JOIN cargos x ON x.id = uc.cargo_id
+  WHERE uc.usuario_id = u.id AND x.exclui_base = 1))`;
+
+// Soma as permissões dos cargos (o cargo base "Morador" vale para todos os moradores).
 // Criança fica só com as de olhar, brincar e ajudar, mesmo que o cargo dê mais.
 function montarUsuario(u, cargos) {
   const permissoes = new Set();
@@ -58,6 +74,8 @@ function montarUsuario(u, cargos) {
     is_root: !!u.is_root,
     ativo: !!u.ativo,
     crianca,
+    // Morador: recebe o cargo base. Os Aliados não são (só veem o que for aberto para Convidados e Aliados).
+    morador: !!u.is_root || cargos.some(c => c.base),
     cargos: cargos.filter(c => !c.base).map(({ id, nome, cor }) => ({ id, nome, cor })),
     permissoes,
   };
@@ -66,11 +84,22 @@ function montarUsuario(u, cargos) {
 async function carregarUsuario(id) {
   const u = await db.get('SELECT id, nome, foto, is_root, ativo, crianca FROM usuarios WHERE id = ?', id);
   if (!u) return null;
-  return montarUsuario(u, await db.all(SQL_CARGOS, id));
+  return montarUsuario(u, await cargosDoUsuario(id));
 }
 
 function perfil(u) {
-  return { id: u.id, nome: u.nome, foto: u.foto, is_root: u.is_root, crianca: u.crianca, cargos: u.cargos, permissoes: [...u.permissoes] };
+  return { id: u.id, nome: u.nome, foto: u.foto, is_root: u.is_root, crianca: u.crianca, morador: u.morador, cargos: u.cargos, permissoes: [...u.permissoes] };
+}
+
+// Módulos de livros (Tabelionato, Guarda...) com pelo menos um livro marcado para Convidados e Aliados.
+async function modulosDosAliados() {
+  return (await db.all('SELECT DISTINCT modulo FROM livros WHERE aliados = 1 ORDER BY modulo')).map(l => l.modulo);
+}
+
+// O perfil de quem entrou, para o site montar o menu. Quem vê a parte dos Aliados recebe também
+// os módulos que têm livros abertos para eles (aliadosModulos).
+async function perfilCompleto(u) {
+  return { ...perfil(u), aliadosModulos: u.permissoes.has('aliados.ver') ? await modulosDosAliados() : [] };
 }
 
 const CINCO_MINUTOS = 5 * 60 * 1000;
@@ -83,7 +112,7 @@ async function usuarioDaRequisicao(req) {
     SELECT u.id, u.nome, u.foto, u.is_root, u.ativo, u.crianca, u.ultimo_acesso FROM sessoes s JOIN usuarios u ON u.id = s.usuario_id
     WHERE s.token_hash = ? AND s.expira_em > datetime('now') AND u.ativo = 1`, sha(token));
   if (!u) return null;
-  return { usuario: montarUsuario(u, await db.all(SQL_CARGOS, u.id)), token, ultimoAcesso: u.ultimo_acesso };
+  return { usuario: montarUsuario(u, await cargosDoUsuario(u.id)), token, ultimoAcesso: u.ultimo_acesso };
 }
 
 // A sessão continua valendo? (usuário não foi desativado nem removido, e ela não venceu)
@@ -117,7 +146,22 @@ const exigir = (...perms) => (req, res, next) => {
   try { checar(req, ...perms); next(); } catch (e) { next(e); }
 };
 
+// Partes que são só dos moradores (Comunidade, Mapa): os Aliados não entram.
+const SO_MORADORES = 'Esta parte é só para os moradores da Casa Luckham.';
+function checarMorador(req) {
+  if (!req.usuario) throw erro(401, 'Faça login para continuar.');
+  if (!req.usuario.morador) throw erro(403, SO_MORADORES);
+}
+const exigirMorador = (req, res, next) => {
+  try { checarMorador(req); next(); } catch (e) { next(e); }
+};
+
+// Convidados e Aliados: quem não tem a permissão normal (ex.: "anuncios.ver"), mas vê a parte dos Aliados,
+// enxerga só o que foi marcado para eles.
+const soAliados = (req, perm) => !pode(req, perm) && pode(req, 'aliados.ver');
+
 module.exports = {
-  criarSessao, encerrarSessao, comandoDerrubarSessoes, carregarUsuario, montarUsuario, perfil,
-  sessao, usuarioDaRequisicao, sessaoAindaValida, pode, checar, exigirLogin, exigir,
+  criarSessao, encerrarSessao, comandoDerrubarSessoes, carregarUsuario, montarUsuario, perfil, perfilCompleto,
+  cargosEfetivos, modulosDosAliados, SQL_NAO_MORADOR,
+  sessao, usuarioDaRequisicao, sessaoAindaValida, pode, checar, exigirLogin, exigir, checarMorador, exigirMorador, soAliados,
 };

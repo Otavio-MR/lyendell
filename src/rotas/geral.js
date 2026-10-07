@@ -1,7 +1,7 @@
 const { hoje } = require('../cobranca');
 const express = require('express');
 const { db } = require('../db');
-const { exigir, exigirLogin, pode } = require('../auth');
+const { exigir, exigirLogin, pode, soAliados } = require('../auth');
 const { upload, salvarArquivo } = require('../uploads');
 const { erro, linha, inteiro } = require('../util');
 const { MODULOS } = require('../permissoes');
@@ -35,22 +35,27 @@ r.get('/inicio', async (req, res) => {
   for (const m of Object.keys(MODULOS)) {
     if (pode(req, `${m}.ver`)) tarefas.push(contarModulo(m).then(n => { out.numeros[m] = n; }));
   }
-  if (pode(req, 'congresso.ver')) tarefas.push(novidades('congresso').then(x => { out.congresso = x; }));
-  if (pode(req, 'leis.ver')) tarefas.push(novidades('leis').then(x => { out.leis = x; }));
+  // Os Aliados (convidados de outras casas) veem só o que foi marcado para Convidados e Aliados.
+  for (const m of ['congresso', 'leis']) {
+    if (pode(req, `${m}.ver`)) tarefas.push(novidades(m).then(x => { out[m] = x; }));
+    else if (pode(req, 'aliados.ver')) tarefas.push(novidades(m, true).then(x => { out[m] = x; }));
+  }
   if (pode(req, 'usuarios.ver')) tarefas.push(db.get('SELECT COUNT(*) AS n FROM usuarios WHERE ativo = 1').then(x => { out.numeros.usuarios = x.n; }));
   if (pode(req, 'galeria.ver')) {
     tarefas.push(db.get('SELECT COUNT(*) AS n FROM fotos').then(x => { out.numeros.fotos = x.n; }));
     tarefas.push(db.all('SELECT id, titulo, arquivo FROM fotos ORDER BY id DESC LIMIT 8').then(x => { out.fotos = x; }));
   }
-  if (pode(req, 'atividades.ver')) {
-    tarefas.push(db.get("SELECT COUNT(*) AS n FROM atividades WHERE status = 'aberta'").then(x => { out.numeros.atividades = x.n; }));
+  if (pode(req, 'atividades.ver') || pode(req, 'aliados.ver')) {
+    const marcadas = soAliados(req, 'atividades.ver') ? 'AND a.aliados = 1' : '';
+    tarefas.push(db.get(`SELECT COUNT(*) AS n FROM atividades a WHERE a.status = 'aberta' ${marcadas}`).then(x => { out.numeros.atividades = x.n; }));
     tarefas.push(db.all(`
-      SELECT a.id, a.titulo, a.item, a.meta, a.pacote, a.prazo,
+      SELECT a.id, a.titulo, a.item, a.meta, a.pacote, a.prazo, a.aliados,
         COALESCE((SELECT SUM(quantidade) FROM contribuicoes c WHERE c.atividade_id = a.id), 0) AS total
-      FROM atividades a WHERE a.status = 'aberta' ORDER BY a.id DESC LIMIT 4`).then(x => { out.atividades = x; }));
+      FROM atividades a WHERE a.status = 'aberta' ${marcadas} ORDER BY a.id DESC LIMIT 4`).then(x => { out.atividades = x; }));
   }
-  if (pode(req, 'anuncios.ver')) {
-    tarefas.push(db.all('SELECT id, titulo, conteudo, importancia, fixado, autor_nome, criado_em FROM anuncios ORDER BY fixado DESC, id DESC LIMIT 3')
+  if (pode(req, 'anuncios.ver') || pode(req, 'aliados.ver')) {
+    const marcados = soAliados(req, 'anuncios.ver') ? 'WHERE aliados = 1' : '';
+    tarefas.push(db.all(`SELECT id, titulo, conteudo, importancia, fixado, autor_nome, criado_em, aliados FROM anuncios ${marcados} ORDER BY fixado DESC, id DESC LIMIT 3`)
       .then(x => { out.anuncios = x; }));
   }
   await Promise.all(tarefas);
@@ -58,11 +63,12 @@ r.get('/inicio', async (req, res) => {
 });
 
 // As últimas publicações do Congresso e das Leis de Lyendell, para ninguém ficar sem saber.
-async function novidades(modulo) {
+// soMarcados: só dos livros marcados para Convidados e Aliados (o que os Aliados podem ler).
+async function novidades(modulo, soMarcados = false) {
   const linhas = await db.all(`
     SELECT r.id, r.livro_id, r.numero, r.dados, COALESCE(r.revisado_em, r.criado_em) AS em, l.nome AS livro, l.campos
     FROM registros r JOIN livros l ON l.id = r.livro_id
-    WHERE l.modulo = ? AND r.situacao = 'aprovado'
+    WHERE l.modulo = ? AND r.situacao = 'aprovado' ${soMarcados ? 'AND l.aliados = 1' : ''}
     ORDER BY COALESCE(r.revisado_em, r.criado_em) DESC, r.id DESC LIMIT 3`, modulo);
   return linhas.map(x => {
     const campos = JSON.parse(x.campos);
