@@ -55,6 +55,7 @@ const MENU = [
     { rota: '/admin/usuarios', nome: 'Usuários', icone: 'usuarios', perm: ['usuarios.ver'] },
     { rota: '/admin/cargos', nome: 'Cargos', icone: 'chave', perm: ['usuarios.ver', 'cargos.gerenciar'] },
     { rota: '/admin/diario', nome: 'Diário do sistema', icone: 'livro', perm: ['diario.ver'] },
+    { rota: '/financas', nome: 'Gestão Financeira', icone: 'moeda', perm: ['financas.ver'] },
   ] },
 ];
 
@@ -83,6 +84,9 @@ const ROTAS = [
   [/^\/admin\/usuarios$/, () => usuarios()],
   [/^\/admin\/cargos$/, () => cargos()],
   [/^\/admin\/diario$/, () => diario()],
+  // Gestão Financeira: carregada só quando alguém abre (o arquivo é grande e poucos usam).
+  [/^\/financas(?:\/([a-z]+))?$/, async aba => (await import('./telas/financas.js')).financas(aba || 'visao')],
+  [/^\/financas\/(folha|cidadao)\/(\d+)$/, async (aba, id) => (await import('./telas/financas.js')).financas(aba, id)],
   [/^\/recreacao$/, () => recreacao()],
   [/^\/clube$/, () => clube()],
   [/^\/bobo$/, () => caixaDePegadinhas()],

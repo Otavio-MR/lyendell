@@ -25,7 +25,7 @@ Todo usuário é morador (menos os Aliados, veja "Convidados e Aliados"). Os car
 | Cargo | O que pode |
 |---|---|
 | Administrador (Evran) | Tudo, inclusive criar usuários e criar ou editar cargos |
-| Família Nobre | Tudo, menos criar usuários e mexer nos cargos (e as pegadinhas, que são só do Bobo) |
+| Família Nobre | Tudo, menos criar usuários e mexer nos cargos (e as pegadinhas, que são só do Bobo). Na Gestão Financeira, só acompanha |
 | Tabeliã | Tudo no Tabelionato: aprovar registros, editar, apagar, criar livros, seções, campos e opções, e marcar pagamentos |
 | Escriba | Fazer registros no Tabelionato, que vão para a aprovação da Tabeliã |
 | Comandante da Guarda | Tudo na Guarda do Coelho, inclusive aprovar os registros dos guardas |
@@ -36,6 +36,7 @@ Todo usuário é morador (menos os Aliados, veja "Convidados e Aliados"). Os car
 | Lorde Comandante | Faz as Leis de Lyendell junto com a Família Nobre: escreve, publica, edita e revoga |
 | Bobo da Corte | A Caixa de Pegadinhas, só dele: prega peças no pessoal e conta piadas na praça (veja "Bobo da Corte") |
 | Game Dev | Troca os desenhos dos joguinhos pelos próprios sprites, e a troca vale para todo mundo (veja "Sprites dos jogos") |
+| Mestre da Moeda | A Gestão Financeira: profissões e salários, presenças, produção, folhas de pagamento e o tesouro (veja "Gestão Financeira") |
 | Aliados | Convidados e aliados de outras casas. **Não são moradores**: veem a cidade, jogam e conversam na Recreação e no Club Coelho, mas não publicam nem editam nada (veja "Convidados e Aliados") |
 | Morador | Ver tudo (menos o Hospital), ajudar nas atividades, usar a Recreação e mandar propostas ao Congresso |
 
@@ -226,6 +227,75 @@ O Registro de Comerciantes já vem com pagamento **a cada 14 dias**, contado a p
 - Só quem tem a permissão **Marcar pagamentos** (a Tabeliã, e a Família Nobre, que pode tudo) marca como paga, e sempre com uma **observação** dizendo como foi pago (ex.: "Lírios: 30" ou "Itens: 2 pacotes de trigo").
 - Quando um comércio fecha, a Tabeliã usa **Encerrar cobrança** para ele parar de acumular parcelas.
 - O intervalo (14 dias) e o campo de data se mudam em **Configurar livro**, e qualquer outro livro do Tabelionato pode ganhar pagamentos (ex.: aluguel de propriedades).
+
+## Gestão Financeira (Folha de Pagamento)
+
+Menu **Administração > Gestão Financeira** (`#/financas`). É do **Mestre da Moeda**; a Família Nobre
+acompanha sem mexer, e ninguém mais vê. As permissões ficam no grupo "Gestão Financeira" da tela Cargos:
+
+| Permissão | Quem tem | O que libera |
+|---|---|---|
+| `financas.ver` | Mestre da Moeda, Família Nobre | Ver tudo: tesouro, folhas, cidadãos, relatórios |
+| `financas.gerir` | Mestre da Moeda | Profissões e valores, vínculos, presenças, entregas, ajustes, movimentações e configurações |
+| `financas.aprovar` | Mestre da Moeda | Aprovar, rejeitar e pagar folhas; estornar movimentações |
+| `financas.excecao` | ninguém (só o administrador concede) | Autorizar pagamento ou saída acima do saldo disponível, sempre com justificativa |
+
+**Cidadãos.** A folha usa os registros aprovados do Tabelionato (Moradores, Nobres e Outros), sem cadastro
+novo. A "Profissão" escrita no registro aparece só como referência: o vínculo profissional é criado pelo
+Mestre da Moeda. Os dados extras (vínculos, observações administrativas, presenças, entregas e pagamentos)
+ficam em tabelas próprias ligadas ao registro, e os registros do Tabelionato nunca são alterados.
+
+**Profissões e vínculos.** Cada pessoa pode ter várias profissões ao mesmo tempo, cada uma com a sua regra:
+- **salário fixo** (Guarda, Tabelião, Médico, Conselheiro, Mestre da Moeda, Mão do Lorde): salário-base por
+  período (semanal, quinzenal, mensal ou a cada N dias) e turnos previstos. Se a profissão é
+  **proporcional à presença**: `salário = base × turnos cumpridos ÷ turnos previstos`, nunca acima da base
+  sem um ajuste justificado. Presente, licença e missão oficial contam como cumpridos; falta justificada
+  conta só se a profissão disser. O vínculo pode ter salário e turnos próprios.
+- **produção** (Artesão, Ferreiro, Fazendeiro, Coletor de recursos): cada produto ou recurso tem o seu valor
+  e unidade (unidade, pilha, baú, lote ou item). `pagamento = quantidade aceita × valor unitário`. O valor
+  fica guardado na hora em que a entrega é aceita: mudar a tabela depois não muda o que já foi aceito.
+  A mesma referência (ex.: "baú 12 do armazém") não entra duas vezes, e uma entrega igual (mesma pessoa,
+  produto, dia e quantidade) só passa com confirmação e justificativa.
+
+Vínculos ficam ativos, suspensos (sem salário fixo) ou encerrados (com data de fim). Toda correção de
+vínculo, presença ou entrega pede justificativa e fica no histórico (`financas_auditoria`).
+
+**Valores de demonstração.** As profissões começam com a tabela de referência (Guarda 40 por semana,
+proporcional; Tabelião 60; Médico 50; Conselheiro 50; Mestre da Moeda 60; Mão do Lorde 60; Artesão 10 e
+Ferreiro 15 por lote; Fazendeiro e Coletor 10 por baú), marcadas como **demonstração**. A folha avisa
+quando usa um valor ainda não conferido, e aprovar assim pede uma confirmação a mais. Mudar o valor (ou
+"Confirmar valor") tira a marca. Os itens de produção são genéricos: detalhe por produto ou recurso
+(batata, trigo, ferro...) antes de pagar de verdade.
+
+**Folha de pagamento.**
+1. **Prévia**: escolhe o período e o site calcula (salários pelos turnos, produção aceita ainda não paga,
+   soma por pessoa e total), com alertas: presença faltando, turnos acima do previsto, entregas esperando
+   conferência, entregas iguais, valores de demonstração, teto e reserva, saldo. É só simulação.
+2. **Fechar para revisão**: grava a folha (nº, período, quem fechou) e prende as presenças e entregas dela,
+   para nada entrar em duas folhas. Duas folhas não cobrem o mesmo dia. Aqui dá para revisar o valor de
+   um item (com justificativa) e lançar ajustes.
+3. **Aprovar** (ou **rejeitar**, com motivo, liberando as presenças e entregas). Ao aprovar, o valor fica
+   **reservado**, mas o saldo ainda não muda. Passar do saldo disponível só com `financas.excecao` e
+   justificativa.
+4. **Pagar** (tudo ou itens escolhidos): só aqui o dinheiro sai do tesouro, um movimento "salário" por
+   item. Um item nunca é pago duas vezes, nem com dois cliques ao mesmo tempo.
+
+Folha aprovada ou paga não muda em silêncio: correção é um **ajuste** (valor a mais, ou negativo para
+desconto) com justificativa, que entra na mesma folha para ser pago.
+
+**Tesouro.** Começa com um lançamento único de **saldo inicial de 1.000 Lírios** (feito uma vez só, não
+repete em atualizações). Painel com saldo, receitas, despesas, salários previstos (folhas em revisão),
+aprovados, pagos e reservados, e o **disponível** (saldo menos o reservado). Receitas, despesas, ajustes e
+transferências são lançados à mão (ajuste e transferência com justificativa); saída acima do disponível
+precisa da exceção. Nada é apagado: correção é **estorno** (o valor contrário, com justificativa, uma vez
+só). Pagamento de folha não se estorna, corrige com ajuste na folha.
+
+**Orçamento.** Teto de planejamento da folha regular (800 Lírios) e reserva (200 Lírios), editáveis em
+Configurações. Só geram alertas: nunca cortam nem reduzem pagamentos.
+
+**Relatórios.** Folha detalhada e recibo de cada pessoa, por profissão, produção por trabalhador,
+presenças e turnos, receitas e despesas, pagamentos pendentes e histórico de folhas, com exportação em CSV
+e impressão (ou PDF pelo "Salvar como PDF" do navegador).
 
 ## Livros do Minecraft (.book)
 

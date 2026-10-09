@@ -7,6 +7,7 @@ const { LIVROS_PADRAO, AJUDA_ABERTURA, CAMPOS_PENA, CAMPO_GUARDAS, CAMPOS_FICHA,
 const { CASAS_PADRAO } = require('./casas-padrao');
 const { PREDIOS_PADRAO } = require('./predios-padrao');
 const { PERGUNTAS_PADRAO } = require('./perguntas-padrao');
+const { PROFISSOES_PADRAO, TURNOS_SEMANA, SALDO_INICIAL, CONFIG_PADRAO } = require('./financas-padrao');
 const { linha, chaveNome } = require('./util');
 
 // Na internet o banco fica no Turso (TURSO_DATABASE_URL + TURSO_AUTH_TOKEN).
@@ -491,11 +492,181 @@ CREATE TABLE IF NOT EXISTS diario (
   detalhe TEXT NOT NULL DEFAULT '',
   criado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Gestão Financeira (v31). Os cidadãos são os registros aprovados do Tabelionato (Moradores, Nobres e
+-- Outros): tudo aqui aponta para registros.id e guarda o nome da época, sem criar outro cadastro.
+CREATE TABLE IF NOT EXISTS profissoes (
+  id INTEGER PRIMARY KEY,
+  nome TEXT NOT NULL,
+  chave TEXT NOT NULL UNIQUE,
+  remuneracao TEXT NOT NULL DEFAULT 'fixo',
+  salario_base REAL NOT NULL DEFAULT 0,
+  frequencia TEXT NOT NULL DEFAULT 'semanal',
+  turnos_previstos INTEGER NOT NULL DEFAULT 5,
+  proporcional INTEGER NOT NULL DEFAULT 1,
+  justificada_conta INTEGER NOT NULL DEFAULT 0,
+  regra TEXT NOT NULL DEFAULT '',
+  demonstracao INTEGER NOT NULL DEFAULT 0,
+  ativa INTEGER NOT NULL DEFAULT 1,
+  ordem INTEGER NOT NULL DEFAULT 0,
+  criado_por_nome TEXT NOT NULL DEFAULT '',
+  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  atualizado_por_nome TEXT,
+  atualizado_em TEXT
+);
+
+CREATE TABLE IF NOT EXISTS producao_itens (
+  id INTEGER PRIMARY KEY,
+  profissao_id INTEGER NOT NULL,
+  nome TEXT NOT NULL,
+  unidade TEXT NOT NULL DEFAULT 'unidade',
+  valor REAL NOT NULL DEFAULT 0,
+  demonstracao INTEGER NOT NULL DEFAULT 0,
+  ativo INTEGER NOT NULL DEFAULT 1,
+  criado_por_nome TEXT NOT NULL DEFAULT '',
+  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  atualizado_por_nome TEXT,
+  atualizado_em TEXT
+);
+
+CREATE TABLE IF NOT EXISTS vinculos (
+  id INTEGER PRIMARY KEY,
+  registro_id INTEGER NOT NULL,
+  cidadao_nome TEXT NOT NULL DEFAULT '',
+  profissao_id INTEGER NOT NULL,
+  situacao TEXT NOT NULL DEFAULT 'ativo',
+  salario_base REAL,
+  turnos_previstos INTEGER,
+  inicio TEXT NOT NULL,
+  fim TEXT,
+  observacao TEXT NOT NULL DEFAULT '',
+  criado_por_nome TEXT NOT NULL DEFAULT '',
+  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  atualizado_por_nome TEXT,
+  atualizado_em TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_vinculos_registro ON vinculos(registro_id);
+
+CREATE TABLE IF NOT EXISTS cidadao_financas (
+  registro_id INTEGER PRIMARY KEY,
+  observacoes TEXT NOT NULL DEFAULT '',
+  atualizado_por_nome TEXT,
+  atualizado_em TEXT
+);
+
+CREATE TABLE IF NOT EXISTS presencas (
+  id INTEGER PRIMARY KEY,
+  vinculo_id INTEGER NOT NULL,
+  data TEXT NOT NULL,
+  situacao TEXT NOT NULL DEFAULT 'presente',
+  turnos REAL NOT NULL DEFAULT 1,
+  observacao TEXT NOT NULL DEFAULT '',
+  folha_id INTEGER,
+  criado_por_nome TEXT NOT NULL DEFAULT '',
+  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  atualizado_por_nome TEXT,
+  atualizado_em TEXT,
+  UNIQUE (vinculo_id, data)
+);
+
+CREATE TABLE IF NOT EXISTS entregas (
+  id INTEGER PRIMARY KEY,
+  vinculo_id INTEGER NOT NULL,
+  item_id INTEGER NOT NULL,
+  quantidade REAL NOT NULL,
+  valor_unitario REAL,
+  data TEXT NOT NULL,
+  referencia TEXT NOT NULL DEFAULT '',
+  situacao TEXT NOT NULL DEFAULT 'pendente',
+  observacao TEXT NOT NULL DEFAULT '',
+  motivo TEXT,
+  folha_id INTEGER,
+  criado_por_nome TEXT NOT NULL DEFAULT '',
+  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  revisado_por_nome TEXT,
+  revisado_em TEXT,
+  atualizado_por_nome TEXT,
+  atualizado_em TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_entregas_vinculo ON entregas(vinculo_id);
+
+CREATE TABLE IF NOT EXISTS folhas (
+  id INTEGER PRIMARY KEY,
+  inicio TEXT NOT NULL,
+  fim TEXT NOT NULL,
+  situacao TEXT NOT NULL DEFAULT 'revisao',
+  observacao TEXT NOT NULL DEFAULT '',
+  alertas TEXT NOT NULL DEFAULT '[]',
+  criado_por_nome TEXT NOT NULL DEFAULT '',
+  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  aprovado_por_nome TEXT,
+  aprovado_em TEXT,
+  excecao TEXT,
+  rejeitado_por_nome TEXT,
+  rejeitado_em TEXT,
+  motivo TEXT
+);
+
+CREATE TABLE IF NOT EXISTS folha_itens (
+  id INTEGER PRIMARY KEY,
+  folha_id INTEGER NOT NULL,
+  registro_id INTEGER NOT NULL,
+  cidadao_nome TEXT NOT NULL DEFAULT '',
+  vinculo_id INTEGER,
+  profissao_nome TEXT NOT NULL DEFAULT '',
+  tipo TEXT NOT NULL,
+  descricao TEXT NOT NULL DEFAULT '',
+  calculado REAL NOT NULL DEFAULT 0,
+  valor REAL NOT NULL DEFAULT 0,
+  detalhes TEXT NOT NULL DEFAULT '{}',
+  justificativa TEXT,
+  criado_por_nome TEXT NOT NULL DEFAULT '',
+  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  pago_em TEXT,
+  pago_por_nome TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_folha_itens_folha ON folha_itens(folha_id);
+
+-- valor: positivo entra no tesouro, negativo sai. Nada é apagado: correção vira estorno.
+CREATE TABLE IF NOT EXISTS tesouro_movimentos (
+  id INTEGER PRIMARY KEY,
+  tipo TEXT NOT NULL,
+  valor REAL NOT NULL,
+  descricao TEXT NOT NULL DEFAULT '',
+  categoria TEXT NOT NULL DEFAULT '',
+  periodo TEXT NOT NULL DEFAULT '',
+  registro_id INTEGER,
+  folha_id INTEGER,
+  folha_item_id INTEGER,
+  estorno_de INTEGER,
+  justificativa TEXT,
+  excecao TEXT,
+  criado_por_nome TEXT NOT NULL DEFAULT '',
+  autorizado_por_nome TEXT,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+-- Cada item da folha só é pago uma vez, e cada movimento só é estornado uma vez (mesmo com dois cliques juntos).
+CREATE UNIQUE INDEX IF NOT EXISTS tesouro_salario_unico ON tesouro_movimentos(folha_item_id) WHERE tipo = 'salario';
+CREATE UNIQUE INDEX IF NOT EXISTS tesouro_estorno_unico ON tesouro_movimentos(estorno_de) WHERE estorno_de IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS financas_auditoria (
+  id INTEGER PRIMARY KEY,
+  entidade TEXT NOT NULL,
+  entidade_id INTEGER,
+  acao TEXT NOT NULL,
+  antes TEXT,
+  depois TEXT,
+  justificativa TEXT,
+  usuario_id INTEGER,
+  usuario_nome TEXT NOT NULL DEFAULT '',
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_financas_auditoria ON financas_auditoria(entidade, entidade_id);
 `;
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 30;
+const VERSAO = 31;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -590,6 +761,12 @@ async function migrar() {
   // v30: os Aliados passam a ver a cidade (mapa, anúncios, Congresso, Juramento, Leis, Galeria, Comunidade) e a jogar na Recreação.
   if (versao < 30) await db.run('UPDATE cargos SET descricao = ? WHERE nome = ? AND descricao = ?', CARGOS_PADRAO.find(c => c.nome === 'Aliados').descricao, 'Aliados', 'Convidados e aliados de outras casas. Não são moradores: veem só o que for marcado para Convidados e Aliados.');
   if (versao < 30) await darPermissoes({ Aliados: ['aliados.ver', 'anuncios.ver', 'congresso.ver', 'leis.ver', 'galeria.ver', 'recreacao.usar'] });
+  // v31: Gestão Financeira. As tabelas novas vêm do ESQUEMA; aqui entram o cargo Mestre da Moeda e a
+  // leitura para a Família Nobre. As profissões e o saldo inicial do tesouro entram uma vez só (semear).
+  if (versao < 31) {
+    await criarCargo('Mestre da Moeda');
+    await darPermissoes({ 'Família Nobre': ['financas.ver'] });
+  }
   // v20: o campo "Nickname" vira "Endereço" em todos os livros (no RP o nick é o endereço da pessoa).
   if (versao < 20) await nickVirouEndereco();
   // v19: propostas do povo para o Congresso (todo morador manda; a Senadora avalia).
@@ -962,6 +1139,28 @@ async function semear() {
         'INSERT INTO perguntas (categoria, texto, alternativas, correta) VALUES (?, ?, ?, 0)', categoria, texto, JSON.stringify(alternativas),
       ]),
       ["INSERT INTO meta (chave, valor) VALUES ('perguntas_semeadas', '1')"],
+    ]);
+  }
+
+  // Gestão Financeira: as profissões de demonstração e o saldo inicial do tesouro entram uma vez só.
+  // Depois disso, nem atualização do site nem reinício lançam o saldo de novo.
+  if (!await db.get("SELECT valor FROM meta WHERE chave = 'financas_semeadas'")) {
+    const vazio = !(await db.get('SELECT COUNT(*) AS n FROM profissoes')).n;
+    if (vazio) {
+      for (const [i, p] of PROFISSOES_PADRAO.entries()) {
+        const { id } = await db.run(`INSERT INTO profissoes (nome, chave, remuneracao, salario_base, frequencia, turnos_previstos, proporcional, regra, demonstracao, ordem, criado_por_nome)
+          VALUES (?, ?, ?, ?, 'semanal', ?, ?, ?, ?, ?, 'Sistema')`,
+        p.nome, chaveNome(p.nome), p.remuneracao, p.salario_base || 0, TURNOS_SEMANA, p.proporcional ?? 0, p.regra, p.remuneracao === 'fixo' ? 1 : 0, i);
+        for (const it of p.itens || []) {
+          await db.run("INSERT INTO producao_itens (profissao_id, nome, unidade, valor, demonstracao, criado_por_nome) VALUES (?, ?, ?, ?, 1, 'Sistema')", id, it.nome, it.unidade, it.valor);
+        }
+      }
+    }
+    await db.lote([
+      !(await db.get("SELECT id FROM tesouro_movimentos WHERE tipo = 'saldo_inicial'")) && [
+        "INSERT INTO tesouro_movimentos (tipo, valor, descricao, categoria, criado_por_nome) VALUES ('saldo_inicial', ?, 'Saldo inicial do tesouro da Capital', 'Saldo inicial', 'Sistema')", SALDO_INICIAL],
+      ["INSERT INTO meta (chave, valor) VALUES ('financas_config', ?) ON CONFLICT (chave) DO NOTHING", JSON.stringify(CONFIG_PADRAO)],
+      ["INSERT INTO meta (chave, valor) VALUES ('financas_semeadas', '1')"],
     ]);
   }
 

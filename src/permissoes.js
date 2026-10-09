@@ -85,6 +85,12 @@ const CATALOGO = [
   { grupo: 'Convidados e Aliados', itens: [
     { chave: 'aliados.ver', nome: 'Ver o que for marcado para Convidados e Aliados' },
   ] },
+  { grupo: 'Gestão Financeira', itens: [
+    { chave: 'financas.ver', nome: 'Ver a Gestão Financeira: tesouro, folhas de pagamento, profissões e pagamentos dos cidadãos' },
+    { chave: 'financas.gerir', nome: 'Cadastrar profissões, vínculos, presenças, produção, valores e movimentações do tesouro (Mestre da Moeda)' },
+    { chave: 'financas.aprovar', nome: 'Aprovar, rejeitar e pagar folhas de pagamento e estornar movimentações (Mestre da Moeda)' },
+    { chave: 'financas.excecao', nome: 'Autorizar pagamento ou saída acima do saldo disponível do tesouro (sempre com justificativa)' },
+  ] },
 ];
 
 const TODAS = CATALOGO.flatMap(g => g.itens.map(i => i.chave));
@@ -93,13 +99,16 @@ const TODAS = CATALOGO.flatMap(g => g.itens.map(i => i.chave));
 // Nada de registrar, editar, apagar, aprovar, publicar ou administrar (isso é coisa de gente grande).
 // A parte dos Aliados (convidados de outras casas) também fica de fora.
 const PERMITIDAS_CRIANCA = new Set([
-  ...TODAS.filter(p => p.endsWith('.ver') && p !== 'usuarios.ver' && p !== 'diario.ver' && p !== 'aliados.ver'),
+  ...TODAS.filter(p => p.endsWith('.ver') && p !== 'usuarios.ver' && p !== 'diario.ver' && p !== 'aliados.ver' && p !== 'financas.ver'),
   'atividades.participar', 'recreacao.usar', 'bobo.pegadinhas',
 ]);
 // Coisas só do Bobo da Corte: nem a Família Nobre recebe junto com "tudo".
 const SO_DO_BOBO = new Set(['bobo.pegadinhas']);
 // Coisa só dos Aliados (convidados de outras casas): a Família Nobre já vê tudo e não precisa disso.
 const SO_DOS_ALIADOS = new Set(['aliados.ver']);
+// O dinheiro da Capital é do Mestre da Moeda: a Família Nobre acompanha (financas.ver), mas não mexe.
+// Pagar acima do saldo (financas.excecao) não vem em cargo nenhum: o administrador concede em Cargos.
+const SO_DA_MOEDA = new Set(['financas.gerir', 'financas.aprovar', 'financas.excecao']);
 const VALIDAS = new Set(TODAS);
 
 // Todo usuário é morador (menos quem tem um cargo que "não é morador", como os Aliados): estas permissões valem para eles.
@@ -145,7 +154,7 @@ const CARGOS_PADRAO = [
     permissoes: MORADOR },
   { nome: 'Família Nobre', cor: '#d8b13a',
     descricao: DESCRICOES['Família Nobre'][1],
-    permissoes: TODAS.filter(p => p !== 'usuarios.criar' && p !== 'cargos.gerenciar' && !EXCLUSIVAS[p] && !SO_DO_BOBO.has(p) && !SO_DOS_ALIADOS.has(p)) },
+    permissoes: TODAS.filter(p => p !== 'usuarios.criar' && p !== 'cargos.gerenciar' && !EXCLUSIVAS[p] && !SO_DO_BOBO.has(p) && !SO_DOS_ALIADOS.has(p) && !SO_DA_MOEDA.has(p)) },
   { nome: 'Tabeliã', cor: '#c98b4a',
     descricao: DESCRICOES['Tabeliã'][1],
     permissoes: [...MEMBRO, ...acoes('tabelionato', 'registrar', 'editar', 'apagar', 'configurar', 'pagamentos', 'aprovar'), 'mapa.editar', 'juramento.marcar'] },
@@ -181,6 +190,9 @@ const CARGOS_PADRAO = [
   { nome: 'Aliados', cor: '#5aa0d8', exclui_base: true,
     descricao: 'Convidados e aliados de outras casas. Não são moradores: veem a cidade (mapa, anúncios, Congresso, Juramento, Leis, Galeria e Comunidade), jogam e conversam na Recreação e no Club Coelho, mas não publicam nem editam nada. Os livros do Tabelionato, da Guarda e do Hospital e as atividades, só os marcados para Convidados e Aliados.',
     permissoes: ['aliados.ver', 'anuncios.ver', 'congresso.ver', 'leis.ver', 'galeria.ver', 'recreacao.usar'] },
+  { nome: 'Mestre da Moeda', cor: '#c9a227',
+    descricao: 'Cuida do tesouro da Capital: profissões e salários, presenças, produção entregue, folhas de pagamento e movimentações em Lírios.',
+    permissoes: [...MEMBRO, 'financas.ver', 'financas.gerir', 'financas.aprovar'] },
 ];
 
-module.exports = { CATALOGO, TODAS, VALIDAS, PERMITIDAS_CRIANCA, CARGOS_PADRAO, DESCRICOES, EXCLUSIVAS, MODULOS, SO_DO_BOBO, SO_DOS_ALIADOS };
+module.exports = { CATALOGO, TODAS, VALIDAS, PERMITIDAS_CRIANCA, CARGOS_PADRAO, DESCRICOES, EXCLUSIVAS, MODULOS, SO_DO_BOBO, SO_DOS_ALIADOS, SO_DA_MOEDA };
