@@ -256,7 +256,9 @@ function desenharMapa() {
       s('circle', { r: 22, fill: 'none', stroke: '#3a3122', 'stroke-width': 1 }),
       s('path', { d: 'M0 -34L6 -6L34 0L6 6L0 34L-6 6L-34 0L-6 -6Z', fill: '#1c1a12', stroke: '#b8943a', 'stroke-width': 1.2 }),
       s('path', { d: 'M0 -34L6 -6L0 0Z M34 0L6 6L0 0Z M0 34L-6 6L0 0Z M-34 0L-6 -6L0 0Z', fill: '#b8943a' }),
-      s('text', { class: 'm-nome', y: -40 }, 'N')));
+      // Na vista do jogo que serviu de base, o Norte fica para baixo e o Sul para cima.
+      s('text', { class: 'm-nome', y: -40 }, 'S'),
+      s('text', { class: 'm-nome', y: 48 }, 'N')));
 
   const { x: px, y: py } = PORTAO;
   svg.append(estilo, defs,
