@@ -3437,3 +3437,48 @@ button.fin-cel:hover { border-color: var(--ouro); color: var(--ouro-l); }
   body.fin-imprimir-recibo .modal-corpo { overflow: visible; padding: 0; }
   body.fin-imprimir-recibo .documento { box-shadow: none; background: #fff; color: #000; }
 }
+
+/* ─── Menu de administrador nos jogos ─────────────── */
+.adm-raiz { position: fixed; right: 12px; top: 42%; z-index: 150; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: none; }
+.adm-botao { pointer-events: auto; display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 999px; border: 1px solid var(--ouro); background: rgba(20, 24, 18, 0.92); color: var(--ouro); font-family: var(--f-titulo); font-size: 0.8rem; letter-spacing: 0.08em; cursor: pointer; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45); }
+.adm-botao:hover { background: var(--ouro); color: #1b1403; }
+.adm-faixa { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 150; display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; background: var(--vermelho-fundo); border: 1px solid var(--vermelho); color: #f3c7b9; font-size: 0.82rem; max-width: calc(100vw - 32px); }
+.adm-faixa[hidden] { display: none; }
+.adm-painel { display: grid; gap: 14px; }
+.adm-abas { justify-self: start; }
+.adm-conteudo { display: grid; gap: 14px; }
+.adm-nota { display: flex; align-items: center; gap: 8px; color: #f3c7b9; font-size: 0.9rem; }
+.adm-grupo { display: grid; gap: 8px; }
+.adm-grupo h3 { font-family: var(--f-titulo); font-size: 0.85rem; letter-spacing: 0.05em; color: var(--ouro); }
+.adm-acoes { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.adm-acao { display: grid; gap: 8px; align-content: space-between; padding: 10px 12px; border: 1px solid var(--borda); border-radius: var(--raio); background: var(--sup-2, var(--sup)); }
+.adm-acao-cab { display: grid; gap: 2px; }
+.adm-acao-cab small { color: var(--suave); }
+.adm-campos { display: flex; flex-wrap: wrap; gap: 8px 12px; }
+.adm-campo { display: grid; gap: 4px; flex: 1 1 140px; min-width: 0; }
+.adm-campo span { font-size: 0.8rem; color: var(--suave); }
+.adm-efeitos { display: flex; flex-wrap: wrap; gap: 8px; }
+.adm-botoes { display: flex; flex-wrap: wrap; gap: 10px; }
+.adm-selo-efeito { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 190; display: flex; gap: 8px; padding: 6px 12px; border-radius: 999px; background: rgba(20, 24, 18, 0.92); border: 1px solid var(--vermelho); color: #f3c7b9; font-size: 0.85rem; pointer-events: none; }
+.adm-escuro { position: fixed; inset: 0; z-index: 180; pointer-events: none; background: radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.55) 0, rgba(0, 0, 0, 0.96) 22%); }
+#app.adm-ponta { transform: rotate(180deg); }
+#app.adm-espelho { transform: scaleX(-1); }
+#app.adm-gigante { transform: scale(1.6); }
+#app.adm-minusculo { transform: scale(0.55); }
+#app.adm-tremor { animation: adm-tremor 0.18s linear infinite; }
+#app.adm-arcoiris { animation: adm-arcoiris 2.4s linear infinite; }
+@keyframes adm-tremor { 0% { transform: translate(0, 0); } 25% { transform: translate(-6px, 3px); } 50% { transform: translate(5px, -4px); } 75% { transform: translate(-3px, -3px); } 100% { transform: translate(0, 0); } }
+@keyframes adm-arcoiris { from { filter: hue-rotate(0deg) saturate(1.6); } to { filter: hue-rotate(360deg) saturate(1.6); } }
+@media (max-width: 640px) { .adm-raiz { top: auto; bottom: 84px; } .adm-botao span { display: none; } }
+@media (prefers-reduced-motion: reduce) { #app.adm-tremor, #app.adm-arcoiris { animation-duration: 3s; } }
+
+/* ─── Texto formatado dos anúncios (igual ao Discord) ─ */
+.texto-formatado { display: grid; gap: 6px; overflow-wrap: anywhere; }
+.texto-formatado p, .texto-formatado ul, .texto-formatado ol, .texto-formatado blockquote { margin: 0; }
+.texto-formatado ul, .texto-formatado ol { padding-left: 1.4em; display: grid; gap: 3px; }
+.texto-formatado blockquote { border-left: 3px solid var(--ouro); padding: 2px 0 2px 10px; color: var(--suave); }
+.texto-formatado strong { color: var(--texto); }
+.texto-formatado .tf-espaco { height: 4px; }
+.anuncio-emojis { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+.anuncio-emoji { width: 34px; height: 32px; border-radius: 8px; border: 1px solid var(--borda); background: var(--sup-2); font-size: 1.05rem; line-height: 1; cursor: pointer; }
+.anuncio-emoji:hover { border-color: var(--ouro); }

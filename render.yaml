@@ -28,3 +28,10 @@ services:
         sync: false
       - key: VAPID_CONTATO
         value: https://casa-luckham.onrender.com
+      # Anúncios no Discord: o webhook do canal e os IDs dos cargos (veja o README, "Anúncios no Discord").
+      - key: DISCORD_WEBHOOK_ANUNCIOS
+        sync: false
+      - key: DISCORD_CARGO_MORADORES
+        sync: false
+      - key: DISCORD_CARGO_ALIADOS
+        sync: false

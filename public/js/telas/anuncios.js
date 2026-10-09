@@ -4,6 +4,7 @@ import {
 } from '../core.js';
 import { entradaImagem } from './livros.js';
 import { livroDeAnuncio } from '../livro-mc.js';
+import { textoFormatado } from '../texto-formatado.js';
 
 const IMPORTANCIAS = [
   ['comum', 'Comum'],
@@ -11,11 +12,17 @@ const IMPORTANCIAS = [
   ['urgente', 'Urgente'],
 ];
 
+// Emojis rápidos para o texto (saem iguais no site e no Discord).
+const EMOJIS = ['📢', '⚠️', '🚨', '🐇', '🏰', '⚔️', '🛡️', '📜', '🎉', '🌾', '⚒️', '💰', '🗓️', '📍', '✅', '❤️'];
+// As marcações do Discord que o servidor deixa usar (null: o Discord não está configurado).
+let opcoesDiscord = null;
+
 export async function anuncios() {
   const raiz = h('div', { class: 'pagina pagina-estreita' });
 
   async function desenhar() {
-    const { anuncios: lista } = await get('/api/anuncios');
+    const { anuncios: lista, discord } = await get('/api/anuncios');
+    opcoesDiscord = discord || null;
     trocar(raiz, 
       cabecalho({
         titulo: 'Mural de Anúncios', icone: 'megafone',
@@ -44,7 +51,7 @@ function cartao(a, recarregar) {
         h('span', null, h('strong', null, a.autor_nome || 'desconhecido'), ' · ',
           h('span', { title: dataHora(a.criado_em) }, relativo(a.criado_em)),
           a.editado_em ? ' · editado' : ''))),
-    a.conteudo && h('div', { class: 'texto-livre anuncio-texto' }, a.conteudo),
+    a.conteudo && textoFormatado(a.conteudo, 'texto-formatado anuncio-texto'),
     a.imagem && h('button', { class: 'anuncio-img', type: 'button', onclick: () => modal({ corpo: h('img', { src: a.imagem, alt: a.titulo, class: 'img-cheia' }), classe: 'modal-lb', tamanho: 'grande' }) },
       h('img', { src: a.imagem, alt: a.titulo, loading: 'lazy' })),
     h('footer', { class: 'anuncio-acoes' },
@@ -69,6 +76,23 @@ function cartao(a, recarregar) {
 
 function formAnuncio(a, depois) {
   const s = { titulo: a?.titulo || '', conteudo: a?.conteudo || '', importancia: a?.importancia || 'comum', imagem: a?.imagem || '', fixado: false, aliados: !!a?.aliados };
+  // Discord: quem marcar. O padrão segue o "Visível para Convidados e Aliados" até a pessoa escolher.
+  let discordEscolhido = !!a?.discord_marcar;
+  s.discord_marcar = a?.discord_marcar || (s.aliados ? 'moradores_aliados' : 'moradores');
+  const opcoesMarcar = (opcoesDiscord || []).filter(o => o.valor !== 'todos' || pode('anuncios.moderar') || s.discord_marcar === 'todos');
+  const seletorDiscord = opcoesDiscord && h('select', { class: 'input', onchange: e => { s.discord_marcar = e.target.value; discordEscolhido = true; } },
+    opcoesMarcar.map(o => h('option', { value: o.valor, selected: o.valor === s.discord_marcar }, o.nome)));
+  if (seletorDiscord && !opcoesMarcar.some(o => o.valor === s.discord_marcar)) s.discord_marcar = seletorDiscord.value;
+  const mensagem = h('textarea', { class: 'input', rows: '7', maxlength: '5000', oninput: e => { s.conteudo = e.target.value; } }, s.conteudo);
+  // Põe o emoji onde está o cursor.
+  const porEmoji = emoji => {
+    const ini = mensagem.selectionStart ?? mensagem.value.length;
+    const fim = mensagem.selectionEnd ?? ini;
+    mensagem.value = mensagem.value.slice(0, ini) + emoji + mensagem.value.slice(fim);
+    s.conteudo = mensagem.value;
+    mensagem.focus();
+    mensagem.setSelectionRange(ini + emoji.length, ini + emoji.length);
+  };
   const envio = { n: 0 };
   const opcoesImp = h('div', { class: 'segmentado', role: 'radiogroup', 'aria-label': 'Importância' });
   const desenharImp = () => trocar(opcoesImp, ...IMPORTANCIAS.map(([v, n]) =>
@@ -81,13 +105,27 @@ function formAnuncio(a, depois) {
     textoOk: a ? 'Salvar' : 'Publicar',
     conteudo: [
       campo('Título', h('input', { class: 'input', value: s.titulo, maxlength: '120', placeholder: 'Ex.: Feira de trocas no sábado', oninput: e => { s.titulo = e.target.value; } }), { obrigatorio: true }),
-      campo('Mensagem', h('textarea', { class: 'input', rows: '6', maxlength: '5000', oninput: e => { s.conteudo = e.target.value; } }, s.conteudo)),
+      h('div', { class: 'campo' },
+        h('span', { class: 'campo-rotulo' }, 'Mensagem'),
+        h('div', { class: 'anuncio-emojis', 'aria-label': 'Emojis' }, EMOJIS.map(e => h('button', { type: 'button', class: 'anuncio-emoji', title: 'Pôr no texto', onclick: () => porEmoji(e) }, e))),
+        mensagem,
+        h('small', { class: 'campo-ajuda' }, 'Dá para usar **negrito**, *itálico*, __sublinhado__, ~~riscado~~, listas com "- " no começo da linha e "> " para citação. Sai igual no site e no Discord.')),
       h('div', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Importância'), opcoesImp),
       h('div', { class: 'campo' }, h('span', { class: 'campo-rotulo' }, 'Imagem (opcional)'), entradaImagem(s.imagem, v => { s.imagem = v; }, envio)),
       !a && pode('anuncios.moderar') && h('label', { class: 'marcador' },
         h('input', { type: 'checkbox', onchange: e => { s.fixado = e.target.checked; } }), h('span', null, 'Fixar no topo do mural')),
       h('label', { class: 'marcador', title: 'Os Aliados (convidados de outras casas) não são moradores e só veem o que for marcado assim.' },
-        h('input', { type: 'checkbox', checked: s.aliados, onchange: e => { s.aliados = e.target.checked; } }), h('span', null, 'Visível para Convidados e Aliados')),
+        h('input', { type: 'checkbox', checked: s.aliados, onchange: e => {
+          s.aliados = e.target.checked;
+          // Enquanto a pessoa não escolheu no Discord, a marcação acompanha.
+          if (seletorDiscord && !discordEscolhido) {
+            const padrao = s.aliados ? 'moradores_aliados' : 'moradores';
+            if (opcoesMarcar.some(o => o.valor === padrao)) { s.discord_marcar = padrao; seletorDiscord.value = padrao; }
+          }
+        } }), h('span', null, 'Visível para Convidados e Aliados')),
+      seletorDiscord && campo('Avisar no Discord', seletorDiscord, {
+        ajuda: a?.noDiscord ? 'Editar aqui atualiza a mensagem no canal (sem marcar ninguém de novo).' : 'O anúncio vai para o canal de anúncios do Discord da Casa Luckham, marcando quem você escolher.',
+      }),
     ],
     aoEnviar: async () => {
       if (envio.n) throw new Error('Espere a imagem terminar de enviar.');

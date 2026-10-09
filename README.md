@@ -327,6 +327,43 @@ for comprido demais, o que não cabe passa para a página seguinte.
 
 Anúncios, atividades e pagamentos continuam no estilo antigo (moldura e cabeçalhos com ✦).
 
+## Anúncios no Discord
+
+Todo anúncio publicado no Mural de Anúncios vai também para um canal do servidor do Discord da Casa
+Luckham, por um **webhook** (o "bot" de mensagens do canal, que aparece com a etiqueta BOT e não precisa
+ficar ligado em lugar nenhum). Quem publica escolhe em **Avisar no Discord**:
+
+| Opção | O que acontece |
+|---|---|
+| @Moradores | marca o cargo dos Moradores (o padrão) |
+| @Aliados | marca o cargo dos Aliados |
+| @Moradores e @Aliados | marca os dois (o padrão quando o anúncio é "Visível para Convidados e Aliados") |
+| @everyone | marca o servidor todo (só quem modera o mural, como a Família Nobre) |
+| Mandar sem marcar ninguém | vai para o canal sem pingar ninguém |
+| Não mandar para o Discord | fica só no site |
+
+A mensagem sai como um cartão com o título (📢 comum, ⚠️ importante, 🚨 urgente), a cor da importância,
+quem publicou, o texto, a imagem (anexada) e o link para o mural. O texto aceita o mesmo jeito de escrever
+do Discord, e aparece igual no site: `**negrito**`, `*itálico*`, `__sublinhado__`, `~~riscado~~`, listas
+com `- ` no começo da linha, listas numeradas e `> ` para citação. O formulário tem uma fileira de emojis
+para pôr no texto. Um "@everyone" escrito no meio do texto não pinga ninguém: só vale a escolha do campo.
+
+Editar o anúncio no site edita a mensagem no Discord (sem marcar ninguém de novo); apagar no site apaga lá.
+Trocar para "Não mandar" depois tira a mensagem do canal; trocar de "Não mandar" para uma marcação manda.
+
+**Configurar** (no `.env` e no Render, em Environment):
+1. No Discord, no canal de anúncios: Editar canal > Integrações > Webhooks > Novo webhook. Dê o nome
+   (ex.: "Casa Luckham") e a foto do brasão, e clique em **Copiar URL do webhook**. Essa URL vai em
+   `DISCORD_WEBHOOK_ANUNCIOS` (ela é um segredo: quem tem a URL posta no canal).
+2. Ligue o Modo desenvolvedor (Configurações do usuário > Avançado). Em Configurações do servidor > Cargos,
+   clique com o botão direito no cargo dos Moradores > **Copiar ID do cargo** e cole em
+   `DISCORD_CARGO_MORADORES`; o mesmo para os Aliados em `DISCORD_CARGO_ALIADOS`.
+3. Se a marcação @everyone não pingar ninguém, confira nas permissões do canal a opção "Mencionar
+   @everyone, @here e todos os cargos".
+
+Sem o webhook, nada é enviado e o campo "Avisar no Discord" não aparece. Sem o ID de um cargo, a opção
+daquele cargo não aparece.
+
 ## Mural de Atividades
 
 Alguém cria uma atividade com o item e a meta (ex.: 960 batatas, que o sistema mostra como

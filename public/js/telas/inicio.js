@@ -1,4 +1,5 @@
 import { estado, get, h, icone, modal, botao, chipCargo, chipCrianca, chipAliados, barra, num, pacotes, relativo, dataCurta, seloNivel, avatarPessoa, normalizar, pode, avatar, ehMorador, veModulo } from '../core.js';
+import { semFormatacao } from '../texto-formatado.js';
 import { MENU_CRIANCA, falaDoDia, curiosidadeDoDia } from '../crianca.js';
 import { barraNivel } from './pessoas.js';
 import { MODULOS } from './livros.js';
@@ -189,7 +190,7 @@ function gradeMurais(d) {
               a.importancia !== 'comum' ? h('span', { class: `etiqueta imp-${a.importancia}` }, a.importancia === 'urgente' ? 'Urgente' : 'Importante') : null,
               a.aliados && ehMorador() ? chipAliados() : null),
             h('strong', null, a.titulo),
-            h('p', null, a.conteudo.length > 140 ? `${a.conteudo.slice(0, 140)}…` : a.conteudo),
+            h('p', null, (t => (t.length > 140 ? `${t.slice(0, 140)}…` : t))(semFormatacao(a.conteudo))),
             h('small', null, `${a.autor_nome} · ${relativo(a.criado_em)}`))))
         : h('p', { class: 'painel-vazio' }, 'Nenhum anúncio ainda.')),
 

@@ -173,7 +173,9 @@ CREATE TABLE IF NOT EXISTS anuncios (
   autor_nome TEXT NOT NULL DEFAULT '',
   criado_em TEXT NOT NULL DEFAULT (datetime('now')),
   editado_em TEXT,
-  aliados INTEGER NOT NULL DEFAULT 0
+  aliados INTEGER NOT NULL DEFAULT 0,
+  discord_marcar TEXT,
+  discord_msg TEXT
 );
 
 CREATE TABLE IF NOT EXISTS atividades (
@@ -666,7 +668,7 @@ CREATE INDEX IF NOT EXISTS idx_financas_auditoria ON financas_auditoria(entidade
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 31;
+const VERSAO = 32;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -763,6 +765,11 @@ async function migrar() {
   if (versao < 30) await darPermissoes({ Aliados: ['aliados.ver', 'anuncios.ver', 'congresso.ver', 'leis.ver', 'galeria.ver', 'recreacao.usar'] });
   // v31: Gestão Financeira. As tabelas novas vêm do ESQUEMA; aqui entram o cargo Mestre da Moeda e a
   // leitura para a Família Nobre. As profissões e o saldo inicial do tesouro entram uma vez só (semear).
+  // v32: anúncios no Discord (quem marcar e a mensagem que foi para lá).
+  if (versao < 32) {
+    if (!await colunaExiste('anuncios', 'discord_marcar')) await db.run('ALTER TABLE anuncios ADD COLUMN discord_marcar TEXT');
+    if (!await colunaExiste('anuncios', 'discord_msg')) await db.run('ALTER TABLE anuncios ADD COLUMN discord_msg TEXT');
+  }
   if (versao < 31) {
     await criarCargo('Mestre da Moeda');
     await darPermissoes({ 'Família Nobre': ['financas.ver'] });

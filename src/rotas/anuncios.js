@@ -5,6 +5,7 @@ const { anotar } = require('../diario');
 const progresso = require('../progresso');
 const { urlValida, comandoApagarArquivo } = require('../uploads');
 const { erro, linha, texto, idDaRota } = require('../util');
+const discord = require('../discord');
 
 const IMPORTANCIAS = ['comum', 'importante', 'urgente'];
 
@@ -21,7 +22,10 @@ function ler(req, atual = {}) {
   const imagem = req.body?.imagem !== undefined ? (urlValida(req.body.imagem) ? req.body.imagem : null) : (atual.imagem ?? null);
   // "Visível para Convidados e Aliados": os Aliados (que não são moradores) também leem este anúncio.
   const aliados = req.body?.aliados !== undefined ? (req.body.aliados ? 1 : 0) : (atual.aliados ? 1 : 0);
-  return { titulo, conteudo, importancia, imagem, aliados };
+  // Discord: quem marcar (@Moradores, @Aliados, @everyone...). Marcar o servidor todo é só para quem modera.
+  const discordMarcar = Object.hasOwn(discord.MARCAR, String(req.body?.discord_marcar)) ? req.body.discord_marcar : (atual.discord_marcar || discord.marcarPadrao(aliados));
+  if (discordMarcar === 'todos' && atual.discord_marcar !== 'todos' && !pode(req, 'anuncios.moderar')) throw erro(403, 'Só quem modera o mural pode marcar @everyone no Discord.');
+  return { titulo, conteudo, importancia, imagem, aliados, discordMarcar };
 }
 
 // Aviso para os Aliados quando um anúncio passa a ser visível para eles.
@@ -39,14 +43,19 @@ r.get('/', async (req, res) => {
   const lista = await db.all(`
     SELECT a.*, u.foto AS autor_foto FROM anuncios a LEFT JOIN usuarios u ON u.id = a.autor_id
     ${soMarcados ? 'WHERE a.aliados = 1' : ''} ORDER BY a.fixado DESC, a.id DESC LIMIT 200`);
-  res.json({ anuncios: lista.map(a => ({ ...a, fixado: !!a.fixado, aliados: !!a.aliados, podeMexer: podeMexer(req, a) })) });
+  res.json({
+    anuncios: lista.map(({ discord_msg, ...a }) => ({ ...a, fixado: !!a.fixado, aliados: !!a.aliados, podeMexer: podeMexer(req, a), noDiscord: !!discord_msg })),
+    // O formulário mostra o "Avisar no Discord" só quando o webhook está configurado.
+    discord: pode(req, 'anuncios.publicar') ? discord.opcoesParaOSite() : null,
+  });
 });
 
 r.post('/', exigir('anuncios.publicar'), async (req, res) => {
   const a = ler(req);
   const fixado = req.body?.fixado && pode(req, 'anuncios.moderar') ? 1 : 0;
-  const { id } = await db.run('INSERT INTO anuncios (titulo, conteudo, importancia, imagem, fixado, autor_id, autor_nome, aliados) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    a.titulo, a.conteudo, a.importancia, a.imagem, fixado, req.usuario.id, req.usuario.nome, a.aliados);
+  const { id } = await db.run('INSERT INTO anuncios (titulo, conteudo, importancia, imagem, fixado, autor_id, autor_nome, aliados, discord_marcar) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    a.titulo, a.conteudo, a.importancia, a.imagem, fixado, req.usuario.id, req.usuario.nome, a.aliados, a.discordMarcar);
+  discord.sincronizar(id); // vai para o canal do Discord (sem esperar)
   await anotar(req, 'Publicou um anúncio', a.titulo);
   await progresso.registrar(req.usuario.id, 'anuncio');
   require('../notificacoes').avisar('anuncios', {
@@ -68,12 +77,13 @@ r.put('/:id', async (req, res) => {
   if (!podeMexer(req, atual)) checar(req, 'anuncios.moderar');
   const a = ler(req, atual);
   await db.lote([
-    ["UPDATE anuncios SET titulo = ?, conteudo = ?, importancia = ?, imagem = ?, aliados = ?, editado_em = datetime('now') WHERE id = ?",
-      a.titulo, a.conteudo, a.importancia, a.imagem, a.aliados, atual.id],
+    ["UPDATE anuncios SET titulo = ?, conteudo = ?, importancia = ?, imagem = ?, aliados = ?, discord_marcar = ?, editado_em = datetime('now') WHERE id = ?",
+      a.titulo, a.conteudo, a.importancia, a.imagem, a.aliados, a.discordMarcar, atual.id],
     atual.imagem && atual.imagem !== a.imagem ? comandoApagarArquivo(atual.imagem) : null,
   ]);
   await anotar(req, 'Editou um anúncio', a.titulo);
   if (a.aliados && !atual.aliados) avisarAliados(req, atual.id, a); // acabou de ser aberto para os Aliados
+  discord.sincronizar(atual.id); // a mensagem no Discord muda junto (ou sai, se escolheram não mandar)
   res.json({ ok: true });
 });
 
@@ -89,6 +99,7 @@ r.delete('/:id', async (req, res) => {
   const a = await buscar(req);
   if (!podeMexer(req, a)) checar(req, 'anuncios.moderar');
   await db.lote([['DELETE FROM anuncios WHERE id = ?', a.id], comandoApagarArquivo(a.imagem)]);
+  discord.apagar(a.discord_msg);
   await anotar(req, 'Apagou um anúncio', a.titulo);
   res.json({ ok: true });
 });

@@ -704,6 +704,13 @@ export function livroDosJuramentados(pessoas, autor) {
   return mc;
 }
 
+// As marcas de **negrito**, *itálico*, __sublinhado__ e ~~riscado~~ dos anúncios (as mesmas de texto-formatado.js),
+// tiradas para o livro.
+const semMarcas = t => String(t || '')
+  .replace(/\*\*(.+?)\*\*/g, '$1').replace(/__(.+?)__/g, '$1').replace(/~~(.+?)~~/g, '$1')
+  .replace(/(^|[^*])\*(?!\s)(.+?)\*/g, '$1$2').replace(/(^|[^\w])_(?!\s)(.+?)_/g, '$1$2')
+  .replace(/^\s*[•·]\s+/gm, '- ').replace(/^\s*>\s?/gm, '');
+
 export function livroDeAnuncio(a, autor) {
   const mc = new LivroMC(a.titulo, autor || a.autor_nome);
   const selo = a.importancia === 'urgente' ? 'URGENTE' : a.importancia === 'importante' ? 'IMPORTANTE' : '';
@@ -715,7 +722,8 @@ export function livroDeAnuncio(a, autor) {
     vazia(),
     ...texto(`Lyendell, ${dataCurta(a.criado_em)}`, '8', { centro: true }),
   ]));
-  if (a.conteudo) mc.bloco(texto(a.conteudo, '0'), { junto: false });
+  // No livro do Minecraft vai o texto sem as marcas de **negrito** e afins (a fonte do jogo mede diferente).
+  if (a.conteudo) mc.bloco(texto(semMarcas(a.conteudo), '0'), { junto: false });
   mc.bloco(assinatura([...texto('Publicado por', '8'), ...texto(a.autor_nome || 'desconhecido', '0'), ...texto(`em ${dataHora(a.criado_em)}`, '8')]));
   return mc;
 }
