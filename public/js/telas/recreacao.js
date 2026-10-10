@@ -354,7 +354,8 @@ function painelRanking() {
   let tamanho = '3x3';
   let tamanhoMem = '4x4';
   let dificuldade = 'facil';
-  const ABAS = [['festa', 'Festa na Toca'], ['quiz', 'Quiz'], ['cidade', 'Lyendell Dorme'], ['cobras', 'Cobrinha ao vivo'], ['velha', 'Jogo da Velha'], ['ppt', 'Pedra, Papel e Tesoura'], ['lig4', 'Lig 4'],
+  let contraQuem = 'jogadores'; // Arena da Toca: contra jogadores ou contra o Raposo
+  const ABAS = [['festa', 'Festa na Toca'], ['arena', 'Arena da Toca'], ['quiz', 'Quiz'], ['cidade', 'Lyendell Dorme'], ['cobras', 'Cobrinha ao vivo'], ['velha', 'Jogo da Velha'], ['ppt', 'Pedra, Papel e Tesoura'], ['lig4', 'Lig 4'],
     ['damas', 'Damas'], ['pacman', 'Pac-Coelho'], ['cobrinha', 'Cobrinha'], ['quebra', 'Quebra-cabeça'], ['memoria', 'Memória'],
     ['minado', 'Campo Minado'], ['2048', '2048'], ...Object.entries(ARCADE).map(([id, j]) => [id, j.nome])];
   const eu = estado.eu.nome;
@@ -391,6 +392,15 @@ function painelRanking() {
       conteudo = tabela([['Cenouras', l => l.pontos]], dados.cobrinha);
     } else if (aba === 'festa') {
       conteudo = tabela([['Vitórias', l => l.vitorias], ['Festas', l => l.partidas], ['Douradas', l => l.douradas]], dados.festa || []);
+    } else if (aba === 'arena') {
+      conteudo = [
+        h('div', { class: 'segmentado ranking-tamanhos' }, [['jogadores', 'Contra jogadores'], ['raposo', 'Contra o Raposo']].map(([k, nome]) =>
+          h('button', { class: `seg ${k === contraQuem ? 'ativo' : ''}`, type: 'button', onclick: () => { contraQuem = k; desenhar(); } }, nome))),
+        tabela([['Vitórias', l => l.vitorias], ['Partidas', l => l.partidas], ['Coroas', l => num(l.coroas)]], dados.arena?.[contraQuem] || []),
+        h('p', { class: 'suave ranking-nota' }, contraQuem === 'jogadores'
+          ? 'Partidas de versus com pelo menos duas pessoas. Empata nas vitórias? Fica na frente quem tem mais coroas.'
+          : 'Partidas de co-op e as jogadas sozinho, todas contra o Raposo.'),
+      ];
     } else if (aba === 'cidade') {
       conteudo = tabela([['Vitórias', l => l.vitorias], ['Partidas', l => l.partidas], ['Chegou vivo', l => l.sobreviveu]], dados.cidade || []);
     } else if (aba === 'cobras') {

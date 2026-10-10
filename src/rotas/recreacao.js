@@ -24,11 +24,22 @@ const rankingAoVivo = jogo => db.all(`
     SELECT jogador2_nome, vencedor = 2, vencedor = 1, vencedor IS NULL FROM partidas WHERE jogo = ?
   ) GROUP BY nome ORDER BY vitorias DESC, derrotas ASC, nome LIMIT 10`, jogo, jogo);
 
+// Arena da Toca: vitórias, partidas e coroas (cada coroa vale 1000 pontos na partida). São dois rankings,
+// para ninguém liderar só vencendo o robô: "jogadores" é o versus com pelo menos duas pessoas; "raposo" é o
+// co-op e o versus jogado sozinho (as duas contra o Raposo).
+const rankingArena = contraRaposo => db.all(`
+  SELECT usuario_nome AS nome, SUM(venceu) AS vitorias, COUNT(*) AS partidas, SUM(pontos / 1000) AS coroas
+  FROM resultados
+  WHERE ${contraRaposo ? "jogo = 'junto_arena_coop' OR (jogo = 'junto_arena_versus' AND jogadores = 1)" : "jogo = 'junto_arena_versus' AND jogadores > 1"}
+  GROUP BY usuario_nome ORDER BY vitorias DESC, coroas DESC, partidas ASC, nome LIMIT 10`);
+
 const melhoresPontos = jogo => db.all(
   'SELECT usuario_nome AS nome, MAX(pontos) AS pontos FROM recordes WHERE jogo = ? GROUP BY usuario_nome ORDER BY pontos DESC LIMIT 10', jogo);
 
 r.get('/ranking', async (req, res) => {
-  const [velha, ppt, lig4, damas, cobras, festaRanking, cidade, cobrinha, pacman, jogo2048, barris, supercoelho, travessia, corrida, quiz, ...outros] = await Promise.all([
+  const [arenaJogadores, arenaRaposo, velha, ppt, lig4, damas, cobras, festaRanking, cidade, cobrinha, pacman, jogo2048, barris, supercoelho, travessia, corrida, quiz, ...outros] = await Promise.all([
+    rankingArena(false),
+    rankingArena(true),
     rankingAoVivo('velha'),
     rankingAoVivo('ppt'),
     rankingAoVivo('lig4'),
@@ -72,6 +83,7 @@ r.get('/ranking', async (req, res) => {
   const minado = outros.slice(TAMANHOS.length + Object.keys(MEMORIA).length);
   res.json({
     velha, ppt, lig4, damas, cobras, festa: festaRanking, cidade, cobrinha, pacman, quiz, 2048: jogo2048, barris, supercoelho, travessia, corrida,
+    arena: { jogadores: arenaJogadores, raposo: arenaRaposo },
     quebra: Object.fromEntries(TAMANHOS.map((t, i) => [t, quebra[i]])),
     memoria: Object.fromEntries(Object.keys(MEMORIA).map((t, i) => [t, memoria[i]])),
     minado: Object.fromEntries(Object.keys(MINADO).map((t, i) => [t, minado[i]])),

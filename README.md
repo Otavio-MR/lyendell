@@ -475,6 +475,10 @@ Estilo Clash Royale, em `#/recreacao/arena` (servidor: `src/junto-arena.js`; nav
   navegadores só mandam as cartas e desenham os quadros, misturando dois seguidos. Dá para assistir pela tela da arena.
 - O Raposo (o computador) defende o que atravessa o rio, usa feitiço em grupos, monta empurrões atrás de um tanque e
   não deixa as cenouras sobrarem. Quem sai no meio deixa o lugar para ele. Resultado guardado como `junto_arena_<modo>`.
+- **Ranking** (aba "Arena da Toca" no Ranking da Recreação): vitórias, partidas e coroas de cada pessoa, os 10
+  primeiros. São dois: **Contra jogadores** (versus com pelo menos duas pessoas) e **Contra o Raposo** (co-op e
+  partidas jogadas sozinho), para ninguém liderar só vencendo o robô. Empate nas vitórias: fica na frente quem
+  tem mais coroas. Partida em que o menu de administrador foi usado não entra.
 
 ### Batalha da Toca
 
