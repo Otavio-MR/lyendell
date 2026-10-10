@@ -25,6 +25,7 @@ import { ARCADE } from './jogos/lista.js';
 import { telaSprites } from './telas/sprites.js';
 import { ligarSpritesAoVivo } from './sprites.js';
 import { registrarServiceWorker } from './notificacoes.js';
+import { iniciarEfeitosAdm } from './adm-jogos.js';
 
 const app = document.getElementById('app');
 
@@ -227,6 +228,7 @@ function montar() {
     radioDoCanto()));
 
   if (pode('recreacao.usar')) ligar();
+  iniciarEfeitosAdm(); // as pegadinhas do menu de administrador chegam em qualquer tela
   ligarSpritesAoVivo(ouvir); // alguém trocou um sprite: todos recarregam
   registrarServiceWorker(); // para as notificações no celular/PC
   carregarTrilha();

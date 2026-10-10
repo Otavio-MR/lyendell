@@ -129,7 +129,7 @@ function novo({ modo, n, dif, semente } = {}) {
     vidas: coop ? 3 + n : null,
     popups: [],
     coelhos: Array.from({ length: n }, (_, i) => ({
-      i, ...lugarDeSaida(i), pontos: 0, combo: 0, estado: 'vivo', protegido: 0, relogio: 0, querDir: null, parado: false, sai: false,
+      i, ...lugarDeSaida(i), pontos: 0, combo: 0, estado: 'vivo', protegido: 0, relogio: 0, querDir: null, parado: false, sai: false, ritmo: 1,
     })),
     raposas: [...RAPOSAS, ...(n >= 3 ? [BRASA] : [])].map((r, i) => (i === 0
       ? { ...r, i, modo: 'normal', tx: 14, ty: 11, dir: ESQ, p: 0.5, assustada: false, reverter: false }
@@ -305,8 +305,9 @@ function moverRaposa(sim, r, dt) {
 }
 
 // O movimento do coelho (o mesmo do solo): anda de casa em casa; a direção pedida vale na próxima curva.
+// ritmo: 1 normal, 0,5 com a pegadinha "lento", 0 congelado.
 function moverCoelho(sim, c, dt) {
-  let passo = VEL * sim.vel.coelho * dt;
+  let passo = VEL * sim.vel.coelho * (c.ritmo ?? 1) * dt;
   const q = c.querDir;
   for (let n = 0; passo > 1e-9 && n < 10; n++) {
     // Meia-volta pode a qualquer momento.
@@ -437,6 +438,63 @@ function passo(sim, dt) {
   return true;
 }
 
+/* ─── Menu do administrador ─── */
+
+// O ritmo de cada coelho agora (junto.js manda a cada passo, pelas pegadinhas de cada um).
+function ritmos(sim, lista) {
+  sim.coelhos.forEach((c, k) => { c.ritmo = Number.isFinite(lista[k]) ? lista[k] : 1; });
+}
+
+const coelhoDe = (sim, i) => {
+  const c = sim.coelhos[i];
+  if (!c || c.estado === 'saiu') throw new Error('Esse coelho não está no labirinto.');
+  return c;
+};
+
+const admin = {
+  // Vidas da equipe (só no co-op).
+  maisVidas(sim, n) {
+    if (sim.modo !== 'coop') throw new Error('No versus do Pac-Coelho não há vidas: quem é pego só perde pontos.');
+    sim.vidas = Math.max(0, sim.vidas + n);
+    return sim.vidas;
+  },
+  // Um coelho que ficou de fora (co-op sem vidas) volta, protegido.
+  reviver(sim, i) {
+    const c = coelhoDe(sim, i);
+    if (c.estado !== 'fora' && !c.sai) throw new Error('Esse coelho ainda está no jogo.');
+    Object.assign(c, lugarDeSaida(c.i), { estado: 'vivo', sai: false, protegido: TEMPO_PROTEGIDO, parado: false, relogio: 0 });
+  },
+  // Escudo: as raposas não pegam esse coelho por alguns segundos.
+  escudo(sim, i, segundos) {
+    const c = coelhoDe(sim, i);
+    if (c.estado !== 'vivo') throw new Error('Esse coelho não está correndo agora.');
+    c.protegido = Math.max(c.protegido, segundos);
+  },
+  darPontos(sim, i, n) {
+    const c = coelhoDe(sim, i);
+    c.pontos = Math.max(0, c.pontos + n);
+    const [x, y] = posicao(c);
+    sim.popups.push({ x, y, valor: n, i: c.i, ate: 1.4 });
+    return c.pontos;
+  },
+  // As raposas ficam assustadas agora (como se alguém comesse uma cenoura grande).
+  assustar(sim) { assustar(sim); },
+  // As raposas voltam para a toca e só saem depois de alguns segundos (uma de cada vez).
+  tirarRaposas(sim, segundos) {
+    sim.raposas.forEach((r, k) => {
+      const [fx, fy] = r.casa || [13.5, 14];
+      Object.assign(r, { modo: 'casa', fx, fy, bob: k % 2 ? 1 : -1, dir: CIMA, assustada: false, reverter: false, solta: sim.t + segundos + k * 0.6 });
+    });
+  },
+  // Pula a fase: os Lírios somem todos e o labirinto conta como limpo (a partida acaba).
+  limpar(sim) {
+    for (const k of LISTA_MOEDAS) sim.moedas[k] = 0;
+    sim.comidas = sim.total;
+    sim.mudouMoedas = true;
+    sim.fim = 'limpou';
+  },
+};
+
 /* ─── O que vai para os navegadores ─── */
 
 function codigo(c) {
@@ -503,7 +561,7 @@ function resultado(sim, presentes, porTempo = false) {
 const pontos = sim => sim.coelhos.map(c => c.pontos);
 
 module.exports = {
-  novo, agir, passo, quadro, resultado, sair, pontos,
+  novo, agir, passo, quadro, resultado, sair, pontos, ritmos, admin,
   // Para os testes.
   _interno: { MAPA, COLS, LINHAS, DIRS, FASES, SAIDAS, LISTA_MOEDAS, BASE64, codificarMoedas, posicao, casaDe, maisPerto, alvo, livre },
 };

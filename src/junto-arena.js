@@ -16,6 +16,8 @@
 // Quem sai no meio deixa o lugar para o Raposo, que continua com as cartas e as cenouras dele.
 // Puro (sem rede e sem relógio): a mesma semente com os mesmos comandos dá os mesmos quadros.
 
+const adm = require('./adm-jogos');
+
 const ESCALA = Math.max(0.01, Number(process.env.ARENA_ESCALA) || 1); // só para os testes (partida curta)
 
 const PASSO = 0.05;         // segundos de jogo por passo
@@ -134,7 +136,8 @@ function novaIa(sim, s, preferido) {
   s.ia = { espera: 1 + sim.sorte() * 1.5, apoios: 0, ultimoApoio: -99, ladoPreferido: preferido, ultimaDefesa: -99 };
 }
 
-function novo({ modo, n, dif, semente } = {}) {
+// ids (opcional): o usuário de cada pessoa, para as pegadinhas do menu de administrador (veja uidDe).
+function novo({ modo, n, dif, semente, ids } = {}) {
   n = Math.max(1, Math.min(4, Math.floor(Number(n) || 1)));
   dif = Math.max(1, Number(dif) || 1);
   const coop = modo === 'coop';
@@ -142,6 +145,7 @@ function novo({ modo, n, dif, semente } = {}) {
     modo: coop ? 'coop' : 'versus', n, dif, sorte: sorteDe(Number(semente) || 0),
     t: 0, acum: 0, tiques: 0, proxId: 1, prorrogacao: false, fim: null, vencedor: null,
     coroas: [0, 0], ents: [], tiros: [], feiticos: [], fx: [], assentos: [], dano: [],
+    uids: Array.isArray(ids) ? ids.slice(0, n) : null,
   };
   // Os assentos: as pessoas primeiro (o assento i é a pessoa i), depois os Raposos.
   const lados = [];
@@ -193,6 +197,10 @@ function falar(sim, fala, lado = 1) {
 
 /* ─── Comandos ─── */
 
+// O usuário de cada pessoa (sim.uids[i]), para as pegadinhas do menu de administrador (congelar, lento,
+// invertido). Sem a lista, ninguém é atrapalhado (e o jogo continua puro).
+const uidDe = (sim, k) => sim.uids?.[k] ?? null;
+
 // Onde o lado pode pôr uma tropa (ou construção). Feitiço vale em qualquer lugar da arena.
 function lugarValido(sim, lado, x, y, carta) {
   if (!(x >= 0.5 && x <= LARG - 0.5 && y >= 0.5 && y <= ALT - 0.5)) return false;
@@ -226,12 +234,20 @@ function jogarCarta(sim, k, chave, x, y) {
   if (pos < 0 || s.cen < carta.custo - 1e-9) return false;
   if (sim.t - s.ultima < ENTRE_CARTAS - 1e-9) return false;
   if (!lugarValido(sim, s.lado, x, y, carta)) return false;
-  s.cen -= carta.custo;
+  if (!(s.infinita > sim.t)) s.cen -= carta.custo; // energia infinita (menu de administrador): não gasta
   s.ultima = sim.t;
   s.jogadas++;
   // O ciclo: a carta jogada vai para o fim da fila e a próxima entra no lugar dela.
   s.fila.push(chave);
   s.mao[pos] = s.fila.shift();
+  lancar(sim, k, carta, x, y);
+  return true;
+}
+
+// Põe a carta na arena (tropas ou feitiço), sem conferir nada.
+function lancar(sim, k, carta, x, y) {
+  const s = sim.assentos[k];
+  const chave = carta.k;
   efeito(sim, FX.carta, x, y, IDX_CARTA[chave], k);
   if (carta.feitico) {
     const f = carta.feitico;
@@ -256,7 +272,11 @@ function agir(sim, i, ev) {
   const s = sim.assentos[i];
   if (!s || s.raposo || s.saiu || sim.fim || !ev) return null;
   if (ev.tipo === 'carta') {
-    return jogarCarta(sim, i, String(ev.carta || ''), ev.x, ev.y) ? { mudou: false } : null;
+    // Congelado não joga carta; com os controles invertidos, a carta cai do outro lado (espelhada).
+    const uid = uidDe(sim, i);
+    if (!adm.podeAgir(uid)) return null;
+    const x = uid != null && adm.ativo(uid, 'inverter') ? LARG - Number(ev.x) : ev.x;
+    return jogarCarta(sim, i, String(ev.carta || ''), x, ev.y) ? { mudou: false } : null;
   }
   if (ev.tipo === 'baralho') {
     // O baralho escolhido antes da partida: vale enquanto a pessoa não jogou nenhuma carta.
@@ -561,32 +581,39 @@ function desempatar(sim) {
   else acabar(sim, a > b ? 0 : 1, 'desempate');
 }
 
+// O fim do tempo normal (o menu de administrador pode somar ou tirar segundos).
+const fimNormal = sim => TEMPO_NORMAL + (sim.bonus || 0);
+
 function conferirFim(sim) {
   if (sim.fim) return;
   const [a, b] = sim.coroas;
-  if (!sim.prorrogacao && sim.t >= TEMPO_NORMAL - 1e-9) {
+  if (!sim.prorrogacao && sim.t >= fimNormal(sim) - 1e-9) {
     if (a !== b) { acabar(sim, a > b ? 0 : 1, 'coroas'); return; }
     sim.prorrogacao = true;
   }
   if (sim.prorrogacao) {
     if (a !== b) acabar(sim, a > b ? 0 : 1, 'morte-subita');
-    else if (sim.t >= TEMPO_NORMAL + TEMPO_EXTRA - 1e-9) desempatar(sim);
+    else if (sim.t >= fimNormal(sim) + TEMPO_EXTRA - 1e-9) desempatar(sim);
   }
 }
 
-const dobro = sim => sim.prorrogacao || sim.t >= DOBRO_DESDE - 1e-9;
+const dobro = sim => sim.prorrogacao || sim.t >= DOBRO_DESDE + (sim.bonus || 0) - 1e-9;
 
 function tique(sim) {
   sim.t = Math.round((sim.t + PASSO) * 1000) / 1000;
   sim.tiques++;
   const taxa = (PASSO * (dobro(sim) ? 2 : 1)) / RECARGA;
-  for (const s of sim.assentos) s.cen = Math.min(MAX_CENOURAS, s.cen + taxa * s.mult);
+  for (const s of sim.assentos) {
+    // Lento (pegadinha): as cenouras voltam na metade do ritmo. Energia infinita (menu): sempre cheio.
+    const lento = s.raposo ? 1 : adm.velocidade(uidDe(sim, s.i));
+    s.cen = s.infinita > sim.t ? MAX_CENOURAS : Math.min(MAX_CENOURAS, s.cen + taxa * s.mult * lento);
+  }
   for (const e of sim.ents) if (vivo(e)) agirEnt(sim, e);
   moverTiros(sim);
   andarFeiticos(sim);
   separar(sim);
   limparMortos(sim);
-  sim.assentos.forEach((s, k) => { if (s.raposo && !sim.fim) pensar(sim, s, k); });
+  sim.assentos.forEach((s, k) => { if (s.raposo && !s.parado && !sim.fim) pensar(sim, s, k); });
   conferirFim(sim);
   if (sim.fx.length && sim.fx[0].ate <= sim.t) sim.fx = sim.fx.filter(f => f.ate > sim.t);
 }
@@ -594,12 +621,12 @@ function tique(sim) {
 // Um passo do relógio do servidor (uns 50 ms; o jogo anda em passos fixos de 50 ms).
 function passo(sim, dt) {
   if (sim.fim) return false;
-  sim.acum += Math.max(0, Math.min(0.25, Number(dt) || 0));
-  for (let n = 0; sim.acum >= PASSO - 1e-9 && !sim.fim && n < 8; n++) {
+  sim.acum += Math.max(0, Math.min(0.25, Number(dt) || 0)) * (sim.ritmo || 1);
+  for (let n = 0, max = 8 * Math.ceil(sim.ritmo || 1); sim.acum >= PASSO - 1e-9 && !sim.fim && n < max; n++) {
     tique(sim);
     sim.acum -= PASSO;
   }
-  if (sim.acum > PASSO) sim.acum = 0; // servidor engasgado: não tenta correr atrás
+  if (sim.acum > PASSO * (sim.ritmo || 1)) sim.acum = 0; // servidor engasgado: não tenta correr atrás
   return true;
 }
 
@@ -775,7 +802,7 @@ function pensar(sim, s, k) {
 // 0 pessoa | 1 Raposo | 2 saiu]), u (tropas: [id, tipo, assento, x*10, y*10, vida %, estado]),
 // p (tiros: [id, tipo, x*10, y*10]), fx (acontecimentos: [id, tipo, x*10, y*10, a, b]), f ([vencedor, motivo]).
 function quadro(sim) {
-  const restante = sim.prorrogacao ? TEMPO_NORMAL + TEMPO_EXTRA - sim.t : TEMPO_NORMAL - sim.t;
+  const restante = sim.prorrogacao ? fimNormal(sim) + TEMPO_EXTRA - sim.t : fimNormal(sim) - sim.t;
   const q = {
     t: Math.round(sim.t * 100) / 100,
     s: sim.fim ? 'fim' : sim.tiques ? 'jogando' : 'pronto',
@@ -816,8 +843,83 @@ function resultado(sim, presentes, porTempo = false) {
 // Os pontos de cada pessoa: 1000 por coroa do seu lado + o dano que fez nas torres do outro lado.
 const pontos = sim => sim.assentos.filter(s => s.i >= 0).map(s => sim.coroas[s.lado] * 1000 + Math.floor(sim.dano[s.i] || 0));
 
+/* ─── Menu de administrador (src/adm/arena-batalha.js) ─── */
+
+const admin = {
+  // Quem é cada pessoa (os usuários da sala, na mesma ordem): é o que liga as pegadinhas aos assentos.
+  donos(sim, uids) { sim.uids = Array.isArray(uids) ? [...uids] : null; },
+  encher(sim, k) { sim.assentos[k].cen = MAX_CENOURAS; },
+  zerar(sim, k) { sim.assentos[k].cen = 0; },
+  // Energia infinita por alguns segundos (de jogo).
+  infinita(sim, k, seg) { const s = sim.assentos[k]; s.infinita = sim.t + seg; s.cen = MAX_CENOURAS; },
+  // Cura as torres do lado e levanta as que caíram (a coroa que o outro lado ganhou com cada uma volta).
+  consertar(sim, lado) {
+    let curadas = 0;
+    let levantadas = 0;
+    for (let j = 0; j < 3; j++) {
+      const t = sim.torres[lado * 3 + j];
+      if (t.morto) {
+        if (t.tipo === 'rei') continue; // castelo caído: a partida já acabou
+        Object.assign(t, { morto: false, hp: t.max, alvo: null, cd: t.d.cad * 0.4, estado: 1 });
+        sim.coroas[1 - lado] = Math.max(0, sim.coroas[1 - lado] - 1);
+        levantadas++;
+      } else if (t.hp < t.max) {
+        t.hp = t.max;
+        curadas++;
+      }
+    }
+    return { curadas, levantadas };
+  },
+  // Uma carta de graça para o assento k (não sai da mão nem gasta cenouras). faixa: 0 esquerda, 1 direita,
+  // 2 meio. Tropa: do lado dele, perto do rio. Feitiço: na torre do outro lado naquela faixa (meio: no castelo).
+  soltar(sim, k, chave, faixa) {
+    const s = sim.assentos[k];
+    const carta = CARTA[chave];
+    if (!s || !carta || sim.fim) return false;
+    if (carta.feitico) {
+      const t = sim.torres[(1 - s.lado) * 3 + (faixa === 2 ? 2 : faixa === 1 ? 1 : 0)];
+      lancar(sim, k, carta, t.x, t.y);
+    } else {
+      lancar(sim, k, carta, faixa === 2 ? LARG / 2 : PONTES[faixa === 1 ? 1 : 0], yDoLado(s.lado, 19.5));
+    }
+    return true;
+  },
+  // Derruba a torre idx (lado * 3 + 0 esquerda, 1 direita, 2 castelo). O castelo acaba a partida.
+  derrubar(sim, idx) {
+    const t = sim.torres[idx];
+    if (!t || !vivo(t) || sim.fim) return false;
+    t.hp = 0;
+    limparMortos(sim);
+    return true;
+  },
+  // Acaba agora com o lado escolhido vencendo (-1: empate).
+  vencer(sim, lado) { acabar(sim, lado, 'adm'); },
+  ritmo(sim, r) { sim.ritmo = Math.max(0.25, Math.min(4, Number(r) || 1)); },
+  // Soma (ou tira) segundos do tempo normal.
+  tempo(sim, seg) { sim.bonus = (sim.bonus || 0) + seg; },
+  // Segundos de jogo que ainda podem faltar (contando a prorrogação inteira).
+  restante: sim => Math.max(0, fimNormal(sim) + TEMPO_EXTRA - sim.t),
+  restanteNormal: sim => (sim.prorrogacao ? fimNormal(sim) + TEMPO_EXTRA : fimNormal(sim)) - sim.t,
+  // Para (ou solta) todos os Raposos. Devolve quantos.
+  pararRaposos(sim, parar) {
+    const lista = sim.assentos.filter(s => s.raposo && !!s.parado !== parar);
+    for (const s of lista) s.parado = parar;
+    return lista.length;
+  },
+  // Mais um Raposo no lado escolhido (com o próprio baralho e as próprias cenouras).
+  novoRaposo(sim, lado) {
+    if (sim.assentos.length >= 8 || sim.fim) return false;
+    const s = { i: -1, lado, raposo: true, saiu: false, cen: CENOURAS_INICIO, ultima: -9, jogadas: 0, mult: 1, nivel: 1 };
+    prepararBaralho(sim, s, BARALHOS_RAPOSO[Math.floor(sim.sorte() * BARALHOS_RAPOSO.length)]);
+    novaIa(sim, s, Math.floor(sim.sorte() * 2));
+    sim.assentos.push(s);
+    sim.dano.push(0);
+    return true;
+  },
+};
+
 module.exports = {
-  novo, agir, passo, quadro, resultado, sair, pontos,
+  novo, agir, passo, quadro, resultado, sair, pontos, admin,
   // Para os testes.
   _interno: {
     PASSO, LARG, ALT, MEIO, PONTES, TEMPO_NORMAL, TEMPO_EXTRA, DOBRO_DESDE, RECARGA, CHEGADA, ENTRE_CARTAS, MAX_CENOURAS,

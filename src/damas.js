@@ -24,8 +24,10 @@ function novo(inicia) {
       if (l > 4) t[casa(l, c)] = { j: inicia, d: 0 };
     }
   }
-  return { tabuleiro: t, vez: inicia, claras: inicia, ultima: null, semProgresso: 0 };
+  // historico: como estava antes de cada jogada (o menu de administrador desfaz a última).
+  return { tabuleiro: t, vez: inicia, claras: inicia, ultima: null, semProgresso: 0, historico: [] };
 }
+const HISTORICO = 30;
 
 // Para onde as pedras de cada um andam: as claras sobem (-1), as escuras descem (+1).
 const frente = (e, j) => (j === e.claras ? -1 : 1);
@@ -104,6 +106,10 @@ function jogar(e, i, { de, caminho } = {}) {
     throw new ErroDamas(max ? `A captura é obrigatória: capture ${max === 1 ? 'a peça' : `as ${max} peças`}.` : 'Essa jogada não vale.');
   }
   const t = e.tabuleiro;
+  if (Array.isArray(e.historico)) {
+    e.historico.push({ tabuleiro: t.map(p => (p ? { ...p } : null)), vez: e.vez, ultima: e.ultima, semProgresso: e.semProgresso });
+    if (e.historico.length > HISTORICO) e.historico.shift();
+  }
   const peca = t[de];
   const fim = jog.caminho[jog.caminho.length - 1];
   t[de] = null;
@@ -130,4 +136,12 @@ function visao(e) {
   };
 }
 
-module.exports = { novo, jogar, visao, jogadasPossiveis, ErroDamas };
+// Volta o tabuleiro para antes da última jogada guardada (devolve false se não há o que desfazer).
+function desfazer(e) {
+  const antes = e.historico?.pop();
+  if (!antes) return false;
+  Object.assign(e, antes);
+  return true;
+}
+
+module.exports = { novo, jogar, visao, jogadasPossiveis, desfazer, ErroDamas };

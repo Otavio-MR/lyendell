@@ -21,6 +21,7 @@ const festa = require('./festa');
 const mundo = require('./cidade-mundo');
 const { paraCriancas } = require('./censura');
 const bobo = require('./bobo');
+const adm = require('./adm-jogos');
 
 const ESPERA_MS = Number(process.env.RECREACAO_ESPERA_MS) || 30_000;       // tempo para voltar depois de cair
 const REVALIDAR_MS = Number(process.env.RECREACAO_REVALIDAR_MS) || 120_000; // confere se a sessão ainda vale
@@ -93,6 +94,7 @@ const JOGOS = {
       if (e.vez !== i) throw new ErroJogo('Não é a sua vez.');
       if (!Number.isInteger(casa) || casa < 0 || casa > 8 || e.tabuleiro[casa]) throw new ErroJogo('Essa casa não está livre.');
       e.tabuleiro[casa] = e.simbolos[i];
+      (e.ordem ??= []).push(casa); // a ordem das jogadas (o menu de administrador desfaz a última)
       const linha = LINHAS.find(l => l.every(c => e.tabuleiro[c] === e.simbolos[i]));
       if (linha) { e.linha = linha; return { vencedor: i }; }
       if (e.tabuleiro.every(Boolean)) return { empate: true };
@@ -303,7 +305,7 @@ function finalizarRaposa(s, resultado, motivo) {
   Object.assign(s, { status: 'fim', vencedor: resultado.empate ? null : resultado.vencedor, empate: !!resultado.empate, motivo, terminou: Date.now() });
   const humanos = s.jogadores.filter(p => !p.saiu);
   const venceram = s.vencedor === 0;
-  db.lote(humanos.map(p => [
+  if (adm.valeRanking(s)) db.lote(humanos.map(p => [
     'INSERT INTO resultados (jogo, usuario_id, usuario_nome, posicao, jogadores, pontos, venceu) VALUES (?, ?, ?, ?, ?, ?, ?)',
     `${s.jogo}_raposa`, p.id, p.nome, venceram ? 1 : 2, humanos.length, 0, venceram ? 1 : 0,
   ])).then(async () => {
@@ -344,7 +346,7 @@ function finalizar(s, resultado, motivo) {
   s.motivo = motivo;
   s.terminou = Date.now();
   const [a, b] = s.jogadores;
-  if (!a || !b) return;
+  if (!a || !b || !adm.valeRanking(s)) return;
   db.run('INSERT INTO partidas (jogo, jogador1_id, jogador1_nome, jogador2_id, jogador2_nome, vencedor, motivo) VALUES (?, ?, ?, ?, ?, ?, ?)',
     s.jogo, a.id, a.nome, b.id, b.nome, s.empate ? null : s.vencedor + 1, motivo)
     .then(async () => {
@@ -490,7 +492,7 @@ function terminarQuiz(s) {
   const resumo = resumoDoQuiz(s, lista);
   e.resultado = resumo;
   const venceu = c => (resumo.modo === 'todos' ? c === lista[0] : resumo.vencedores.includes(c.id));
-  if (lista.length) {
+  if (lista.length && adm.valeRanking(s)) {
     db.lote(lista.map((c, posicao) => [
       'INSERT INTO quiz_resultados (usuario_id, usuario_nome, pontos, acertos, total, posicao, jogadores) VALUES (?, ?, ?, ?, ?, ?, ?)',
       c.id, c.nome, c.pontos, c.acertos, e.perguntas.length, resumo.modo === 'todos' ? posicao + 1 : venceu(c) ? 1 : 2, lista.length,
@@ -596,7 +598,8 @@ function visaoCobras(s) {
   const e = s.estado;
   return {
     ...cobras.visao(e),
-    ms: COBRAS_PASSO_MS, // a tela usa para deslizar as cobras entre um passo e outro
+    // A tela usa para deslizar as cobras entre um passo e outro (o menu de administrador pode mudar o ritmo).
+    ms: Math.round(COBRAS_PASSO_MS * ({ lenta: 1.7, rapida: 0.6 }[e.ritmo] || 1)),
     fase: e.fase,
     largada: e.fase === 'largada' ? Math.max(0, e.largada - Date.now()) : 0,
     classificacao: e.fase === 'fim' ? cobras.classificacao(e).map(c => ({ i: c.i, pontos: c.pontos, viva: c.viva })) : null,
@@ -659,7 +662,7 @@ function terminarCobras(s) {
   const v = r.vencedor;
   Object.assign(s, { status: 'fim', vencedor: v, empate: r.empate, motivo: r.empate ? 'empate' : 'vitoria', terminou: Date.now() });
   const lista = cobras.classificacao(e);
-  db.lote(lista.map((c, posicao) => [
+  if (adm.valeRanking(s)) db.lote(lista.map((c, posicao) => [
     'INSERT INTO resultados (jogo, usuario_id, usuario_nome, posicao, jogadores, pontos, venceu) VALUES (?, ?, ?, ?, ?, ?, ?)',
     'cobras', c.id, s.jogadores[c.i].nome, posicao + 1, lista.length, c.pontos, r.venceram.includes(c.i) ? 1 : 0,
   ])).then(async () => {
@@ -715,7 +718,7 @@ function terminarMesa(s) {
   e.vencedores = venceram;
   Object.assign(s, { status: 'fim', vencedor: venceram.length === 1 ? venceram[0] : null, empate: !venceram.length, motivo: e.fim, terminou: Date.now() });
   const lista = ativosIdx.map(i => s.jogadores[i]);
-  db.lote(ativosIdx.map(i => [
+  if (adm.valeRanking(s)) db.lote(ativosIdx.map(i => [
     'INSERT INTO resultados (jogo, usuario_id, usuario_nome, posicao, jogadores, pontos, venceu) VALUES (?, ?, ?, ?, ?, ?, ?)',
     `${s.jogo}_${s.opcoes.modo}`, s.jogadores[i].id, s.jogadores[i].nome, venceram.includes(i) ? 1 : 2, lista.length,
     s.jogo === 'memoria' ? e.pares[i] : s.jogo === 'minado' ? e.casas?.[i] || 0 : s.jogo === 'quebra' ? e.certas?.[i] || 0 : 0, venceram.includes(i) ? 1 : 0,
@@ -748,7 +751,9 @@ async function comecarJunto(s) {
   }
   if (!salas.has(s.id) || s.status !== 'esperando') return;
   s.jogadores = jogadores;
-  s.estado = junto.novo(s.opcoes, jogadores.length, visuais);
+  s.estado = junto.novo(s.opcoes, jogadores.length, visuais, Date.now(), jogadores.map(p => p.id));
+  // Quem é quem nos jogos rodados no servidor (as pegadinhas do menu de administrador valem desde o começo).
+  if (s.estado.sim) s.estado.sim.uids = jogadores.map(p => p.id);
   Object.assign(s, { status: 'jogando', vencedor: null, empate: false, motivo: null });
   s.revanche.clear();
   agendarJunto(s);
@@ -793,7 +798,7 @@ function terminarJunto(s) {
   const venceram = e.vencedores || [];
   Object.assign(s, { status: 'fim', vencedor: venceram.length === 1 ? venceram[0] : null, empate: !venceram.length, motivo: e.fim, terminou: Date.now() });
   const lista = indicesAtivos(s);
-  db.lote(lista.map(i => [
+  if (adm.valeRanking(s)) db.lote(lista.map(i => [
     'INSERT INTO resultados (jogo, usuario_id, usuario_nome, posicao, jogadores, pontos, venceu) VALUES (?, ?, ?, ?, ?, ?, ?)',
     `junto_${e.jogo}_${e.modo}`, s.jogadores[i].id, s.jogadores[i].nome, venceram.includes(i) ? 1 : 2, lista.length,
     e.p[i]?.pontos || 0, venceram.includes(i) ? 1 : 0,
@@ -846,7 +851,7 @@ function terminarFesta(s) {
   Object.assign(s, { status: 'fim', vencedor: venceram.length === 1 ? venceram[0] : null, empate: venceram.length !== 1, motivo: 'acabou', terminou: Date.now() });
   const ranking = festa.ranking(e);
   const humanos = s.jogadores.map((p, k) => k).filter(k => !s.jogadores[k].saiu);
-  db.lote(humanos.map(k => [
+  if (adm.valeRanking(s)) db.lote(humanos.map(k => [
     'INSERT INTO resultados (jogo, usuario_id, usuario_nome, posicao, jogadores, pontos, venceu) VALUES (?, ?, ?, ?, ?, ?, ?)',
     'festa', s.jogadores[k].id, s.jogadores[k].nome, ranking.find(r => r.k === k)?.pos || 4, e.j.length, e.j[k].douradas, venceram.includes(k) ? 1 : 0,
   ])).then(async () => {
@@ -965,7 +970,7 @@ function terminarCidade(s) {
   const venceram = new Set(e.vencedores?.indices || []);
   Object.assign(s, { status: 'fim', vencedor: null, empate: !venceram.size, motivo: e.vencedores?.time || 'fim', terminou: Date.now() });
   const lista = e.j.map((p, i) => ({ ...p, i, venceu: venceram.has(i) }));
-  db.lote(lista.map(p => [
+  if (adm.valeRanking(s)) db.lote(lista.map(p => [
     'INSERT INTO resultados (jogo, usuario_id, usuario_nome, posicao, jogadores, pontos, venceu) VALUES (?, ?, ?, ?, ?, ?, ?)',
     'cidade', p.id, p.nome, p.venceu ? 1 : 2, lista.length, p.vivo ? 1 : 0, p.venceu ? 1 : 0,
   ])).then(async () => {
@@ -1106,6 +1111,8 @@ const acoes = {
     const i = s ? indiceNa(s, u.id) : -1;
     if (!s || i < 0 || s.jogadores[i].saiu) throw new ErroJogo('Você não está nessa partida.');
     if (s.status !== 'jogando') throw new ErroJogo('A partida não está em andamento.');
+    // Pegadinha do menu de administrador: congelado não joga (velha, lig 4, damas, PPT, quiz, mesas...).
+    if (!adm.podeAgir(u.id)) throw new ErroJogo('Você está congelado! Espere alguns segundos.');
     if (ehQuiz(s)) { responder(s, i, jogada || {}); return; }
     if (s.jogo === 'cidade') { jogarCidade(s, i, jogada || {}); return; }
     if (ehMesa(s)) { jogarMesa(s, i, jogada || {}); return; }
@@ -1351,7 +1358,85 @@ const acoes = {
       avisarTransmissoes();
     }
   },
+
+  /* ─── Menu de administrador nos jogos (src/adm-jogos.js) ─── */
+
+  // Pegadinha em um ou mais jogadores (ids) ou em todos os de uma sala ({ sala: id }).
+  'adm:efeito'(u, { alvos, sala, efeito, segundos }) {
+    exigirAdm(u);
+    const def = adm.EFEITOS[efeito];
+    if (!def) throw new ErroJogo('Pegadinha desconhecida.');
+    const s = sala ? salas.get(sala) : null;
+    const ids = new Set(s ? ativos(s).map(p => p.id) : (Array.isArray(alvos) ? alvos : [alvos]).map(Number).filter(Boolean));
+    const lista = [...ids].filter(id => conexoes.has(id));
+    if (!lista.length) throw new ErroJogo('Ninguém online para receber essa pegadinha.');
+    for (const id of lista) {
+      const ate = adm.aplicar(id, efeito, segundos);
+      paraUsuario(id, 'adm:efeito', { efeito, classe: def.tipo, ate, segundos: Math.round((ate - Date.now()) / 1000) });
+      // Quem está numa partida com alguém atrapalhado: a partida deixa de valer para o ranking.
+      if (def.tipo === 'atrapalhar') { const minha = salaAtivaDe(id); if (minha) marcarAdm(minha); }
+    }
+    paraUsuario(u.id, 'adm:feito', { texto: `${def.nome}: ${lista.length === 1 ? pessoas.get(lista[0])?.nome || 'jogador' : `${lista.length} jogadores`}.` });
+  },
+
+  // As ações do menu para uma sala (dependem do jogo e de como a partida está).
+  'adm:listar'(u, { id }, ws) {
+    exigirAdm(u);
+    const s = salas.get(id);
+    if (!s) throw new ErroJogo('Essa partida não existe mais.');
+    enviar(ws, 'adm:acoes', {
+      id, jogo: adm.chaveDaSala(s), acoes: adm.acoesDaSala(s),
+      jogadores: s.jogadores.map((p, i) => ({ i, id: p.id, nome: p.nome, saiu: !!p.saiu })),
+      vale: adm.valeRanking(s),
+    });
+  },
+
+  async 'adm:jogo'(u, { id, acao, dados }, ws) {
+    exigirAdm(u);
+    const s = salas.get(id);
+    if (!s || s.status !== 'jogando') throw new ErroJogo('A partida não está em andamento.');
+    const g = adm.grupoDa(s);
+    if (!g || !adm.acoesDaSala(s).some(a => a.id === acao)) throw new ErroJogo('Essa ação não existe para este jogo agora.');
+    marcarAdm(s);
+    let texto;
+    try {
+      texto = await g.executar(s, acao, dados && typeof dados === 'object' ? dados : {}, { ...ctxAdm(), admin: u });
+    } catch (e) {
+      throw e instanceof adm.ErroAdm ? new ErroJogo(e.message) : e;
+    }
+    if (salas.has(s.id)) enviarSala(s);
+    enviar(ws, 'adm:feito', { texto: texto || 'Feito.' });
+    acoes['adm:listar'](u, { id }, ws);
+  },
 };
+
+function exigirAdm(u) {
+  if (!u.permissoes.has(adm.PERMISSAO)) throw new ErroJogo('Só o administrador usa esse menu.');
+}
+
+// A partida passa a não valer para o ranking; quem joga fica sabendo (uma vez).
+function marcarAdm(s) {
+  if (!s.estado || s.estado.adm) return;
+  adm.marcar(s.estado);
+  for (const id of new Set([...s.jogadores.map(p => p.id), ...s.espectadores])) {
+    paraUsuario(id, 'adm:aviso', { sala: s.id, texto: 'O administrador usou o menu nesta partida: ela não vale para o ranking.' });
+  }
+}
+
+// O que os arquivos de src/adm/ podem usar para mexer nas partidas.
+function ctxAdm() {
+  return {
+    salas, ErroJogo, ErroAdm: adm.ErroAdm, adm,
+    enviar, enviarSala, paraUsuario, paraTodos, avisarLobby, ativos, indiceNa, indicesAtivos, quemVeJunto,
+    finalizar, finalizarRaposa, agendarRaposa,
+    abrirPergunta, revelar, conferirRespostas, terminarQuiz,
+    enviarQuadroCobras, terminarCobras, agendarPasso,
+    terminarMesa,
+    enviarQuadroJunto, terminarJunto, agendarJunto,
+    terminarFesta,
+    enviarMundo, mundoDe, agendarCidade, passoCidade, terminarCidade,
+  };
+}
 
 /* ─── Bobo da Corte ───────────────────────────────── */
 
@@ -1479,6 +1564,8 @@ function iniciarRecreacao(servidor) {
   // O Club Coelho usa a mesma conexão (as ações 'clube:*' ficam em src/clube.js).
   clube.iniciar({ paraUsuario, ehCrianca, limpar: paraCriancas });
   Object.assign(acoes, clube.acoes);
+  // Menu de administrador: as ações de cada grupo de jogos (src/adm/*.js).
+  adm.carregar();
   // Os coelhos de cada vila do Lyendell Dorme: 10 vezes por segundo, só quando alguém andou.
   setInterval(() => {
     for (const s of salas.values()) if (s.jogo === 'cidade' && s.mundo?.sujo) enviarMundo(s);

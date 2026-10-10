@@ -10,6 +10,7 @@ import { juntoNoJogo, CORES_JUNTO } from '../junto.js';
 import { abrirJunto } from './junto.js';
 import { desenharCoelho, elipse, sombrear, sorte } from '../desenho-coelho.js';
 import { registrarPecas, desenharSprite, aoMudarSprites, nomeDe as nomeDaPeca, nomeTrocado, usarNomeDaPeca } from '../sprites.js';
+import { admDirecao, admVelocidade } from '../adm-jogos.js';
 
 /* ─── As mesmas regras do servidor (src/junto-batalha.js) ─── */
 
@@ -797,8 +798,10 @@ function telaJogo(jt) {
       ajustarTamanho();
       if (pred.ativo && mapa && ultimo?.eu?.es === VIVO && !acabou) {
         lerControles();
-        const vel = VEL * (terreno(mapa, pred.x, pred.y) === RIO ? 0.55 : 1) * (ultimo.eu.cu > 0 ? 0.7 : 1);
-        andar(mapa, pred, cmd.mx, cmd.my, vel, dt);
+        const vel = VEL * (terreno(mapa, pred.x, pred.y) === RIO ? 0.55 : 1) * (ultimo.eu.cu > 0 ? 0.7 : 1) * admVelocidade();
+        // Pegadinhas do administrador (o servidor faz a mesma conta): congelado fica parado, invertido anda ao contrário.
+        const d = admDirecao({ x: cmd.mx, y: cmd.my });
+        if (d) andar(mapa, pred, d.x, d.y, vel, dt);
       }
       desenhar(agora);
       if (agora - ultimoHud > 100) { ultimoHud = agora; atualizarHud(agora); desenharMini(); }
@@ -1325,6 +1328,7 @@ function telaJogo(jt) {
       h('h2', null, venceu ? 'Toca Suprema!' : coop && venc.length === 0 && q.fim?.motivo ? 'A equipe caiu' : 'Fim da batalha'),
       h('p', { class: 'bt-fim-sub' }, venceu
         ? (coopVenceu ? 'A equipe foi a última de pé. Os Raposos voltaram para a toca!' : 'Você foi o último de pé. A ilha é sua!')
+        : q.fim?.motivo === 'adm' ? 'O administrador terminou a partida.'
         : q.fim?.motivo === 'eliminados' ? 'Todas as pessoas ficaram fora. Os Raposos venceram desta vez.'
           : q.fim?.motivo === 'tempo' ? 'O tempo acabou.' : 'Não foi desta vez.'),
       h('div', { class: 'bt-fim-numeros' },

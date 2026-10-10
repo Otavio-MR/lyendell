@@ -1,8 +1,9 @@
 // Mesas compartilhadas na tela: Campo Minado, Quebra-cabeça e Memória, cada um com versus e co-op.
 // O tabuleiro fica no servidor (src/mesa.js); aqui só se desenha e se manda o clique de cada um.
 
-import { h, trocar, icone, botao, cabecalho, avatar, get, pode, confirmar } from '../core.js';
+import { h, trocar, icone, botao, cabecalho, avatar, get, pode, confirmar, aviso } from '../core.js';
 import { enviar, entrarNaPartida, rt } from '../tempo-real.js';
+import { admPodeAgir } from '../adm-jogos.js';
 import { pintarCasa, DIFICULDADES } from './jogos-sozinho.js';
 import { cartaMemoria, FIGURAS, estiloPeca, recortarQuadrado } from './recreacao.js';
 
@@ -27,6 +28,11 @@ const SUB = {
   memoria: s => MODOS_MEMORIA[s.opcoes?.modo || 'versus'].texto,
 };
 const versus = s => s.opcoes?.modo === 'versus';
+// Uma jogada na mesa (congelado por uma pegadinha do administrador, não joga).
+function jogarNaMesa(id, jogada) {
+  if (!admPodeAgir()) { aviso('Você está congelado! Espere passar.', 'erro'); return; }
+  enviar('sala:jogar', { id, jogada });
+}
 const ICONE = { minado: 'minado', quebra: 'peca', memoria: 'cartas' };
 
 // A imagem recortada do quebra-cabeça fica guardada (recortar é demorado).
@@ -120,7 +126,7 @@ function campoMinado(s, e) {
   const grade = h('div', { class: `minado-grade ${s.status === 'fim' ? 'terminou' : ''} ${vs ? 'versus' : ''}`.trim(), style: { '--col': d.col, '--lin': d.lin } });
   let segurar = null;
   let segurou = false;
-  const jogar = (casa, tipo) => podeJogar && enviar('sala:jogar', { id: s.id, jogada: { tipo, casa } });
+  const jogar = (casa, tipo) => podeJogar && jogarNaMesa(s.id, { tipo, casa });
   [...e.v].forEach((c, i) => {
     const el = h(podeJogar ? 'button' : 'div', { type: podeJogar ? 'button' : null, 'data-i': i, class: 'minado-casa fechada' });
     pintarCasa(el, c);
@@ -173,7 +179,7 @@ function quebraCabeca(s, e, redesenhar) {
         style: { ...estiloPeca(url, e.n, p), '--quem': CORES[(e.ultimo?.i ?? 0) % CORES.length], '--dono': presa(i) && e.deQuem[i] >= 0 ? CORES[e.deQuem[i] % CORES.length] : null },
         onclick: podeJogar && !presa(i) ? () => {
           if (escolhida == null) { escolhida = i; redesenhar(); return; }
-          if (escolhida !== i) enviar('sala:jogar', { id: s.id, jogada: { tipo: 'trocar', a: escolhida, b: i } });
+          if (escolhida !== i) jogarNaMesa(s.id, { tipo: 'trocar', a: escolhida, b: i });
           escolhida = null;
           redesenhar();
         } : null,
@@ -191,7 +197,7 @@ function memoria(s, e) {
   const [lin, col] = { '4x4': [4, 4], '4x6': [4, 6], '6x6': [6, 6] }[e.t];
   const minhaVez = s.eu >= 0 && s.status === 'jogando' && e.vez === s.eu && e.abertas.length < 2;
   const grade = h('div', { class: 'mem-grade' }, e.v.map((f, i) => {
-    const carta = cartaMemoria(f >= 0 ? FIGURAS[f] : null, minhaVez && f < 0 ? () => enviar('sala:jogar', { id: s.id, jogada: { casa: i } }) : null);
+    const carta = cartaMemoria(f >= 0 ? FIGURAS[f] : null, minhaVez && f < 0 ? () => jogarNaMesa(s.id, { casa: i }) : null);
     if (f >= 0 && e.quem[i] < 0) carta.classList.add('virada');
     if (e.quem[i] >= 0) { carta.classList.add('achada'); carta.style.setProperty('--quem', CORES[e.quem[i] % CORES.length]); }
     if (!minhaVez && carta.tagName === 'BUTTON') carta.disabled = true;
@@ -224,7 +230,14 @@ function lateral(s, e) {
 function fim(s, e, { jogador, souDono }) {
   let titulo;
   let venci = false;
-  if (versus(s) && s.jogo !== 'memoria') {
+  if (e.fim === 'adm') {
+    // O administrador terminou a partida (e talvez escolheu quem vence).
+    const v = e.vencedores || [];
+    venci = v.includes(s.eu);
+    titulo = !versus(s) ? (v.length ? 'O administrador deu a vitória para a equipe!' : 'O administrador encerrou a partida.')
+      : v.length === 1 ? (venci ? 'O administrador encerrou: você venceu!' : `O administrador encerrou: ${s.jogadores[v[0]].nome} venceu!`)
+        : 'O administrador encerrou a partida. Empate!';
+  } else if (versus(s) && s.jogo !== 'memoria') {
     const v = e.vencedores || [];
     venci = v.includes(s.eu);
     const oque = s.jogo === 'minado' ? 'abriu mais casas' : 'pôs mais peças';

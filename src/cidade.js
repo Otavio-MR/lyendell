@@ -4,6 +4,8 @@
 // os Raposos vencem se ficarem em número igual ou maior que o resto.
 // Aqui só ficam as regras (sem rede): src/recreacao.js cuida das salas, dos tempos e de mandar a visão de cada um.
 
+const adm = require('./adm-jogos');
+
 class ErroCidade extends Error {}
 
 const ESCALA = Number(process.env.CIDADE_ESCALA) || 1; // os testes rodam o jogo bem mais rápido
@@ -204,6 +206,8 @@ function todosProntos(e) {
 // jogada = { tipo, alvo } (alvo null = não fazer nada), { tipo: 'flechar', alvos: [a, b] },
 // { tipo: 'colete', vestir }, { tipo: 'pocoes', vida, veneno, pronto }.
 function agir(e, i, jogada = {}) {
+  // Pegadinha do menu de administrador: congelado não usa poder nem vota até o gelo derreter.
+  if (!adm.podeAgir(e.j[i]?.id)) throw new ErroCidade('Você está congelado! Espere o gelo derreter.');
   const a = acoesDe(e, i).find(x => x.tipo === jogada.tipo);
   if (!a) throw new ErroCidade(e.fase === 'noite' || e.fase === 'dia' ? 'Você não pode fazer isso agora.' : 'Espere a sua vez.');
   const alvoValido = (alvo, { nulo = true } = {}) => {
@@ -246,12 +250,17 @@ const CAUSAS = {
   agua: 'era Raposo e caiu com a água benta', sacerdote: 'jogou água benta em quem não era Raposo e pagou com a vida',
   guarda: 'morreu protegendo alguém', tristeza: 'morreu de tristeza', cacador: 'levou um tiro do Caçador',
   execucao: 'foi executado pela cidade', saiu: 'foi embora da cidade',
+  adm: 'foi atingido por um raio do administrador',
 };
+
+// Protegido pelo menu de administrador nesta noite (nada de noite o mata).
+const blindado = (e, i) => !!e.noite?.blindados?.has(i);
 
 // Mata e leva junto quem estiver apaixonado; Caçador que morre fica na fila para atirar.
 function matar(e, i, causa, mortes) {
   const p = e.j[i];
   if (!p.vivo) return;
+  if (causa !== 'saiu' && causa !== 'adm' && blindado(e, i)) { nota(e, i, 'Uma proteção misteriosa te salvou esta noite!'); return; }
   p.vivo = false;
   p.causa = causa;
   p.morreuDia = e.dia;
@@ -305,6 +314,7 @@ function resolverNoite(e) {
   const atacar = (alvo, causa) => {
     const p = e.j[alvo];
     if (!p.vivo) return;
+    if (blindado(e, alvo)) { nota(e, alvo, 'Você foi atacado, mas uma proteção misteriosa te salvou!'); return; }
     if (protegidos.has(alvo)) { salvos.push({ alvo, por: 'curandeira' }); return; }
     const guarda = guardas.get(alvo);
     if (guarda != null && e.j[guarda].vivo) { matar(e, guarda, 'guarda', mortes); nota(e, guarda, `Você protegeu ${p.nome} e não sobreviveu.`); return; }
@@ -527,6 +537,8 @@ function podeLer(e, i, canal) {
 }
 
 function falar(e, i, canal, texto) {
+  const mudo = (e.mudos?.[i] || 0) - Date.now();
+  if (mudo > 0) throw new ErroCidade(`O administrador te silenciou: espere ${Math.ceil(mudo / 1000)} s para falar.`);
   if (!podeFalar(e, i, canal)) {
     throw new ErroCidade(canal === 'dia' && e.fase === 'noite' ? 'A cidade está dormindo. Espere amanhecer.' : 'Você não pode falar aqui agora.');
   }
@@ -585,7 +597,147 @@ function visao(e, i, agora = Date.now()) {
 // Quem recebe uma mensagem do chat (índices dos jogadores; -1 = quem assiste).
 const leitores = (e, canal) => [-1, ...e.j.map((p, i) => i)].filter(i => podeLer(e, i, canal));
 
+/* ─── Menu de administrador (src/adm/cidade.js) ───── */
+// Mexem direto no estado; quem chama cuida do relógio das fases e de mandar a sala de novo.
+
+const nomePapel = papel => `${artigo(papel)} ${PAPEIS[papel].nome}`;
+const NOMES_TIMES = { coelhos: 'Coelhos', raposos: 'Raposos', neutro: 'Neutros' };
+
+function conferirAlvo(e, i, { vivo = null } = {}) {
+  if (!Number.isInteger(i) || !e.j[i]) throw new ErroCidade('Escolha um jogador da partida.');
+  if (vivo === true && !e.j[i].vivo) throw new ErroCidade(`${e.j[i].nome} já está morto.`);
+  if (vivo === false && e.j[i].vivo) throw new ErroCidade(`${e.j[i].nome} está vivo.`);
+  return e.j[i];
+}
+const vezDoCacador = (e, i) => e.fase === 'cacador' && e.cacadores[0] === i;
+
+// Mais tempo na fase de agora (ms).
+function admMaisTempo(e, extra, agora = Date.now()) {
+  if (e.fase === 'fim') throw new ErroCidade('A partida já acabou.');
+  e.prazo = Math.max(e.prazo, agora) + extra;
+  e.duracao = Math.max(e.duracao, e.prazo - agora);
+}
+
+// Termina agora com a vitória de um time (coelhos, raposos, neutro) ou de ninguém.
+function admVencer(e, time) {
+  if (e.fase === 'fim') throw new ErroCidade('A partida já acabou.');
+  if (![...Object.keys(NOMES_TIMES), 'ninguem'].includes(time)) throw new ErroCidade('Escolha o time que vence.');
+  const indices = time === 'ninguem' ? [] : e.j.map((p, i) => i).filter(i => PAPEIS[e.j[i].papel].time === time);
+  if (time !== 'ninguem' && !indices.length) throw new ErroCidade(`Ninguém nesta partida é do time dos ${NOMES_TIMES[time]}.`);
+  const texto = time === 'ninguem' ? 'O administrador encerrou a partida: ninguém venceu.'
+    : time === 'neutro' ? `Os neutros venceram (${indices.map(i => nomeDe(e, i)).join(', ')}), por decisão do administrador!`
+      : `Os ${NOMES_TIMES[time]} venceram, por decisão do administrador!`;
+  e.vencedores = { time, texto, indices };
+  e.fase = 'fim';
+  e.prazo = 0;
+  e.cacadores = [];
+  registrar(e, texto, 'fim');
+}
+
+// Volta à vida (o Caçador que está escolhendo em quem atirar não pode voltar no meio da escolha).
+function admReviver(e, i) {
+  const p = conferirAlvo(e, i, { vivo: false });
+  if (e.fase === 'fim') throw new ErroCidade('A partida já acabou.');
+  if (p.causa === 'saiu') throw new ErroCidade(`${p.nome} saiu da sala: não dá para voltar.`);
+  if (vezDoCacador(e, i)) throw new ErroCidade('Espere o Caçador atirar.');
+  Object.assign(p, { vivo: true, causa: null, morreuDia: null });
+  e.cacadores = e.cacadores.filter(k => k !== i);
+  nota(e, i, 'O administrador te trouxe de volta à vida!');
+  registrar(e, `Um milagre em Lyendell: ${p.nome} voltou à vida!`, 'bom');
+}
+
+// Ninguém mata essa pessoa nesta noite (ataques, veneno, água benta, tristeza).
+function admProteger(e, i) {
+  const p = conferirAlvo(e, i, { vivo: true });
+  if (e.fase !== 'noite' || !e.noite) throw new ErroCidade('Só dá para proteger alguém de noite.');
+  e.noite.blindados ??= new Set();
+  e.noite.blindados.add(i);
+  return p;
+}
+
+// Mata na hora. Caçador morto atira na próxima virada de fase. Devolve true se a partida acabou.
+function admMatar(e, i) {
+  const p = conferirAlvo(e, i, { vivo: true });
+  if (e.fase === 'fim') throw new ErroCidade('A partida já acabou.');
+  const mortes = [];
+  matar(e, i, 'adm', mortes);
+  for (const m of mortes) registrar(e, textoMorte(e, m), 'morte');
+  // Quem morreu agora some das escolhas (não dá para votar nem atacar um morto).
+  for (const k of mortes) {
+    if (e.noite) {
+      delete e.noite.ataques[k];
+      e.noite.prontos.delete(k);
+      for (const [x, alvo] of Object.entries(e.noite.ataques)) if (alvo === k) delete e.noite.ataques[x];
+      for (const [x, esc] of Object.entries(e.noite.escolhas)) if (esc?.alvo === k) delete e.noite.escolhas[x];
+      if (e.noite.veneno === k) e.noite.veneno = null;
+    }
+    delete e.votos[k];
+    for (const [x, alvo] of Object.entries(e.votos)) if (alvo === k) delete e.votos[x];
+    if (e.tiro === k) e.tiro = undefined;
+  }
+  if (e.cacadores.length) return false; // o Caçador atira antes de conferir o fim
+  const fim = conferirFim(e);
+  if (!fim) return false;
+  e.vencedores = fim;
+  e.fase = 'fim';
+  e.prazo = 0;
+  registrar(e, fim.texto, 'fim');
+  void p;
+  return true;
+}
+
+// Troca a classe de alguém vivo (o que ele já tinha escolhido nesta noite é desfeito).
+function admTrocarPapel(e, i, papel) {
+  const p = conferirAlvo(e, i, { vivo: true });
+  if (!PAPEIS[papel]) throw new ErroCidade('Escolha uma classe.');
+  if (e.fase === 'fim') throw new ErroCidade('A partida já acabou.');
+  if (p.papel === papel) throw new ErroCidade(`${p.nome} já é ${nomePapel(papel)}.`);
+  if (vezDoCacador(e, i)) throw new ErroCidade('Espere o Caçador atirar.');
+  const antigo = p.papel;
+  p.papel = papel;
+  p.vidas = papel === 'anciao' ? 2 : 1;
+  p.coletes = papel === 'andarilho' ? 2 : 0;
+  if (e.noite) {
+    delete e.noite.ataques[i];
+    delete e.noite.escolhas[i];
+    delete e.noite.coletes[i];
+    e.noite.prontos.delete(i);
+  }
+  nota(e, i, `O administrador trocou a sua classe: agora você é ${nomePapel(papel)}.`);
+  if (ASSASSINOS.has(papel)) {
+    const outros = e.j.filter((x, k) => k !== i && x.vivo && ASSASSINOS.has(x.papel));
+    nota(e, i, outros.length ? `Os outros Raposos: ${outros.map(x => x.nome).join(', ')}.` : 'Você é o único Raposo. Cuidado!');
+    for (const [k, x] of e.j.entries()) if (k !== i && x.vivo && (ASSASSINOS.has(x.papel) || x.papel === 'traidor')) nota(e, k, `${p.nome} agora é Raposo.`);
+  }
+  if (papel === 'traidor') nota(e, i, `Os Raposos são: ${e.j.filter(x => x.vivo && ASSASSINOS.has(x.papel)).map(x => x.nome).join(', ') || 'ninguém (todos morreram)'}.`);
+  return antigo;
+}
+
+// Não fala no chat do jogo por alguns segundos.
+function admSilenciar(e, i, segundos, agora = Date.now()) {
+  const p = conferirAlvo(e, i);
+  e.mudos ??= {};
+  e.mudos[i] = agora + segundos * 1000;
+  return p;
+}
+
+// Um aviso no diário da partida (todo mundo lê).
+function admAnunciar(e, texto) {
+  const t = String(texto || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+  if (!t) throw new ErroCidade('Escreva o aviso.');
+  registrar(e, `Aviso do administrador: ${t}`, 'info');
+  return t;
+}
+
+// A classe de cada um (para o administrador, e só para ele).
+function admPapel(e, i) {
+  const p = conferirAlvo(e, i);
+  const time = { coelhos: 'time dos Coelhos', raposos: 'time dos Raposos', neutro: 'neutro' }[PAPEIS[p.papel].time];
+  return `${p.nome} é ${nomePapel(p.papel)} (${time})${p.vivo ? '' : ', já morto'}${e.amantes?.includes(i) ? ', apaixonado' : ''}.`;
+}
+
 module.exports = {
   PAPEIS, ASSASSINOS, OPCIONAIS, MIN, MAX, TEMPOS_DIA, ErroCidade,
   validarOpcoes, distribuir, novo, acoesDe, agir, todosProntos, encurtar, avancar, sair, falar, podeFalar, leitores, visao, conferirFim, alvoDosRaposos,
+  admMaisTempo, admVencer, admReviver, admProteger, admMatar, admTrocarPapel, admSilenciar, admAnunciar, admPapel,
 };

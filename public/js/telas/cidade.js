@@ -4,9 +4,10 @@
 // No meio fica a vila dos coelhos (telas/cidade-mundo.js): cada um anda com o seu coelho e usa o
 // poder clicando na toca (de noite) ou no coelho (de dia) de alguém.
 
-import { h, trocar, icone, botao, cabecalho, avatar, confirmar } from '../core.js';
+import { h, trocar, icone, botao, cabecalho, avatar, confirmar, aviso } from '../core.js';
 import { enviar, entrarNaPartida, rt } from '../tempo-real.js';
 import { criarMundo, previaDoCoelho, corDoJogador, PELOS, NOMES_PELO, ACESSORIOS, EMOTES } from './cidade-mundo.js';
+import { admPodeAgir } from '../adm-jogos.js';
 
 // Nomes, times e textos das classes (os mesmos de src/cidade.js).
 export const PAPEIS = {
@@ -50,7 +51,7 @@ const FASES = {
 const CAUSAS = {
   raposos: 'pego pelos Raposos', gatuno: 'pego pelo Gatuno', veneno: 'envenenado', agua: 'caiu com a água benta',
   sacerdote: 'errou a água benta', guarda: 'morreu protegendo alguém', tristeza: 'morreu de tristeza', cacador: 'tiro do Caçador',
-  execucao: 'executado pela cidade', saiu: 'foi embora',
+  execucao: 'executado pela cidade', saiu: 'foi embora', adm: 'raio do administrador',
 };
 const ICONE_DIARIO = { morte: 'caveira', sol: 'sol', lua: 'lua', bom: 'check', fim: 'trofeu' };
 // O que aparece no menu ao clicar na toca ou no coelho de alguém.
@@ -168,7 +169,11 @@ export function criarTelaCidade(id, { sair, sairJa }) {
   }
   const relogioId = setInterval(tique, 250);
 
-  const jogar = jogada => enviar('sala:jogar', { id, jogada });
+  // Congelado (pegadinha do menu de administrador): nada de poder nem voto até passar (o servidor também confere).
+  const jogar = jogada => {
+    if (!admPodeAgir()) { aviso('Você está congelado! Espere o gelo derreter.', 'erro'); return; }
+    enviar('sala:jogar', { id, jogada });
+  };
 
   /* A vila: clicar no chão anda; clicar numa toca ou num coelho abre o menu do que dá para fazer. */
   function opcoesPara(k) {
@@ -475,7 +480,7 @@ export function criarTelaCidade(id, { sair, sairJa }) {
     const v = e.vencedores;
     const venceu = s.eu >= 0 && v?.indices.includes(s.eu);
     return h('section', { class: `painel cid-fim ${venceu ? 'venci' : ''}`.trim() },
-      h('span', { class: 'cid-fim-icone' }, icone(v?.time === 'raposos' ? 'raposa' : v?.time === 'gatuno' ? 'gato' : v?.time === 'amantes' ? 'coracao' : 'coelho')),
+      h('span', { class: 'cid-fim-icone' }, icone(v?.time === 'raposos' ? 'raposa' : v?.time === 'gatuno' ? 'gato' : v?.time === 'amantes' ? 'coracao' : v?.time === 'neutro' ? 'mascara' : 'coelho')),
       h('h2', null, v?.texto || 'Fim de jogo.'),
       s.eu >= 0 && h('p', { class: 'cid-fim-voce' }, venceu ? 'Você venceu!' : 'Não foi desta vez.'),
       v?.indices.length > 0 && h('p', { class: 'suave' }, `Vencedores: ${v.indices.map(k => s.jogadores[k].nome).join(', ')}`),

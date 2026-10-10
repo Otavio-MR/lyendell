@@ -4,7 +4,8 @@
 import { h, trocar, icone, botao, cabecalho, aviso, get, post, pode, aoSair, estado, num } from '../core.js';
 import { rt, ouvir, transmitir, enviarQuadro, pararTransmissao } from '../tempo-real.js';
 import { juntoNoJogo } from '../junto.js';
-import { segredosDoJogo } from '../segredos.js';
+import { segredosDoJogo, SEGREDOS } from '../segredos.js';
+import { menuAdm, admDirecao, admPodeAgir, admVelocidade } from '../adm-jogos.js';
 import { desenharParte } from '../roupas-coelho.js';
 import { sombrear } from '../desenho-coelho.js';
 import { registrarPecas, desenharSprite, temSprite, aoMudarSprites, nomeDe } from '../sprites.js';
@@ -768,6 +769,13 @@ export function pacCoelho() {
     },
   });
 
+  // Menu de administrador. Usou, a partida não vale recorde (até "Jogar de novo").
+  let admUsado = false;
+  let invencivel = false;
+  let raposasParadas = false;
+  let ritmo = 1; // a velocidade do jogo escolhida no menu
+  const menu = menuAdm({ titulo: 'Pac-Coelho', get acoes() { return acoesAdm(); }, aoUsar: () => { admUsado = true; } });
+
   /* ─── Andamento do jogo ─── */
 
   function novoJogo() {
@@ -776,6 +784,11 @@ export function pacCoelho() {
     konamiUsado = false;
     buuuNoNivel = 0;
     seg.novaPartida();
+    admUsado = false;
+    invencivel = false;
+    raposasParadas = false;
+    ritmo = 1;
+    menu.novaPartida();
     nivel = 1;
     vidaExtra = false;
     novoNivel();
@@ -852,7 +865,8 @@ export function pacCoelho() {
   const casaDoPac = () => { const [x, y] = posicao(pac); return [colunaCerta(Math.round(x)), Math.round(y)]; };
 
   function moverPac(dt) {
-    let passo = VEL * vel.pac * dt;
+    if (!admPodeAgir()) return; // pegadinha "congelar": o coelho fica parado
+    let passo = VEL * vel.pac * admVelocidade() * dt; // "lento": anda na metade
     for (let n = 0; passo > 1e-9 && n < 10; n++) {
       // Meia-volta pode a qualquer momento.
       if (querDir && contraria(querDir, pac.dir) && pac.p > 0) {
@@ -989,7 +1003,7 @@ export function pacCoelho() {
         // Comida na porta da toca (ainda saindo), ela volta direto para dentro.
         Object.assign(r, { modo: r.modo === 'saindo' ? 'entrando' : 'olhos', assustada: false });
         congelado = 0.5;
-      } else {
+      } else if (!invencivel) {
         situacao = 'morrendo';
         relogio = 1.8;
         return;
@@ -1035,13 +1049,14 @@ export function pacCoelho() {
     if (situacao !== 'jogando') return;
     colisoes();
     if (situacao !== 'jogando') return;
-    for (const r of raposas) moverRaposa(r, dt);
+    if (!raposasParadas) for (const r of raposas) moverRaposa(r, dt);
     colisoes();
   }
 
   async function fimDeJogo() {
     situacao = 'fim';
     mostrarSobre();
+    if (admUsado || menu.usado()) { mostrarSobre('Partida com o menu de administrador: não vale recorde.'); return; }
     if (!pontos) return;
     if (!seg.valeRecorde()) { mostrarSobre('Modo secreto: esta partida não vale recorde.'); return; }
     try {
@@ -1080,7 +1095,7 @@ export function pacCoelho() {
     const dt = Math.min(0.05, ultimo ? (agora - ultimo) / 1000 : 0);
     ultimo = agora;
     try {
-      atualizar(dt);
+      atualizar(dt * ritmo);
       const e = foto();
       desenho.desenhar(e, t);
       transmitirQuadro(e);
@@ -1137,8 +1152,104 @@ export function pacCoelho() {
   }
 
   function virar(d) {
-    querDir = d;
+    // Pegadinhas do administrador: congelado não vira; invertido vai para o lado contrário.
+    const nome = admDirecao(nomeDir(d));
+    if (!nome) return;
+    querDir = DIR_DO_NOME[nome] || d;
     if (situacao === 'inicio' || situacao === 'pausado') comecar();
+  }
+
+  /* ─── Menu de administrador ─── */
+
+  // Marca a partida antes de mexer (assim o fim de jogo já sabe que ela não vale recorde).
+  const usar = fn => valores => {
+    if (situacao === 'fim') throw new Error('A partida acabou: comece outra para usar isso.');
+    menu.marcar();
+    return fn(valores);
+  };
+  const ligarDesligar = [{ id: 'ligar', nome: 'Ligar', tipo: 'escolha', opcoes: [['sim', 'Ligar'], ['nao', 'Desligar']] }];
+  const quantos = (n, max) => Math.max(1, Math.min(max, Math.floor(Number(n)) || 1));
+  function irNivel(n) {
+    nivel = n;
+    novoNivel();
+    atualizarHud();
+    mostrarSobre();
+  }
+  function acoesAdm() {
+    return [
+      {
+        id: 'invencivel', nome: 'Invencível', grupo: 'Ajudar', ajuda: 'As raposas passam pelo coelho sem pegar.', campos: ligarDesligar,
+        executar: usar(v => { invencivel = v.ligar !== 'nao'; return invencivel ? 'Coelho invencível: as raposas não pegam.' : 'Invencível desligado.'; }),
+      },
+      {
+        id: 'vidas', nome: 'Dar vidas', grupo: 'Ajudar', campos: [{ id: 'n', nome: 'Quantas', tipo: 'numero', min: 1, max: 50, padrao: 3 }],
+        executar: usar(v => {
+          const n = quantos(v.n, 50);
+          vidas += n;
+          popups.push({ x: 13.5, y: 20, texto: `+${n} ${n === 1 ? 'vida' : 'vidas'}!`, ate: 2 });
+          atualizarHud();
+          return `+${n} ${n === 1 ? 'vida' : 'vidas'} (agora ${vidas}).`;
+        }),
+      },
+      {
+        id: 'pontos', nome: 'Dar pontos', grupo: 'Ajudar', campos: [{ id: 'n', nome: 'Quantos', tipo: 'numero', min: 1, max: 1000000, padrao: 1000 }],
+        executar: usar(v => { const n = quantos(v.n, 1000000); somar(n); return `+${num(n)} pontos.`; }),
+      },
+      {
+        id: 'susto', nome: 'Susto nas raposas', grupo: 'Ajudar', ajuda: 'Como o Lírio grande: as raposas ficam com medo e dá para pegá-las.',
+        executar: usar(() => {
+          assustar();
+          popups.push({ x: 13.5, y: 14, texto: 'Buuu!', ate: 1.6 });
+          return `As raposas ficaram com medo por ${tempoDeSusto(nivel)} segundos.`;
+        }),
+      },
+      {
+        id: 'cenoura', nome: 'Cenoura agora', grupo: 'Ajudar', ajuda: 'A cenoura de bônus aparece embaixo da toca.',
+        executar: usar(() => { cenoura = { ate: 9.5 }; return 'A cenoura apareceu embaixo da toca.'; }),
+      },
+      {
+        id: 'toca', nome: 'Raposas para a toca', grupo: 'Mexer na partida', ajuda: 'Todas as raposas soltas voltam para a toca.',
+        executar: usar(() => {
+          let n = 0;
+          for (const r of raposas) if (r.modo === 'normal') { Object.assign(r, { modo: 'olhos', assustada: false }); n++; }
+          return n ? `${n} ${n === 1 ? 'raposa voltou' : 'raposas voltaram'} para a toca.` : 'Nenhuma raposa estava solta.';
+        }),
+      },
+      {
+        id: 'paradas', nome: 'Raposas paradas', grupo: 'Mexer na partida', ajuda: 'As raposas ficam congeladas até desligar.', campos: ligarDesligar,
+        executar: usar(v => { raposasParadas = v.ligar !== 'nao'; return raposasParadas ? 'As raposas estão paradas.' : 'As raposas voltaram a andar.'; }),
+      },
+      {
+        id: 'proxima', nome: 'Passar de nível', grupo: 'Mexer na partida',
+        executar: usar(() => { irNivel(nivel + 1); return `Começando o nível ${nivel}.`; }),
+      },
+      {
+        id: 'nivel', nome: 'Escolher o nível', grupo: 'Mexer na partida', ajuda: 'Os níveis mais altos têm raposas mais rápidas e sustos mais curtos.',
+        campos: [{ id: 'n', nome: 'Nível', tipo: 'escolha', opcoes: Array.from({ length: 12 }, (_, i) => [i + 1, `Nível ${i + 1}`]) }],
+        executar: usar(v => { irNivel(quantos(v.n, 99)); return `Começando o nível ${nivel}.`; }),
+      },
+      {
+        id: 'velocidade', nome: 'Velocidade do jogo', grupo: 'Mexer na partida', ajuda: 'Vale até o fim desta partida.',
+        campos: [{ id: 'ritmo', nome: 'Velocidade', tipo: 'escolha', opcoes: [['0.5', 'Lenta'], ['1', 'Normal'], ['1.5', 'Rápida']], padrao: '1' }],
+        executar: usar(v => {
+          ritmo = Number(v.ritmo) || 1;
+          return `Velocidade do jogo: ${ritmo < 1 ? 'lenta' : ritmo > 1 ? 'rápida' : 'normal'}.`;
+        }),
+      },
+      {
+        id: 'terminar', nome: 'Terminar a partida', grupo: 'Mexer na partida', perigo: true, ajuda: 'Acaba agora, com os pontos que tem.',
+        executar: usar(() => { fimDeJogo(); return 'A partida foi encerrada.'; }),
+      },
+      // Os códigos secretos, ligados direto (com o mesmo aviso e o mesmo selo de quando são digitados).
+      ...Object.entries(SEGREDOS).filter(([, s]) => s.jogos.includes('pacman')).map(([chave, s]) => ({
+        id: `segredo-${chave}`, nome: `Código: ${s.nome}`, grupo: 'Modo', ajuda: s.efeito,
+        executar: usar(() => {
+          const r = seg.usar(chave);
+          if (r === 'recusado') throw new Error(`${s.nome}: não deu para usar agora (já foi usado nesta partida ou neste nível?).`);
+          return r === 'usado' ? `${s.nome}: feito.` : `${s.nome}: ${r === 'ligado' ? 'ligado' : 'desligado'}.`;
+        }),
+      })),
+    ];
   }
 
   const aoTeclar = e => {

@@ -1288,6 +1288,9 @@ function novoEstado(ctx) {
 function montar(ctx, E, copia = false) {
   const som = nome => { try { ctx.som?.(nome); } catch { /* sem som */ } };
   const segredo = chave => { try { return !!ctx.segredo?.(chave); } catch { return false; } };
+  // Pegadinha "lento" do menu de administrador: cada pulinho demora o dobro (0.5).
+  const lento = () => { try { return Number(ctx.velocidade?.()) || 1; } catch { return 1; } };
+  let invencivel = false; // menu de administrador (só sozinho)
   const parts = Array.from({ length: 60 }, () => ({ vida: 0, max: 1, x: 0, p: 0, z: 0, vx: 0, vz: 0, tipo: 0 }));
   let relogioBrilho = 0;
   // Jogo junto (versus ou co-op). As cópias dos testes (teste.clonar) não mandam nada para a sala.
@@ -1388,7 +1391,7 @@ function montar(ctx, E, copia = false) {
       E.pulo = { t: 0, dur: 0.1, x0: E.x, x1: E.x, f0: E.fila, f1: E.fila, bater: true, bx: dx, by: dy };
       return;
     }
-    E.pulo = { t: 0, dur: DUR_PULO, x0: E.x, x1, f0: E.fila, f1: E.fila + dy, bater: false, bx: dx, by: dy };
+    E.pulo = { t: 0, dur: DUR_PULO / lento(), x0: E.x, x1, f0: E.fila, f1: E.fila + dy, bater: false, bx: dx, by: dy };
     if (dy !== 0) E.tronco = -1;
     if (dy > 0) E.ocioso = 0;
     som('passo');
@@ -1454,6 +1457,12 @@ function montar(ctx, E, copia = false) {
 
   function morrer(tipo, motivo = '', vx = 0) {
     if (E.morte) return;
+    if (invencivel && !J) { // menu de administrador: nada pega o coelho (anda na água e o gavião espera)
+      E.ocioso = 0;
+      if (tipo === 'gaviao') E.cam = Math.min(E.cam, pAtual() - 0.3);
+      if (tipo === 'correnteza') { E.x = limitar(E.x, 24, LARGURA - 24); E.tronco = -1; }
+      return;
+    }
     const p = pAtual();
     E.morte = { tipo, motivo, t: 0, vx, x: limitar(xAtual(), 12, LARGURA - 12), p: tipo === 'gaviao' ? Math.max(p, E.cam + 0.3) : p };
     E.pulo = null;
@@ -1899,6 +1908,8 @@ function montar(ctx, E, copia = false) {
         if (!o.sumido) puf(o.e ? o.ex : o.x, o.e ? o.ep : o.p);
         o.fora = true;
       };
+      // O administrador reviveu alguém pelo menu: o coelho dele volta a aparecer.
+      J.aoEvento = (i, ev) => { if (ev?.tipo === 'reviveu' && i !== J.eu && R[i]) R[i].fora = false; };
       J.aoChegou = i => {
         const o = R[i];
         if (!o) return;
@@ -2057,6 +2068,55 @@ function montar(ctx, E, copia = false) {
       if (!ligado) return;
       som('poder');
       if (chave === OURO) brilhos(14, xAtual(), pAtual());
+    },
+
+    // Menu de administrador (arcade.js): só quando joga sozinho.
+    adm: J ? null : {
+      invencivel(ligar) {
+        invencivel = !!ligar;
+        return ligar ? 'Coelho invencível: carroças, trem, rio e gavião não pegam ele.' : 'Invencível desligado.';
+      },
+      terminar() {
+        E.acabou = true;
+        if (!copia) melhorSessao = Math.max(melhorSessao, E.maxFila);
+        return 'A travessia foi encerrada.';
+      },
+      acoes: [
+        {
+          id: 'pular', nome: 'Pular fileiras', grupo: 'Mexer na partida', ajuda: 'Leva o coelho para a frente, num campo seguro.',
+          campos: [{ id: 'n', nome: 'Quantas fileiras', tipo: 'numero', min: 1, max: 500, padrao: 25 }],
+          executar({ n }) {
+            if (E.morte) throw new Error('O coelho já foi pego.');
+            const alvo = E.fila + Math.max(1, Math.min(500, Math.floor(Number(n)) || 1));
+            gerarAte(alvo + 80);
+            const col = colunaDoX(E.x);
+            for (let r = alvo; r < alvo + 80; r++) {
+              const fx = faixa(r);
+              if (!fx || fx.tipo !== 'g') continue;
+              const livres = fx.bloq.map((b, c) => (b ? -1 : c)).filter(c => c >= 0);
+              if (!livres.length) continue;
+              const c = livres.reduce((m, x) => (Math.abs(x - col) < Math.abs(m - col) ? x : m), livres[0]);
+              Object.assign(E, { fila: r, x: c * CEL + 24, pulo: null, guardado: null, tronco: -1, ocioso: 0, maxFila: Math.max(E.maxFila, r), cam: r - 3.5 });
+              gerarAte();
+              puf(E.x, E.fila);
+              som('poder');
+              return `O coelho pulou para a fileira ${r}.`;
+            }
+            throw new Error('Não achei um campo seguro lá na frente.');
+          },
+        },
+        {
+          id: 'cenouras', nome: 'Dar cenouras douradas', grupo: 'Ajudar',
+          campos: [{ id: 'n', nome: 'Quantas', tipo: 'numero', min: 1, max: 100, padrao: 5 }],
+          executar({ n }) {
+            const k = Math.max(1, Math.min(100, Math.floor(Number(n)) || 1));
+            E.cenouras += k;
+            som('moeda');
+            brilhos(10, xAtual(), pAtual());
+            return `+${k} ${k === 1 ? 'cenoura dourada' : 'cenouras douradas'}.`;
+          },
+        },
+      ],
     },
 
     // Ganchos para os testes no Node (não mexem no jogo, exceto colocar).

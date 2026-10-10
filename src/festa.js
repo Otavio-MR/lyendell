@@ -89,6 +89,13 @@ function sorteDe(semente) {
   };
 }
 const dado = rnd => 1 + Math.floor(rnd() * 10);
+// O dado de alguém: o valor escolhido pelo administrador (uma vez), ou o sorteado.
+function dadoDe(e, k) {
+  const v = e.dadoForcado?.[k];
+  if (v == null) return dado(e.rnd);
+  delete e.dadoForcado[k];
+  return v;
+}
 
 // Quantas casas faltam de uma casa até outra (pelo caminho mais curto).
 function distancia(de, para) {
@@ -159,7 +166,7 @@ function agir(e, i, acao = {}, agora = Date.now()) {
   if (e.fase === 'ordem') {
     if (tipo !== 'rolar') throw new ErroFesta('Jogue o dado para ver quem começa.');
     if (p.ordemDado != null) return false;
-    p.ordemDado = dado(e.rnd);
+    p.ordemDado = dadoDe(e, i);
     return true;
   }
   if (e.fase === 'minijogo') {
@@ -199,7 +206,7 @@ function decidir(e, i, acao, agora) {
     if (tipo !== 'rolar') return false;
     const n = e.dadosExtras || 1;
     e.dadosExtras = 0;
-    const valores = Array.from({ length: n }, () => dado(e.rnd));
+    const valores = Array.from({ length: n }, (_, x) => (x === 0 ? dadoDe(e, i) : dado(e.rnd)));
     e.dado = { valores, total: valores.reduce((a, b) => a + b, 0) };
     e.passo = 'dado';
     e.prazo = agora + ms(1300);
@@ -274,7 +281,7 @@ function passo(e, agora = Date.now()) {
 }
 
 function fecharOrdem(e, agora) {
-  for (const p of e.j) if (p.ordemDado == null) p.ordemDado = dado(e.rnd);
+  e.j.forEach((p, k) => { if (p.ordemDado == null) p.ordemDado = dadoDe(e, k); });
   e.ordem = e.j.map((_, k) => k).sort((a, b) => e.j[b].ordemDado - e.j[a].ordemDado || a - b);
   mensagem(e, `${e.j[e.ordem[0]].nome} começa!`, 'info');
   e.fase = 'turno';
@@ -673,6 +680,73 @@ function evento(e, i, ev = {}) {
   return { outros: { ...ev, i } };
 }
 
+/* ─── Menu do administrador (src/adm/festa.js) ───── */
+
+const coelhoDe = (e, k) => {
+  const p = e.j[k];
+  if (!p) throw new ErroFesta('Esse coelho não está na festa.');
+  return p;
+};
+const admin = {
+  // Dar (ou tirar, n < 0) cenouras. Devolve quanto mudou.
+  cenouras(e, k, n) {
+    const p = coelhoDe(e, k);
+    const mudou = contar(e, k, n);
+    mensagem(e, mudou >= 0 ? `O administrador deu ${mudou} cenouras para ${p.nome}!` : `O administrador tirou ${-mudou} cenouras de ${p.nome}.`, mudou >= 0 ? 'azul' : 'vermelha');
+    return mudou;
+  },
+  douradas(e, k, n) {
+    const p = coelhoDe(e, k);
+    const antes = p.douradas;
+    p.douradas = Math.max(0, p.douradas + n);
+    const mudou = p.douradas - antes;
+    mensagem(e, mudou >= 0 ? `O administrador deu ${mudou} ${mudou === 1 ? 'cenoura dourada' : 'cenouras douradas'} para ${p.nome}!` : `O administrador tirou ${-mudou} ${mudou === -1 ? 'cenoura dourada' : 'cenouras douradas'} de ${p.nome}.`, 'dourada');
+    return mudou;
+  },
+  // Anda n casas pelo caminho principal (sem cair em casa nenhuma).
+  mover(e, k, n) {
+    const p = coelhoDe(e, k);
+    for (let x = 0; x < n; x++) p.pos = TABULEIRO[p.pos].prox[0];
+    mensagem(e, `O administrador levou ${p.nome} ${n} ${n === 1 ? 'casa' : 'casas'} para a frente.`, 'sorte');
+    return p.pos;
+  },
+  // O próximo dado desse coelho vai dar v (no dado da ordem ou no primeiro dado da vez).
+  forcarDado(e, k, v) {
+    coelhoDe(e, k);
+    e.dadoForcado ??= {};
+    e.dadoForcado[k] = v;
+  },
+  // Fecha o minijogo de agora sem vencedores e segue a festa.
+  pularMinijogo(e, agora = Date.now()) {
+    const m = e.minijogo;
+    if (e.fase !== 'minijogo' || !m || !['apresenta', 'jogando'].includes(m.passo)) throw new ErroFesta('Não há minijogo acontecendo agora.');
+    Object.assign(m, { passo: 'resultado', vencedores: [], placar: null, pulado: true });
+    e.prazo = agora + ms(2500);
+    mensagem(e, `O administrador pulou o minijogo ${m.nome}.`, 'minijogo');
+  },
+  // A rodada de agora vira a última (depois do minijogo vêm as estrelas bônus).
+  ultimaRodada(e) {
+    if (e.rodada >= e.rodadas) throw new ErroFesta('Esta já é a última rodada.');
+    e.rodadas = e.rodada;
+    mensagem(e, 'O administrador decidiu: esta é a última rodada!', 'anuncio');
+  },
+  // Termina já. vencedor: o índice de quem vence (ganha douradas até ficar na frente), ou null pelo placar.
+  terminar(e, vencedor = null) {
+    if (e.fim) throw new ErroFesta('A festa já acabou.');
+    if (vencedor != null) {
+      const p = coelhoDe(e, vencedor);
+      const max = Math.max(...e.j.map(x => x.douradas));
+      const outros = e.j.filter(x => x !== p && x.douradas === max).length;
+      if (p.douradas < max || outros) p.douradas = max + 1;
+    }
+    e.fim = 'acabou';
+    e.fase = 'fim';
+    e.minijogo = e.minijogo ? { ...e.minijogo, passo: 'fechado' } : null;
+    e.vencedores = ranking(e).filter(r => r.pos === 1).map(r => r.k);
+    mensagem(e, 'O administrador encerrou a festa.', 'anuncio');
+  },
+};
+
 function visao(e, agora = Date.now()) {
   const m = e.minijogo;
   return {
@@ -683,7 +757,7 @@ function visao(e, agora = Date.now()) {
     ultimas: ultimas(e),
     minijogo: m && m.passo !== 'fechado' ? {
       id: m.id, nome: m.nome, formato: m.formato, tipo: m.tipo, duracao: m.duracao, times: m.times, semente: m.semente, n: m.n,
-      passo: m.passo, prontos: m.prontos, inicioEm: m.inicio ? m.inicio - agora : null, vencedores: m.vencedores, placar: m.placar || null,
+      passo: m.passo, prontos: m.prontos, inicioEm: m.inicio ? m.inicio - agora : null, vencedores: m.vencedores, placar: m.placar || null, pulado: !!m.pulado,
       chegaram: m.resultados.map(Boolean),
     } : null,
     bonus: e.bonus ? { mostradas: e.bonus.mostradas, estrelas: e.bonus.estrelas.slice(0, e.bonus.mostradas) } : null,
@@ -692,5 +766,5 @@ function visao(e, agora = Date.now()) {
 }
 
 module.exports = {
-  ErroFesta, ITENS, MINIJOGOS, TABULEIRO, RODADAS, PRECO_DOURADA, opcoes, novo, agir, passo, evento, sair, visao, ranking, distancia,
+  ErroFesta, ITENS, MINIJOGOS, TABULEIRO, RODADAS, PRECO_DOURADA, opcoes, novo, agir, passo, evento, sair, visao, ranking, distancia, admin,
 };

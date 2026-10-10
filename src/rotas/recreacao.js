@@ -85,6 +85,8 @@ r.get('/ranking', async (req, res) => {
 const LIMITES = { cobrinha: 400, pacman: 5_000_000, 2048: 10_000_000, barris: 5_000_000, supercoelho: 5_000_000, travessia: 100_000, corrida: 1_000_000 };
 
 r.post('/recordes', async (req, res) => {
+  // Partida em que o menu de administrador foi usado não vale recorde (nem cenouras).
+  if (req.body?.adm) return res.status(201).json({ recorde: false, anterior: null, cenouras: 0, adm: true });
   const jogo = req.body?.jogo;
   let variante = '';
   let pontos;

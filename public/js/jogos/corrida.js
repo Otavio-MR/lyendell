@@ -958,6 +958,7 @@ function montar(ctx, E, copia = false) {
   const J0 = ctx.junto || null;
   const J = J0 && copia ? { ...J0, pos: nada, evento: nada, pegar: nada, morri: nada, cheguei: nada, pontos: nada } : J0;
   const coop = !!J && J.modo === 'coop';
+  let invencivel = false; // menu de administrador (só sozinho)
   const R = []; // cada pessoa da sala: o que ela mandou e onde o coelho dela aparece aqui
 
   /* O caminho em volta de quem corre: gera à frente e esquece o que ficou para trás */
@@ -1128,7 +1129,7 @@ function montar(ctx, E, copia = false) {
   // Um passo de quem está correndo (sozinho ou junto): o mundo já andou.
   function correr(dt, entrada, podeBater) {
     fisica(dt, entrada);
-    if (podeBater) {
+    if (podeBater && !(invencivel && !J)) { // invencível (menu de administrador): passa através de tudo
       const o = bateu();
       if (o) { morrer(o); return; }
     }
@@ -1314,6 +1315,8 @@ function montar(ctx, E, copia = false) {
         const o = R[i];
         if (o && !o.fora) o.fora = true;
       };
+      // O administrador reviveu alguém pelo menu: o coelho dele volta a aparecer.
+      J.aoEvento = (i, ev) => { if (ev?.tipo === 'reviveu' && i !== J.eu && R[i]) R[i].fora = false; };
       J.aoChegou = i => {
         const o = R[i];
         if (!o) return;
@@ -1463,6 +1466,51 @@ function montar(ctx, E, copia = false) {
 
     usarSegredo: () => false,
     mudouSegredo: nada,
+
+    // Menu de administrador (arcade.js): só quando joga sozinho.
+    adm: J ? null : {
+      invencivel(ligar) {
+        invencivel = !!ligar;
+        return ligar ? 'Coelho invencível: passa através das pedras e das aves.' : 'Invencível desligado.';
+      },
+      terminar() {
+        E.acabou = true;
+        if (!copia) melhorSessao = Math.max(melhorSessao, pontosAgora());
+        return 'A corrida foi encerrada.';
+      },
+      acoes: [
+        {
+          id: 'avancar', nome: 'Avançar metros', grupo: 'Mexer na partida', ajuda: 'Leva o coelho para a frente (o caminho fica mais rápido, como se tivesse corrido).',
+          campos: [{ id: 'n', nome: 'Quantos metros', tipo: 'numero', min: 10, max: 5000, padrao: 200 }],
+          executar({ n }) {
+            if (E.morte) throw new Error('O coelho já tropeçou.');
+            const m = Math.max(10, Math.min(5000, Math.floor(Number(n)) || 10));
+            const alvo = E.d + m * PX_M;
+            for (let k = 0; k < 200000 && distancia(E.R, E.tempo) < alvo; k++) E.tempo += 0.01;
+            E.d = distancia(E.R, E.tempo);
+            E.dVivo = E.d;
+            gerarAte();
+            // Nada bem em cima do coelho na chegada.
+            E.obs = E.obs.filter(o => telaX(o, E.d) > X_COELHO + 260 || telaX(o, E.d) + o.w < X_COELHO - 40);
+            marcos();
+            puf(E.d, CHAO - 20);
+            som('poder');
+            return `O coelho avançou ${m} m (agora ${Math.floor(E.dVivo / PX_M)} m).`;
+          },
+        },
+        {
+          id: 'lirios', nome: 'Dar Lírios', grupo: 'Ajudar', ajuda: `Cada Lírio vale ${LIRIO_M} m de bônus.`,
+          campos: [{ id: 'n', nome: 'Quantos', tipo: 'numero', min: 1, max: 500, padrao: 10 }],
+          executar({ n }) {
+            const k = Math.max(1, Math.min(500, Math.floor(Number(n)) || 1));
+            E.nLirios += k;
+            som('moeda');
+            brilhos(8, E.d, CHAO - 40);
+            return `+${k} ${k === 1 ? 'Lírio' : 'Lírios'} (+${k * LIRIO_M} m).`;
+          },
+        },
+      ],
+    },
 
     // Ganchos para os testes no Node (não mexem no jogo).
     teste: {

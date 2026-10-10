@@ -64,6 +64,7 @@ const CATALOGO = [
     { chave: 'recreacao.moderar', nome: 'Apagar mensagens de outros no chat' },
     { chave: 'recreacao.perguntas', nome: 'Criar e editar as perguntas do quiz' },
     { chave: 'sprites.editar', nome: 'Trocar os desenhos dos joguinhos pelos próprios sprites (imagens em tira de quadros)' },
+    { chave: 'jogos.admin', nome: 'Menu de administrador nos jogos: pegadinhas, mexer na partida, ajudar jogadores e dar ou tirar cenouras (a partida deixa de valer para o ranking)' },
   ] },
   { grupo: 'Leis de Lyendell', itens: [
     { chave: 'leis.ver', nome: 'Ler as Leis de Lyendell' },
@@ -109,6 +110,8 @@ const SO_DOS_ALIADOS = new Set(['aliados.ver']);
 // O dinheiro da Capital é do Mestre da Moeda: a Família Nobre acompanha (financas.ver), mas não mexe.
 // Pagar acima do saldo (financas.excecao) não vem em cargo nenhum: o administrador concede em Cargos.
 const SO_DA_MOEDA = new Set(['financas.gerir', 'financas.aprovar', 'financas.excecao']);
+// O menu de administrador dos jogos não vem em cargo nenhum: o administrador tem e libera em Cargos se quiser.
+const SO_DO_ADMIN = new Set(['jogos.admin']);
 const VALIDAS = new Set(TODAS);
 
 // Todo usuário é morador (menos quem tem um cargo que "não é morador", como os Aliados): estas permissões valem para eles.
@@ -154,7 +157,7 @@ const CARGOS_PADRAO = [
     permissoes: MORADOR },
   { nome: 'Família Nobre', cor: '#d8b13a',
     descricao: DESCRICOES['Família Nobre'][1],
-    permissoes: TODAS.filter(p => p !== 'usuarios.criar' && p !== 'cargos.gerenciar' && !EXCLUSIVAS[p] && !SO_DO_BOBO.has(p) && !SO_DOS_ALIADOS.has(p) && !SO_DA_MOEDA.has(p)) },
+    permissoes: TODAS.filter(p => p !== 'usuarios.criar' && p !== 'cargos.gerenciar' && !EXCLUSIVAS[p] && !SO_DO_BOBO.has(p) && !SO_DOS_ALIADOS.has(p) && !SO_DA_MOEDA.has(p) && !SO_DO_ADMIN.has(p)) },
   { nome: 'Tabeliã', cor: '#c98b4a',
     descricao: DESCRICOES['Tabeliã'][1],
     permissoes: [...MEMBRO, ...acoes('tabelionato', 'registrar', 'editar', 'apagar', 'configurar', 'pagamentos', 'aprovar'), 'mapa.editar', 'juramento.marcar'] },

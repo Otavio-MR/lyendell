@@ -14,6 +14,7 @@ import { juntoNoJogo, CORES_JUNTO } from '../junto.js';
 import { abrirJunto } from './junto.js';
 import { registrarPecas, desenharSprite, aoMudarSprites, usarNomeDaPeca } from '../sprites.js';
 import { desenharCoelho, desenharRaposa, elipse, sombrear } from '../desenho-coelho.js';
+import { admPodeAgir } from '../adm-jogos.js';
 
 /* ─── As regras que o navegador precisa saber (as mesmas de src/junto-arena.js) ─── */
 
@@ -1309,6 +1310,7 @@ function arenaJunto() {
     if (!q || acabou || q.s !== 'jogando') return;
     const c = CARTAS[q.a[jt.eu]?.[2 + slot]];
     if (!c) return;
+    if (!admPodeAgir()) { textoCartaInvalida('Você está congelado! Espere passar.'); return; } // pegadinha do administrador
     if (!lugarOk(c, x, y)) { textoCartaInvalida(c.raio ? 'Fora da arena.' : 'Tropas só no seu lado da arena (ou no bolso de uma torre caída).'); return; }
     if (c.custo > cenourasAgora() + 0.05) { textoCartaInvalida(`Faltam cenouras: ${c.nome} custa ${c.custo}.`); return; }
     jt.evento({ tipo: 'carta', carta: c.k, x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 });
@@ -1519,6 +1521,7 @@ function textoDoFim(q, eu, coop, s) {
     coroas: `por ${placar} coroas`,
     'morte-subita': 'na morte súbita',
     desempate: 'no desempate (perdeu quem tinha a torre mais fraca)',
+    adm: 'pela escolha do administrador',
   }[motivo] || '';
   if (v === eu) return coop ? (motivo === 'castelo' ? 'A equipe derrubou a Toca do Raposo!' : `A equipe venceu o Raposo ${como}!`) : `Vitória! Você ${motivo === 'castelo' ? como : `venceu ${como}`}.`;
   return coop ? `O Raposo venceu a equipe ${motivo === 'castelo' ? 'derrubando a Toca do Rei' : como}.` : `Derrota: ${motivo === 'castelo' ? `você ${como}` : `o outro lado venceu ${como}`}.`;

@@ -10,15 +10,20 @@
 //     instrucoes: { teclado, toque }, comoJogar: [[emoji, nome, texto], ...],
 //     pecasComoJogar: { nome: 'chave.da.peca' } (opcional: o nome da linha segue o nome da peça do sprite),
 //     criar(ctx) -> jogo, desenharFoto(g, foto, t) }
-// ctx = { sorte, segredo(chave), som(nome), junto, largura, altura } (junto: null quando a pessoa joga sozinha)
+// ctx = { sorte, segredo(chave), som(nome), junto, largura, altura, velocidade() } (junto: null quando a pessoa
+//        joga sozinha; velocidade(): 0.5 enquanto a pessoa leva a pegadinha "lento", para o coelho andar devagar)
 // jogo = { pontos, acabou, atualizar(dt, entrada), desenhar(g, t), resumo(), foto(),
-//          usarSegredo?(chave), mudouSegredo?(chave, ligado) }
+//          usarSegredo?(chave), mudouSegredo?(chave, ligado), adm? }
+// adm (opcional, só sozinho): o que o menu de administrador pode fazer na partida. Tudo opcional:
+//   { invencivel(ligar), vidas(n), pontos(n), fases() -> [[valor, nome]], irFase(valor), proxima(), terminar(),
+//     acoes: [{ id, nome, grupo, ajuda, campos, executar(valores) }] } (cada um devolve uma frase ou lança Error)
 // entrada = { esq, dir, cima, baixo, pular, acao, apertou: Set('esq'|'dir'|'cima'|'baixo'|'pular'|'acao'|'toque') }
 
 import { h, trocar, icone, botao, cabecalho, aviso, get, post, pode, aoSair, estado, num } from './core.js';
 import { rt, ouvir, transmitir, enviarQuadro, pararTransmissao } from './tempo-real.js';
 import { juntoNoJogo, sorteJunto, textoDoFimJunto } from './junto.js';
-import { segredosDoJogo } from './segredos.js';
+import { segredosDoJogo, SEGREDOS } from './segredos.js';
+import { menuAdm, admDirecao, admPodeAgir, admVelocidade } from './adm-jogos.js';
 import { nomeDe } from './sprites.js';
 
 const PASSO = 1 / 60;
@@ -27,6 +32,9 @@ const TECLAS = {
   Space: 'pular', KeyZ: 'pular', KeyK: 'pular', KeyX: 'acao', KeyJ: 'acao', ShiftLeft: 'acao', ShiftRight: 'acao',
 };
 const NOME_DIR = { esq: 'esquerda', dir: 'direita', cima: 'cima', baixo: 'baixo' };
+const DIR_DO_NOME = { esquerda: 'esq', direita: 'dir', cima: 'cima', baixo: 'baixo' };
+const RITMOS = { lenta: 0.5, normal: 1, rapida: 1.5 };
+const NAO_VALE_ADM = 'Partida com o menu de administrador: não vale recorde.';
 
 /* ─── Som: efeitos feitos na hora com o WebAudio (sem arquivos) ─── */
 
@@ -147,6 +155,15 @@ export function telaArcade(def) {
     aoUsar: chave => (jogo && situacao !== 'fim' ? !!jogo.usarSegredo?.(chave) : false),
   });
 
+  // Menu de administrador: só sozinho (as partidas ao vivo já têm o menu da sala). Usou, a partida não vale recorde.
+  let admUsado = false;
+  let ritmo = 1; // a velocidade do jogo escolhida no menu
+  const menu = jt ? null : menuAdm({
+    titulo: def.nome,
+    get acoes() { return acoesAdm(); },
+    aoUsar: () => { admUsado = true; },
+  });
+
   function desenharBotaoSom() {
     trocar(botaoSom, icone(mudo ? 'mudo' : 'volume'));
     botaoSom.title = mudo ? 'Ligar o som' : 'Desligar o som';
@@ -160,7 +177,10 @@ export function telaArcade(def) {
 
   function novoJogo() {
     seg.novaPartida();
-    jogo = def.criar({ sorte, segredo: chave => seg.ativo(chave), som, junto: jt, largura: def.largura, altura: def.altura });
+    admUsado = false;
+    ritmo = 1;
+    menu?.novaPartida();
+    jogo = def.criar({ sorte, segredo: chave => seg.ativo(chave), som, junto: jt, largura: def.largura, altura: def.altura, velocidade: admVelocidade });
     situacao = 'inicio';
     pontosAntes = -1;
     acumulado = 0;
@@ -190,7 +210,9 @@ export function telaArcade(def) {
     som('fim');
     const r = jogo.resumo?.() || {};
     mostrarSobre();
-    if (jt || pontos <= 0) return;
+    if (jt) return;
+    if (admUsado || menu?.usado()) { anexarAoFim(h('p', { class: 'cobra-recorde' }, icone('alerta'), NAO_VALE_ADM)); return; }
+    if (pontos <= 0) return;
     if (!seg.valeRecorde()) { anexarAoFim(h('p', { class: 'cobra-recorde' }, icone('estrela'), 'Modo secreto ligado: esta partida não vale recorde.')); return; }
     try {
       const resp = await post('/api/recreacao/recordes', { jogo: def.id, pontos, detalhe: String(r.detalhe || '').slice(0, 60) });
@@ -253,11 +275,9 @@ export function telaArcade(def) {
     for (const k of ['esq', 'dir', 'cima', 'baixo', 'pular', 'acao']) {
       entrada[k] = seguros.teclado.has(k) || [...seguros.toque.values()].includes(k);
     }
-    if (def.controles?.cimaPula && entrada.cima) entrada.pular = true;
   }
   function apertar(k) {
     pendentes.add(k);
-    if (def.controles?.cimaPula && k === 'cima') pendentes.add('pular');
     if (situacao === 'inicio' && !jt && (k === 'pular' || (def.controles?.deslizar && NOME_DIR[k]))) comecar();
   }
 
@@ -338,6 +358,33 @@ export function telaArcade(def) {
   });
   tela.addEventListener('pointercancel', () => { inicioToque = null; });
 
+  // O que o jogo recebe: a entrada depois das pegadinhas do administrador (valem também no jogo junto).
+  // Congelado: nada mexe. Invertido: os lados trocam (e o toque para frente vira para trás).
+  // O "pular com a seta para cima" (cimaPula) vem depois da troca, para seguir a seta que valeu.
+  function comoFica(k) {
+    if (NOME_DIR[k]) return DIR_DO_NOME[admDirecao(NOME_DIR[k])] || null;
+    if (!admPodeAgir()) return null;
+    if (k === 'toque' && admDirecao('cima') === 'baixo') return 'baixo';
+    return k;
+  }
+  function entradaDoJogo(bruta) {
+    const ent = { esq: false, dir: false, cima: false, baixo: false, pular: false, acao: false, apertou: new Set() };
+    for (const k of ['esq', 'dir', 'cima', 'baixo', 'pular', 'acao']) {
+      if (!bruta[k]) continue;
+      const v = comoFica(k);
+      if (v) ent[v] = true;
+    }
+    for (const k of bruta.apertou) {
+      const v = comoFica(k);
+      if (v) ent.apertou.add(v);
+    }
+    if (def.controles?.cimaPula) {
+      if (ent.cima) ent.pular = true;
+      if (ent.apertou.has('cima')) ent.apertou.add('pular');
+    }
+    return ent;
+  }
+
   /* O relógio do jogo */
 
   function passo(agora) {
@@ -347,12 +394,12 @@ export function telaArcade(def) {
     if (!jogo) return;
     try {
       if (situacao === 'jogando') {
-        acumulado += dt;
+        acumulado += dt * (jt ? 1 : ritmo);
         let n = 0;
         while (acumulado >= PASSO && n < 6) {
           entrada.apertou = pendentes;
           pendentes = new Set();
-          jogo.atualizar(PASSO, entrada);
+          jogo.atualizar(PASSO, entradaDoJogo(entrada));
           acumulado -= PASSO;
           n++;
           if (jogo.acabou && !jt) break;
@@ -389,6 +436,88 @@ export function telaArcade(def) {
     window.removeEventListener('blur', aoSairDaJanela);
     document.removeEventListener('visibilitychange', aoEsconder);
   });
+
+  /* As ações do menu de administrador: as comuns ficam aqui e usam os ganchos que o jogo oferece (jogo.adm) */
+
+  function partidaAdm() {
+    if (!jogo || situacao === 'fim' || jogo.acabou) throw new Error('A partida acabou: comece outra para usar isso.');
+    return jogo.adm || {};
+  }
+  // Marca a partida antes de mexer (assim o fim de jogo já sabe que ela não vale recorde).
+  const usar = fn => valores => {
+    const a = partidaAdm();
+    menu?.marcar();
+    return fn(a, valores);
+  };
+  const ate = (n, min, max) => Math.max(min, Math.min(max, Math.floor(Number(n)) || min));
+  function acoesAdm() {
+    const a = jogo?.adm || {};
+    const lista = [];
+    if (a.invencivel) {
+      lista.push({
+        id: 'invencivel', nome: 'Invencível', grupo: 'Ajudar', ajuda: 'Nada machuca o coelho até desligar.',
+        campos: [{ id: 'ligar', nome: 'Invencível', tipo: 'escolha', opcoes: [['sim', 'Ligar'], ['nao', 'Desligar']] }],
+        executar: usar((x, v) => x.invencivel(v.ligar !== 'nao')),
+      });
+    }
+    if (a.vidas) {
+      lista.push({
+        id: 'vidas', nome: 'Dar vidas', grupo: 'Ajudar',
+        campos: [{ id: 'n', nome: 'Quantas', tipo: 'numero', min: 1, max: 50, padrao: 3 }],
+        executar: usar((x, v) => x.vidas(ate(v.n, 1, 50))),
+      });
+    }
+    if (a.pontos) {
+      lista.push({
+        id: 'pontos', nome: 'Dar pontos', grupo: 'Ajudar',
+        campos: [{ id: 'n', nome: 'Quantos', tipo: 'numero', min: 1, max: 1000000, padrao: 1000 }],
+        executar: usar((x, v) => x.pontos(ate(v.n, 1, 1000000))),
+      });
+    }
+    if (a.proxima) lista.push({ id: 'proxima', nome: 'Passar de fase', grupo: 'Mexer na partida', executar: usar(x => x.proxima()) });
+    if (a.fases && a.irFase) {
+      lista.push({
+        id: 'fase', nome: 'Escolher a fase', grupo: 'Mexer na partida', ajuda: 'Começa a fase escolhida agora.',
+        campos: [{ id: 'fase', nome: 'Fase', tipo: 'escolha', opcoes: a.fases() }],
+        executar: usar((x, v) => x.irFase(v.fase)),
+      });
+    }
+    lista.push({
+      id: 'velocidade', nome: 'Velocidade do jogo', grupo: 'Mexer na partida', ajuda: 'Vale até o fim desta partida.',
+      campos: [{
+        id: 'ritmo', nome: 'Velocidade', tipo: 'escolha', opcoes: [['lenta', 'Lenta'], ['normal', 'Normal'], ['rapida', 'Rápida']],
+        padrao: Object.keys(RITMOS).find(k => RITMOS[k] === ritmo) || 'normal',
+      }],
+      executar: usar((x, v) => {
+        ritmo = RITMOS[v.ritmo] || 1;
+        return `Velocidade do jogo: ${{ lenta: 'lenta', rapida: 'rápida' }[v.ritmo] || 'normal'}.`;
+      }),
+    });
+    if (a.terminar) {
+      lista.push({
+        id: 'terminar', nome: 'Terminar a partida', grupo: 'Mexer na partida', perigo: true, ajuda: 'Acaba agora, com os pontos que tem.',
+        executar: usar(x => {
+          const r = x.terminar();
+          if (situacao !== 'jogando' && jogo.acabou) fim(); // jogando, o relógio do jogo encerra no próximo passo
+          return r || 'A partida foi encerrada.';
+        }),
+      });
+    }
+    for (const extra of a.acoes || []) lista.push({ ...extra, executar: usar((x, v) => extra.executar(v)) });
+    // Os códigos secretos deste jogo, ligados direto (com o mesmo aviso e o mesmo selo de quando são digitados).
+    for (const [chave, s] of Object.entries(SEGREDOS)) {
+      if (!s.jogos.includes(def.id)) continue;
+      lista.push({
+        id: `segredo-${chave}`, nome: `Código: ${s.nome}`, grupo: 'Modo', ajuda: s.efeito,
+        executar: usar(() => {
+          const r = seg.usar(chave);
+          if (r === 'recusado') throw new Error(`${s.nome}: não deu para usar agora.`);
+          return r === 'usado' ? `${s.nome}: feito.` : `${s.nome}: ${r === 'ligado' ? 'ligado' : 'desligado'}.`;
+        }),
+      });
+    }
+    return lista;
+  }
 
   function carregarRanking() {
     get('/api/recreacao/ranking').then(r => {

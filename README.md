@@ -634,6 +634,43 @@ O código: `public/js/clube-ilha.js` (o registro das salas), `public/js/ilha/<re
 `public/js/ilha/<região>-jogos.js` (minijogos), `public/js/ilha/centro-mapa.js` (o mapa) e
 `src/clube-ilha/<região>.js` (o chão, as chegadas, as recompensas e o progresso no servidor).
 
+### Menu de administrador nos jogos
+
+Quem tem a permissão **Menu de administrador nos jogos** (`jogos.admin`) vê um botão **ADM** no canto de
+cada jogo. Nenhum cargo vem com ela: o administrador tem, e pode liberar para outro cargo na tela Cargos.
+O painel tem três abas:
+
+- **Este jogo:** o que dá para fazer na partida (veja abaixo).
+- **Pegadinhas:** em qualquer jogador (ou em todos da partida), por quantos segundos quiser.
+  **Atrapalhar** mexe no controle: controles invertidos, congelar (não anda nem joga) e lento.
+  **Efeitos na tela:** confete, ponta-cabeça, espelho, terremoto, cores malucas, apagar as luzes, zoom
+  gigante, tela minúscula, torta na cara, almofada de pum e manada de coelhos.
+- **Cenouras:** dar ou tirar cenouras do Club Coelho de qualquer pessoa (sem o teto do dia, nunca deixa o
+  saldo negativo, e vai para o diário do sistema). Quem recebe fica sabendo na hora.
+
+**Partida em que o menu foi usado não vale para o ranking**, nem recorde, missão, conquista ou cenouras de
+prêmio. Todos da partida recebem o aviso. A próxima partida (revanche, outra rodada) volta a valer.
+
+O que cada jogo tem em **Este jogo** (resumo):
+
+| Jogo | Ações |
+|---|---|
+| Velha, Lig 4, Damas, PPT (e contra a Raposa) | declarar vencedor, empate, dar a vez, desfazer jogada, pôr peça, promover a dama, tirar peça, ganhar a rodada |
+| Quiz | revelar a resposta, pular a pergunta, dar ou tirar pontos, terminar |
+| Cobrinha ao vivo | crescer, encolher, escudo, reviver, velocidade, cenouras extras, terminar escolhendo o resultado |
+| Campo Minado, Quebra-cabeça e Memória (mesas) | resolver tudo, abrir ou encaixar algumas, dar pontos, mostrar as cartas, terminar escolhendo quem vence |
+| Travessia, Barris, Super Coelho, Corrida (juntos) | mais vidas, reviver, escudo, pontos, pular de fase, mais ou menos tempo, terminar escolhendo o vencedor |
+| Pac-Coelho e 2048 (juntos) | vidas, reviver, escudo, assustar ou tirar as raposas, criar peça, desfazer, pontos, terminar |
+| Arena da Toca | encher a energia, energia infinita, curar torres, carta de graça, destruir torre, velocidade, tempo, Raposo sai ou entra, terminar |
+| Batalha da Toca | vida e escudo cheios, invencível, dar arma e itens, teletransportar, fechar ou parar a zona, robôs, tirar as armas, terminar |
+| Festa na Toca | dar ou tirar cenouras douradas e cenouras, andar casas, escolher o próximo dado, pular minijogo, última rodada, terminar |
+| Lyendell Dorme | pular fase, mais tempo, vitória de um time, reviver, proteger, matar, trocar a classe, silenciar, ver a classe de alguém (só você vê) |
+| Club Coelho | dar item, teletransportar, chamar todo mundo, emote, frase boba, progresso da Ilha, zerar limite de minijogo |
+| Jogos de uma pessoa só (arcade, Pac-Coelho, Campo Minado, 2048, Cobrinha, Quebra-cabeça, Memória) | invencível, vidas, pontos, escolher ou pular fase, velocidade, ligar qualquer código secreto, resolver, terminar |
+
+Arquivos: `src/adm-jogos.js` (núcleo), `src/adm/*.js` (um por grupo de jogos), `public/js/adm-jogos.js`
+(o painel e as pegadinhas no navegador).
+
 ### Códigos secretos
 
 Os jogos de uma pessoa só escondem códigos: uma sequência de setas (no teclado, deslizando o dedo ou

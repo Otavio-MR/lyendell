@@ -4,10 +4,35 @@
 import { h, trocar, icone, botao, cabecalho, aviso, get, post, pode, aoSair, estado, num } from '../core.js';
 import { rt, ouvir, transmitir, enviarQuadro, pararTransmissao } from '../tempo-real.js';
 import { juntoNoJogo } from '../junto.js';
-import { segredosDoJogo } from '../segredos.js';
+import { segredosDoJogo, SEGREDOS } from '../segredos.js';
 import { efeito } from '../bobo-efeitos.js';
+import { menuAdm, admDirecao, admPodeAgir } from '../adm-jogos.js';
 
 const escutar = (tipo, fn) => aoSair(ouvir(tipo, fn));
+const NAO_VALE_ADM = 'Partida com o menu de administrador: não vale recorde.';
+
+// O menu de administrador de um jogo daqui. ativa() lança Error quando não dá para mexer agora; marca a partida
+// antes de mexer (assim o fim de jogo já sabe que ela não vale recorde). jogo: a chave dos códigos secretos.
+function menuSozinho({ titulo, jogo, seg, acoes, ativa, aoUsar }) {
+  let menu = null;
+  const usar = fn => valores => { ativa?.(); menu.marcar(); return fn(valores); };
+  const codigos = () => Object.entries(SEGREDOS).filter(([, s]) => s.jogos.includes(jogo)).map(([chave, s]) => ({
+    id: `segredo-${chave}`, nome: `Código: ${s.nome}`, grupo: 'Modo', ajuda: s.efeito,
+    executar: usar(() => {
+      const r = seg.usar(chave);
+      if (r === 'recusado') throw new Error(`${s.nome}: não deu para usar agora.`);
+      return r === 'usado' ? `${s.nome}: feito.` : `${s.nome}: ${r === 'ligado' ? 'ligado' : 'desligado'}.`;
+    }),
+  }));
+  menu = menuAdm({
+    titulo,
+    get acoes() { return [...acoes().map(a => ({ ...a, executar: a.livre ? a.executar : usar(a.executar) })), ...codigos()]; },
+    aoUsar,
+  });
+  return menu;
+}
+const ligarDesligar = [{ id: 'ligar', nome: 'Ligar', tipo: 'escolha', opcoes: [['sim', 'Ligar'], ['nao', 'Desligar']] }];
+const quantos = (n, max) => Math.max(1, Math.min(max, Math.floor(Number(n)) || 1));
 const relogio = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 function exigirAcesso() {
@@ -119,8 +144,84 @@ export function campoMinado() {
   const pontoXyzzy = h('span', { class: 'xyzzy-ponto', hidden: true, 'aria-hidden': 'true' });
   const segredos = segredosDoJogo('minado', { aoMudar: () => { pontoXyzzy.hidden = !segredos.ativo('minado-xyzzy'); pontoXyzzy.classList.remove('perigo'); } });
 
+  // Menu de administrador. Usou, a partida não vale recorde (até o próximo jogo).
+  let admUsado = false;
+  let revelar = false; // as armadilhas aparecem no campo (só aqui, quem assiste não vê)
+  const fechadasSeguras = () => casas.map((_, i) => i).filter(i => !abertas[i] && !bandeiras[i] && !minas.has(i));
+  // Antes da primeira casa não há armadilhas: o menu começa o jogo pela casa do meio.
+  const comecarPeloMeio = () => { const m = Math.floor(d.lin / 2) * d.col + Math.floor(d.col / 2); bandeiras[m] = 0; abrir(m); };
+  const depoisDeMexer = () => { desenhar(); transmitirQuadro(true); };
+  const menu = menuSozinho({
+    titulo: 'Campo Minado', jogo: 'minado', seg: segredos,
+    aoUsar: () => { admUsado = true; },
+    ativa: () => { if (situacao === 'fim') throw new Error('A partida acabou: comece outra para usar isso.'); },
+    acoes: () => [
+      {
+        id: 'segura', nome: 'Abrir uma casa segura', grupo: 'Ajudar', ajuda: 'Abre uma casa sem armadilha.',
+        executar() {
+          if (!minas) { comecarPeloMeio(); depoisDeMexer(); return 'Abri a casa do meio para começar.'; }
+          const lista = fechadasSeguras();
+          if (!lista.length) throw new Error('Não sobrou casa segura fechada.');
+          abrir(lista[Math.floor(Math.random() * lista.length)]);
+          depoisDeMexer();
+          return 'Uma casa segura foi aberta.';
+        },
+      },
+      {
+        id: 'bandeiras', nome: 'Bandeira nas armadilhas', grupo: 'Ajudar', ajuda: 'Põe bandeira em todas as armadilhas (e tira as erradas).',
+        executar() {
+          if (!minas) throw new Error('As armadilhas só aparecem depois da primeira casa aberta.');
+          bandeiras.fill(0);
+          for (const m of minas) bandeiras[m] = 1;
+          depoisDeMexer();
+          return `${minas.size} bandeiras nas armadilhas.`;
+        },
+      },
+      {
+        id: 'revelar', nome: 'Revelar as armadilhas', grupo: 'Modo', ajuda: 'As armadilhas aparecem no campo até desligar.', campos: ligarDesligar,
+        executar({ ligar }) {
+          revelar = ligar !== 'nao';
+          desenhar();
+          if (revelar && !minas) return 'Revelar ligado: as armadilhas aparecem depois da primeira casa aberta.';
+          return revelar ? 'As armadilhas estão à mostra.' : 'As armadilhas voltaram a ficar escondidas.';
+        },
+      },
+      {
+        id: 'resolver', nome: 'Resolver o campo', grupo: 'Mexer na partida', ajuda: 'Abre todas as casas seguras: vitória na hora.',
+        executar() {
+          if (!minas) comecarPeloMeio();
+          if (situacao !== 'fim') {
+            for (const i of fechadasSeguras()) abertas[i] = 1;
+            ganhar();
+          }
+          return 'Campo resolvido.';
+        },
+      },
+      {
+        id: 'zerar', nome: 'Zerar o relógio', grupo: 'Mexer na partida',
+        executar() {
+          inicio = Date.now();
+          seg = 0;
+          tempoEl.textContent = relogio(0);
+          return 'O relógio voltou para 0:00.';
+        },
+      },
+      {
+        id: 'explodir', nome: 'Terminar a partida', grupo: 'Mexer na partida', perigo: true, ajuda: 'Pisa numa armadilha e perde.',
+        executar() {
+          if (!minas) comecarPeloMeio();
+          if (situacao !== 'fim') perder([...minas][0]);
+          return 'A partida foi encerrada.';
+        },
+      },
+    ],
+  });
+
   function novoJogo() {
     clearInterval(relogioId);
+    admUsado = false;
+    revelar = false;
+    menu.novaPartida();
     d = DIFICULDADES[dificuldade()];
     const total = d.lin * d.col;
     minas = null;
@@ -192,7 +293,7 @@ export function campoMinado() {
   }
 
   function clicar(i, bandeira = false) {
-    if (situacao === 'fim') return;
+    if (situacao === 'fim' || !admPodeAgir()) return; // congelado (pegadinha do administrador): não abre nada
     if (bandeira || (modoBandeira && !abertas[i])) marcar(i);
     else if (abertas[i]) abrirEmVolta(i);
     else abrir(i);
@@ -217,7 +318,7 @@ export function campoMinado() {
   }
 
   function desenhar() {
-    casas.forEach((el, i) => pintarCasa(el, codigoDe(i)));
+    casas.forEach((el, i) => pintarCasa(el, revelar && minas?.has(i) && !abertas[i] && !bandeiras[i] && situacao !== 'fim' ? 'm' : codigoDe(i)));
     let marcadas = 0;
     for (const b of bandeiras) marcadas += b;
     restantesEl.textContent = d.minas - marcadas;
@@ -256,6 +357,7 @@ export function campoMinado() {
     trocar(sobre, caixa);
     sobre.hidden = false;
     transmitirQuadro(true);
+    if (admUsado || menu.usado()) { caixa.insertBefore(h('p', { class: 'cobra-recorde' }, icone('alerta'), NAO_VALE_ADM), caixa.lastChild); return; }
     if (!segredos.valeRecorde()) { caixa.insertBefore(h('p', { class: 'cobra-recorde' }, icone('estrela'), 'Modo secreto ligado: esta partida não vale recorde.'), caixa.lastChild); return; }
     if (await guardarResultado({ jogo: 'minado', variante: dificuldadeAtual, pontos: seg, detalhe: relogio(seg) }, caixa)) carregarRanking();
   }
@@ -434,6 +536,73 @@ export function jogo2048() {
     },
   });
 
+  // Menu de administrador. Usou, a partida não vale recorde (até o próximo jogo).
+  let admUsado = false;
+  const ativa = () => { if (situacao === 'fim') throw new Error('A partida acabou: comece outra (ou desfaça a última jogada).'); };
+  const depoisDeMexer = () => { desenhar(); transmitirQuadro(); };
+  const menu = menuSozinho({
+    titulo: '2048', jogo: '2048', seg,
+    aoUsar: () => { admUsado = true; },
+    ativa,
+    acoes: () => [
+      {
+        id: 'peca', nome: 'Criar uma peça', grupo: 'Ajudar', ajuda: 'O bloco escolhido aparece num espaço vazio.',
+        campos: [{ id: 'v', nome: 'Bloco', tipo: 'escolha', opcoes: [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048].map(v => [v, String(v)]), padrao: 128 }],
+        executar({ v }) {
+          const l = livres();
+          if (!l.length) throw new Error('Não tem espaço vazio no tabuleiro.');
+          const i = l[Math.floor(Math.random() * l.length)];
+          blocos.push({ id: proximoId++, v, l: Math.floor(i / 4), c: i % 4, novo: true });
+          depoisDeMexer();
+          if (!temJogada()) fim();
+          return `Apareceu um bloco de ${v}.`;
+        },
+      },
+      {
+        id: 'desfazer', nome: 'Desfazer a última jogada', grupo: 'Ajudar', livre: true, ajuda: 'Funciona até depois do fim do jogo.',
+        executar() {
+          if (!historico.length) throw new Error('Não tem jogada para desfazer.');
+          desfazer();
+          return 'A última jogada foi desfeita.';
+        },
+      },
+      {
+        id: 'limpar', nome: 'Tirar os blocos pequenos', grupo: 'Ajudar', ajuda: 'Somem todos os blocos de 2 e de 4.',
+        executar() {
+          const saem = blocos.filter(b => b.v <= 4);
+          if (!saem.length) throw new Error('Não tem bloco de 2 nem de 4.');
+          if (saem.length === blocos.length) saem.pop(); // sempre fica um bloco
+          for (const b of saem) { elementos.get(b.id)?.remove(); elementos.delete(b.id); }
+          blocos = blocos.filter(b => !saem.includes(b));
+          depoisDeMexer();
+          return `Sumiram ${saem.length} ${saem.length === 1 ? 'bloco pequeno' : 'blocos pequenos'}.`;
+        },
+      },
+      {
+        id: 'dobrar', nome: 'Dobrar o maior bloco', grupo: 'Ajudar',
+        executar() {
+          const maior = blocos.reduce((m, b) => (b.v > m.v ? b : m), blocos[0]);
+          maior.v *= 2;
+          depoisDeMexer();
+          return `O maior bloco virou ${maior.v}.`;
+        },
+      },
+      {
+        id: 'pontos', nome: 'Dar pontos', grupo: 'Ajudar', campos: [{ id: 'n', nome: 'Quantos', tipo: 'numero', min: 1, max: 1000000, padrao: 1000 }],
+        executar({ n }) {
+          const k = quantos(n, 1000000);
+          pontos += k;
+          depoisDeMexer();
+          return `+${num(k)} pontos.`;
+        },
+      },
+      {
+        id: 'terminar', nome: 'Terminar a partida', grupo: 'Mexer na partida', perigo: true, ajuda: 'Acaba agora, com os pontos que tem.',
+        executar() { fim(); return 'A partida foi encerrada.'; },
+      },
+    ],
+  });
+
   function desfazer() {
     const antes = historico.pop();
     if (!antes) { aviso('Não tem jogada para desfazer.'); return; }
@@ -463,6 +632,8 @@ export function jogo2048() {
     historico = [];
     ouroUsado = false;
     seg.novaPartida();
+    admUsado = false;
+    menu.novaPartida();
     faixa.hidden = true;
     sobre.hidden = true;
     novoBloco();
@@ -587,6 +758,7 @@ export function jogo2048() {
       botao('Jogar de novo', { classe: 'btn-ouro', icone: 'frente', onclick: novoJogo }));
     depois(() => { trocar(sobre, caixa); sobre.hidden = false; }, 400);
     transmitirQuadro();
+    if (admUsado || menu.usado()) { caixa.insertBefore(h('p', { class: 'cobra-recorde' }, icone('alerta'), NAO_VALE_ADM), caixa.lastChild); return; }
     if (!seg.valeRecorde()) { caixa.insertBefore(h('p', { class: 'cobra-recorde' }, icone('estrela'), 'Modo secreto ligado: esta partida não vale recorde.'), caixa.lastChild); return; }
     if (await guardarResultado({ jogo: '2048', pontos, detalhe: `maior bloco ${maior}` }, caixa)) carregarRanking();
   }
@@ -609,7 +781,9 @@ export function jogo2048() {
     const dir = DIRECOES_2048[e.code];
     if (!dir) return;
     e.preventDefault();
-    mover(dir);
+    // Pegadinhas do administrador: congelado não mexe; invertido vai para o lado contrário.
+    const vale = admDirecao(dir);
+    if (vale) mover(vale);
   };
   document.addEventListener('keydown', aoTeclar);
   let toque = null;
@@ -621,7 +795,8 @@ export function jogo2048() {
     if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
     const dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'direita' : 'esquerda') : (dy > 0 ? 'baixo' : 'cima');
     seg.direcao(dir);
-    mover(dir);
+    const vale = admDirecao(dir);
+    if (vale) mover(vale);
   });
   tabuleiro.addEventListener('pointercancel', () => { toque = null; });
 

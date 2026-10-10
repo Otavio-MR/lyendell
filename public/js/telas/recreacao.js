@@ -1,6 +1,7 @@
 // Recreação: salão com chat e partidas ao vivo, e os jogos de uma pessoa só (Pac-Coelho, cobrinha, quebra-cabeça e memória).
 
 import { h, trocar, icone, botao, botaoIcone, cabecalho, vazio, avatar, avatarPessoa, aviso, confirmar, get, post, pode, aoSair, dataHora, estado, num } from '../core.js';
+import { menuAdm, admDirecao, admPodeAgir, admVelocidade } from '../adm-jogos.js';
 import { rt, ouvir, enviar, lendoChat, criarPartida, entrarNaPartida, transmitir, enviarQuadro, pararTransmissao } from '../tempo-real.js';
 import { assistirPac } from './pac-coelho.js';
 import { abrirSalaQuiz, telaQuiz, teclaQuiz } from './quiz.js';
@@ -427,6 +428,8 @@ function painelRanking() {
 export function sala(id) {
   exigirAcesso();
   const raiz = h('div', { class: 'pagina rec-partida' });
+  // Menu de administrador: as ações de cada jogo ao vivo vêm do servidor (src/adm/).
+  menuAdm({ titulo: () => rt.partidas.get(id)?.nomeJogo || 'Partida', sala: () => id });
   let pedido = false;
   let tabuleiroAntes = null;
   let rodadasAntes = null;
@@ -1113,7 +1116,67 @@ export function cobrinha() {
   let recorde = null;
   const sorte = Math.random;
   const seg = segredosDoJogo('cobrinha', { aoMudar: () => { if (cobra) desenharTudo(); } });
-  const ritmo = () => (seg.ativo('cobra-turbo') ? Math.max(40, passoMs * 0.55) : passoMs);
+  // Menu de administrador: invencível, ritmo escolhido (multiplica o tempo do passo) e a partida sem recorde.
+  let admInvencivel = false;
+  let admRitmo = 1;
+  let semRecorde = false;
+  // Lenta (pegadinha do administrador): o passo demora o dobro.
+  const ritmo = () => (seg.ativo('cobra-turbo') ? Math.max(40, passoMs * 0.55) : passoMs) * admRitmo / admVelocidade();
+  const RITMOS_ADM = { lenta: 1.7, normal: 1, rapida: 0.6 };
+  const menu = menuAdm({
+    titulo: 'Cobrinha',
+    aoUsar: () => { semRecorde = true; },
+    acoes: [
+      {
+        id: 'invencivel', nome: 'Invencível', grupo: 'Ajudar', ajuda: 'Passa pelas paredes e pelo próprio corpo (até a próxima partida).',
+        campos: [{ id: 'ligar', nome: 'Invencível', tipo: 'escolha', opcoes: [['sim', 'Ligado'], ['nao', 'Desligado']], padrao: 'sim' }],
+        executar: ({ ligar }) => { menu.marcar(); admInvencivel = ligar === 'sim'; return admInvencivel ? 'A cobra está invencível.' : 'Invencível desligado.'; },
+      },
+      {
+        id: 'crescer', nome: 'Crescer', grupo: 'Ajudar', campos: [{ id: 'casas', nome: 'Quantas casas', tipo: 'numero', min: 1, max: 50, padrao: 5 }],
+        executar: ({ casas }) => {
+          const n = Math.max(1, Math.min(50, Math.round(casas) || 5));
+          menu.marcar();
+          const rabo = cobra[cobra.length - 1];
+          for (let k = 0; k < n; k++) cobra.push({ ...rabo });
+          desenharTudo();
+          return `A cobra cresceu ${n} ${n === 1 ? 'casa' : 'casas'}.`;
+        },
+      },
+      {
+        id: 'pontos', nome: 'Mais cenouras no placar', grupo: 'Ajudar', campos: [{ id: 'quantas', nome: 'Quantas', tipo: 'numero', min: 1, max: 999, padrao: 10 }],
+        executar: ({ quantas }) => {
+          const n = Math.max(1, Math.min(999, Math.round(quantas) || 10));
+          menu.marcar();
+          pontos += n;
+          pontosEl.textContent = pontos;
+          transmitirQuadro();
+          return `+${n} cenouras no placar.`;
+        },
+      },
+      {
+        id: 'velocidade', nome: 'Velocidade', grupo: 'Mexer na partida',
+        campos: [{ id: 'ritmo', nome: 'Velocidade', tipo: 'escolha', opcoes: [['lenta', 'Lenta'], ['normal', 'Normal'], ['rapida', 'Rápida']], padrao: 'normal' }],
+        executar: ({ ritmo: r }) => {
+          if (!RITMOS_ADM[r]) throw new Error('Escolha a velocidade.');
+          menu.marcar();
+          admRitmo = RITMOS_ADM[r];
+          return `Velocidade: ${{ lenta: 'lenta', normal: 'normal', rapida: 'rápida' }[r]}.`;
+        },
+      },
+      {
+        id: 'segredo', nome: 'Ligar código secreto', grupo: 'Modo', ajuda: 'Liga (ou desliga, se já estiver ligado) um modo secreto da cobrinha.',
+        campos: [{ id: 'chave', nome: 'Código', tipo: 'escolha', opcoes: Object.entries(SEGREDOS).filter(([, s]) => s.jogos.includes('cobrinha') && s.seq).map(([k, s]) => [k, s.nome]) }],
+        executar: ({ chave }) => {
+          const s = SEGREDOS[chave];
+          if (!s?.seq) throw new Error('Escolha um código.');
+          menu.marcar();
+          for (const d of s.seq) seg.direcao(d); // como se tivesse feito a sequência de setas
+          return `${s.nome}: ${seg.ativo(chave) ? 'ligado' : 'desligado'}.`;
+        },
+      },
+    ],
+  });
 
   function novoJogo() {
     cobra = [{ x: 6, y: 10 }, { x: 5, y: 10 }, { x: 4, y: 10 }];
@@ -1122,6 +1185,10 @@ export function cobrinha() {
     pontos = 0;
     passoMs = 135;
     seg.novaPartida();
+    admInvencivel = false;
+    admRitmo = 1;
+    semRecorde = false;
+    menu.novaPartida();
     pontosEl.textContent = '0';
     novaComida();
     situacao = 'pronto';
@@ -1167,8 +1234,8 @@ export function cobrinha() {
     const come = comida && cabeca.x === comida.x && cabeca.y === comida.y;
     const corpo = come ? cobra : cobra.slice(0, -1); // a ponta do rabo sai do lugar neste passo
     if (cabeca.x < 0 || cabeca.y < 0 || cabeca.x >= N || cabeca.y >= N || corpo.some(p => p.x === cabeca.x && p.y === cabeca.y)) {
-      fimDeJogo();
-      return;
+      if (!admInvencivel) { fimDeJogo(); return; }
+      cabeca = { x: (cabeca.x + N) % N, y: (cabeca.y + N) % N }; // invencível: atravessa a parede (e o corpo)
     }
     cobra.unshift(cabeca);
     if (come) {
@@ -1190,6 +1257,7 @@ export function cobrinha() {
     desenharTudo(true);
     mostrarSobre();
     if (!pontos) return;
+    if (semRecorde) { mostrarSobre('Menu de administrador usado: esta partida não vale recorde.'); return; }
     if (!seg.valeRecorde()) { mostrarSobre('Modo secreto ligado: esta partida não vale recorde.'); return; }
     try {
       const r = await post('/api/recreacao/recordes', { jogo: 'cobrinha', pontos });
@@ -1244,7 +1312,7 @@ export function cobrinha() {
   const aoTeclar = e => {
     if (e.target.closest?.('input, textarea, select, [contenteditable]') || document.querySelector('.modal-fundo')) return;
     const d = DIRECOES[e.code];
-    if (d) { e.preventDefault(); virar(d); return; }
+    if (d) { e.preventDefault(); const v = admDirecao(d); if (v) virar(v); return; } // pegadinha: invertido ou congelado
     if (e.code === 'Space' || e.code === 'KeyP') {
       e.preventDefault();
       if (situacao === 'jogando') pausar(); else comecar();
@@ -1264,7 +1332,8 @@ export function cobrinha() {
     if (Math.max(Math.abs(dx), Math.abs(dy)) < 20) return;
     const d = Math.abs(dx) > Math.abs(dy) ? [Math.sign(dx), 0] : [0, Math.sign(dy)];
     seg.direcao(nomeDir(d));
-    virar(d);
+    const v = admDirecao(d);
+    if (v) virar(v);
   });
 
   const aoEsconder = () => { if (document.hidden) pausar(); };
@@ -1277,7 +1346,7 @@ export function cobrinha() {
     document.removeEventListener('visibilitychange', aoEsconder);
   });
 
-  const seta = (ic, d, rotulo) => h('button', { class: `dpad-${ic}`, type: 'button', 'aria-label': rotulo, onpointerdown: e => { e.preventDefault(); seg.direcao(nomeDir(d)); virar(d); } }, icone(ic));
+  const seta = (ic, d, rotulo) => h('button', { class: `dpad-${ic}`, type: 'button', 'aria-label': rotulo, onpointerdown: e => { e.preventDefault(); seg.direcao(nomeDir(d)); const v = admDirecao(d); if (v) virar(v); } }, icone(ic));
 
   function carregarRanking() {
     get('/api/recreacao/ranking').then(r => {
@@ -1322,6 +1391,23 @@ export function quebraCabeca() {
   let transmissao = null; // { info, estado() } enquanto monta uma imagem
   let redesenharQuebra = null;
   const seg = segredosDoJogo('quebra', { aoMudar: () => redesenharQuebra?.() });
+  // Menu de administrador: resolver e encaixar peças na imagem que está sendo montada (admJogo).
+  let semRecorde = false;
+  let admJogo = null;
+  const exigirImagem = () => { if (!admJogo) throw new Error('Escolha uma imagem primeiro.'); return admJogo; };
+  const menu = menuAdm({
+    titulo: 'Quebra-cabeça',
+    aoUsar: () => { semRecorde = true; },
+    acoes: [
+      { id: 'resolver', nome: 'Resolver tudo', grupo: 'Mexer na partida', perigo: true, ajuda: 'Todas as peças vão para o lugar.', executar: () => exigirImagem().resolver() },
+      {
+        id: 'encaixar', nome: 'Encaixar peças', grupo: 'Ajudar', campos: [{ id: 'quantas', nome: 'Quantas', tipo: 'numero', min: 1, max: 25, padrao: 3 }],
+        executar: ({ quantas }) => exigirImagem().encaixar(Math.max(1, Math.min(25, Math.round(quantas) || 3))),
+      },
+    ],
+  });
+  // Congelado por uma pegadinha do administrador: não mexe nas peças.
+  const congelado = () => { if (admPodeAgir()) return false; aviso('Você está congelado! Espere passar.', 'erro'); return true; };
   aoSair(() => {
     clearInterval(cronometro);
     pararTransmissao();
@@ -1335,6 +1421,7 @@ export function quebraCabeca() {
 
   function escolher() {
     clearInterval(cronometro);
+    admJogo = null;
     if (transmissao) { transmissao = null; pararTransmissao(); }
     const grade = h('div', { class: 'qc-fotos' }, h('div', { class: 'carregando-tela' }, h('span', { class: 'giro' })));
     const tamanhos = h('div', { class: 'segmentado' });
@@ -1379,6 +1466,8 @@ export function quebraCabeca() {
     const total = n * n;
     let pecas = embaralhar(total);
     seg.novaPartida();
+    semRecorde = false;
+    menu.novaPartida();
     let selecionada = null;
     let movimentos = 0;
     let comeco = null;
@@ -1416,7 +1505,7 @@ export function quebraCabeca() {
     if (rt.conectado) transmitir('quebra', transmissao.info);
 
     function trocarPecas(a, b) {
-      if (resolvido || a === b) return;
+      if (resolvido || a === b || congelado()) return;
       if (!comeco) {
         comeco = Date.now();
         cronometro = setInterval(() => {
@@ -1434,7 +1523,7 @@ export function quebraCabeca() {
     }
 
     function tocar(i) {
-      if (resolvido) return;
+      if (resolvido || congelado()) return;
       if (selecionada == null) selecionada = i;
       else if (selecionada === i) selecionada = null;
       else { trocarPecas(selecionada, i); return; }
@@ -1483,6 +1572,7 @@ export function quebraCabeca() {
           botao('Jogar de novo', { classe: 'btn-ouro', onclick: () => jogar(titulo) }),
           botao('Outra imagem', { onclick: escolher })));
       if (seg.ativo('festa')) efeito('confete');
+      if (semRecorde) { resultado.insertBefore(h('p', { class: 'cobra-recorde' }, icone('alerta'), 'Menu de administrador usado: esta partida não vale recorde.'), resultado.children[2]); return; }
       if (!seg.valeRecorde()) { resultado.insertBefore(h('p', { class: 'cobra-recorde' }, icone('estrela'), 'Modo secreto ligado: esta partida não vale recorde.'), resultado.children[2]); return; }
       try {
         const r = await post('/api/recreacao/recordes', { jogo: 'quebra', variante, pontos: s, detalhe: `${movimentos} trocas` });
@@ -1501,6 +1591,34 @@ export function quebraCabeca() {
           : h('p', { class: 'painel-vazio' }, 'Ninguém montou nesse tamanho ainda.'));
       }).catch(() => {});
     }
+
+    // O que o menu de administrador faz nesta imagem (marca a partida antes de terminar: o recorde não vai).
+    admJogo = {
+      resolver() {
+        if (resolvido) throw new Error('A imagem já está montada.');
+        menu.marcar();
+        if (!comeco) comeco = Date.now();
+        pecas = pecas.map((_, i) => i);
+        selecionada = null;
+        desenhar();
+        terminou();
+        return 'Imagem montada.';
+      },
+      encaixar(n) {
+        if (resolvido) throw new Error('A imagem já está montada.');
+        const erradas = pecas.map((p, i) => (p === i ? -1 : i)).filter(i => i >= 0).sort(() => Math.random() - 0.5).slice(0, n);
+        menu.marcar();
+        if (!comeco) comeco = Date.now();
+        for (const k of erradas) {
+          const j = pecas.indexOf(k);
+          [pecas[k], pecas[j]] = [pecas[j], pecas[k]];
+        }
+        selecionada = null;
+        desenhar();
+        if (pecas.every((p, i) => p === i)) { terminou(); return 'Encaixou as últimas peças: imagem montada.'; }
+        return `Encaixou ${erradas.length} ${erradas.length === 1 ? 'peça' : 'peças'}.`;
+      },
+    };
 
     desenhar();
     carregarRanking();
@@ -1591,6 +1709,70 @@ export function memoria() {
   let fecharTimer = null;
   let recorde = null;
   let espiou = false;
+  let semRecorde = false; // o menu de administrador foi usado nesta partida
+  let espiarTimer = null;
+  const comecarRelogio = () => {
+    if (situacao !== 'pronto') return;
+    situacao = 'jogando';
+    inicio = Date.now();
+    relogioId = setInterval(tique, 500);
+  };
+  // Os pares que faltam: [carta, carta] (sem os que têm uma carta aberta agora, se der).
+  const paresQueFaltam = () => {
+    const mapa = new Map();
+    cartas.forEach((c, i) => { if (!c.achada) mapa.set(c.fig, [...(mapa.get(c.fig) || []), i]); });
+    return [...mapa.values()];
+  };
+  const menu = menuAdm({
+    titulo: 'Jogo da Memória',
+    aoUsar: () => { semRecorde = true; },
+    acoes: [
+      {
+        id: 'revelar', nome: 'Revelar todas', grupo: 'Ajudar', ajuda: 'Todas as cartas aparecem por alguns segundos.',
+        campos: [{ id: 'segundos', nome: 'Segundos', tipo: 'numero', min: 1, max: 10, padrao: 3 }],
+        executar: ({ segundos }) => {
+          if (situacao === 'fim') throw new Error('A partida já acabou.');
+          const s = Math.max(1, Math.min(10, Math.round(segundos) || 3));
+          menu.marcar();
+          botoes.forEach((b, i) => { if (!cartas[i].achada) b.classList.add('virada'); });
+          clearTimeout(espiarTimer);
+          espiarTimer = setTimeout(atualizar, s * 1000);
+          return `Cartas à mostra por ${s} s.`;
+        },
+      },
+      {
+        id: 'par', nome: 'Resolver um par', grupo: 'Ajudar',
+        executar: () => {
+          if (situacao === 'fim') throw new Error('A partida já acabou.');
+          const lista = paresQueFaltam();
+          const livres = lista.filter(([a, b]) => !abertas.includes(a) && !abertas.includes(b));
+          const par = (livres.length ? livres : lista)[Math.floor(Math.random() * (livres.length || lista.length))];
+          menu.marcar();
+          comecarRelogio();
+          for (const i of par) cartas[i].achada = true;
+          abertas = abertas.filter(i => !par.includes(i));
+          achados++;
+          if (achados === cartas.length / 2) { fecharAbertas(); fimDeJogo(); return 'Era o último par: fim de jogo.'; }
+          atualizar();
+          transmitirQuadro(true);
+          return 'Um par resolvido.';
+        },
+      },
+      {
+        id: 'terminar', nome: 'Terminar', grupo: 'Mexer na partida', perigo: true, ajuda: 'Acha todos os pares e termina a partida.',
+        executar: () => {
+          if (situacao === 'fim') throw new Error('A partida já acabou.');
+          menu.marcar();
+          comecarRelogio();
+          fecharAbertas();
+          cartas.forEach(c => { c.achada = true; });
+          achados = cartas.length / 2;
+          fimDeJogo();
+          return 'Partida terminada.';
+        },
+      },
+    ],
+  });
   const segredos = segredosDoJogo('memoria', {
     aoUsar: chave => {
       if (chave !== 'memoria-espiar' || espiou || situacao === 'fim') return false;
@@ -1613,6 +1795,9 @@ export function memoria() {
     seg = 0;
     situacao = 'pronto';
     espiou = false;
+    semRecorde = false;
+    clearTimeout(espiarTimer);
+    menu.novaPartida();
     segredos.novaPartida();
     moldura.style.setProperty('--colunas', col);
     moldura.style.setProperty('--linhas', lin);
@@ -1635,12 +1820,9 @@ export function memoria() {
 
   function clicar(i) {
     if (situacao === 'fim' || cartas[i].achada || abertas.includes(i)) return;
+    if (!admPodeAgir()) { aviso('Você está congelado! Espere passar.', 'erro'); return; } // pegadinha do administrador
     if (fecharTimer) fecharAbertas();
-    if (situacao === 'pronto') {
-      situacao = 'jogando';
-      inicio = Date.now();
-      relogioId = setInterval(tique, 500);
-    }
+    comecarRelogio();
     abertas.push(i);
     if (abertas.length === 2) {
       jogadas++;
@@ -1689,6 +1871,7 @@ export function memoria() {
     atualizar();
     transmitirQuadro(true);
     if (segredos.ativo('festa')) efeito('confete');
+    if (semRecorde) { caixa.insertBefore(h('p', { class: 'cobra-recorde' }, icone('alerta'), 'Menu de administrador usado: esta partida não vale recorde.'), caixa.lastChild); return; }
     if (!segredos.valeRecorde()) { caixa.insertBefore(h('p', { class: 'cobra-recorde' }, icone('estrela'), 'Modo secreto ligado: esta partida não vale recorde.'), caixa.lastChild); return; }
     try {
       const r = await post('/api/recreacao/recordes', { jogo: 'memoria', variante: tamanhoMemoria, pontos: jogadas, detalhe: relogio(seg) });
@@ -1734,6 +1917,7 @@ export function memoria() {
   aoSair(() => {
     clearInterval(relogioId);
     clearTimeout(fecharTimer);
+    clearTimeout(espiarTimer);
     situacao = 'fim';
     pararTransmissao();
   });

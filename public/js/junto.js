@@ -75,6 +75,7 @@ export function juntoNoJogo(jogo, { aoLargar, aoAcabar } = {}) {
   let ultimaPos = 0;
   let posPendente = null;
   let timerPos = null;
+  let reviver = false; // o administrador me trouxe de volta: recomeça a tela quando a sala disser que voltei
 
   const jt = {
     id, jogo, modo: s0.estado.modo, semente: s0.estado.semente, dif: s0.estado.dif, n: s0.estado.n, eu: s0.eu,
@@ -177,7 +178,9 @@ export function juntoNoJogo(jogo, { aoLargar, aoAcabar } = {}) {
     const s = rt.partidas.get(id);
     if (!s || !s.estado) return;
     sala = s;
-    limite = Math.min(limite, Date.now() + s.estado.acabaEm);
+    // O relógio do fim só adianta (mensagem atrasada), a não ser que o administrador dê mais tempo.
+    const novoLimite = Date.now() + s.estado.acabaEm;
+    limite = novoLimite > limite + 2000 ? novoLimite : Math.min(limite, novoLimite);
     // O relógio: a estimativa mais cedo é a mais certa (a mensagem só pode chegar atrasada).
     inicio = Math.min(inicio, Date.now() + s.estado.largadaEm);
     if (s.estado.fase !== faseVista) {
@@ -189,7 +192,13 @@ export function juntoNoJogo(jogo, { aoLargar, aoAcabar } = {}) {
     }
     desenharPainel();
     if (s.status === 'fim') terminou(s);
+    else if (reviver && !s.estado.p?.[jt.eu]?.fora) voltarAoJogo();
   }));
+  // Quem estava fora e foi revivido pelo administrador: a tela do jogo recomeça e entra de novo na partida.
+  function voltarAoJogo() {
+    reviver = false;
+    setTimeout(() => window.dispatchEvent(new HashChangeEvent('hashchange')), 0);
+  }
   aoSair(ouvir('sala:fechada', () => { if (!rt.partidas.get(id)) terminou(null); }));
   aoSair(ouvir('junto:pos', m => { if (m.id === id && m.i !== jt.eu) jt.aoPos(m.i, m.d); }));
   aoSair(ouvir('junto:quadro', m => { if (m.id === id) jt.aoQuadro(m.q); }));
@@ -202,6 +211,13 @@ export function juntoNoJogo(jogo, { aoLargar, aoAcabar } = {}) {
       case 'fora': jt.aoFora(ev.i); break;
       case 'chegou': jt.aoChegou(ev.i); break;
       case 'fase': break; // a fase nova chega junto com a sala (com a hora de começar)
+      case 'reviveu':
+        // Para os outros, o jogo pode mostrar o coelho de volta (aoEvento); o meu recomeça a tela.
+        if (ev.i !== jt.eu) { jt.aoEvento(ev.i, ev); break; }
+        if (acabou) break;
+        reviver = true;
+        if (!sala.estado?.p?.[jt.eu]?.fora) voltarAoJogo();
+        break;
       case 'pontos': {
         const g = sala.estado?.p?.[ev.i];
         if (g) { g.pontos = ev.n; desenharPainel(); }

@@ -182,7 +182,8 @@ export function segredosDoJogo(jogo, { bloqueado = false, aoMudar, aoUsar } = {}
     ajudou && h('small', null, 'esta partida não vale recorde'));
   }
 
-  function anunciar(chave, texto, recusado = false) {
+  // registrar: false quando quem liga é o menu de administrador (não vai para o Livro de segredos nem dá conquista).
+  function anunciar(chave, texto, recusado = false, registrar = true) {
     const s = SEGREDOS[chave];
     const flash = h('div', { class: 'segredo-flash', 'aria-hidden': 'true' }, h('span', null, 'CÓDIGO SECRETO!'));
     document.body.append(flash);
@@ -196,34 +197,36 @@ export function segredosDoJogo(jogo, { bloqueado = false, aoMudar, aoUsar } = {}
       setTimeout(() => { el.classList.add('saindo'); setTimeout(() => el.remove(), 300); }, 6000);
     }
     // Guarda no Livro de segredos (as conquistas chegam pela conexão ao vivo).
-    if (!avisados.has(chave)) {
+    if (registrar && !avisados.has(chave)) {
       avisados.add(chave);
       post('/api/recreacao/segredos', { chave }).catch(() => {});
     }
   }
 
-  function alternar(chave) {
+  // Devolve o que aconteceu: 'usado' ou 'recusado' (os de uma vez só), 'ligado' ou 'desligado'.
+  function alternar(chave, registrar = true) {
     const s = SEGREDOS[chave];
     if (s.instantaneo) {
       if (aoUsar?.(chave) === false) {
-        anunciar(chave, 'Esse já foi usado agora. Tente de novo mais tarde!', true);
-        return;
+        if (registrar) anunciar(chave, 'Esse já foi usado agora. Tente de novo mais tarde!', true); // o menu avisa do jeito dele
+        return 'recusado';
       }
       if (!s.recorde) ajudou = true;
-      anunciar(chave);
+      anunciar(chave, null, false, registrar);
       desenharSelo();
-      return;
+      return 'usado';
     }
     const ligar = !ativos.has(chave);
     if (ligar) {
       ativos.add(chave);
       if (!s.recorde) ajudou = true;
-      anunciar(chave);
+      anunciar(chave, null, false, registrar);
     } else {
       ativos.delete(chave);
     }
     aoMudar?.(chave, ligar);
     desenharSelo();
+    return ligar ? 'ligado' : 'desligado';
   }
 
   function conferir() {
@@ -266,5 +269,8 @@ export function segredosDoJogo(jogo, { bloqueado = false, aoMudar, aoUsar } = {}
       desenharSelo();
     },
     valeRecorde: () => !ajudou,
+    // O menu de administrador liga (ou desliga) um código deste jogo direto, como se tivesse sido digitado,
+    // mas sem guardar no Livro de segredos. Devolve como alternar() (ou null se o código não é deste jogo).
+    usar: chave => (meus.some(([c]) => c === chave) ? alternar(chave, false) : null),
   };
 }

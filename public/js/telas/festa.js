@@ -8,6 +8,7 @@ import { desenharCoelho, elipse, sombrear } from '../desenho-coelho.js';
 import { CORES_JUNTO, sorteJunto } from '../junto.js';
 import { som } from '../arcade.js';
 import { registrarPecas, desenharSprite, aoMudarSprites } from '../sprites.js';
+import { admDirecao, admPodeAgir, admVelocidade } from '../adm-jogos.js';
 
 const L = 1200;
 const A = 800;
@@ -478,7 +479,7 @@ export function criarTelaFesta(id, { sair, sairJa }) {
       const tipo = m.tipo;
       return h('div', { class: 'painel festa-minijogo-cartao' },
         h('h2', null, icone('trofeu'), m.nome),
-        h('p', { class: 'partida-status vitoria' }, m.vencedores?.length ? `${m.vencedores.map(k => e.j[k].nome).join(' e ')} ${m.vencedores.length > 1 ? 'venceram' : 'venceu'}! +10 cenouras` : 'Ninguém venceu.'),
+        h('p', { class: 'partida-status vitoria' }, m.pulado ? 'O administrador pulou este minijogo.' : m.vencedores?.length ? `${m.vencedores.map(k => e.j[k].nome).join(' e ')} ${m.vencedores.length > 1 ? 'venceram' : 'venceu'}! +10 cenouras` : 'Ninguém venceu.'),
         h('ol', { class: 'festa-lista' }, e.j.map((p, k) => {
           const r = m.placar?.[k];
           const texto = !r ? '' : tipo === 'pontos' ? `${r.pontos} pts` : tipo === 'corrida' ? (r.vivo ? `chegou em ${r.tempo.toFixed(1)} s` : `${Math.round(r.pontos)}%`) : r.vivo ? 'sobreviveu!' : `caiu aos ${Math.floor(r.tempo)} s`;
@@ -511,6 +512,8 @@ export function criarTelaFesta(id, { sair, sairJa }) {
       pegar: chave => enviar('junto:evento', { id, ev: { tipo: 'pegar', chave: String(chave) } }, { silencioso: true }),
       reportar: r => { if (reportei || eu < 0) return; reportei = true; enviar('junto:evento', { id, ev: { tipo: 'resultado', k: eu, r } }, { silencioso: true }); },
       som,
+      // Pegadinhas do administrador (controles invertidos, congelado, lento): o minijogo aplica na entrada.
+      adm: { direcao: admDirecao, podeAgir: admPodeAgir, velocidade: admVelocidade },
     };
     const inst = def.criar(ctx);
     const tirar = [

@@ -10,6 +10,8 @@
 // Puro (sem rede e sem relógio): a mesma semente com os mesmos comandos dá os mesmos quadros.
 // BATALHA_ESCALA (só para testes) encurta o balão e a área segura (0,05 = 20 vezes mais rápido).
 
+const adm = require('./adm-jogos');
+
 const MUNDO = 2400;
 const T = 40;              // lado de uma casa do terreno
 const G = MUNDO / T;       // 60 x 60 casas
@@ -495,7 +497,8 @@ function novaZona(sim, de, raio) {
   return { x: de.x, y: de.y, r: raio };
 }
 
-function novo({ modo, n, dif, semente, escala, autopiloto } = {}) {
+// ids (opcional): o usuário de cada pessoa, para as pegadinhas do menu de administrador (veja uidDe).
+function novo({ modo, n, dif, semente, escala, autopiloto, ids } = {}) {
   n = clamp(Math.floor(Number(n) || 1), 1, 10);
   dif = Math.max(1, Number(dif) || 1);
   const coop = modo === 'coop';
@@ -509,6 +512,7 @@ function novo({ modo, n, dif, semente, escala, autopiloto } = {}) {
     lutadores: [], balas: [], granadas: [], explosoes: [], feed: [], acertos: [],
     itens: new Map(), baldesItens: Array.from({ length: NB * NB }, () => new Set()), proxItem: 1, proxFeed: 1,
     mapaPara: new Set(), conhecidos: new Map(), removidos: [], balao: null, zona: null,
+    uids: Array.isArray(ids) ? ids.slice(0, n) : null,
   };
   const nomes = [...RAPOSOS];
   for (let k = nomes.length - 1; k > 0; k--) { const j = Math.floor(sorte() * (k + 1)); [nomes[k], nomes[j]] = [nomes[j], nomes[k]]; }
@@ -565,14 +569,20 @@ function novoCerebro(sim) {
 
 /* ─── Comandos ─── */
 
+// O usuário de cada pessoa (sim.uids[i]), para as pegadinhas do menu de administrador (congelar, lento,
+// invertido). Robôs não têm. Sem a lista, ninguém é atrapalhado (e o jogo continua puro).
+const uidDe = (sim, p) => (p.humano ? sim.uids?.[p.i] ?? null : null);
+
 // ev: { tipo: 'in', sq, mx, my, a, d, at, ac: ['pegar', ...], id } (id: o item para pegar).
 function agir(sim, i, ev) {
   const p = sim.lutadores[i];
   if (!p || sim.fim || !ev || ev.tipo !== 'in' || p.estado === SAIU) return null;
   if (Array.isArray(ev.ac)) {
+    const congelado = !adm.podeAgir(uidDe(sim, p)); // congelado (pegadinha): só pode pedir o mapa
     for (const a of ev.ac.slice(0, 6)) {
       if (!ACOES.has(a)) continue;
       if (a === 'mapa') { sim.mapaPara.delete(i); sim.conhecidos.delete(i); continue; }
+      if (congelado) continue;
       if (p.acoes.length < 8) p.acoes.push(a === 'pegar' && Number.isInteger(ev.id) ? { a, id: ev.id } : { a });
     }
   }
@@ -609,7 +619,7 @@ const vivoNaPartida = p => p.estado === AVIAO || p.estado === CAINDO || p.estado
 const aliados = (sim, a, b) => a.eq === b.eq;
 
 function aplicarDano(sim, alvo, dano, autor, arma, ax, ay) {
-  if (sim.fim || !noChao(alvo) || dano <= 0) return;
+  if (sim.fim || !noChao(alvo) || dano <= 0 || alvo.invencivel > sim.t) return;
   const absorvido = Math.min(alvo.escudo, dano);
   alvo.escudo -= absorvido;
   alvo.vida -= dano - absorvido;
@@ -713,7 +723,7 @@ function atirar(sim, p, dt) {
     if (p.recarga <= 0) terminarRecarga(p);
     return;
   }
-  if (!p.in.at || p.espera > 0) return;
+  if (!p.in.at || p.espera > 0 || !adm.podeAgir(uidDe(sim, p))) return; // congelado não atira
   const a = p.in.a;
   if (!w) {
     // Patada: bem de perto.
@@ -925,17 +935,20 @@ function pular(sim, p) {
 
 // Achou chão: se caiu no mar ou num obstáculo, vai para o lugar livre mais perto.
 function pousar(sim, p) {
-  const m = sim.mapa;
   p.estado = VIVO;
+  [p.x, p.y] = lugarLivre(sim.mapa, p.x, p.y);
+}
+function lugarLivre(m, x0, y0) {
   for (let r = 0; r < 1500; r += 20) {
     const voltas = r === 0 ? 1 : Math.ceil((2 * Math.PI * r) / 20);
     for (let k = 0; k < voltas; k++) {
       const a = (k / voltas) * Math.PI * 2;
-      const x = clamp(p.x + Math.cos(a) * r, 40, MUNDO - 40);
-      const y = clamp(p.y + Math.sin(a) * r, 40, MUNDO - 40);
-      if (pisavel(m, x, y) && terreno(m, x, y) !== RIO && livreDeObstaculos(m, x, y, RAIO + 2)) { p.x = x; p.y = y; return; }
+      const x = clamp(x0 + Math.cos(a) * r, 40, MUNDO - 40);
+      const y = clamp(y0 + Math.sin(a) * r, 40, MUNDO - 40);
+      if (pisavel(m, x, y) && terreno(m, x, y) !== RIO && livreDeObstaculos(m, x, y, RAIO + 2)) return [x, y];
     }
   }
+  return [x0, y0];
 }
 
 function andarBalao(sim, dt) {
@@ -955,18 +968,26 @@ function velocidade(sim, p) {
   let v = VEL;
   if (terreno(sim.mapa, p.x, p.y) === RIO) v *= 0.55;
   if (p.cura) v *= 0.7;
-  return v;
+  return v * adm.velocidade(uidDe(sim, p)); // lento (pegadinha): metade
 }
 
 function mover(sim, p, dt) {
   const m = sim.mapa;
   let { mx, my } = p.in;
   if (p.humano && !p.bot && sim.t - p.inT > 1) { mx = 0; my = 0; p.in.at = false; } // sem comandos há 1 s: para
+  const uid = uidDe(sim, p);
+  if (uid != null) {
+    // Pegadinhas: congelado fica parado; invertido anda para o lado contrário.
+    const d = adm.direcao(uid, { x: mx, y: my });
+    mx = d ? d.x : 0;
+    my = d ? d.y : 0;
+  }
   if (p.estado === CAINDO) {
-    p.x = clamp(p.x + mx * VEL_QUEDA * dt, 30, MUNDO - 30);
-    p.y = clamp(p.y + my * VEL_QUEDA * dt, 30, MUNDO - 30);
-    p.vx = mx * VEL_QUEDA;
-    p.vy = my * VEL_QUEDA;
+    const vq = VEL_QUEDA * adm.velocidade(uid);
+    p.x = clamp(p.x + mx * vq * dt, 30, MUNDO - 30);
+    p.y = clamp(p.y + my * vq * dt, 30, MUNDO - 30);
+    p.vx = mx * vq;
+    p.vy = my * vq;
     p.queda -= dt;
     if (p.queda <= 0) pousar(sim, p);
     return;
@@ -991,8 +1012,8 @@ function mover(sim, p, dt) {
 function andarZona(sim, dt) {
   const z = sim.zona;
   const esc = sim.escala;
-  if (z.modo !== 'fim') {
-    z.resta -= dt;
+  if (z.modo !== 'fim' && !sim.zonaParada) {
+    z.resta -= dt * (sim.zonaRitmo || 1); // o menu de administrador pode parar a área ou fechar mais rápido
     if (z.modo === 'espera' && z.resta <= 0) {
       z.modo = 'fecha';
       z.resta = ZONA[z.fase][1] * esc;
@@ -1020,7 +1041,7 @@ function andarZona(sim, dt) {
   }
   const dano = (ZONA[Math.min(z.fase, ZONA.length - 1)][3] / esc) * dt;
   for (const p of sim.lutadores) {
-    if (!noChao(p) || Math.hypot(p.x - z.x, p.y - z.y) <= z.r) continue;
+    if (!noChao(p) || p.invencivel > sim.t || Math.hypot(p.x - z.x, p.y - z.y) <= z.r) continue;
     p.vida -= dano;
     if (p.vida <= 0) eliminar(sim, p, -1, COD_ZONA);
   }
@@ -1457,8 +1478,163 @@ function resultado(sim, presentes, porTempo = false) {
 // Os pontos de cada pessoa (junto.js copia para o placar da sala): quantos eliminou.
 const pontos = sim => sim.lutadores.filter(p => p.humano).map(p => p.abates);
 
+/* ─── Menu de administrador (src/adm/arena-batalha.js) ─── */
+
+// Leva o lutador para (x, y): no chão, para o lugar livre mais perto; no balão, pula e cai lá.
+function levar(sim, p, x, y) {
+  if (p.estado === AVIAO) pular(sim, p);
+  if (p.estado === CAINDO) { p.x = clamp(x, 30, MUNDO - 30); p.y = clamp(y, 30, MUNDO - 30); return; }
+  [p.x, p.y] = lugarLivre(sim.mapa, x, y);
+  p.vx = 0;
+  p.vy = 0;
+}
+
+const admin = {
+  // Quem é cada pessoa (os usuários da sala, na mesma ordem): é o que liga as pegadinhas aos lutadores.
+  donos(sim, uids) { sim.uids = Array.isArray(uids) ? [...uids] : null; },
+  // Vida cheia; quem já tinha caído volta para a ilha (no meio da área segura).
+  vida(sim, i) {
+    const p = sim.lutadores[i];
+    if (!p || p.estado === SAIU || sim.fim) return null;
+    if (p.estado === FORA) {
+      const z = sim.zona;
+      Object.assign(p, { estado: VIVO, vida: 100, escudo: 0, colocacao: 0, matador: -1, atacante: -1, cura: null, recarga: 0, espera: 0 });
+      [p.x, p.y] = lugarLivre(sim.mapa, z.x, z.y);
+      return 'reviveu';
+    }
+    p.vida = 100;
+    return 'curou';
+  },
+  escudo(sim, i) { sim.lutadores[i].escudo = 100; },
+  invencivel(sim, i, seg) { sim.lutadores[i].invencivel = sim.t + seg; },
+  // Uma arma (t: 0 a 4, raridade r: 0 a 4) com o pente e a munição cheios. Mãos cheias: troca a da mão
+  // (a velha fica no chão).
+  arma(sim, i, t, r) {
+    const p = sim.lutadores[i];
+    const A = ARMAS[t];
+    const nova = { t, r, pente: A.pente };
+    const vazio = p.armas.findIndex(w => !w);
+    if (vazio >= 0) { p.armas[vazio] = nova; p.arma = vazio; } else {
+      const velha = p.armas[p.arma];
+      const [x, y] = lugarParaItem(sim, p.x, p.y, 1);
+      novoItem(sim, ARMA, velha.t, velha.r, velha.pente, x, y);
+      p.armas[p.arma] = nova;
+    }
+    p.recarga = 0;
+    p.mun[A.mun] = capMun(p, A.mun);
+  },
+  // Itens: 'municao' (toda cheia), 'curas' (bandagens e poções), 'granadas', 'mochila' ou 'tudo'.
+  itens(sim, i, qual) {
+    const p = sim.lutadores[i];
+    if (qual === 'mochila' || qual === 'tudo') p.mochila = true;
+    if (qual === 'municao' || qual === 'tudo') p.mun = p.mun.map((_, k) => capMun(p, k));
+    if (qual === 'curas' || qual === 'tudo') { p.band = cap(p, 'band'); p.poc = cap(p, 'poc'); }
+    if (qual === 'granadas' || qual === 'tudo') p.gran = cap(p, 'gran');
+  },
+  // Tira as armas da mão (ficam no chão, perto).
+  desarmar(sim, i) {
+    const p = sim.lutadores[i];
+    let n = 0;
+    p.armas.forEach((w, k) => {
+      if (!w) return;
+      const [x, y] = lugarParaItem(sim, p.x, p.y, k + 2);
+      novoItem(sim, ARMA, w.t, w.r, w.pente, x, y);
+      n++;
+    });
+    p.armas = [null, null];
+    p.recarga = 0;
+    return n;
+  },
+  // destino: 'centro' (da área segura) ou 'longe' (o lugar da área mais longe dos outros).
+  teleportar(sim, i, destino) {
+    const p = sim.lutadores[i];
+    const z = sim.zona;
+    if (destino === 'longe') {
+      const outros = sim.lutadores.filter(o => o !== p && noChao(o) && !aliados(sim, o, p));
+      let melhor = { x: z.x, y: z.y };
+      let maior = -1;
+      for (let k = 0; k < 40; k++) {
+        const c = pontoNaZona(sim, z, 0.9);
+        const d = outros.length ? Math.min(...outros.map(o => Math.hypot(o.x - c.x, o.y - c.y))) : 0;
+        if (d > maior) { maior = d; melhor = c; }
+      }
+      levar(sim, p, melhor.x, melhor.y);
+    } else levar(sim, p, z.x, z.y);
+  },
+  // A área segura: fecha a fase de agora na hora (vai direto para o círculo seguinte), fecha mais rápido
+  // (ritmo) ou para.
+  fecharZona(sim) {
+    const z = sim.zona;
+    if (z.modo === 'fim') return false;
+    Object.assign(z, { x: z.para.x, y: z.para.y, r: z.para.r });
+    z.fase++;
+    if (z.fase < ZONA.length) {
+      z.modo = 'espera';
+      z.resta = ZONA[z.fase][0] * sim.escala;
+      z.para = novaZona(sim, z, ZONA[z.fase][2]);
+    } else {
+      z.modo = 'fim';
+      z.fase = ZONA.length - 1;
+      z.resta = 0;
+    }
+    return true;
+  },
+  ritmoZona(sim, r) { sim.zonaRitmo = Math.max(0.25, Math.min(8, Number(r) || 1)); },
+  pararZona(sim, parar) { sim.zonaParada = !!parar; },
+  // Tira os robôs vivos da ilha (as coisas deles ficam no chão). Devolve quantos.
+  tirarRobos(sim) {
+    let n = 0;
+    for (const p of sim.lutadores) {
+      if (p.humano || !vivoNaPartida(p) || sim.fim) continue;
+      eliminar(sim, p, -1, COD_SAIU);
+      p.estado = SAIU;
+      n++;
+    }
+    return n;
+  },
+  // Mais robôs: caem do céu dentro da área segura. Devolve quantos entraram.
+  colocarRobos(sim, qtd) {
+    const livres = Math.max(0, 24 - sim.lutadores.length);
+    const n = Math.min(livres, Math.max(1, Math.floor(qtd)));
+    if (!n || sim.fim) return 0;
+    let eq = Math.max(...sim.lutadores.map(p => p.eq)) + 1;
+    for (let k = 0; k < n; k++) {
+      const i = sim.lutadores.length;
+      const [nome, pelo] = RAPOSOS[i % RAPOSOS.length];
+      const p = novoLutador(i, false, nome, sim.modo === 'coop' ? eq + Math.floor(k / 4) : i);
+      p.pelo = pelo;
+      p.bot = novoCerebro(sim);
+      const c = pontoNaZona(sim, sim.zona, 0.8);
+      p.bot.pouso = c;
+      Object.assign(p, { estado: CAINDO, x: clamp(c.x + (sim.sorte() - 0.5) * 200, 30, MUNDO - 30), y: clamp(c.y + (sim.sorte() - 0.5) * 200, 30, MUNDO - 30), queda: QUEDA * Math.max(0.2, sim.escala) });
+      sim.lutadores.push(p);
+    }
+    // Os navegadores precisam dos nomes e das cores dos novos: o mapa vai de novo para todos.
+    sim.mapaPara.clear();
+    sim.conhecidos.clear();
+    return n;
+  },
+  // Acaba agora: i vence (no co-op, a equipe toda); -1: ninguém vence.
+  vencer(sim, i) {
+    if (sim.fim) return;
+    const p = i >= 0 ? sim.lutadores[i] : null;
+    if (!p) { acabar(sim, 'adm', [], []); return; }
+    if (sim.modo === 'coop') {
+      const equipe = sim.lutadores.filter(o => o.humano && o.estado !== SAIU);
+      acabar(sim, 'adm', equipe.map(o => o.i), equipe);
+    } else acabar(sim, 'adm', [i], [p]);
+  },
+  // Para o menu: como está cada um (estado e se ainda joga).
+  estado: (sim, i) => ['balão', 'caindo', 'vivo', 'fora', 'saiu'][sim.lutadores[i]?.estado] ?? 'saiu',
+  zona: sim => ({ modo: sim.zona.modo, fase: sim.zona.fase, parada: !!sim.zonaParada, ritmo: sim.zonaRitmo || 1 }),
+  robos: sim => sim.lutadores.filter(p => !p.humano && vivoNaPartida(p)).length,
+  total: sim => sim.lutadores.length,
+  ARMAS: ARMAS.map(a => a.nome),
+  RARIDADES,
+};
+
 module.exports = {
-  novo, agir, passo, quadro, quadroPara, resultado, sair, pontos,
+  novo, agir, passo, quadro, quadroPara, resultado, sair, pontos, admin,
   // Para os testes.
   _interno: {
     MUNDO, T, G, MAR, AREIA, GRAMA, RIO, PONTE, RAIO, VEL, ARMAS, MUNICOES, CAP_MUN, CAP, ZONA, OBSTACULOS, ARMA, MUN, BAND, POC, GRAN, MOCH,

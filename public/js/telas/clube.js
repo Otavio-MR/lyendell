@@ -18,6 +18,7 @@ const IDS_POMPOM = ['rosa', 'azul', 'amarelo', 'verde', 'roxo', 'preto', 'branco
 const corPompom = id => CORES_POMPOM[IDS_POMPOM.indexOf(id)] || CORES_POMPOM[0];
 import { desenharIlhaFixa, desenharIlhaViva, MAPA_W, MAPA_H } from '../ilha/centro-mapa.js';
 import { desenhoDoIcone } from '../icones-mapa.js';
+import { menuAdm, podeAdm, admPodeAgir, admVelocidade, admEfeito } from '../adm-jogos.js';
 
 const VEL = 170; // o mesmo do servidor
 const EMOTES = [
@@ -128,7 +129,7 @@ export async function clube() {
     const p = pessoas.get(m.id);
     if (!p) return;
     if (Math.hypot(p.x - m.x, p.y - m.y) > 60) { p.x = m.x; p.y = m.y; }
-    Object.assign(p, { tx: m.tx, ty: m.ty, d: m.d, dancando: false, sentado: false });
+    Object.assign(p, { tx: m.tx, ty: m.ty, d: m.d, vel: m.vel, dancando: false, sentado: false });
   });
   escutar('clube:fala', ({ id, texto }) => {
     const p = pessoas.get(id);
@@ -145,6 +146,17 @@ export async function clube() {
   });
   escutar('clube:visual', ({ id, visual }) => { const p = pessoas.get(id); if (p) p.visual = visual; });
   escutar('clube:toca', m => { if (sala === `toca:${m.toca.dono}`) toca = m.toca; });
+  // O menu de administrador mexeu nas minhas cenouras, nos meus itens ou no meu progresso da Ilha.
+  escutar('adm:cenouras', m => { if (Number.isFinite(m.moedas)) mudarMoedas(m.moedas); });
+  escutar('clube:itens', m => { if (m.itens) eu.itens = m.itens; if (m.texto) aviso(m.texto); });
+  escutar('clube:progresso', m => {
+    if (progressoIlha) {
+      progressoIlha = { ...progressoIlha };
+      if (m.valor == null) delete progressoIlha[m.chave]; else progressoIlha[m.chave] = m.valor;
+    }
+    if (m.texto) aviso(m.texto);
+  });
+  escutar('clube:aviso', m => aviso(m.texto));
   // Alguém mexeu nos sprites: pode ter item novo na loja (ou saído dela). O catálogo vem de novo.
   let pedidoCatalogo = null;
   escutar('sprites', () => {
@@ -191,13 +203,17 @@ export async function clube() {
     return achou;
   }
   function andarAte(x, y, depois = null) {
+    const eu_ = pessoas.get(meuId);
+    if (!eu_) return;
+    // Pegadinhas do menu de administrador: congelado não anda; invertido vai para o lado contrário do clique
+    // (e não faz nada ao chegar); lento anda na metade da velocidade (o servidor confere e avisa os outros).
+    if (!admPodeAgir()) { aviso('Você está congelado! Espere o gelo derreter.', 'erro'); return; }
+    if (admEfeito('inverter')) { x = 2 * eu_.x - x; y = 2 * eu_.y - y; depois = null; }
     const chao = dados.salas[tipoSala()]?.chao || [0, 0, W, H];
     const tx = Math.round(Math.max(chao[0], Math.min(chao[2], x)));
     const ty = Math.round(Math.max(chao[1], Math.min(chao[3], y)));
-    const eu_ = pessoas.get(meuId);
-    if (!eu_) return;
     if (tx !== Math.round(eu_.x)) eu_.d = tx > eu_.x ? 1 : -1;
-    Object.assign(eu_, { tx, ty, dancando: false, sentado: false });
+    Object.assign(eu_, { tx, ty, dancando: false, sentado: false, vel: VEL * admVelocidade() });
     aoChegar = depois;
     enviar('clube:andar', { x: tx, y: ty }, { silencioso: true });
   }
@@ -293,7 +309,7 @@ export async function clube() {
         if (p.id === meuId && aoChegar) { const f = aoChegar; aoChegar = null; f(); }
         continue;
       }
-      const k = Math.min(1, (VEL * dt) / dist);
+      const k = Math.min(1, ((p.vel || VEL) * dt) / dist);
       p.x += dx * k;
       p.y += dy * k;
       p.passo += dt;
@@ -815,6 +831,112 @@ export async function clube() {
     }
   };
   document.addEventListener('keydown', aoTeclar);
+
+  /* ─── Menu de administrador (permissão jogos.admin) ─── */
+  // As ações vão pelo WebSocket ('clube:adm', em src/clube.js) e a resposta volta em 'clube:adm-feito'.
+  // Usar o menu aqui não mexe em ranking nenhum; as cenouras dos minijogos continuam só as que se ganham jogando.
+  let pedidosAdm = 0;
+  const esperandoAdm = new Map();
+  let infoAdm = null; // { minijogos: [[id, nome]], progresso: [{ chave, nome, sim, min, max }], frases }
+  escutar('clube:adm-feito', m => { const f = esperandoAdm.get(m.pedido); if (f) { esperandoAdm.delete(m.pedido); f(m); } });
+  function pedirAdm(acao, extra = {}) {
+    return new Promise((ok, falhou) => {
+      const pedido = ++pedidosAdm;
+      if (!enviar('clube:adm', { ...extra, acao, pedido }, { silencioso: true })) { falhou(new Error('Sem conexão com a recreação agora.')); return; }
+      const relogio = setTimeout(() => { esperandoAdm.delete(pedido); falhou(new Error('O servidor não respondeu. Tente de novo.')); }, 10_000);
+      esperandoAdm.set(pedido, m => { clearTimeout(relogio); if (m.erro) falhou(new Error(m.erro)); else ok(m); });
+    });
+  }
+  const carregarInfoAdm = () => { if (podeAdm() && !infoAdm && rt.conectado) pedirAdm('info').then(m => { infoAdm = m; }).catch(() => {}); };
+  escutar('estado', carregarInfoAdm);
+  carregarInfoAdm();
+
+  // As escolhas (montadas na hora em que o painel abre).
+  const opPessoas = () => {
+    const lista = [[meuId, `Eu (${estado.eu.nome})`]];
+    const ja = new Set([meuId]);
+    for (const p of [...pessoas.values(), ...(rt.online || [])]) if (!ja.has(p.id)) { ja.add(p.id); lista.push([p.id, `${p.nome}${pessoas.has(p.id) ? ' (nesta sala)' : ''}`]); }
+    return lista;
+  };
+  const campoPessoa = () => ({ id: 'pessoa', nome: 'Quem', tipo: 'escolha', padrao: meuId, opcoes: opPessoas() });
+  const opSalas = () => [
+    ...Object.entries(dados.salas).filter(([k]) => k !== 'toca').map(([k, s]) => [k, s.nome]).sort((a, b) => a[1].localeCompare(b[1], 'pt-BR')),
+    [`toca:${meuId}`, 'A minha toca'],
+  ];
+  const NOME_TIPO = { ...NOME_PARTE, movel: 'Móvel', piso: 'Chão', parede: 'Parede', pelo: 'Pelo' };
+  const opItens = () => dados.catalogo.filter(i => i.preco > 0 && i.sprite !== false)
+    .map(i => [i.id, `${i.nome} (${NOME_TIPO[i.tipo] || i.tipo}, ${num(i.preco)})`]);
+  const acoesAdm = [
+    {
+      id: 'cenouras-eu', nome: 'Dar cenouras a mim mesmo', grupo: 'Cenouras', ajuda: 'Sem o teto do dia. Fica no diário do sistema.',
+      campos: [{ id: 'quantidade', nome: 'Quantas', tipo: 'numero', min: 1, max: 100000, padrao: 500 }],
+      async executar({ quantidade }) {
+        const n = Math.floor(Number(quantidade));
+        if (!(n > 0)) throw new Error('Diga quantas cenouras.');
+        const r = await post('/api/clube/adm/cenouras', { usuario_id: meuId, quantidade: n });
+        mudarMoedas(r.moedas);
+        return `+${r.mudou} cenouras. Agora você tem ${num(r.moedas)}.`;
+      },
+    },
+    {
+      id: 'item', nome: 'Dar um item da loja', grupo: 'Itens', ajuda: 'Roupa e pelo: um só. Móvel: até 20 iguais.',
+      get campos() {
+        return [campoPessoa(), { id: 'item', nome: 'Item', tipo: 'escolha', opcoes: opItens() },
+          { id: 'quantidade', nome: 'Quantos (só móveis)', tipo: 'numero', min: 1, max: 20, padrao: 1 }];
+      },
+      async executar({ pessoa, item, quantidade }) { return (await pedirAdm('item', { alvo: pessoa, item, quantidade })).texto; },
+    },
+    {
+      id: 'levar', nome: 'Teletransportar para uma sala', grupo: 'Mexer no clube', ajuda: 'Você ou alguém que está no clube agora (entra até em toca fechada).',
+      get campos() { return [campoPessoa(), { id: 'sala', nome: 'Para onde', tipo: 'escolha', padrao: 'praca', opcoes: opSalas() }]; },
+      async executar({ pessoa, sala: destino }) { return (await pedirAdm('levar', { alvo: pessoa, sala: destino })).texto; },
+    },
+    {
+      id: 'chamar', nome: 'Chamar todo mundo para cá', grupo: 'Mexer no clube', ajuda: 'Quem está no clube vem para a sala onde você está.',
+      get campos() { return [{ id: 'de', nome: 'Quem vem', tipo: 'escolha', padrao: 'todos', opcoes: [['todos', 'Todo o clube'], ...opSalas().map(([k, n]) => [k, `Quem está em: ${n}`])] }]; },
+      async executar({ de }) { return (await pedirAdm('chamar', { de })).texto; },
+    },
+    {
+      id: 'emote', nome: 'Fazer alguém fazer um emote', grupo: 'Brincadeiras',
+      get campos() {
+        return [campoPessoa(), { id: 'e', nome: 'Emote', tipo: 'escolha', padrao: 'oi', opcoes: [...EMOTES.map(([k, e, nome]) => [k, `${e} ${nome}`]), ['dancar', '💃 Dançar'], ['sentar', 'Sentar']] }];
+      },
+      async executar({ pessoa, e }) { return (await pedirAdm('emote', { alvo: pessoa, e })).texto; },
+    },
+    {
+      id: 'falar', nome: 'Fazer alguém dizer uma frase boba', grupo: 'Brincadeiras', ajuda: 'Só frases prontas e inofensivas.',
+      get campos() { return [campoPessoa(), { id: 'frase', nome: 'Frase', tipo: 'escolha', padrao: 0, opcoes: (infoAdm?.frases || ['Eu amo cenouras!']).map((f, k) => [k, f]) }]; },
+      async executar({ pessoa, frase }) { return (await pedirAdm('falar', { alvo: pessoa, frase })).texto; },
+    },
+    {
+      id: 'progresso', nome: 'Progresso da Ilha', grupo: 'Ilha', ajuda: 'Faixa do ninja, chave do Quartel do Capitão, segredo da cachoeira...',
+      get campos() {
+        return [campoPessoa(),
+          { id: 'chave', nome: 'O quê', tipo: 'escolha', opcoes: (infoAdm?.progresso || []).map(p => [p.chave, p.nome]) },
+          { id: 'valor', nome: 'Número (faixa ou lugar)', tipo: 'numero', min: 0, max: 10, padrao: 10 },
+          { id: 'modo', nome: 'Fazer', tipo: 'escolha', padrao: 'dar', opcoes: [['dar', 'Dar'], ['apagar', 'Apagar (volta do zero)']] }];
+      },
+      async executar({ pessoa, chave, valor, modo }) {
+        if (!chave) throw new Error('Carregando as opções. Tente de novo.');
+        return (await pedirAdm('progresso', { alvo: pessoa, chave, valor, apagar: modo === 'apagar' })).texto;
+      },
+    },
+    {
+      id: 'resetar', nome: 'Zerar o limite de um minijogo', grupo: 'Ilha', ajuda: 'A espera entre partidas, o presente de uma vez por dia ou o teto de cenouras do dia.',
+      get campos() {
+        return [campoPessoa(), {
+          id: 'jogo', nome: 'O quê', tipo: 'escolha', padrao: 'tudo',
+          opcoes: [['tudo', 'Tudo'], ['teto', 'O teto de cenouras do dia'], ['espera', 'A espera entre minijogos'], ...(infoAdm?.minijogos || [])],
+        }];
+      },
+      async executar({ pessoa, jogo }) { return (await pedirAdm('resetar', { alvo: pessoa, jogo })).texto; },
+    },
+  ];
+  menuAdm({
+    titulo: 'Club Coelho', acoes: acoesAdm,
+    jogadores: () => [...pessoas.values()].map(p => ({ id: p.id, nome: p.id === meuId ? `${p.nome} (você)` : p.nome })),
+    semRanking: true, aoUsar() {}, // o clube não tem ranking
+  });
 
   /* ─── Começo ─── */
   if (dados.presente) setTimeout(() => aviso(`Presente do dia: +${dados.presente} cenouras!`), 600);

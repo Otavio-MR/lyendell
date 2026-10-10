@@ -83,6 +83,9 @@ function criar(ctx) {
     },
   };
   const j = S.j;
+  // Pegadinha "lento" do menu de administrador: o coelho anda e corre devagar (0.5).
+  const lento = () => { try { return Number(ctx.velocidade?.()) || 1; } catch { return 1; } };
+  let invencivel = false; // menu de administrador (só sozinho)
 
   /* Mapa e colisão */
   const cod = (c, r) => (c < 0 || c >= S.nivel.L || r < 0 || r >= LINHAS ? B.VAZIO : S.nivel.mapa[r * S.nivel.L + c]);
@@ -291,7 +294,7 @@ function criar(ctx) {
     j.agachado = sim;
   }
   function ferir() {
-    if (S.modo !== 'jogo' || j.inv > 0 || j.estrela > 0 || j.morto || j.crescer > 0) return;
+    if (S.modo !== 'jogo' || j.inv > 0 || j.estrela > 0 || j.morto || j.crescer > 0 || (invencivel && !jt)) return;
     if (j.forma > 0) {
       j.forma = 0;
       j.y += j.h - PEQUENO;
@@ -304,6 +307,13 @@ function criar(ctx) {
   }
   function morrer(caiu) {
     if (S.modo !== 'jogo') return;
+    if (invencivel && !jt) { // menu de administrador: o buraco e a lava jogam o coelho para cima; o tempo volta
+      if (S.tempo <= 0) { S.tempo = TEMPO_FASE; S.relogio = 0; return; }
+      if (caiu) j.y = H - j.h - T;
+      j.vy = -PULO * 1.7; j.chao = false; j.sobre = -1;
+      som('pulo');
+      return;
+    }
     S.modo = 'morrendo';
     S.tm = 0;
     Object.assign(j, { morto: true, caiu, subiu: false, vx: 0, vy: 0, estrela: 0, inv: 0, crescer: 0 });
@@ -334,7 +344,7 @@ function criar(ctx) {
     // Andar, correr, derrapar
     let sentido = (ent.dir ? 1 : 0) - (ent.esq ? 1 : 0);
     if (j.agachado && j.chao) sentido = 0;
-    const max = ent.acao ? CORRER : ANDAR;
+    const max = (ent.acao ? CORRER : ANDAR) * lento();
     if (sentido) {
       j.dir = sentido;
       if (j.vx * sentido < 0 && j.chao) j.vx += sentido * DERRAPAR * dt;
@@ -1535,6 +1545,8 @@ function criar(ctx) {
     };
     jt.aoEvento = (i, ev) => {
       if (i === jt.eu || !ev) return;
+      // O administrador reviveu alguém pelo menu: o coelho dele volta a aparecer.
+      if (ev.tipo === 'reviveu') { if (S.outros[i]) S.outros[i].fora = false; return; }
       if (ev.tipo === 'mastro') {
         if (ev.s !== S.fase) return;
         S.mastros.push({ i, q: Number(ev.q) || 0 });
@@ -1748,6 +1760,64 @@ function criar(ctx) {
     },
     mudouSegredo(chave, ligado) {
       if (chave === 'super-lua') popup(j.x + 6, j.y - 8, ligado ? 'Gravidade da lua!' : 'Gravidade normal');
+    },
+    // Menu de administrador (arcade.js): só quando joga sozinho.
+    adm: jt ? null : {
+      invencivel(ligar) {
+        invencivel = !!ligar;
+        return ligar ? 'Super Coelho invencível: nada machuca, e buraco e lava jogam ele para cima.' : 'Invencível desligado.';
+      },
+      vidas(n) {
+        S.vidas += n;
+        som('vida');
+        popup(j.x + 6, j.y - 8, `+${n} ${n === 1 ? 'vida' : 'vidas'}`);
+        return `+${n} ${n === 1 ? 'vida' : 'vidas'} (agora ${S.vidas}).`;
+      },
+      pontos(n) {
+        ganhar(n, j.x + 6, j.y - 8, `+${n}`);
+        return `+${n} pontos.`;
+      },
+      fases: () => FASES.map((f, i) => [i, `Mundo 1-${i + 1}: ${f.nome}`]),
+      irFase(i) {
+        const n = Math.max(0, Math.min(FASES.length - 1, Number(i) || 0));
+        carregar(n);
+        return `Indo para o Mundo 1-${n + 1}: ${FASES[n].nome}.`;
+      },
+      proxima() {
+        if (S.fase < FASES.length - 1) carregar(S.fase + 1);
+        else { S.volta++; carregar(0); } // depois do castelo: a próxima volta (sem contar resgate)
+        return `Indo para o Mundo 1-${S.fase + 1}: ${FASES[S.fase].nome}${S.volta > 1 ? ` (volta ${S.volta})` : ''}.`;
+      },
+      terminar() {
+        S.modo = 'fim'; S.tm = 0; S.acabou = true;
+        return 'A partida foi encerrada.';
+      },
+      acoes: [
+        {
+          id: 'poder', nome: 'Dar um poder', grupo: 'Ajudar',
+          campos: [{ id: 'qual', nome: 'Poder', tipo: 'escolha', opcoes: [['estrela', 'Estrela (10 s invencível)'], ['grande', 'Coelho grande'], ['fogo', 'Coelho de fogo']] }],
+          executar({ qual }) {
+            if (j.morto || !['jogo', 'titulo'].includes(S.modo)) throw new Error('Agora não dá: espere a fase estar andando.');
+            if (qual === 'estrela') {
+              j.estrela = 10; S.comboEstrela = 0;
+              som('poder');
+              return 'O coelho pegou a estrela: 10 segundos invencível.';
+            }
+            if (j.forma === 0) crescer();
+            if (qual === 'fogo') j.forma = 2;
+            som('poder');
+            faiscas(j.x + 6, j.y + 8, 8, qual === 'fogo' ? '#ffb35a' : '#f7e08a');
+            return qual === 'fogo' ? 'Virou o Coelho de Fogo.' : 'O coelho ficou grande.';
+          },
+        },
+        {
+          id: 'tempo', nome: 'Encher o tempo', grupo: 'Ajudar', ajuda: 'O relógio da fase volta para o começo.',
+          executar() {
+            S.tempo = TEMPO_FASE; S.relogio = 0;
+            return `Tempo cheio de novo (${TEMPO_FASE}).`;
+          },
+        },
+      ],
     },
     // Para os testes
     _estado: S,

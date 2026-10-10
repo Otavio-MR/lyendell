@@ -7,6 +7,7 @@ import { h, trocar } from '../core.js';
 import { enviar } from '../tempo-real.js';
 import { PELOS, sorte, elipse, sombrear, desenharCoelho, desenharRaposa, desenharFantasma, desenharArvore, quebrarTexto } from '../desenho-coelho.js';
 import { registrarPecas, desenharSprite, temSprite, aoMudarSprites, usarNomeDaPeca } from '../sprites.js';
+import { admDirecao, admPodeAgir, admVelocidade, admEfeito } from '../adm-jogos.js';
 
 export { desenharCoelho };
 
@@ -427,6 +428,8 @@ export function criarMundo(id, { aoClicar, nomeDoPapel = p => p }) {
   // O meu coelho anda até um ponto (e, chegando, faz alguma coisa).
   function andarAte(x, y, depois) {
     if (!local) return;
+    // Pegadinha "controles invertidos": o coelho vai para o lado contrário do clique (e não faz nada ao chegar).
+    if (admEfeito('inverter')) { x = 2 * local.x - x; y = 2 * local.y - y; depois = null; }
     andarPara = { x: Math.max(24, Math.min(W - 24, x)), y: Math.max(40, Math.min(H - 16, y)), depois };
   }
 
@@ -435,7 +438,12 @@ export function criarMundo(id, { aoClicar, nomeDoPapel = p => p }) {
     let dx = 0;
     let dy = 0;
     for (const k of teclas) { dx += DIRS[k][0]; dy += DIRS[k][1]; }
-    if (!dx && !dy && andarPara) {
+    // Pegadinhas do administrador: congelado não anda; invertido anda ao contrário.
+    if (dx || dy) {
+      const v = admDirecao({ x: dx, y: dy });
+      dx = v ? v.x : 0;
+      dy = v ? v.y : 0;
+    } else if (andarPara && admPodeAgir()) {
       const ax = andarPara.x - local.x;
       const ay = andarPara.y - local.y;
       const d = Math.hypot(ax, ay);
@@ -448,8 +456,9 @@ export function criarMundo(id, { aoClicar, nomeDoPapel = p => p }) {
     const tam = Math.hypot(dx, dy);
     local.andando = tam > 0;
     if (tam > 0) {
-      local.x = Math.max(24, Math.min(W - 24, local.x + (dx / tam) * VEL * dt));
-      local.y = Math.max(40, Math.min(H - 16, local.y + (dy / tam) * VEL * dt));
+      const vel = VEL * admVelocidade(); // lento: metade da velocidade
+      local.x = Math.max(24, Math.min(W - 24, local.x + (dx / tam) * vel * dt));
+      local.y = Math.max(40, Math.min(H - 16, local.y + (dy / tam) * vel * dt));
       if (dx) local.d = dx > 0 ? 1 : -1;
       local.passo += dt;
     }

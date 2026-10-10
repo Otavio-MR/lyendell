@@ -104,12 +104,16 @@ function novo({ modo, n, dif, semente }) {
   };
 }
 
+// ev.ritmo (das pegadinhas, posto por junto.js): 0,5 = lento, joga no máximo a cada 2 x ESPERA_MS.
 function agir(sim, i, ev = {}, agora = Date.now()) {
   if (sim.fim || ev.tipo !== 'mover' || !DIRECOES.includes(ev.dir)) return null;
+  const lento = Number(ev.ritmo) > 0 && Number(ev.ritmo) < 1;
   if (sim.modo === 'coop') {
-    if (agora - (sim.espera[i] || 0) < ESPERA_MS) return null;
+    if (agora - (sim.espera[i] || 0) < (lento ? ESPERA_MS / ev.ritmo : ESPERA_MS)) return null;
+    const antes = { g: [...sim.g], pontos: sim.pontos };
     const r = deslizar(sim.g, ev.dir);
     if (!r.mexeu) return null;
+    sim.desfazer = antes;
     sim.espera[i] = agora;
     sim.pontos += r.pontos;
     sim.jogadas++;
@@ -123,8 +127,12 @@ function agir(sim, i, ev = {}, agora = Date.now()) {
   }
   const t = sim.t[i];
   if (!t || t.fora) return null;
+  if (lento && agora - (t.espera || 0) < (2 * ESPERA_MS)) return null;
+  const antes = { g: [...t.g], pontos: t.pontos };
   const r = deslizar(t.g, ev.dir);
   if (!r.mexeu) return null;
+  t.desfazer = antes;
+  t.espera = agora;
   t.pontos += r.pontos;
   t.ultimo = ev.dir;
   gastarPedras(t.g);
@@ -186,8 +194,54 @@ function resultado(sim, presentes, porTempo = false) {
 // Os pontos de cada um (no co-op, todos têm os pontos da equipe).
 const pontos = sim => (sim.modo === 'coop' ? Array(sim.n).fill(sim.pontos) : sim.t.map(t => t.pontos));
 
+/* ─── Menu do administrador ─── */
+
+// O tabuleiro de alguém (no co-op, o único tabuleiro).
+const tabuleiroDe = (sim, i) => {
+  if (sim.modo === 'coop') return sim;
+  const t = sim.t[i];
+  if (!t) throw new Error('Esse jogador não tem tabuleiro.');
+  return t;
+};
+
+const admin = {
+  // Uma peça escolhida numa casa vazia. Devolve false se o tabuleiro está cheio.
+  colocar(sim, i, valor) {
+    const t = tabuleiroDe(sim, i);
+    const livres = t.g.map((v, p) => (v === 0 ? p : -1)).filter(p => p >= 0);
+    if (!livres.length) return false;
+    t.g[livres[Math.floor(Math.random() * livres.length)]] = valor;
+    if (sim.modo === 'coop' && valor >= sim.alvo) sim.fim = 'meta';
+    else if (sim.modo === 'versus' && t.fora && temJogada(t.g)) t.fora = false;
+    return true;
+  },
+  // Volta a última jogada (o tabuleiro e os pontos). As pedras já mandadas para os outros ficam.
+  desfazer(sim, i) {
+    const t = tabuleiroDe(sim, i);
+    if (!t.desfazer) return false;
+    t.g = t.desfazer.g;
+    t.pontos = t.desfazer.pontos;
+    t.desfazer = null;
+    if (sim.modo === 'versus') t.fora = !temJogada(t.g);
+    return true;
+  },
+  darPontos(sim, i, n) {
+    const t = tabuleiroDe(sim, i);
+    t.pontos = Math.max(0, t.pontos + n);
+    return t.pontos;
+  },
+  // Tira as pedras do tabuleiro de alguém (versus); quem tinha travado volta a jogar.
+  tirarPedras(sim, i) {
+    const t = tabuleiroDe(sim, i);
+    const n = t.g.filter(v => v < 0).length;
+    t.g = t.g.map(v => (v < 0 ? 0 : v));
+    if (sim.modo === 'versus' && t.fora && temJogada(t.g)) t.fora = false;
+    return n;
+  },
+};
+
 function sair(sim, i) {
   if (sim.modo === 'versus' && sim.t[i]) sim.t[i].fora = true;
 }
 
-module.exports = { novo, agir, quadro, resultado, pontos, sair, deslizar, temJogada, METAS };
+module.exports = { novo, agir, quadro, resultado, pontos, sair, deslizar, temJogada, METAS, admin };

@@ -1002,6 +1002,9 @@ function criar(ctx) {
   const segredo = typeof ctx.segredo === 'function' ? ctx.segredo : () => false;
   const J = ctx.junto || null; // jogo junto (versus ou co-op); null quando joga sozinho
   const VAZIO = new Set();
+  // Pegadinha "lento" do menu de administrador: o coelho anda e sobe devagar (0.5).
+  const lento = () => { try { return Number(ctx.velocidade?.()) || 1; } catch { return 1; } };
+  let invencivel = false; // menu de administrador (só sozinho)
 
   const e = {
     nivel: 1, vidas: 3, pontos: 0, bonus: 5000, espelho: false, L: CENARIOS[0], D: dificuldade(1),
@@ -1085,6 +1088,10 @@ function criar(ctx) {
 
   function morrer(causa) {
     if (e.fase !== 'jogo') return;
+    if (invencivel && !J) { // menu de administrador: nada machuca (o bônus que zerou volta cheio)
+      if (causa === 'tempo') { e.bonus = e.D.bonus; e.relogioBonus = 0; e.alertou = false; }
+      return;
+    }
     e.fase = 'morte'; e.faseT = 0; e.causa = causa; e.mortes++;
     e.coelho.estado = 'morte'; e.coelho.marreta = 0;
     if (jj) jj.avisouMorte = false;
@@ -1143,14 +1150,14 @@ function criar(ctx) {
         }
       }
       c.andando = mov !== 0;
-      if (mov) { c.dir = mov; c.x += mov * VEL_ANDAR * dt; c.passo += dt; }
+      if (mov) { c.dir = mov; c.x += mov * VEL_ANDAR * lento() * dt; c.passo += dt; }
       c.x = limitar(c.x, limiteEsq(L, c.gi), limiteDir(L, c.gi)); c.y = alturaViga(L.vigas[c.gi], c.x);
     } else if (c.estado === 'escada') {
       const l = c.esc;
       const sobe = ent.cima && !ent.baixo;
       const desce = ent.baixo && !ent.cima;
       if (!sobe && !desce) return;
-      c.y += (desce ? 1 : -1) * VEL_SUBIR * dt; c.passo += dt;
+      c.y += (desce ? 1 : -1) * VEL_SUBIR * lento() * dt; c.passo += dt;
       c.somEscada += dt;
       if (c.somEscada >= 0.24) { c.somEscada = 0; som('passo'); }
       if (c.y <= l.yTopo) {
@@ -1666,6 +1673,8 @@ function criar(ctx) {
 
   // Alguém esmagou um barril ou fagulha: some aqui também (só ele; o resto do mundo não muda).
   function aoEvento(i, ev) {
+    // O administrador reviveu alguém pelo menu: o coelho dele volta a aparecer.
+    if (ev?.tipo === 'reviveu') { if (i !== J.eu) outro(i).fora = false; return; }
     if (!ev || ev.tipo !== 'quebrou') return;
     const fase = Number(ev.n);
     const tipo = ev.b != null ? 'b' : ev.f != null ? 'f' : '';
@@ -2062,6 +2071,69 @@ function criar(ctx) {
     mudouSegredo(chave, ligado) {
       if (chave === 'barris-coroa') e.coroa = !!ligado;
       if (chave === 'barris-lento') e.lento = !!ligado;
+    },
+    // Menu de administrador (arcade.js): só quando joga sozinho.
+    adm: J ? null : {
+      invencivel(ligar) {
+        invencivel = !!ligar;
+        return ligar ? 'Coelho invencível: os barris e as fagulhas passam por ele.' : 'Invencível desligado.';
+      },
+      vidas(n) {
+        e.vidas += n;
+        som('vida');
+        mostrar(`+${n} ${n === 1 ? 'vida' : 'vidas'}`, e.coelho.x, e.coelho.y - 56, '#7fe08a', true);
+        return `+${n} ${n === 1 ? 'vida' : 'vidas'} (agora ${e.vidas}).`;
+      },
+      pontos(n) {
+        e.pontos += n;
+        mostrar(`+${n}`, e.coelho.x, e.coelho.y - 46, OURO, true);
+        return `+${n} pontos.`;
+      },
+      fases: () => Array.from({ length: 12 }, (_, i) => [i + 1, `Nível ${i + 1}`]),
+      irFase(n) {
+        iniciarNivel(Math.max(1, Math.min(99, Number(n) || 1)));
+        return `Começando o nível ${e.nivel}.`;
+      },
+      proxima() {
+        if (e.fase === 'jogo' || e.fase === 'pronto') { vencer(); return 'A Princesa Cenoura foi resgatada: vem o próximo nível.'; }
+        if (e.fase === 'vitoria') throw new Error('O nível já está terminando.');
+        iniciarNivel(e.nivel + 1);
+        return `Começando o nível ${e.nivel}.`;
+      },
+      terminar() {
+        e.vidas = 0; e.fase = 'fim'; e.faseT = 0; e.acabou = true;
+        return 'A partida foi encerrada.';
+      },
+      acoes: [
+        {
+          id: 'marreta', nome: 'Dar a marreta', grupo: 'Ajudar', ajuda: 'O coelho pega uma marreta na hora (8 segundos).',
+          executar() {
+            const c = e.coelho;
+            if ((e.fase !== 'jogo' && e.fase !== 'pronto') || c.estado === 'escada' || c.estado === 'morte') throw new Error('Agora não dá: espere o coelho estar no chão.');
+            c.marreta = DURACAO_MARRETA; c.marretaT = 0;
+            som('poder');
+            mostrar('Marreta!', c.x, c.y - 40, OURO);
+            return 'O coelho ganhou a marreta.';
+          },
+        },
+        {
+          id: 'limpar', nome: 'Sumir com os barris', grupo: 'Ajudar', ajuda: 'Tira todos os barris e fagulhas da torre agora.',
+          executar() {
+            for (const b of e.barris) poeira(b.x, b.y + R, 4);
+            for (const f of e.fagulhas) poeira(f.x, f.y, 4);
+            const n = e.barris.length + e.fagulhas.length;
+            e.barris.length = 0; e.fagulhas.length = 0;
+            return n ? `Sumiram ${n} ${n === 1 ? 'perigo' : 'perigos'} da torre.` : 'Não tinha nenhum barril na torre.';
+          },
+        },
+        {
+          id: 'bonus', nome: 'Encher o bônus', grupo: 'Ajudar', ajuda: 'O relógio do bônus volta para o começo.',
+          executar() {
+            e.bonus = e.D.bonus; e.relogioBonus = 0; e.alertou = false;
+            return `Bônus cheio de novo (${e.bonus}).`;
+          },
+        },
+      ],
     },
   };
   // Para os testes: o estado por dentro (não aparece em Object.keys nem no JSON).

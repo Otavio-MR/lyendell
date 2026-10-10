@@ -8,6 +8,7 @@
 //  - Memória: cada um na sua vez vira duas cartas. Versus: quem achar mais pares vence.
 //    Co-op: a equipe precisa achar todos os pares sem passar da meta de jogadas.
 // Só as regras (sem rede): recreacao.js cuida das salas e de mandar o tabuleiro para todo mundo.
+// O menu de administrador (src/adm/salas.js) pode escolher quem vence: fica em e.forcado (índices) e e.fim = 'adm'.
 
 class ErroMesa extends Error {}
 
@@ -146,6 +147,7 @@ const minado = {
     casas: e.modo === 'versus' ? e.casas : null, fora: e.modo === 'versus' ? e.fora : null,
   }),
   vencedores(e, ativos) {
+    if (e.forcado) return e.forcado.filter(k => ativos.includes(k));
     if (e.modo !== 'versus') return e.fim === 'ganhou' ? ativos : [];
     if (!ativos.length) return [];
     const max = Math.max(...ativos.map(k => e.casas[k]));
@@ -200,6 +202,7 @@ const quebra = {
     deQuem: e.modo === 'versus' ? e.deQuem : null, certas: e.modo === 'versus' ? e.certas : null,
   }),
   vencedores(e, ativos) {
+    if (e.forcado) return e.forcado.filter(k => ativos.includes(k));
     if (e.modo !== 'versus') return e.fim === 'montado' ? ativos : [];
     if (!ativos.length) return [];
     const max = Math.max(...ativos.map(k => e.certas[k]));
@@ -267,12 +270,14 @@ const memoria = {
   },
   visao: e => ({
     jogo: 'memoria', t: e.t, modo: e.modo,
-    v: e.cartas.map((f, k) => (e.achada[k] >= 0 || e.abertas.includes(k) ? f : -1)), quem: e.achada,
+    // espiar: o menu de administrador mostrou todas as cartas por alguns segundos.
+    v: e.cartas.map((f, k) => (e.achada[k] >= 0 || e.abertas.includes(k) || (e.espiar || 0) > Date.now() ? f : -1)), quem: e.achada,
     abertas: e.abertas, vez: e.vez, jogadas: e.jogadas, pares: e.pares, meta: e.meta, fim: e.fim,
     seg: Math.floor(((e.terminou || Date.now()) - e.inicio) / 1000),
   }),
   // Versus: quem achou mais pares (empate: todos os empatados). Co-op: todo mundo, se a equipe ganhou.
   vencedores(e, ativos) {
+    if (e.forcado) return e.forcado.filter(k => ativos.includes(k));
     if (e.modo === 'coop') return e.fim === 'ganhou' ? ativos : [];
     const max = Math.max(...ativos.map(k => e.pares[k]));
     const melhores = ativos.filter(k => e.pares[k] === max);

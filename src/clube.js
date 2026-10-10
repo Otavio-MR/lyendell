@@ -13,6 +13,8 @@ const { hoje } = require('./cobranca');
 const antispam = require('./antispam');
 const progresso = require('./progresso');
 const nomesSprites = require('./sprites-nomes');
+const adm = require('./adm-jogos');
+const { anotar } = require('./diario');
 
 class ErroClube extends Error {}
 
@@ -200,6 +202,14 @@ const SALAS = {
 const ILHA = require('./clube-ilha');
 Object.assign(SALAS, ILHA.salas);
 
+// Fim de um minijogo do clube (rota POST /api/clube/minijogo): as cenouras ganhas, com teto por partida e por dia.
+const MINIJOGOS = {
+  pesca: { max: 60, cenouras: p => p * 3, limite: 40 },   // pontos = peixes pescados
+  danca: { max: 60, cenouras: p => p / 400, limite: 100_000 },
+  ...ILHA.minijogos, // os minijogos das salas da Ilha (src/clube-ilha/)
+};
+const ultimoMinijogo = new Map(); // id -> quando terminou o último minijogo (a espera entre um e outro)
+
 const ehToca = sala => /^toca:\d+$/.test(sala);
 const tipoDaSala = sala => (ehToca(sala) ? 'toca' : sala);
 const EMOTES = ['oi', 'coracao', 'risada', 'susto', 'pergunta', 'zzz', 'cenoura', 'estrela', 'dancar', 'sentar', 'cafe'];
@@ -308,12 +318,12 @@ function posicaoAgora(p, agora = Date.now()) {
   const dy = p.ty - p.y;
   const dist = Math.hypot(dx, dy);
   if (!dist) return [p.x, p.y];
-  const k = Math.min(1, ((agora - p.partiu) / 1000) * VEL / dist);
+  const k = Math.min(1, ((agora - p.partiu) / 1000) * (p.vel || VEL) / dist);
   return [p.x + dx * k, p.y + dy * k];
 }
 function publico(p) {
   const [x, y] = posicaoAgora(p);
-  return { id: p.id, nome: p.nome, x: Math.round(x), y: Math.round(y), tx: p.tx, ty: p.ty, d: p.d, visual: p.visual, dancando: p.dancando, sentado: p.sentado };
+  return { id: p.id, nome: p.nome, x: Math.round(x), y: Math.round(y), tx: p.tx, ty: p.ty, d: p.d, vel: p.vel || VEL, visual: p.visual, dancando: p.dancando, sentado: p.sentado };
 }
 function paraSala(sala, tipo, dados, menos = null) {
   for (const p of naSala(sala)) if (p.id !== menos) ctx.paraUsuario(p.id, tipo, dados);
@@ -331,7 +341,8 @@ function sair(id) {
   paraSala(p.sala, 'clube:saiu', { id });
 }
 
-async function entrar(u, { sala }, ws = null) {
+// forcar: o administrador levando alguém (entra até em toca fechada).
+async function entrar(u, { sala }, ws = null, { forcar = false } = {}) {
   sala = String(sala || 'praca');
   if (!SALAS[sala] && !ehToca(sala)) throw new ErroClube('Essa sala não existe.');
   let toca = null;
@@ -340,7 +351,7 @@ async function entrar(u, { sala }, ws = null) {
     const d = await db.get('SELECT u.nome, c.toca FROM usuarios u LEFT JOIN clube c ON c.usuario_id = u.id WHERE u.id = ?', dono);
     if (!d) throw new ErroClube('Essa toca não existe.');
     toca = { dono, nome: d.nome, ...tocaPadrao(json(d.toca, {})) };
-    if (!toca.aberta && dono !== u.id) throw new ErroClube(`A toca de ${d.nome} está fechada para visitas agora.`);
+    if (!toca.aberta && dono !== u.id && !forcar) throw new ErroClube(`A toca de ${d.nome} está fechada para visitas agora.`);
   }
   const eu = await perfil(u.id);
   const antes = presentes.get(u.id);
@@ -362,6 +373,16 @@ async function entrar(u, { sala }, ws = null) {
 }
 const visitas = new Set();
 
+// O emote de alguém (dançar e sentar ligam e desligam), para todos da sala.
+function fazerEmote(p, e) {
+  if (e === 'dancar' || e === 'sentar') {
+    const [x, y] = posicaoAgora(p);
+    Object.assign(p, { x: Math.round(x), y: Math.round(y), tx: Math.round(x), ty: Math.round(y), dancando: e === 'dancar' ? !p.dancando : false, sentado: e === 'sentar' ? !p.sentado : false });
+  }
+  paraSala(p.sala, 'clube:emote', { id: p.id, e, x: Math.round(p.tx), y: Math.round(p.ty), dancando: p.dancando, sentado: p.sentado });
+  ILHA.aoEmote({ sala: p.sala, e, id: p.id, pessoas: naSala(p.sala), paraSala: (tipo, dados) => paraSala(p.sala, tipo, dados) });
+}
+
 const acoes = {
   async 'clube:entrar'(u, dados, ws) { await entrar(u, dados, ws); },
 
@@ -373,11 +394,13 @@ const acoes = {
     if (!p) return;
     const [x0, y0, x1, y1] = SALAS[tipoDaSala(p.sala)].chao;
     const [cx, cy] = posicaoAgora(p);
+    // Pegadinhas do menu de administrador: congelado não anda; lento anda na metade da velocidade.
+    if (!adm.podeAgir(u.id)) return;
     const tx = Math.max(x0, Math.min(x1, Math.round(Number(x) || 0)));
     const ty = Math.max(y0, Math.min(y1, Math.round(Number(y) || 0)));
-    Object.assign(p, { x: Math.round(cx), y: Math.round(cy), tx, ty, partiu: Date.now(), dancando: false, sentado: false });
+    Object.assign(p, { x: Math.round(cx), y: Math.round(cy), tx, ty, partiu: Date.now(), dancando: false, sentado: false, vel: VEL * adm.velocidade(u.id) });
     if (tx !== p.x) p.d = tx > p.x ? 1 : -1;
-    paraSala(p.sala, 'clube:andar', { id: u.id, x: p.x, y: p.y, tx, ty, d: p.d }, u.id);
+    paraSala(p.sala, 'clube:andar', { id: u.id, x: p.x, y: p.y, tx, ty, d: p.d, vel: p.vel }, u.id);
   },
 
   'clube:falar'(u, { texto }) {
@@ -397,12 +420,7 @@ const acoes = {
     const agora = Date.now();
     if (agora - (p.ultimoEmote || 0) < 500) return;
     p.ultimoEmote = agora;
-    if (e === 'dancar' || e === 'sentar') {
-      const [x, y] = posicaoAgora(p);
-      Object.assign(p, { x: Math.round(x), y: Math.round(y), tx: Math.round(x), ty: Math.round(y), dancando: e === 'dancar' ? !p.dancando : false, sentado: e === 'sentar' ? !p.sentado : false });
-    }
-    paraSala(p.sala, 'clube:emote', { id: u.id, e, x: Math.round(p.tx), y: Math.round(p.ty), dancando: p.dancando, sentado: p.sentado });
-    ILHA.aoEmote({ sala: p.sala, e, id: u.id, pessoas: naSala(p.sala), paraSala: (tipo, dados) => paraSala(p.sala, tipo, dados) });
+    fazerEmote(p, e);
   },
 
   // Quantas pessoas em cada sala e quais tocas estão abertas (para o mapa).
@@ -416,6 +434,178 @@ const acoes = {
       }).filter(t => t.aberta || t.id === u.id),
     });
   },
+};
+
+/* ─── Menu de administrador no clube ──────────────── */
+// 'clube:adm' { acao, pedido, ... } (só com a permissão jogos.admin): dar um item da loja, levar alguém para
+// uma sala, chamar todo mundo para onde estou, fazer alguém acenar ou dizer uma frase boba, dar progresso da
+// Ilha e zerar as esperas e tetos dos minijogos. A resposta vai em 'clube:adm-feito' { pedido, texto | erro }.
+// O que muda o perfil de alguém fica no diário do sistema.
+
+const NOMES_MINIJOGOS = {
+  pesca: 'Pescaria no Lago', danca: 'Dança da Toca', mancala: 'Mancala das Cenouras', pizzaria: 'Fábrica de Pizzas',
+  lanca_pompom: 'Lança-Pompom', surfe: 'Pegando Ondas', pesca_gelo: 'Pescaria no Gelo', jato: 'Aventura a Jato',
+  tesouro: 'Caça ao Tesouro', bau_capitao: 'Baú do Capitão', neve_guerra: 'Guerra de Bolas de Neve', neve_treno: 'Corrida de Trenó',
+  neve_mina: 'Mina de Ouro', neve_pompons: 'Resgate dos Pompons', neve_lixo: 'Separar o Lixo', neve_quiz: 'Quiz da Ilha',
+  missao_qg: 'Missão do QG', ninja: 'Desafio Ninja', ninja_fogo: 'Desafio do Fogo', ninja_agua: 'Desafio da Água', ninja_neve: 'Desafio da Neve',
+};
+// O progresso da Ilha que o menu pode dar: sim (vira true) ou um número entre min e max.
+const PROGRESSO_ADM = {
+  'ninja.faixa': { nome: 'Faixa do ninja (0 a 10)', min: 0, max: 10 },
+  'navio.chave': { nome: 'Chave do Quartel do Capitão', sim: true },
+  'neve.cachoeira': { nome: 'Segredo da cachoeira', sim: true },
+  'neve.treno': { nome: 'Melhor lugar na Corrida de Trenó (1 a 4)', min: 1, max: 4 },
+};
+// O que o administrador pode fazer alguém dizer (frases bobas e fixas: ninguém fala o que não falaria).
+const FRASES = [
+  'Eu amo cenouras!', 'Quem quer dançar comigo?', 'Alguém viu o meu pompom?', 'Hoje é dia de festa no clube!',
+  'Eu sou o coelho mais fofo da ilha!', 'Vamos pescar no lago?', 'Atchim!', 'Oba!',
+];
+
+async function pessoaAtiva(id) {
+  const p = await db.get('SELECT id, nome FROM usuarios WHERE id = ? AND ativo = 1', Number(id) || 0);
+  if (!p) throw new ErroClube('Pessoa não encontrada.');
+  return p;
+}
+function noClube(id) {
+  const p = presentes.get(Number(id));
+  if (!p) throw new ErroClube('Essa pessoa não está no Club Coelho agora.');
+  return p;
+}
+const nomeDaSala = sala => (ehToca(sala) ? 'uma toca' : SALAS[sala]?.nome || sala);
+const anotarAdm = (u, detalhe) => anotar({ usuario: u }, 'adm_clube', detalhe);
+const gravarProgresso = (id, chave, valor) => db.run(`INSERT INTO clube_progresso (usuario_id, chave, valor) VALUES (?, ?, ?)
+  ON CONFLICT (usuario_id, chave) DO UPDATE SET valor = excluded.valor, atualizado_em = datetime('now')`, id, chave, JSON.stringify(valor));
+
+// Leva alguém (que está no clube) para uma sala, sem olhar se a toca está fechada.
+async function levar(p, sala, avisar) {
+  await entrar({ id: p.id, nome: p.nome }, { sala }, p.ws, { forcar: true });
+  if (avisar) ctx.paraUsuario(p.id, 'clube:aviso', { texto: `O administrador te levou para ${nomeDaSala(sala)}.` });
+}
+
+const ADM = {
+  // O que o menu precisa para montar as escolhas.
+  info() {
+    return {
+      minijogos: Object.keys(MINIJOGOS).map(k => [k, NOMES_MINIJOGOS[k] || k]),
+      progresso: Object.entries(PROGRESSO_ADM).map(([k, d]) => ({ chave: k, ...d })),
+      frases: FRASES,
+    };
+  },
+
+  async item(u, { alvo, item, quantidade }) {
+    await pronto();
+    const i = Object.hasOwn(ITEM, String(item)) ? ITEM[item] : null;
+    if (!i || gratis(i)) throw new ErroClube('Escolha um item da loja.');
+    const pessoa = await pessoaAtiva(alvo || u.id);
+    const eu = await perfil(pessoa.id);
+    const tinha = eu.itens[i.id] || 0;
+    let n = 1;
+    if (i.tipo === 'movel') {
+      n = Math.min(Math.max(1, Math.floor(Number(quantidade) || 1)), 20 - tinha);
+      if (n <= 0) throw new ErroClube(`${pessoa.nome} já tem muitos desses (${tinha}).`);
+    } else if (tinha > 0) throw new ErroClube(`${pessoa.nome} já tem ${i.nome}.`);
+    eu.itens[i.id] = tinha + n;
+    await db.run('UPDATE clube SET itens = ? WHERE usuario_id = ?', JSON.stringify(eu.itens), pessoa.id);
+    const qual = `${i.nome}${n > 1 ? ` (${n})` : ''}`;
+    ctx.paraUsuario(pessoa.id, 'clube:itens', { itens: eu.itens, texto: pessoa.id === u.id ? `Agora você tem ${qual}.` : `O administrador te deu ${qual}!` });
+    await anotarAdm(u, `Deu ${qual} para ${pessoa.nome} no Club Coelho`);
+    return `${pessoa.nome} ganhou ${qual}.`;
+  },
+
+  async levar(u, { alvo, sala }) {
+    const p = noClube(alvo || u.id);
+    sala = String(sala || '');
+    if (!SALAS[sala] && !ehToca(sala)) throw new ErroClube('Essa sala não existe.');
+    await levar(p, sala, p.id !== u.id);
+    return `${p.id === u.id ? 'Você foi' : `${p.nome} foi`} para ${nomeDaSala(sala)}.`;
+  },
+
+  // Todo mundo do clube (ou de uma sala) vem para a sala onde eu estou.
+  async chamar(u, { de }) {
+    const eu = presentes.get(u.id);
+    if (!eu) throw new ErroClube('Entre no Club Coelho primeiro.');
+    de = String(de || 'todos');
+    const lista = [...presentes.values()].filter(p => p.id !== u.id && p.sala !== eu.sala && (de === 'todos' || p.sala === de));
+    if (!lista.length) throw new ErroClube('Ninguém para chamar.');
+    for (const p of lista) await levar(p, eu.sala, true);
+    return `${lista.length} ${lista.length === 1 ? 'pessoa veio' : 'pessoas vieram'} para ${nomeDaSala(eu.sala)}.`;
+  },
+
+  emote(u, { alvo, e }) {
+    const p = noClube(alvo || u.id);
+    if (!EMOTES.includes(e)) throw new ErroClube('Escolha um emote.');
+    fazerEmote(p, e);
+    return `${p.nome} fez o emote.`;
+  },
+
+  falar(u, { alvo, frase }) {
+    const p = noClube(alvo || u.id);
+    const texto = FRASES[Number(frase)];
+    if (!texto) throw new ErroClube('Escolha uma frase.');
+    for (const q of naSala(p.sala)) ctx.paraUsuario(q.id, 'clube:fala', { id: p.id, texto });
+    return `${p.nome} disse: "${texto}"`;
+  },
+
+  async progresso(u, { alvo, chave, valor, apagar }) {
+    const def = Object.hasOwn(PROGRESSO_ADM, String(chave)) ? PROGRESSO_ADM[chave] : null;
+    if (!def) throw new ErroClube('Escolha o progresso da Ilha.');
+    const pessoa = await pessoaAtiva(alvo || u.id);
+    let v = null;
+    if (apagar) {
+      await db.run('DELETE FROM clube_progresso WHERE usuario_id = ? AND chave = ?', pessoa.id, chave);
+    } else {
+      v = def.sim ? true : Math.round(Number(valor));
+      if (!def.sim && (!Number.isFinite(v) || v < def.min || v > def.max)) throw new ErroClube(`Diga um número de ${def.min} a ${def.max}.`);
+      await gravarProgresso(pessoa.id, chave, v);
+    }
+    const texto = apagar ? `${def.nome}: apagado` : `${def.nome}${def.sim ? '' : `: ${v}`}`;
+    ctx.paraUsuario(pessoa.id, 'clube:progresso', { chave, valor: v, texto: pessoa.id === u.id ? null : `O administrador mexeu no seu progresso da Ilha (${texto}).` });
+    await anotarAdm(u, `Progresso da Ilha de ${pessoa.nome} no Club Coelho: ${texto}`);
+    return `${pessoa.nome}: ${texto}.`;
+  },
+
+  // jogo: 'tudo', 'teto' (cenouras ganhas hoje), 'espera' (entre um minijogo e outro) ou um minijogo (a espera e o
+  // "uma vez por dia" dele).
+  async resetar(u, { alvo, jogo }) {
+    jogo = String(jogo || '');
+    if (!['tudo', 'teto', 'espera'].includes(jogo) && !Object.hasOwn(MINIJOGOS, jogo)) throw new ErroClube('Escolha o minijogo.');
+    const pessoa = await pessoaAtiva(alvo || u.id);
+    await perfil(pessoa.id);
+    const feito = [];
+    if (jogo === 'tudo' || jogo === 'teto') {
+      await db.run('UPDATE clube SET ganhos = 0 WHERE usuario_id = ?', pessoa.id);
+      feito.push('o teto de cenouras do dia');
+    }
+    if (jogo !== 'teto') { ultimoMinijogo.delete(pessoa.id); feito.push('a espera entre minijogos'); }
+    const diarios = jogo === 'tudo' ? Object.keys(MINIJOGOS).filter(k => MINIJOGOS[k].umaVezPorDia) : MINIJOGOS[jogo]?.umaVezPorDia ? [jogo] : [];
+    for (const k of diarios) {
+      await db.run('DELETE FROM clube_progresso WHERE usuario_id = ? AND chave = ?', pessoa.id, `minijogo.${k}.dia`);
+      feito.push(`o presente do dia de ${NOMES_MINIJOGOS[k] || k}`);
+      if (k === 'bau_capitao') {
+        await db.run("DELETE FROM clube_progresso WHERE usuario_id = ? AND chave = 'navio.bau'", pessoa.id);
+        ctx.paraUsuario(pessoa.id, 'clube:progresso', { chave: 'navio.bau', valor: null, texto: null });
+      }
+    }
+    const texto = `zerou ${feito.join(', ')}`;
+    await anotarAdm(u, `Club Coelho: ${texto} de ${pessoa.nome}`);
+    return `${pessoa.nome}: ${texto}.`;
+  },
+};
+
+acoes['clube:adm'] = async (u, dados) => {
+  if (!u.permissoes?.has(adm.PERMISSAO)) throw new ErroClube('Só o administrador usa esse menu.');
+  const pedido = Number(dados.pedido) || 0;
+  const f = Object.hasOwn(ADM, String(dados.acao)) ? ADM[dados.acao] : null;
+  try {
+    if (!f) throw new ErroClube('Ação desconhecida.');
+    const r = await f(u, dados);
+    ctx.paraUsuario(u.id, 'clube:adm-feito', typeof r === 'string' ? { pedido, acao: dados.acao, texto: r } : { pedido, acao: dados.acao, ...r });
+  } catch (e) {
+    // Com número de pedido, o erro volta na resposta (a tela mostra uma vez só); sem, vai como erro comum.
+    if (e instanceof ErroClube && pedido) { ctx.paraUsuario(u.id, 'clube:adm-feito', { pedido, acao: dados.acao, erro: e.message }); return; }
+    throw e;
+  }
 };
 
 // O coelho de cada um, pronto para desenhar nos jogos (cor do pelo e a roupa por partes).
@@ -450,6 +640,6 @@ function iniciar(opcoes) { ctx = { ...ctx, ...opcoes }; }
 
 module.exports = {
   CATALOGO, ITEM, PARTES, ROUPA, SALAS, EMOTES, INICIAIS, PRESENTE, TETO_DIA, MAX_MOVEIS, ONDE_MOVEL, ErroClube,
-  CORES_POMPOM, PRECO_POMPOM, lerPompom, limparNomePompom, comPompom,
+  CORES_POMPOM, PRECO_POMPOM, lerPompom, limparNomePompom, comPompom, MINIJOGOS, ultimoMinijogo,
   pronto, recarregarItens, catalogoPublico, pecaDoItem, perfil, validarVisual, visualDesenho, validarToca, ganhar, ganharDeJogo, acoes, sair, fechou, mudouVisual, mudouToca, iniciar, posicaoAgora,
 };

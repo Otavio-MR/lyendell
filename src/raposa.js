@@ -147,7 +147,7 @@ function notaDamas(e, eu) {
   return nota;
 }
 
-const clonar = e => ({ ...e, tabuleiro: e.tabuleiro.map(p => (p ? { ...p } : null)), ultima: null });
+const clonar = e => ({ ...e, tabuleiro: e.tabuleiro.map(p => (p ? { ...p } : null)), ultima: null, historico: null }); // sem histórico: só a partida de verdade guarda
 
 function minimaxDamas(e, prof, eu, alfa, beta) {
   const jogadas = damas.jogadasPossiveis(e, e.vez);

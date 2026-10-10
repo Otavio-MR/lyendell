@@ -8,6 +8,7 @@ const { hoje } = require('../cobranca');
 const progresso = require('../progresso');
 const clube = require('../clube');
 const { erro } = require('../util');
+const { anotar } = require('../diario');
 
 const r = express.Router();
 r.use(exigir('recreacao.usar'));
@@ -29,6 +30,22 @@ r.get('/', async (req, res) => {
     presente, catalogo: clube.catalogoPublico(), tetoDia: clube.TETO_DIA,
     salas: Object.fromEntries(Object.entries(clube.SALAS).map(([k, s]) => [k, { nome: s.nome, chao: s.chao }])),
   });
+});
+
+// Menu de administrador: dar (ou tirar, com valor negativo) cenouras de qualquer pessoa, sem o teto do dia.
+// O saldo nunca fica negativo, e tudo vai para o diário do sistema.
+r.post('/adm/cenouras', exigir('jogos.admin'), async (req, res) => {
+  const alvo = await db.get('SELECT id, nome FROM usuarios WHERE id = ? AND ativo = 1', Number(req.body?.usuario_id) || 0);
+  if (!alvo) throw erro(404, 'Pessoa não encontrada.');
+  const n = Number(req.body?.quantidade);
+  if (!Number.isInteger(n) || !n || Math.abs(n) > 1_000_000) throw erro(400, 'Diga quantas cenouras (um número inteiro, negativo para tirar).');
+  const antes = (await clube.perfil(alvo.id)).moedas;
+  await db.run('UPDATE clube SET moedas = MAX(0, moedas + ?) WHERE usuario_id = ?', n, alvo.id);
+  const moedas = (await clube.perfil(alvo.id)).moedas;
+  await anotar(req, 'adm_cenouras', `${n > 0 ? 'Deu' : 'Tirou'} ${Math.abs(moedas - antes)} cenouras ${n > 0 ? 'para' : 'de'} ${alvo.nome} (saldo: ${moedas})`);
+  // Quem recebeu fica sabendo na hora (e a tela do clube atualiza o saldo).
+  require('../recreacao').paraUsuario(alvo.id, 'adm:cenouras', { moedas, mudou: moedas - antes });
+  res.json({ nome: alvo.nome, antes, moedas, mudou: moedas - antes });
 });
 
 // Comprar um item da loja (roupa e pelo uma vez só; móvel pode ter vários). Item novo só com o sprite enviado
@@ -108,15 +125,10 @@ r.put('/toca', async (req, res) => {
   res.json({ toca });
 });
 
-// Fim de um minijogo do clube: as cenouras ganhas (com teto por partida e por dia).
-const MINIJOGOS = {
-  pesca: { max: 60, cenouras: p => p * 3, limite: 40 },   // pontos = peixes pescados
-  danca: { max: 60, cenouras: p => p / 400, limite: 100_000 },
-};
-// Os minijogos das salas da Ilha (src/clube-ilha/).
+// Fim de um minijogo do clube: as cenouras ganhas (com teto por partida e por dia). Os minijogos (os de sempre e
+// os da Ilha) e a espera entre um e outro ficam em src/clube.js (o menu de administrador zera a espera).
+const { MINIJOGOS, ultimoMinijogo } = clube;
 const ILHA = require('../clube-ilha');
-Object.assign(MINIJOGOS, ILHA.minijogos);
-const ultimoMinijogo = new Map();
 
 // Progresso na Ilha (a faixa do ninja, a chave do capitão...): cada região diz quais chaves existem e
 // como validar (src/clube-ilha/*.js, "progresso").

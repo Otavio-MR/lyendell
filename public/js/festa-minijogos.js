@@ -31,6 +31,25 @@ const entre = (r, a, b) => a + r() * (b - a);
 const num = (v, padrao = 0) => (typeof v === 'number' && Number.isFinite(v) ? v : padrao);
 const suave = (atual, alvo, dt, k = 14) => atual + (alvo - atual) * (1 - Math.exp(-k * dt));
 const aperto = (e, ...nomes) => nomes.some(n => e.apertou.has(n));
+// Pegadinhas na entrada do minijogo: congelado não aperta nada; invertido troca esquerda com direita e
+// cima com baixo; lento vira e.vel (os minijogos multiplicam a velocidade do coelho por ele).
+const NOME_DIR = { esq: 'esquerda', dir: 'direita', cima: 'cima', baixo: 'baixo' };
+const DIR_NOME = { esquerda: 'esq', direita: 'dir', cima: 'cima', baixo: 'baixo' };
+function pegadinhas(e, M) {
+  e.vel = M.admVelocidade();
+  if (!M.admPodeAgir()) {
+    for (const k of ['esq', 'dir', 'cima', 'baixo', 'pular', 'acao']) e[k] = false;
+    e.apertou = SEM_TECLAS;
+    e.ponteiro = null;
+    return e;
+  }
+  const troca = k => DIR_NOME[M.admDirecao(NOME_DIR[k])] || k;
+  if (troca('esq') === 'esq') return e;
+  const antes = { esq: e.esq, dir: e.dir, cima: e.cima, baixo: e.baixo };
+  for (const k of SETAS) e[troca(k)] = antes[k];
+  if (e.apertou.size) e.apertou = new Set([...e.apertou].map(k => (NOME_DIR[k] ? troca(k) : k)));
+  return e;
+}
 const decimal = v => String(v).replace('.', ',');
 
 function hashTexto(s) {
@@ -215,6 +234,10 @@ function criarMoldura(ctx, def) {
   M.pos = d => { if (eu >= 0) try { ctx.pos?.(d); } catch { /* rede */ } };
   M.evento = ev => { if (eu >= 0) try { ctx.evento?.(ev); } catch { /* rede */ } };
   M.pegar = ch => { if (eu >= 0) try { ctx.pegar?.(ch); } catch { /* rede */ } };
+  // Pegadinhas do administrador (ctx.adm vem da tela: admDirecao, admPodeAgir, admVelocidade).
+  M.admPodeAgir = () => { try { return ctx.adm?.podeAgir ? ctx.adm.podeAgir() !== false : true; } catch { return true; } };
+  M.admVelocidade = () => { try { const v = Number(ctx.adm?.velocidade?.()); return v > 0 ? v : 1; } catch { return 1; } };
+  M.admDirecao = d => { try { return ctx.adm?.direcao ? ctx.adm.direcao(d) : d; } catch { return d; } };
   M.reportar = r => {
     if (eu < 0 || M.reportado) return;
     M.reportado = true;
@@ -527,6 +550,7 @@ function montar(ctx, def, fabrica) {
         apertou: en.apertou instanceof Set ? en.apertou : Array.isArray(en.apertou) ? new Set(en.apertou) : SEM_TECLAS,
         ponteiro: en.ponteiro || en.mouse || en.toque || null,
       };
+      pegadinhas(e, M);
       const T = M.tempo();
       M.T = T;
       if (T < 0) {
@@ -582,7 +606,7 @@ function montar(ctx, def, fabrica) {
     },
     resumo() { return J.resumo(M.Tm()); },
     depurar() { return { fim: M.fim, ...(J.depurar ? J.depurar(M.Tm()) : {}) }; },
-    apontar(x, y, atirar = false) { if (J.apontar && Number.isFinite(x) && Number.isFinite(y)) J.apontar(x, y, !!atirar); },
+    apontar(x, y, atirar = false) { if (J.apontar && M.admPodeAgir() && Number.isFinite(x) && Number.isFinite(y)) J.apontar(x, y, !!atirar); },
     aoPos: (i, d) => { if (valido(i) && d && typeof d === 'object') try { J.aoPos?.(i, d); } catch { /* dado ruim */ } },
     aoEvento: (i, ev) => { if (valido(i) && ev && typeof ev.tipo === 'string') try { J.aoEvento?.(i, ev); } catch { /* dado ruim */ } },
     aoPegou: (i, chave) => { if (Number.isInteger(i) && i >= 0 && i < M.N && typeof chave === 'string') try { J.aoPegou?.(i, chave); } catch { /* dado ruim */ } },
@@ -836,7 +860,7 @@ function jogoChuva(M) {
       }
       if (eu < 0 || morto[eu]) return;
       const mov = (e.dir ? 1 : 0) - (e.esq ? 1 : 0);
-      me.x = limitar(me.x + mov * VEL * dt, 22, 618);
+      me.x = limitar(me.x + mov * VEL * e.vel * dt, 22, 618);
       if (mov) { me.dir = mov; me.passo += dt; }
       me.andando = mov !== 0;
       if ((e.pular || e.cima || aperto(e, 'pular', 'cima')) && me.h === 0 && me.vh === 0) { me.vh = PULO; M.som('pulo'); }
@@ -1087,7 +1111,7 @@ function jogoCorrida(M) {
         }
       }
       me.v *= 1 - ATRITO * dt;
-      me.p += me.v * dt;
+      me.p += me.v * e.vel * dt;
       if (me.p >= 100) {
         const tc = Math.max(0, T - (me.p - 100) / Math.max(me.v, 0.01));
         me.p = 100;
@@ -1410,8 +1434,8 @@ function jogoCacada(M) {
       let mx = (e.dir ? 1 : 0) - (e.esq ? 1 : 0);
       let my = (e.baixo ? 1 : 0) - (e.cima ? 1 : 0);
       if (mx && my) { mx *= 0.7071; my *= 0.7071; }
-      me.x = limitar(me.x + mx * VEL * dt, X0, X1);
-      me.y = limitar(me.y + my * VEL * dt, Y0, Y1);
+      me.x = limitar(me.x + mx * VEL * e.vel * dt, X0, X1);
+      me.y = limitar(me.y + my * VEL * e.vel * dt, Y0, Y1);
       if (mx) me.dir = mx > 0 ? 1 : -1;
       me.andando = !!(mx || my);
       if (me.andando) me.passo += dt;
@@ -2082,8 +2106,8 @@ function jogoAlvo(M) {
       let mx = (e.dir ? 1 : 0) - (e.esq ? 1 : 0);
       let my = (e.baixo ? 1 : 0) - (e.cima ? 1 : 0);
       if (mx && my) { mx *= 0.7071; my *= 0.7071; }
-      me.x = limitar(me.x + mx * VEL * dt, 8, L - 8);
-      me.y = limitar(me.y + my * VEL * dt, 8, A - 8);
+      me.x = limitar(me.x + mx * VEL * e.vel * dt, 8, L - 8);
+      me.y = limitar(me.y + my * VEL * e.vel * dt, 8, A - 8);
       if (tiro) atirar(T);
       if (M.passos % 2 === 0) M.pos({ x: red(me.x, 10), y: red(me.y, 10), s: me.tiros });
     },
