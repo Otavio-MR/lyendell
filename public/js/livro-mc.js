@@ -758,17 +758,21 @@ export function livroDeMoradores(livro, registros, autor, { ordem = 'alfabetica'
 
 // O documento de identidade de quem foi registrado (Moradores, Nobres ou Outros): uma "carteira" para a pessoa
 // carregar, só com o essencial: nome (na capa), endereço (o nick), residência e cargo (se a pessoa tiver).
+// Em Outros: nome, endereço, residência em Lyendell, a família a que pertence e o cargo nela.
 // Nada de idade, profissão, estado civil nem dados do registro.
 export function documentoDeIdentidade(nomeModulo, livro, reg, autor) {
   const modelo = modeloDoLivro(nomeModulo, livro) || 'moradores';
-  const v = leitorDaFicha(livro, reg, ['nome', 'nickname', 'residencia', 'cargo', 'cargoFamilia']);
+  const v = leitorDaFicha(livro, reg, ['nome', 'nickname', 'residencia', 'cargo', 'familia', 'cargoFamilia']);
   const nome = umaLinha(v('nome') || v('nickname')) || '---';
   const nick = valorOuNada(v('nickname'));
   const linha = (rotulo, valor) => (valorOuNada(valor) ? [`${rotulo}:`, `§0${umaLinha(valor)}§4`, ''] : null);
   const blocos = [
     nick && nick !== nome ? linha('Endereço', nick) : null,
-    linha('Residência', v('residencia')),
-    linha('Cargo', v('cargo') || v('cargoFamilia')),
+    // Outros (de outra casa ou a serviço): onde moram em Lyendell e a família a que pertencem, com o cargo nela.
+    modelo === 'outros' ? linha('Residência em Lyendell', v('residencia')) : linha('Residência', v('residencia')),
+    ...(modelo === 'outros'
+      ? [linha('Família', v('familia')), linha('Cargo na família', v('cargoFamilia') || v('cargo'))]
+      : [linha('Cargo', v('cargo'))]),
     [...quebrar('Vale perante a Casa Luckham e a Guarda do Coelho.').map(t => `§8${t}`), ''],
     [`§8${SEP}`, FIM],
   ].filter(Boolean);

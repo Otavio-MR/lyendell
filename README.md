@@ -340,7 +340,7 @@ como "sem profissão" e "sem idade".
 
 Na ficha de cada Morador, Nobre ou Outro aprovado, o botão **Documento de identidade** baixa um livro para
 entregar à pessoa, como um RG: capa com o nome e, dentro, só o essencial: o **Endereço** (nick), a **Residência**
-e o **Cargo**, se a pessoa tiver. Mais nada entra (nem idade, profissão, estado civil, juramento ou dados do registro).
+e o **Cargo**, se a pessoa tiver. Em **Outros** o documento traz o nome, o endereço, a **residência em Lyendell**, a\n**família** a que pertence e o **cargo na família**. Mais nada entra (nem idade, profissão, estado civil, juramento ou dados do registro).
 
 ## Escola Luckham
 
