@@ -421,18 +421,9 @@ function listaDeMoradores(l, registros) {
   });
 }
 
-// O documento de identidade da pessoa registrada. Moradores e Nobres mostram se já fizeram o juramento.
-async function baixarIdentidade(m, l, r) {
-  let juramento = null;
-  const modelo = modeloDePessoas(MODULOS[m].titulo, l);
-  if (modelo === 'moradores' || modelo === 'nobres') {
-    try {
-      const j = await get('/api/juramento');
-      const jurou = j.juraram.find(p => p.registro_id === r.id);
-      juramento = { jurou: !!jurou, em: jurou?.desde || null };
-    } catch { juramento = null; } // sem acesso ao juramento: o documento sai sem essa linha
-  }
-  documentoDeIdentidade(MODULOS[m].titulo, l, r, juramento, estado.eu.nome).baixar();
+// O documento de identidade da pessoa registrada: nome, endereço (nick), residência e cargo.
+function baixarIdentidade(m, l, r) {
+  documentoDeIdentidade(MODULOS[m].titulo, l, r, estado.eu.nome).baixar();
 }
 
 /* ─── Ver registro (como documento oficial) ───────── */

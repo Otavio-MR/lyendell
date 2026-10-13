@@ -757,31 +757,20 @@ export function livroDeMoradores(livro, registros, autor, { ordem = 'alfabetica'
 }
 
 // O documento de identidade de quem foi registrado (Moradores, Nobres ou Outros): uma "carteira" para a pessoa
-// carregar. Só entram dados que quase nunca mudam: nome, endereço, número do registro, naturalidade e
-// nascimento (se o formulário do livro tiver esses campos), chegada, juramento e quem registrou.
-// Idade, profissão, residência, cargo e estado civil ficam de fora, porque mudam.
-// juramento: { jurou, em } para Moradores e Nobres; null para Outros (que não juram).
-export function documentoDeIdentidade(nomeModulo, livro, reg, juramento, autor) {
+// carregar, só com o essencial: nome (na capa), endereço (o nick), residência e cargo (se a pessoa tiver).
+// Nada de idade, profissão, estado civil nem dados do registro.
+export function documentoDeIdentidade(nomeModulo, livro, reg, autor) {
   const modelo = modeloDoLivro(nomeModulo, livro) || 'moradores';
-  const v = leitorDaFicha(livro, reg, ['nome', 'nickname', 'chegada', 'naturalidade', 'nascimento', 'genero', 'familia']);
+  const v = leitorDaFicha(livro, reg, ['nome', 'nickname', 'residencia', 'cargo', 'cargoFamilia']);
   const nome = umaLinha(v('nome') || v('nickname')) || '---';
   const nick = valorOuNada(v('nickname'));
   const linha = (rotulo, valor) => (valorOuNada(valor) ? [`${rotulo}:`, `§0${umaLinha(valor)}§4`, ''] : null);
-  const quem = umaLinha(reg.revisado_por_nome) || quemRegistrou(reg);
-  const quando = reg.revisado_em ? dataHora(reg.revisado_em) : quandoRegistrou(reg);
-  const tipo = { moradores: 'Morador', nobres: 'Nobre', outros: 'Outro' }[modelo];
-  // O nome já está grande na capa, então a página de dados começa pelo endereço.
   const blocos = [
     nick && nick !== nome ? linha('Endereço', nick) : null,
-    linha('Registro', `${tipo}, nº ${numeroDoRegistro(reg)}`),
-    linha('Gênero', v('genero')),
-    linha('Nascimento', v('nascimento')),
-    linha('Naturalidade', v('naturalidade')),
-    modelo === 'outros' ? linha('Família', v('familia')) : null,
-    linha('Chegada à Capital', v('chegada')),
-    juramento ? linha('Juramento', juramento.jurou ? `Feito${juramento.em ? ` em ${dataCurta(juramento.em)}` : ''}` : 'Ainda não feito') : null,
+    linha('Residência', v('residencia')),
+    linha('Cargo', v('cargo') || v('cargoFamilia')),
     [...quebrar('Vale perante a Casa Luckham e a Guarda do Coelho.').map(t => `§8${t}`), ''],
-    [`§8${SEP}`, `§0Registrado por: ${quem}`, `em ${quando}§8`, SEP, FIM],
+    [`§8${SEP}`, FIM],
   ].filter(Boolean);
   const capa = capaDaFicha({
     cor: modelo === 'nobres' ? '6' : modelo === 'outros' ? '3' : '2', fecho: modelo === 'moradores' ? '' : '§2',

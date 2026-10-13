@@ -339,11 +339,8 @@ como "sem profissão" e "sem idade".
 ### Documento de identidade
 
 Na ficha de cada Morador, Nobre ou Outro aprovado, o botão **Documento de identidade** baixa um livro para
-entregar à pessoa, como um RG: capa com o nome e o número do registro e, nas páginas de dentro, só o que
-**quase nunca muda**: o **Endereço** (nick), o tipo e o número do registro, a data de chegada à Capital, se já
-fez o **juramento** (e quando) e quem registrou e em que dia. Idade, profissão, residência, cargo e estado
-civil ficam de fora de propósito, porque mudam. Se um dia o formulário do livro ganhar os campos
-**Naturalidade**, **Data de nascimento** ou **Gênero**, eles entram no documento sozinhos.
+entregar à pessoa, como um RG: capa com o nome e, dentro, só o essencial: o **Endereço** (nick), a **Residência**
+e o **Cargo**, se a pessoa tiver. Mais nada entra (nem idade, profissão, estado civil, juramento ou dados do registro).
 
 ## Escola Luckham
 
