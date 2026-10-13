@@ -15,6 +15,7 @@ import { telaMesa } from './mesa.js';
 import { telaJunto, abrirJunto, JOGOS_JUNTO } from './junto.js';
 import { segredosDoJogo, segredosDescobertos, SEGREDOS, NOME_JOGO, comoFazer } from '../segredos.js';
 import { efeito } from '../bobo-efeitos.js';
+import { palcoDoJogo, dentroDaTelaCheia, encaixarNoPalco } from '../jogo-palco.js';
 
 // Seta [x, y] do jogo virando o nome que os códigos secretos usam.
 const nomeDir = ([x, y]) => (x ? (x > 0 ? 'direita' : 'esquerda') : y > 0 ? 'baixo' : 'cima');
@@ -1121,6 +1122,8 @@ export function cobrinha() {
   const recordeEl = h('strong', null, '...');
   const sobre = h('div', { class: 'cobra-sobre' });
   const ranking = h('div');
+  const palco = h('div', { class: 'cobra-moldura' }, tela, sobre);
+  const botaoPausa = botaoIcone('pausa', 'Pausar', () => (situacao === 'jogando' ? pausar() : comecar()), 'btn-pausa');
 
   let cobra, direcao, fila, comida, pontos, passoMs, situacao, timer;
   let recorde = null;
@@ -1284,7 +1287,11 @@ export function cobrinha() {
 
   function mostrarSobre(extra) {
     transmitirQuadro();
-    if (situacao === 'jogando') { sobre.hidden = true; return; }
+    const rodando = situacao === 'jogando';
+    botaoPausa.title = rodando ? 'Pausar' : situacao === 'fim' ? 'Jogar de novo' : 'Continuar';
+    botaoPausa.setAttribute('aria-label', botaoPausa.title);
+    trocar(botaoPausa, icone(rodando ? 'pausa' : 'play'));
+    if (rodando) { sobre.hidden = true; return; }
     sobre.hidden = false;
     const toque = matchMedia('(pointer: coarse)').matches;
     if (situacao === 'pronto') {
@@ -1358,6 +1365,19 @@ export function cobrinha() {
 
   const seta = (ic, d, rotulo) => h('button', { class: `dpad-${ic}`, type: 'button', 'aria-label': rotulo, onpointerdown: e => { e.preventDefault(); seg.direcao(nomeDir(d)); const v = admDirecao(d); if (v) virar(v); } }, icone(ic));
 
+  const botoesPlacar = h('span', { class: 'placar-botoes' }, botaoPausa);
+  const placar = h('div', { class: 'cobra-placar-linha' },
+    h('span', null, 'Cenouras: ', pontosEl),
+    contadorPlateia(),
+    h('span', null, icone('trofeu'), ' Seu recorde: ', recordeEl),
+    botoesPlacar);
+  const dpad = h('div', { class: 'dpad', 'aria-label': 'Controles de direção' },
+    seta('cima', [0, -1], 'Para cima'), seta('voltar', [-1, 0], 'Para a esquerda'),
+    seta('frente', [1, 0], 'Para a direita'), seta('baixo', [0, 1], 'Para baixo'));
+  const ajuste = palcoDoJogo(palco, { proporcao: 1, abaixo: () => [dpad], dentro: () => dentroDaTelaCheia(placar, dpad), aoMudar: ({ cheio }) => encaixarNoPalco(cheio, palco, placar, dpad, areaJogo) });
+  botoesPlacar.append(ajuste.botao);
+  const areaJogo = h('div', { class: 'jogo-area' }, placar, palco, dpad);
+
   function carregarRanking() {
     get('/api/recreacao/ranking').then(r => {
       const meu = r.cobrinha.find(l => l.nome === estado.eu.nome);
@@ -1374,15 +1394,7 @@ export function cobrinha() {
   return h('div', { class: 'pagina' },
     cabecalho({ titulo: 'Cobrinha', icone: 'cobra', voltar: { href: '#/recreacao', texto: 'Recreação' }, sub: 'Cada cenoura faz a cobra crescer e andar mais rápido.' }),
     h('div', { class: 'jogo-solo' },
-      h('div', { class: 'jogo-area' },
-        h('div', { class: 'cobra-placar-linha' },
-          h('span', null, 'Cenouras: ', pontosEl),
-          contadorPlateia(),
-          h('span', null, icone('trofeu'), ' Seu recorde: ', recordeEl)),
-        h('div', { class: 'cobra-moldura' }, tela, sobre),
-        h('div', { class: 'dpad' },
-          seta('cima', [0, -1], 'Para cima'), seta('voltar', [-1, 0], 'Para a esquerda'),
-          seta('frente', [1, 0], 'Para a direita'), seta('baixo', [0, 1], 'Para baixo'))),
+      areaJogo,
       h('aside', { class: 'painel jogo-lateral' },
         h('div', { class: 'painel-cab' }, h('h2', null, icone('trofeu'), 'Melhores')),
         ranking)));
@@ -1632,6 +1644,15 @@ export function quebraCabeca() {
 
     desenhar();
     carregarRanking();
+    const moldura = h('div', { class: 'qc-moldura' }, tabuleiro, previa);
+    palcoDoJogo(moldura, { proporcao: 1, abaixo: () => [resultado, botoesQc], maxLargura: 760 });
+    const botoesQc = h('div', { class: 'qc-botoes' },
+      botao('Ver a imagem', { icone: 'olho', classe: 'btn-pequeno', onclick: e => {
+        previa.hidden = !previa.hidden;
+        e.currentTarget.querySelector('span').textContent = previa.hidden ? 'Ver a imagem' : 'Esconder a imagem';
+      } }),
+      botao('Embaralhar de novo', { icone: 'ajustes', classe: 'btn-pequeno', onclick: () => jogar(titulo) }),
+      botao('Outra imagem', { icone: 'imagem', classe: 'btn-pequeno', onclick: escolher }));
     trocar(raiz, cab(titulo),
       h('div', { class: 'jogo-solo' },
         h('div', { class: 'jogo-area' },
@@ -1640,15 +1661,9 @@ export function quebraCabeca() {
             h('span', null, 'Trocas: ', movEl),
             contadorPlateia(),
             h('span', { class: 'suave' }, variante)),
-          h('div', { class: 'qc-moldura' }, tabuleiro, previa),
+          moldura,
           resultado,
-          h('div', { class: 'qc-botoes' },
-            botao('Ver a imagem', { icone: 'olho', classe: 'btn-pequeno', onclick: e => {
-              previa.hidden = !previa.hidden;
-              e.currentTarget.querySelector('span').textContent = previa.hidden ? 'Ver a imagem' : 'Esconder a imagem';
-            } }),
-            botao('Embaralhar de novo', { icone: 'ajustes', classe: 'btn-pequeno', onclick: () => jogar(titulo) }),
-            botao('Outra imagem', { icone: 'imagem', classe: 'btn-pequeno', onclick: escolher }))),
+          botoesQc),
         h('aside', { class: 'painel jogo-lateral' },
           h('div', { class: 'painel-cab' }, h('h2', null, icone('trofeu'), `Melhores ${variante}`)),
           ranking,
@@ -1699,6 +1714,7 @@ export function memoria() {
   exigirAcesso();
   const grade = h('div', { class: 'mem-grade' });
   const moldura = h('div', { class: 'mem-moldura' });
+  const ajusteMem = palcoDoJogo(moldura, { proporcao: () => { const [l, c] = MEMORIA[tamanhoMemoria]; return (c * 0.8 / l) * 0.97; }, maxLargura: 760 });
   const jogadasEl = h('strong', null, '0');
   const paresEl = h('strong', null, '0');
   const tempoEl = h('strong', null, '0:00');
@@ -1816,6 +1832,7 @@ export function memoria() {
     sobre.hidden = true;
     desenharSeletor();
     atualizar();
+    ajusteMem.medir();
     carregarRanking();
     if (rt.conectado) transmitir('memoria', { n: tamanhoMemoria });
     transmitirQuadro(true);

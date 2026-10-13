@@ -1,0 +1,246 @@
+/* ux-geral: ajustes de usabilidade (carregado depois do estilo.css, então vence em caso de empate).
+   Aqui ficam as regras que valem para o site inteiro: letras mínimas, alvos de toque, foco do teclado,
+   áreas seguras do iPhone, carregando, modais, abas e tabelas que rolam, movimento reduzido. */
+
+:root {
+  --alvo: 44px;
+  --seguro-t: env(safe-area-inset-top, 0px);
+  --seguro-d: env(safe-area-inset-right, 0px);
+  --seguro-b: env(safe-area-inset-bottom, 0px);
+  --seguro-e: env(safe-area-inset-left, 0px);
+}
+
+/* ─── Acessibilidade básica ─────────────────────── */
+.so-leitor { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.pular {
+  position: fixed; left: 12px; top: 12px; z-index: 400; padding: 10px 16px; border-radius: var(--raio-p);
+  background: var(--ouro); color: #1b1403; font-family: var(--f-titulo); font-size: 0.85rem; font-weight: 700;
+  transform: translateY(-160%); transition: transform 0.15s;
+}
+.pular:focus { transform: none; color: #1b1403; outline: 3px solid var(--texto); outline-offset: 2px; }
+#tela:focus, #tela .pag-titulo:focus { outline: none; }
+:focus-visible { outline: 3px solid var(--ouro-l); outline-offset: 2px; }
+.btn-ouro:focus-visible { outline-color: var(--texto); }
+/* Lugares que cortam o contorno (listas que rolam): o foco desenha por dentro. */
+.menu :focus-visible, .abas :focus-visible, .tabela-wrap:focus-visible, .radio-lista :focus-visible, .modal-corpo :focus-visible { outline-offset: -3px; }
+.modal-corpo .btn:focus-visible, .modal-corpo .input:focus-visible { outline-offset: 2px; }
+.modal:focus, .modal:focus-visible { outline: none; }
+.input:focus-visible { outline: none; }
+.input[aria-invalid='true'] { border-color: var(--vermelho); box-shadow: 0 0 0 3px rgba(216, 103, 74, 0.2); }
+.input:disabled, .input[readonly] { opacity: 0.7; cursor: not-allowed; }
+.input::placeholder { color: #8a8b6c; }
+a.nota-link:focus-visible, .livro-card:focus-visible { outline-offset: 2px; }
+
+/* ─── Letras que eram miúdas demais (mínimo de uns 11,5 a 12 px) ─── */
+.sobrelinha { font-size: 0.76rem; }
+.marca small { font-size: 0.72rem; }
+.menu-titulo { font-size: 0.72rem; opacity: 1; }
+.chip { font-size: 0.76rem; color: color-mix(in srgb, var(--cor) 72%, #fff); }
+.status { font-size: 0.74rem; }
+.aba-n { font-size: 0.75rem; }
+.menu-aviso { font-size: 0.76rem; }
+.avatar-p { font-size: 0.72rem; }
+.selo-nivel { font-size: 0.74rem; }
+.tabela th { font-size: 0.74rem; }
+.col-num { font-size: 0.8rem; }
+.campo-rotulo { font-size: 0.8rem; }
+.doc-sobre, .doc-rotulo { font-size: 0.74rem; }
+.pendente-campos dt, .gestao-rotulo, .chat-situacao, .mapa-ficha-sit, .missao-funcao, .fin-cel small { font-size: 0.74rem; }
+.filtro-chip span, .mapa-por > span { font-size: 0.74rem; }
+.escola-aluno-notas small, .fin-moeda, .juramento-ordem, .notif-grupo { font-size: 0.76rem; }
+.tabela-responsiva td[data-rotulo]::before { font-size: 0.72rem; }
+.etiqueta { font-size: 0.86rem; }
+.radio-texto small, .radio-item-tocar small { font-size: 0.8rem; }
+
+/* ─── Botões e campos ───────────────────────────── */
+.btn:disabled, .btn[disabled] { cursor: not-allowed; }
+.btn.ocupado, .btn-icone.ocupado { position: relative; pointer-events: none; cursor: progress; }
+.btn.ocupado > *, .btn-icone.ocupado > * { animation: esmaecer 0.12s 0.35s forwards; }
+.btn.ocupado::after, .btn-icone.ocupado::after {
+  content: ''; position: absolute; left: 50%; top: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%;
+  border: 2px solid color-mix(in srgb, currentColor 30%, transparent); border-top-color: currentColor;
+  opacity: 0; animation: girar 0.7s linear infinite, mostrar 0.12s 0.35s forwards;
+}
+@keyframes esmaecer { to { opacity: 0.15; } }
+@keyframes mostrar { to { opacity: 1; } }
+.senha-linha { position: relative; display: block; }
+.senha-linha .input { padding-right: 48px; }
+.senha-olho { position: absolute; right: 2px; top: 50%; translate: 0 -50%; width: 40px; height: 40px; }
+.form-erro { display: flex; gap: 8px; align-items: flex-start; border-left-width: 3px; border-left-color: var(--vermelho); }
+.form-erro[hidden] { display: none; }
+.vazio-acoes { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+
+/* ─── Carregando ────────────────────────────────── */
+.carregando-tela { display: grid; justify-items: center; align-content: center; gap: 12px; }
+.carregando-tela::after { content: 'Carregando...'; color: var(--suave); font-size: 0.92rem; opacity: 0; animation: mostrar 0.2s 0.4s forwards; }
+.esqueleto-tela { display: grid; gap: 14px; opacity: 0; animation: mostrar 0.25s 0.3s forwards; }
+.esq {
+  border-radius: 10px; background: linear-gradient(90deg, var(--sup) 20%, var(--sup-3) 50%, var(--sup) 80%) 0 0 / 220% 100%;
+  animation: brilho 1.5s ease-in-out infinite;
+}
+.esq-titulo { height: 38px; width: min(60%, 360px); margin-bottom: 4px; }
+.esq-linha { height: 16px; width: min(90%, 620px); }
+.esq-linha.curta { width: min(55%, 340px); }
+.esq-grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-top: 10px; }
+.esq-cartao { height: 132px; border: 1px solid var(--borda); border-radius: var(--raio); }
+@keyframes brilho { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+
+/* ─── Aviso (toast) ─────────────────────────────── */
+#toasts { right: max(20px, var(--seguro-d)); bottom: max(20px, calc(var(--seguro-b) + 12px)); }
+.toast { cursor: pointer; }
+.toast span { overflow-wrap: anywhere; }
+body.com-radio #toasts { bottom: calc(122px + var(--seguro-b)); }
+body.com-radio.radio-mini #toasts { bottom: calc(86px + var(--seguro-b)); }
+.nova-versao { top: max(12px, calc(var(--seguro-t) + 8px)); }
+
+/* ─── Modais ────────────────────────────────────── */
+.modal-fundo { overscroll-behavior: contain; padding-left: max(16px, var(--seguro-e)); padding-right: max(16px, var(--seguro-d)); }
+.modal-corpo { overscroll-behavior: contain; }
+.modal-cab { position: relative; flex: none; }
+.modal-cab h2 { overflow-wrap: anywhere; }
+.modal-rodape { flex: none; }
+.modal-confirmar .confirmar-texto { line-height: 1.5; }
+
+/* ─── Abas e tabelas que rolam para os lados ────── */
+.abas.rola-dir, .abas.rola-esq { scrollbar-width: none; }
+.abas.rola-dir::-webkit-scrollbar, .abas.rola-esq::-webkit-scrollbar { display: none; }
+.abas.rola-dir:not(.rola-esq) { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); }
+.abas.rola-esq:not(.rola-dir) { -webkit-mask-image: linear-gradient(270deg, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(270deg, #000 calc(100% - 36px), transparent); }
+.abas.rola-esq.rola-dir { -webkit-mask-image: linear-gradient(90deg, transparent, #000 36px, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(90deg, transparent, #000 36px, #000 calc(100% - 36px), transparent); }
+.aba { min-height: 44px; }
+.tabela-wrap {
+  overscroll-behavior-x: contain;
+  background:
+    linear-gradient(90deg, var(--sup) 30%, rgba(0, 0, 0, 0)) left center / 36px 100% no-repeat local,
+    linear-gradient(270deg, var(--sup) 30%, rgba(0, 0, 0, 0)) right center / 36px 100% no-repeat local,
+    linear-gradient(90deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0)) left center / 14px 100% no-repeat scroll,
+    linear-gradient(270deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0)) right center / 14px 100% no-repeat scroll,
+    var(--sup);
+}
+.tabela td { overflow-wrap: anywhere; }
+.tabela .nowrap, .tabela .num, .tabela .col-num { overflow-wrap: normal; }
+
+/* ─── Menu lateral e gaveta do celular ──────────── */
+.lateral-cab { display: flex; align-items: center; flex: none; }
+.lateral-cab .marca { flex: 1; min-width: 0; }
+.menu-fechar { display: none; margin-right: 8px; }
+.menu { overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--borda-2) transparent; }
+.menu-item[aria-current='page'] { font-weight: 600; }
+.eu { padding-bottom: calc(14px + var(--seguro-b)); }
+
+/* ─── Player do canto ───────────────────────────── */
+.radio { right: max(18px, var(--seguro-d)); bottom: max(18px, var(--seguro-b)); }
+.radio-bolinha { transition: border-color 0.15s, transform 0.15s; }
+.radio.mini { transition: translate 0.25s ease; }
+/* Jogos com controles de toque: o botão do player fica discreto para não cobrir os controles. */
+body:has(.dpad, .arcade-controles, .palco) .radio.mini .radio-bolinha { opacity: 0.55; }
+body:has(.dpad, .arcade-controles, .palco) .radio.mini .radio-bolinha:hover, body:has(.dpad, .arcade-controles, .palco) .radio.mini .radio-bolinha:focus-visible { opacity: 1; }
+
+/* ─── Celular e tablet ──────────────────────────── */
+@media (max-width: 960px) {
+  .lateral { padding-top: var(--seguro-t); padding-bottom: 0; width: min(var(--lateral), 88vw); visibility: hidden; transition: transform 0.25s ease, visibility 0s 0.25s; }
+  body.menu-aberto .lateral { visibility: visible; transition: transform 0.25s ease; }
+  .menu-fechar { display: inline-grid; }
+  .menu-item { min-height: var(--alvo); padding-block: 10px; }
+  .topo { padding: calc(8px + var(--seguro-t)) max(12px, var(--seguro-d)) 8px max(12px, var(--seguro-e)); }
+  .tela { padding-left: max(16px, var(--seguro-e)); padding-right: max(16px, var(--seguro-d)); padding-bottom: calc(48px + var(--seguro-b)); }
+  body.com-radio .tela { padding-bottom: calc(150px + var(--seguro-b)); }
+  body.com-radio.radio-mini .tela { padding-bottom: calc(96px + var(--seguro-b)); }
+  /* O botão do player sai de cena enquanto se rola para baixo. */
+  body.rolando-baixo .radio.mini { translate: 0 calc(100% + 40px); }
+  .modal-rodape { padding-bottom: calc(14px + var(--seguro-b)); }
+  .login { padding-top: calc(32px + var(--seguro-t)); padding-bottom: calc(32px + var(--seguro-b)); }
+}
+@media (max-width: 640px) {
+  /* Os avisos vão para o alto: embaixo eles cobriam os botões Salvar dos formulários. */
+  body #toasts, body.com-radio #toasts, body.com-radio.radio-mini #toasts {
+    top: calc(var(--seguro-t) + 64px); bottom: auto; left: max(12px, var(--seguro-e)); right: max(12px, var(--seguro-d)); max-width: none;
+  }
+  .radio { right: max(12px, var(--seguro-d)); bottom: max(12px, var(--seguro-b)); width: calc(100vw - 24px - var(--seguro-e) - var(--seguro-d)); }
+  .radio.mini { width: auto; }
+  .vazio { padding: 40px 16px; }
+  .modal-fundo { padding-left: 0; padding-right: 0; }
+}
+
+/* Telas de toque: alvos de pelo menos 44 px nas ações principais (e 40 nas pequenas, com respiro entre elas). */
+@media (pointer: coarse) {
+  .btn { min-height: var(--alvo); }
+  .btn-pequeno { min-height: 40px; padding-inline: 0.85rem; font-size: 0.78rem; }
+  .btn-icone { width: var(--alvo); height: var(--alvo); }
+  .btn-icone .ico { width: 22px; height: 22px; }
+  .radio .btn-icone, .radio-botoes .btn-icone, .radio-item .btn-icone { width: 40px; height: 40px; }
+  .radio-bolinha { width: 56px; height: 56px; }
+  .input { min-height: var(--alvo); font-size: 16px; }
+  .input-pequeno { min-height: 40px; font-size: 16px; }
+  .seg { min-height: 40px; padding-inline: 16px; }
+  .marcador, .cargo-opcao { min-height: var(--alvo); }
+  .marcador input, .cargo-opcao input { width: 22px; height: 22px; }
+  .interruptor { min-height: var(--alvo); align-items: center; }
+  .escola-marca { min-height: var(--alvo); }
+  .escola-nota-celula { min-height: 40px; }
+  .escolha-cor { width: 40px; height: 40px; }
+  .radio-item-tocar { min-height: 44px; }
+  .senha-olho { width: 44px; height: 44px; }
+  .modal-cab .btn-icone { margin-block: -4px; }
+  /* Links soltos no texto: a área de toque cresce sem mexer no desenho. */
+  .voltar { min-height: var(--alvo); margin-bottom: 0; padding-right: 12px; }
+  .painel-cab a, .nota a:not(.btn), .link, .lista-simples + a, .escola a:not(.btn):not(.aba):not(.menu-item) { padding-block: 11px; margin-block: -11px; }
+  a.pessoa, .pessoa-link, .tabela td > a { padding-block: 9px; margin-block: -9px; display: inline-flex; align-items: center; }
+  .chips a.chip, a.chip { padding-block: 9px; margin-block: -6px; }
+}
+
+/* Celular deitado: pouca altura. Tudo fica mais compacto e o cabeçalho não come a tela. */
+@media (max-height: 520px) {
+  .login { align-items: start; }
+  .login-brasao { width: 84px; height: 84px; }
+  .login-caixa { padding: 20px 24px 18px; }
+  .login-titulo { font-size: 1.7rem; }
+  .login-sub { margin-bottom: 12px; }
+  .modal-corpo { padding-block: 12px; }
+  .modal-cab { padding-block: 8px; }
+  .modal-rodape { padding-block: 8px; }
+  .boas-vindas { padding-block: 16px; }
+  .vazio { padding-block: 28px; }
+  .tela { padding-top: 14px; }
+}
+@media (max-height: 520px) and (max-width: 960px) {
+  .topo { position: static; }
+  .modal { max-height: 100vh; max-height: 100dvh; }
+  .modal-fundo { padding: 0; }
+  .modal, .modal.medio, .modal.grande, .modal.pequeno { margin: 0 auto; border-radius: 0; }
+}
+
+/* ─── Movimento reduzido ────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .esq { animation: none; }
+  .esqueleto-tela, .carregando-tela::after { animation-duration: 0.01ms; }
+  /* Carregando continua girando, devagar: é o único sinal de que algo está acontecendo. */
+  .giro, .btn.carregando::after, .btn.ocupado::after, .btn-icone.ocupado::after { animation-duration: 1.6s !important; animation-iteration-count: infinite !important; }
+  .btn.ocupado::after, .btn-icone.ocupado::after { animation-name: girar !important; opacity: 1; }
+  .radio-disco.girando { animation: none; }
+  .pular, .radio.mini { transition: none; }
+}
+
+/* ─── Contraste alto e cores forçadas ───────────── */
+@media (forced-colors: active) {
+  .btn, .input, .chip, .etiqueta, .aba.ativa { border: 1px solid CanvasText; }
+  .menu-item.ativo { outline: 2px solid Highlight; }
+}
+
+/* Cabeçalho da gaveta: marca + botão de fechar cabem sem quebrar o nome. */
+.lateral-cab .marca { padding: 18px 0 14px 16px; gap: 10px; }
+.lateral-cab .marca img { width: 44px; height: 44px; }
+.lateral-cab .marca strong { white-space: nowrap; font-size: 1rem; }
+.lateral-cab .menu-fechar { margin-right: 10px; }
+@media (min-width: 961px) { .lateral-cab .marca { padding: 20px 18px 16px; } .lateral-cab .marca img { width: 50px; height: 50px; } }
+
+@media (pointer: coarse) {
+  .marca-topo { min-height: var(--alvo); }
+  .semana-pessoa { min-height: 40px; }
+  .juramento-pessoa a { display: inline-flex; align-items: center; min-height: 40px; }
+  button.link { min-height: 40px; padding-inline: 8px; }
+}
+@media (max-height: 520px) { .lb-img { max-height: calc(100vh - 130px); max-height: calc(100dvh - 130px); } .lb-palco { min-height: 160px; } }
+.login-titulo { font-size: clamp(1.6rem, 8.5vw, 2.1rem); }
+@media (max-width: 480px) { .login-caixa { padding: 28px 20px 22px; } .login-brasao { width: 120px; height: 120px; } }

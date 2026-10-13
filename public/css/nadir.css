@@ -1,12 +1,12 @@
 /* A Grande Nadir: o santuário da Coelha Mãe (a IA da Casa) e o Livro de Nadir.
    Mesma identidade do site (verde-floresta e o dourado do brasão), com a luz da lua por cima. */
 
-.nadir-pagina { max-width: 820px; margin: 0 auto; display: flex; flex-direction: column; min-height: calc(100vh - 96px); }
+.nadir-pagina { max-width: 820px; margin: 0 auto; display: flex; flex-direction: column; min-height: calc(100vh - 96px); min-height: calc(100dvh - 96px); }
 /* Com o tocador de música, a área principal guarda 140px embaixo. Recolhido, o tocador é só uma bolinha no
    canto, e a tela da Nadir pode descer até perto do fim. Aberto, ele é largo: aí a caixa de pergunta fica
    acima dele (o espaço guardado), para o botão de enviar nunca ficar coberto. No celular também. */
-body.com-radio.radio-mini .nadir-pagina { margin-bottom: -104px; min-height: calc(100vh - 68px); }
-body.com-radio:not(.radio-mini) .nadir-pagina { min-height: calc(100vh - 172px); }
+body.com-radio.radio-mini .nadir-pagina { margin-bottom: -104px; min-height: calc(100vh - 68px); min-height: calc(100dvh - 68px); }
+body.com-radio:not(.radio-mini) .nadir-pagina { min-height: calc(100vh - 172px); min-height: calc(100dvh - 172px); }
 .nadir-oculto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 /* ─── O santuário ─── */
@@ -208,7 +208,7 @@ a.nadir-ficha:hover { border-color: var(--ouro); background: var(--ouro-fundo); 
 @keyframes nadir-chegar { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 
 @media (max-width: 640px) {
-  .nadir-pagina, body.com-radio.radio-mini .nadir-pagina, body.com-radio:not(.radio-mini) .nadir-pagina { margin-bottom: 0; min-height: calc(100vh - 190px); }
+  .nadir-pagina, body.com-radio.radio-mini .nadir-pagina, body.com-radio:not(.radio-mini) .nadir-pagina { margin-bottom: 0; min-height: calc(100vh - 190px); min-height: calc(100dvh - 190px); }
   .nadir-emblema-caixa { width: 168px; height: 168px; }
   .nadir-brilhos { inset: -20px -30px -10px; }
   .compacto .nadir-emblema-caixa { width: 84px; height: 84px; }

@@ -6,6 +6,7 @@ import { rt, ouvir, transmitir, enviarQuadro, pararTransmissao } from '../tempo-
 import { juntoNoJogo } from '../junto.js';
 import { segredosDoJogo, SEGREDOS } from '../segredos.js';
 import { efeito } from '../bobo-efeitos.js';
+import { palcoDoJogo } from '../jogo-palco.js';
 import { menuAdm, admDirecao, admPodeAgir } from '../adm-jogos.js';
 
 const escutar = (tipo, fn) => aoSair(ouvir(tipo, fn));
@@ -120,6 +121,7 @@ export function campoMinado() {
   const grade = h('div', { class: 'minado-grade' });
   const moldura = h('div', { class: 'minado-moldura' }, grade);
   const sobre = h('div', { class: 'cobra-sobre', hidden: true });
+  const ajuste = palcoDoJogo(moldura, { proporcao: () => (d ? d.col / d.lin : 1), maxLargura: 940 });
   const restantesEl = h('strong', null, '0');
   const tempoEl = h('strong', null, '0:00');
   const recordeEl = h('strong', null, '...');
@@ -240,6 +242,7 @@ export function campoMinado() {
     sobre.hidden = true;
     desenharSeletor();
     desenhar();
+    ajuste.medir();
     carregarRanking();
     if (rt.conectado) transmitir('minado', { d: dificuldade() });
     transmitirQuadro(true);
@@ -433,6 +436,7 @@ export function campoMinado() {
     h('div', { class: 'jogo-solo' },
       h('div', { class: 'jogo-area' },
         seletor,
+        h('details', { class: 'ajuda-jogo' }, h('summary', null, 'Como jogar'), h('p', null, 'Abra todas as casas sem pisar nas armadilhas. O número diz quantas armadilhas há em volta. Botão direito (ou segurar o dedo) põe bandeira.')),
         h('div', { class: 'cobra-placar-linha minado-placar' },
           h('span', null, icone('minado'), ' ', restantesEl),
           h('span', null, icone('relogio'), ' ', tempoEl),
@@ -501,6 +505,7 @@ export function jogo2048() {
   const tabuleiro = h('div', { class: 'b2048', tabindex: '0', 'aria-label': 'Tabuleiro do 2048. Use as setas.' }, fundo, camada);
   const sobre = h('div', { class: 'cobra-sobre', hidden: true });
   const moldura = h('div', { class: 'b2048-moldura' }, tabuleiro, sobre);
+  palcoDoJogo(moldura, { proporcao: 1, maxLargura: 940 });
   const pontosEl = h('strong', null, '0');
   const maiorEl = h('strong', null, '2');
   const recordeEl = h('strong', null, '...');

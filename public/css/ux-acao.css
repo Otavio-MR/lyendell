@@ -1,0 +1,129 @@
+/* ux-acao : ajustes de usabilidade dos jogos de ação e ao vivo (carregado depois do estilo.css). */
+
+/* ─── Fliperama (public/js/arcade.js): o jogo cabe na janela, tem tela cheia e botões de toque confortáveis ─── */
+
+.arcade-area { width: 100%; max-width: none; }
+.arcade-palco { display: flex; flex-direction: column; gap: 10px; --bt: clamp(46px, 14vw, 62px); }
+.arcade-palco .cobra-moldura { width: 100%; max-width: none; }
+.arcade-palco .arcade-tela { width: 100%; }
+
+/* A barra de cima: placar e botões (pausar, som, tela cheia, sair) */
+.arcade-barra { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; color: var(--texto-2); }
+.arcade-placar { display: flex; align-items: center; gap: 6px 16px; min-width: 0; overflow: hidden; white-space: nowrap; font-size: 0.95rem; }
+.arcade-placar > span { display: inline-flex; align-items: center; gap: 4px; }
+.arcade-placar strong { color: var(--ouro-l); font-family: var(--f-titulo); }
+.arcade-ferramentas { display: flex; align-items: center; gap: 4px; flex: none; margin-left: auto; }
+.arcade-ferr { width: 44px; height: 44px; background: var(--sup); border-color: var(--borda); text-decoration: none; }
+.arcade-ferr:hover { border-color: var(--ouro-d); }
+.arcade-ferr:disabled { opacity: 0.35; cursor: default; }
+.arcade-ferr:disabled:hover { background: var(--sup); color: var(--texto-2); border-color: var(--borda); }
+.arcade-ferr .ico { width: 22px; height: 22px; }
+.arcade-sair { display: none; }
+.arcade-palco.palco-foco .arcade-sair { display: inline-grid; }
+@media (pointer: coarse) { .arcade-ferr { width: 46px; height: 46px; } }
+@media (max-width: 400px) { .arcade-rec-txt { display: none; } }
+
+/* A caixa por cima do jogo (começar, pausa, fim): cabe no jogo pequeno e rola se não couber */
+.arcade-sobre { overflow: auto; padding: 12px; }
+.arcade-sobre .cobra-caixa { width: min(460px, 100%); max-height: 100%; overflow: auto; }
+.arcade-sobre .btn-grande { width: 100%; }
+.arcade-sobre-acoes { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.arcade-pequeno .arcade-sobre { padding: 6px; }
+.arcade-pequeno .cobra-caixa { padding: 10px 14px; gap: 6px; }
+.arcade-pequeno .cobra-caixa h2 { font-size: 1.05rem; }
+.arcade-pequeno .cobra-caixa p { font-size: 0.88rem; line-height: 1.3; }
+.arcade-pequeno .arcade-sub { display: none; }
+.arcade-pequeno .arcade-instr { font-size: 0.82rem; }
+.arcade-pequeno .cobra-placar { font-size: 1.3rem; }
+.arcade-pequeno .btn-grande { min-height: 44px; }
+
+/* Botões de toque: sempre com 44px ou mais, cabem na largura do celular e não deixam a página rolar */
+.arcade-controles { display: none; width: 100%; justify-content: space-evenly; align-items: flex-end; gap: 12px; touch-action: none; -webkit-touch-callout: none; }
+@media (pointer: coarse) { .arcade-controles { display: flex; } }
+.arcade-moldura { touch-action: none; }
+.arcade-cruz { display: grid; gap: 6px; }
+.arcade-cruz.cruz-completa { grid-template-columns: repeat(3, var(--bt)); grid-template-rows: repeat(3, max(44px, calc(var(--bt) * 0.85))); grid-template-areas: '. cima .' 'esq . dir' '. baixo .'; }
+.arcade-cruz.fileira-3 { grid-template-columns: repeat(3, var(--bt)); grid-template-rows: var(--bt); grid-template-areas: 'esq meio dir'; }
+.arcade-cruz.fileira-3 .b-cima, .arcade-cruz.fileira-3 .b-baixo { grid-area: meio; }
+.arcade-cruz.fileira-2 { grid-template-columns: repeat(2, calc(var(--bt) * 1.2)); grid-template-rows: var(--bt); grid-template-areas: 'esq dir'; }
+.arcade-cruz.so-baixo { grid-template-columns: calc(var(--bt) * 1.7); grid-template-rows: var(--bt); grid-template-areas: 'baixo'; }
+.arcade-acoes { display: flex; gap: 10px; align-items: flex-end; }
+.arcade-acoes:empty { display: none; }
+.arcade-botao { min-height: 44px; min-width: 44px; width: auto; -webkit-tap-highlight-color: transparent; }
+.arcade-botao.b-pular, .arcade-botao.b-acao { border-radius: 50%; width: calc(var(--bt) * 1.15); height: calc(var(--bt) * 1.15); }
+.arcade-botao.b-pular { width: calc(var(--bt) * 1.35); height: calc(var(--bt) * 1.35); }
+.arcade-botao.b-pular, .arcade-botao.b-acao { font-size: 0.78rem; }
+.arcade-dica-giro { display: none; align-items: center; justify-content: center; gap: 6px; font-size: 0.85rem; color: var(--suave); text-align: center; }
+.arcade-dica-giro .ico { width: 16px; height: 16px; }
+@media (pointer: coarse) and (orientation: portrait) { .arcade-dica-giro { display: flex; } }
+
+/* Tela cheia / modo foco: o jogo no meio, a barra em cima e os botões embaixo (ou por cima do jogo, se o celular está deitado) */
+.arcade-palco.palco-foco { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; --bt: clamp(50px, 16vw, 72px); padding: 0 env(safe-area-inset-right) 0 env(safe-area-inset-left); }
+.arcade-palco.palco-foco > .arcade-barra { width: max(var(--palco-w), min(100%, 540px)); flex: none; }
+.arcade-palco.palco-foco > .arcade-moldura { width: var(--palco-w); flex: none; }
+.arcade-palco.palco-foco > .arcade-controles { width: min(100%, 560px); padding: 0 8px; }
+.arcade-palco.palco-foco .arcade-moldura { flex: none; }
+.arcade-palco.palco-foco > .arcade-barra { padding-inline: 8px; }
+.arcade-palco.ctl-sobre { --bt: clamp(48px, 13vh, 62px); }
+.arcade-palco.ctl-sobre > .arcade-controles {
+  position: absolute; left: calc(10px + env(safe-area-inset-left)); right: calc(10px + env(safe-area-inset-right)); bottom: calc(10px + env(safe-area-inset-bottom));
+  width: auto; padding: 0; justify-content: space-between; pointer-events: none; z-index: 3;
+}
+.arcade-palco.ctl-sobre:not(.jogando) > .arcade-controles { visibility: hidden; }
+.arcade-palco.ctl-sobre .arcade-botao { pointer-events: auto; opacity: 0.72; background: rgba(14, 24, 17, 0.6); }
+.arcade-palco.ctl-sobre .arcade-botao.apertado { opacity: 0.95; background: var(--ouro-fundo); }
+.arcade-palco.palco-foco .arcade-dica-giro { margin: 0; }
+
+/* Enquanto joga no celular, a página não pode rolar nem dar zoom */
+.arcade-palco.jogando { touch-action: none; }
+html:has(body.tem-palco-foco) { overscroll-behavior: none; }
+body.tem-palco-foco { overscroll-behavior: none; }
+
+/* A animação de entrada da página não pode deixar uma transformação ativa: ela vira "caixa" dos elementos fixos
+   (a tela cheia dos jogos) e os joga para fora do lugar. Ao terminar, a página volta ao normal. */
+.pagina { animation-fill-mode: backwards; }
+.pagina:has(.palco-foco) { animation: none; }
+
+/* ─── Batalha da Toca: nada de largura maior que a tela no celular ─── */
+.bt-pagina { min-width: 0; }
+.bt-embaixo, .bt-inicio { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 761px) {
+  .bt-embaixo { grid-template-columns: minmax(240px, 320px) minmax(0, 1fr); }
+  .bt-inicio { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
+}
+.bt-embaixo > *, .bt-inicio > * { min-width: 0; }
+.bt-como li, .desafio-nome { overflow-wrap: anywhere; }
+/* O palco cabe na janela: ocupa o que sobra da altura (--bt-topo é a distância do palco até o topo da página). */
+.bt-palco, .bt-palco.bt-toque { height: clamp(380px, calc(100vh - var(--bt-topo, 230px) - 16px), 880px); height: clamp(380px, calc(100dvh - var(--bt-topo, 230px) - 16px), 880px); min-height: 0; touch-action: none; }
+.bt-palco.palco-foco { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; max-width: none; margin: 0; border-radius: 0; border: 0; z-index: 900; }
+.bt-topo { max-width: calc(100% - 150px); }
+@media (min-width: 761px) { .bt-topo { max-width: calc(100% - 220px); } }
+.bt-icone { width: 44px; height: 44px; }
+.bt-icone .ico { width: 20px; height: 20px; }
+.bt-mini-botao:focus-visible, .bt-icone:focus-visible, .bt-btoque:focus-visible, .bt-pular:focus-visible, .bt-arma:focus-visible, .bt-coisa:focus-visible { outline: 2px solid var(--ouro); outline-offset: 2px; }
+.bt-palco.palco-foco .bt-cantos { left: calc(10px + env(safe-area-inset-left)); bottom: calc(10px + env(safe-area-inset-bottom)); }
+.bt-palco.palco-foco > .bt-tela { width: 100%; height: 100%; }
+@media (orientation: portrait) { .bt-toque .bt-cantos { bottom: 108px; } .bt-toque.palco-foco .bt-cantos { bottom: calc(108px + env(safe-area-inset-bottom)); } }
+
+/* ─── Arena da Toca: a arena e a mão de cartas cabem na janela, com tela cheia ─── */
+.arena-centro.palco { --arena-larg: var(--palco-w, 100%); }
+.arena-centro.palco-foco { align-content: center; justify-items: center; gap: 6px; padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+.arena-topo .arena-cheia { width: 44px; height: 44px; background: var(--sup); border-color: var(--borda); }
+.arena-topo .arena-cheia .ico { width: 22px; height: 22px; }
+.arena-carta:focus-visible, .arena-carta-mini:focus-visible { outline: 2px solid var(--ouro); outline-offset: 2px; }
+.arena-mao { touch-action: none; }
+.arena-sobre .cobra-caixa { max-width: 100%; padding: 14px 16px; }
+
+/* ─── Festa: o minijogo cabe na janela, com tela cheia ─── */
+.festa-mini { justify-items: center; align-content: start; }
+.festa-mini-barra { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; }
+.festa-mini .festa-controles { width: 100%; justify-content: space-between; touch-action: none; }
+.festa-mini > .festa-mini-moldura { width: 100%; }
+.festa-mini-moldura > .festa-mini-tela { width: 100%; height: auto; }
+.festa-cruz { grid-template-columns: repeat(4, minmax(44px, 54px)); }
+.festa-mini.palco-foco { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+.festa-mini.palco-foco > .festa-mini-barra, .festa-mini.palco-foco > .festa-mini-moldura { width: var(--palco-w); flex: none; }
+.festa-mini.palco-foco > .festa-mini-barra { width: max(var(--palco-w), min(100%, 480px)); padding-inline: 8px; }
+.festa-mini.palco-foco > .festa-controles { width: min(100%, 560px); padding: 0 8px; }
+.festa-mini.ctl-sobre > .festa-controles { position: absolute; left: 10px; right: 10px; bottom: 10px; width: auto; padding: 0; pointer-events: none; z-index: 3; }
+.festa-mini.ctl-sobre .arcade-botao { pointer-events: auto; opacity: 0.75; background: rgba(14, 24, 17, 0.6); }

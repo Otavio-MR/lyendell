@@ -1,0 +1,205 @@
+/* ux-jogos: ajustes de usabilidade (carregado depois do estilo.css, então vence em caso de empate). */
+
+/* ─── Palco: o tabuleiro cabe na janela (public/js/jogo-palco.js e ajuste-tela.js) ─── */
+.jogo-area > .palco { margin-inline: auto; }
+.palco-sair {
+  display: none; position: absolute; top: 10px; right: 10px; z-index: 6; width: 44px; height: 44px; place-items: center; padding: 0;
+  border-radius: 50%; border: 1px solid var(--borda-2); background: rgba(6, 10, 7, 0.78); color: var(--texto); cursor: pointer;
+}
+.palco-sair:hover { color: var(--ouro-l); border-color: var(--ouro-d); }
+.palco-foco > .palco-sair { display: grid; }
+
+/* Botões de ícone do placar (pausar, tela cheia): alvo de toque confortável. */
+.cobra-placar-linha .btn-icone { width: 44px; height: 44px; flex: none; }
+.cobra-placar-linha { align-items: center; }
+
+/* Cobrinha e Pac-Coelho em tela cheia: placar em cima, tabuleiro no meio, setas embaixo. */
+.cobra-moldura.palco-foco { flex-direction: column; justify-content: center; align-items: center; gap: 8px; display: flex; }
+.cobra-moldura.palco-foco > canvas { flex: none; }
+.cobra-moldura.palco-foco > .cobra-placar-linha { width: var(--palco-w); max-width: calc(100vw - 16px); }
+.cobra-moldura.palco-foco > .dpad { margin-top: 4px; }
+@media (orientation: landscape) and (max-height: 560px) {
+  .cobra-moldura.palco-foco > .cobra-placar-linha { position: absolute; left: 12px; top: 10px; width: auto; max-width: calc(50vw - var(--palco-w) / 2 - 20px); flex-direction: column; align-items: flex-start; gap: 6px; }
+  .cobra-moldura.palco-foco > .dpad { position: absolute; right: 16px; bottom: 12px; margin: 0; }
+}
+
+/* ─── Tabuleiros que se ajustam à janela: larguras máximas (a altura vem do palco) ─── */
+.minado-moldura.palco { max-width: 100%; }
+.minado-moldura.palco:not(.largo) { max-width: 620px; }
+.minado-moldura.largo.palco { overflow-x: auto; overscroll-behavior-x: contain; }
+.b2048-moldura.palco { max-width: 560px; }
+.mem-moldura.palco { max-width: 760px; }
+.qc-moldura.palco { max-width: 760px; }
+.cobra-moldura.palco { max-width: 640px; }
+.cobra-moldura.palco-foco { max-width: none; }
+.jogo-area { max-width: 100%; }
+
+/* Quem rola a página com o dedo não pode mexer o jogo, e o toque no tabuleiro não dá zoom. */
+.minado-grade, .mem-grade, .qc-tabuleiro, .velha, .lig4, .damas { -webkit-tap-highlight-color: transparent; }
+.minado-grade, .mem-grade { touch-action: manipulation; }
+.qc-tabuleiro { touch-action: none; user-select: none; -webkit-user-select: none; }
+
+/* ─── Cabeçalho das telas de jogo mais enxuto quando falta altura ─── */
+@media (max-height: 700px) {
+  .pagina:has(.jogo-solo):not(:has(.minado-grade)) .pag-sub, .pagina.rec-partida .pag-sub { display: none; }
+  .pagina:has(.jogo-solo) > .pag-cab, .pagina.rec-partida > .pag-cab { margin-bottom: 12px; }
+  .pagina:has(.jogo-solo) .voltar, .pagina.rec-partida .voltar { margin-bottom: 2px; }
+}
+
+/* ─── Celular deitado (pouca altura): cabeçalho em uma linha, tabuleiro do lado das informações ─── */
+@media (orientation: landscape) and (max-height: 560px) {
+  .tela:has(.jogo-solo, .rec-partida) { padding-top: 8px; padding-bottom: 20px; }
+  body:has(.jogo-solo, .rec-partida) .topo { position: static; padding-block: 4px; }
+  .pagina:has(.jogo-solo) > .pag-cab, .pagina.rec-partida > .pag-cab { margin-bottom: 8px; align-items: center; gap: 10px; }
+  .pagina:has(.jogo-solo) .pag-cab-texto, .pagina.rec-partida .pag-cab-texto { flex: 1 1 auto; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .pagina:has(.jogo-solo) .pag-sub, .pagina.rec-partida .pag-sub { display: none; }
+  .pagina:has(.jogo-solo) .voltar, .pagina.rec-partida .voltar { margin: 0; }
+  .pagina:has(.jogo-solo) .pag-titulo, .pagina.rec-partida .pag-titulo { font-size: 1.25rem; }
+  .pagina:has(.jogo-solo) .pag-icone, .pagina.rec-partida .pag-icone { width: 34px; height: 34px; }
+  .pagina:has(.jogo-solo) .pag-icone .ico { width: 20px; height: 20px; }
+  .pagina:has(.minado-grade) .pag-sub { display: none; }
+
+  /* informações à esquerda, tabuleiro no meio, setas à direita */
+  .jogo-solo { grid-template-columns: minmax(0, 1fr); }
+  .jogo-area:has(> .palco), .jogo-area:has(> .qc-moldura) {
+    grid-template-columns: minmax(130px, 210px) auto; justify-content: center; justify-items: stretch; align-items: start; gap: 8px 16px;
+  }
+  .jogo-area:has(> .dpad) { grid-template-columns: minmax(130px, 200px) auto auto; }
+  .jogo-area > .palco, .jogo-area > .qc-moldura { grid-column: 2; grid-row: 1 / span 8; justify-self: center; }
+  .jogo-area > :not(.palco):not(.qc-moldura):not(.dpad) { grid-column: 1; }
+  .jogo-area > .dpad { grid-column: 3; grid-row: 1 / span 8; align-self: center; }
+  .jogo-area .cobra-placar-linha { flex-direction: column; align-items: flex-start; gap: 6px; max-width: none; }
+  .jogo-area .cobra-placar-linha .btn-icone { width: 44px; height: 44px; }
+  .jogo-area .segmentado { flex-direction: column; align-items: stretch; }
+  .jogo-area .segmentado .seg { text-align: center; }
+}
+
+/* ─── Setas de toque: cruz compacta (duas linhas) e alvos grandes ─── */
+.dpad { grid-template-areas: '. cima .' 'voltar baixo frente'; grid-template-columns: repeat(3, 68px); grid-template-rows: repeat(2, 58px); gap: 8px; justify-content: center; user-select: none; -webkit-user-select: none; }
+.dpad button { min-width: 44px; min-height: 44px; -webkit-tap-highlight-color: transparent; }
+.dpad button:focus-visible { outline: 2px solid var(--ouro-l); outline-offset: 2px; }
+.dpad .ico { width: 28px; height: 28px; }
+@media (max-width: 640px) {
+  .pagina:has(.jogo-solo):not(:has(.minado-grade)) .pag-sub { display: none; }
+}
+.placar-botoes { display: inline-flex; gap: 6px; margin-left: auto; }
+.cobra-placar-linha { gap: 6px 12px; }
+@media (max-width: 420px) { .pac-vidas .ico { width: 16px; height: 16px; } }
+
+/* ─── Cabeçalho e seletores das telas de jogo no celular ─── */
+.jogo-area > .segmentado { display: grid; grid-template-columns: repeat(auto-fit, minmax(98px, 1fr)); gap: 6px; width: 100%; max-width: 620px; }
+.jogo-area > .segmentado .seg { min-height: 44px; text-align: center; padding: 6px 10px; line-height: 1.2; }
+.ajuda-jogo { display: none; width: 100%; max-width: 620px; color: var(--texto-2); font-size: 0.95rem; }
+.ajuda-jogo summary { cursor: pointer; color: var(--ouro); font-family: var(--f-titulo); font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; min-height: 32px; display: flex; align-items: center; }
+.ajuda-jogo p { padding: 4px 0 8px; }
+@media (max-width: 640px) {
+  .ajuda-jogo { display: block; }
+  .pagina:has(.jogo-solo) > .pag-cab, .pagina.rec-partida > .pag-cab { align-items: center; gap: 10px; margin-bottom: 14px; }
+  .pagina:has(.jogo-solo) .pag-cab-texto, .pagina.rec-partida .pag-cab-texto { flex: 1 1 200px; }
+  .pagina:has(.jogo-solo) .pag-acoes, .pagina.rec-partida .pag-acoes { width: auto; margin-left: auto; }
+  .pagina:has(.jogo-solo) .pag-acoes .btn, .pagina.rec-partida .pag-acoes .btn { flex: none; min-height: 44px; }
+}
+@media (orientation: landscape) and (max-height: 560px) { .ajuda-jogo { display: none; } }
+
+/* ─── Partidas de mesa (velha, lig4, damas, pedra papel e tesoura): o tabuleiro cabe na janela ─── */
+.rec-partida { --mesa-h: max(240px, calc(100dvh - 340px)); }
+.rec-partida .velha { width: min(100%, 380px, var(--mesa-h)); }
+.rec-partida .lig4 { width: min(100%, 500px, calc(var(--mesa-h) * 7 / 6 + 20px)); }
+.rec-partida .damas { width: min(100%, 540px, var(--mesa-h)); }
+.rec-partida .velha-casa, .rec-partida .lig4-coluna { -webkit-tap-highlight-color: transparent; }
+.rec-partida .lig4-coluna { min-width: 0; }
+.rec-partida .ppt-mao { min-width: 88px; min-height: 120px; }
+
+@media (max-width: 640px) {
+  .rec-partida { --mesa-h: max(240px, calc(100dvh - 400px)); }
+  .rec-partida .partida-caixa { gap: 12px; }
+  .rec-partida .duelo { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 6px; }
+  .rec-partida .duelo-vs { font-size: 0.8rem; text-align: center; }
+  .rec-partida .jogador { padding: 8px 10px; gap: 8px; }
+  .rec-partida .jogador .avatar { width: 34px; height: 34px; font-size: 0.7rem; }
+  .rec-partida .jogador-texto strong { font-size: 0.95rem; }
+  .rec-partida .jogador-texto small { font-size: 0.78rem; }
+  .rec-partida .partida-status { font-size: 1.25rem; }
+  .rec-partida .partida-rodape .btn { min-height: 44px; }
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .rec-partida { --mesa-h: max(200px, calc(100dvh - 126px)); }
+  .rec-partida .partida-caixa { max-width: none; grid-template-columns: minmax(230px, 1fr) auto; justify-items: stretch; align-items: start; column-gap: 24px; row-gap: 10px; }
+  .rec-partida .partida-caixa > * { grid-column: 1; }
+  .rec-partida .partida-caixa > :is(.velha, .lig4, .damas-caixa, .ppt, .mesa-tabuleiro) { grid-column: 2; grid-row: 1 / span 6; justify-self: center; align-self: start; }
+  .rec-partida .duelo { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 6px; }
+  .rec-partida .partida-status { text-align: left; font-size: 1.15rem; }
+  .rec-partida .esperando { justify-items: start; text-align: left; }
+}
+@media (orientation: landscape) and (max-height: 560px) {
+  .rec-partida .velha, .rec-partida .damas { width: var(--mesa-h); }
+  .rec-partida .lig4 { width: calc(var(--mesa-h) * 7 / 6 + 20px); }
+}
+
+@media (max-width: 640px) {
+  .rec-partida .pag-titulo { font-size: 1.3rem; }
+  .rec-partida .jogador:not(.ausente) .jogador-texto small { display: none; }
+  .rec-partida .jogador .avatar { font-size: 0.75rem; }
+  .damas-mini, .simbolo { flex: none; }
+}
+.damas-mini { font-size: 0.75rem; }
+
+/* Mesas ao vivo (campo minado, quebra-cabeça, memória em sala): o tabuleiro não passa da altura da janela. */
+.mesa .minado-moldura:not(.largo), .mesa .qc-moldura { max-width: min(100%, 580px, max(260px, calc(100dvh - 360px))); margin-inline: auto; }
+.mesa .mem-moldura { max-width: min(100%, 620px, max(280px, calc((100dvh - 380px) * var(--colunas, 4) / var(--linhas, 4) * 0.8))); margin-inline: auto; }
+@media (orientation: landscape) and (max-height: 560px) {
+  .mesa .minado-moldura:not(.largo), .mesa .qc-moldura { max-width: min(100%, max(200px, calc(100dvh - 120px))); }
+  .mesa .mem-moldura { max-width: min(100%, max(220px, calc((100dvh - 140px) * var(--colunas, 4) / var(--linhas, 4) * 0.8))); }
+}
+
+/* Perguntas do quiz: lista em partes */
+.perguntas-mais { display: grid; justify-items: center; gap: 8px; padding: 14px 0 6px; }
+
+/* ─── Salão da Recreação ─── */
+.ao-vivo, .jogo-novo { font-size: 0.76rem; }
+.chat-situacao, .chat-situacao.on { font-size: 0.76rem; }
+.avatar-p { font-size: 0.75rem; }
+.jogos-titulo { font-size: 0.8rem; }
+.jogo-botoes .btn, .sala-linha .btn, .sprites-atalho, .clube-convite .btn { min-height: 40px; }
+.jogo-botoes { gap: 8px; }
+.jogo-cartao .jogo-texto small { font-size: 0.95rem; line-height: 1.4; }
+.jogo-botoes .btn:focus-visible, .sala-linha .btn:focus-visible { outline: 2px solid var(--ouro-l); outline-offset: 2px; }
+.lista-salas { max-height: 360px; overflow-y: auto; scrollbar-width: thin; }
+.online-lista { max-height: 320px; overflow-y: auto; scrollbar-width: thin; }
+@media (pointer: coarse), (max-width: 760px) {
+  .jogo-botoes .btn, .sala-linha .btn, .sprites-atalho, .clube-convite .btn, .qc-botoes .btn, .partida-rodape .btn, .cobra-caixa .btn { min-height: 44px; }
+  .online-pessoa { min-height: 44px; }
+  .chat-form .input, .chat-form .btn { min-height: 44px; }
+}
+@media (max-width: 1000px) {
+  /* no celular os jogos vêm antes do chat, que é comprido */
+  .rec-grade > .rec-lado { order: -1; }
+  .rec-chat { height: min(520px, calc(100dvh - 160px)); min-height: 360px; }
+}
+
+/* ─── Lyendell Dorme (vila e salão de espera) ─── */
+.cid-opcao-titulo, .filtro-chip span, .cid-papel { font-size: 0.76rem; }
+.filtro-chip { min-height: 36px; }
+.vila-zoom { min-height: 40px; min-width: 44px; }
+.vila-emote { width: 44px; height: 44px; }
+.cid-pelo { width: 36px; height: 36px; }
+@media (max-width: 760px) {
+  .vila-emote { width: 44px; height: 44px; font-size: 1.2rem; }
+  .vila-zoom { min-height: 44px; }
+  .cid-pelo { width: 40px; height: 40px; }
+  .filtro-chip { min-height: 40px; }
+}
+@media (orientation: landscape) and (max-height: 560px) {
+  .vila-tela { height: max(220px, calc(100dvh - 150px)); }
+}
+.filtro-chip, .cid-coelho-dica, .cid-conta { font-size: 0.82rem; }
+
+/* ─── Cobrinha ao vivo (sala): tabuleiro e setas lado a lado no celular deitado ─── */
+@media (orientation: landscape) and (max-height: 560px) {
+  .cobras-area { grid-template-columns: auto minmax(120px, 200px); justify-content: center; justify-items: stretch; align-items: center; gap: 8px 16px; }
+  .cobras-area > .cobras-moldura { grid-column: 1; grid-row: 1 / span 3; max-width: calc((100dvh - 126px) * 4 / 3); width: calc((100dvh - 126px) * 4 / 3); justify-self: center; }
+  .cobras-area > .dpad { grid-column: 2; justify-self: center; }
+  .cobras-area > .cobras-dica { grid-column: 2; }
+}
+.cobras-lista li { min-height: 44px; }

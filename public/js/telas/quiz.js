@@ -283,10 +283,11 @@ export async function perguntasQuiz() {
   let dados = await get('/api/recreacao/perguntas');
   let filtro = '';
   let busca = '';
+  let limite = 30; // a lista é grande: mostra aos poucos
 
   const lista = h('div', { class: 'perguntas-lista' });
   const abas = h('nav', { class: 'abas abas-rolam' });
-  const campoBusca = h('input', { class: 'input', type: 'search', placeholder: 'Procurar pergunta ou resposta...', oninput: e => { busca = e.target.value; desenharLista(); } });
+  const campoBusca = h('input', { class: 'input', type: 'search', placeholder: 'Procurar pergunta ou resposta...', oninput: e => { busca = e.target.value; limite = 30; desenharLista(); }, 'aria-label': 'Procurar pergunta' });
 
   async function recarregar() {
     dados = await get('/api/recreacao/perguntas');
@@ -297,7 +298,7 @@ export async function perguntasQuiz() {
   function desenharAbas() {
     const conta = c => dados.perguntas.filter(p => !c || p.categoria === c).length;
     trocar(abas, [['', 'Todas'], ...Object.entries(dados.categorias)].map(([k, nome]) =>
-      h('button', { class: `aba ${filtro === k ? 'ativa' : ''}`.trim(), type: 'button', onclick: () => { filtro = k; desenharAbas(); desenharLista(); } },
+      h('button', { class: `aba ${filtro === k ? 'ativa' : ''}`.trim(), type: 'button', onclick: () => { filtro = k; limite = 30; desenharAbas(); desenharLista(); } },
         nome, h('span', { class: 'aba-n' }, conta(k)))));
   }
 
@@ -306,7 +307,7 @@ export async function perguntasQuiz() {
     const itens = dados.perguntas.filter(p => (!filtro || p.categoria === filtro)
       && (!b || normalizar([p.texto, ...p.alternativas].join(' ')).includes(b)));
     trocar(lista, itens.length
-      ? itens.map(p => h('article', { class: 'pergunta-cartao' },
+      ? [...itens.slice(0, limite).map(p => h('article', { class: 'pergunta-cartao' },
         h('div', { class: 'pergunta-cab' },
           h('span', { class: 'chip chip-ouro' }, dados.categorias[p.categoria]),
           h('span', { class: 'espaco' }),
@@ -318,7 +319,10 @@ export async function perguntasQuiz() {
         h('p', { class: 'pergunta-texto' }, p.texto),
         h('ol', { class: 'pergunta-alts' }, p.alternativas.map((a, i) => h('li', { class: i === p.correta ? 'certa' : '' },
           h('span', { class: 'quiz-letra' }, LETRAS[i]), h('span', null, a), i === p.correta && icone('check')))),
-        p.criado_por_nome && h('small', { class: 'suave' }, `Criada por ${p.criado_por_nome}`)))
+        p.criado_por_nome && h('small', { class: 'suave' }, `Criada por ${p.criado_por_nome}`))),
+        itens.length > limite && h('div', { class: 'perguntas-mais' },
+          h('small', { class: 'suave' }, `Mostrando ${limite} de ${itens.length}`),
+          botao('Mostrar mais', { icone: 'baixo', onclick: () => { limite += 30; desenharLista(); } }))]
       : vazio('Nenhuma pergunta aqui', busca ? 'Nada encontrado com essa busca.' : 'Crie a primeira pergunta desta categoria.'));
   }
 

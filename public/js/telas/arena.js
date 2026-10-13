@@ -9,6 +9,7 @@
 // lugar (teclas 1 a 4 escolhem a carta; Esc desiste).
 
 import { h, trocar, icone, botao, cabecalho, aoSair, estado, pode, aviso } from '../core.js';
+import { ajustarJogo, iconeReduzir } from '../ajuste-tela.js';
 import { rt, ouvir, enviar, criarPartida } from '../tempo-real.js';
 import { juntoNoJogo, CORES_JUNTO } from '../junto.js';
 import { abrirJunto } from './junto.js';
@@ -1153,6 +1154,27 @@ function criarLeitor() {
   return { receber, montar, ultimo: () => ultimo, haQuadros: () => quadros.length > 0 };
 }
 
+/* ─── O palco da arena cabe na janela e tem tela cheia ─── */
+
+// centro = o bloco todo (topo, arena e mão de cartas); moldura = só a arena. Devolve o botão de tela cheia e o ajuste.
+function ajustarArena(centro, moldura) {
+  const botaoCheia = h('button', { type: 'button', class: 'btn-icone arena-cheia', onclick: () => ajuste.alternar() }, icone('expandir'));
+  const rotular = cheio => {
+    botaoCheia.title = cheio ? 'Sair da tela cheia' : 'Tela cheia';
+    botaoCheia.setAttribute('aria-label', botaoCheia.title);
+    trocar(botaoCheia, cheio ? iconeReduzir() : icone('expandir'));
+  };
+  const ajuste = ajustarJogo(centro, {
+    proporcao: LARG / ALT, maxLargura: 520,
+    margemY: cheio => {
+      const fixo = centro.offsetHeight - moldura.offsetHeight + 4; // o topo, a mão de cartas e o espaço entre eles
+      return cheio ? fixo + 8 : centro.getBoundingClientRect().top + window.scrollY + fixo + 16;
+    },
+    aoMudar: ({ cheio }) => rotular(cheio),
+  });
+  return { botaoCheia, ajuste };
+}
+
 /* ─── Jogando (numa sala da arena) ─── */
 
 function arenaJunto() {
@@ -1487,19 +1509,25 @@ function arenaJunto() {
   });
 
   const titulo = coop ? 'co-op' : jt.n === 1 ? 'contra o Raposo' : jt.n >= 3 ? '2 contra 2' : 'versus';
+  const moldura = h('div', { class: 'arena-moldura' }, tela, sobre, avisoEl);
+  const centro = h('div', { class: 'arena-centro palco' });
+  const { botaoCheia, ajuste } = ajustarArena(centro, moldura);
+  trocar(centro,
+    h('div', { class: 'arena-topo' }, coroasOutro, h('span', { class: 'arena-tempo' }, icone('relogio'), relogioEl, dobroEl), coroasMeu, botaoCheia),
+    moldura,
+    h('div', { class: 'arena-mao' },
+      proximaEl,
+      h('div', { class: 'arena-cartas' }, slots),
+      h('div', { class: 'arena-cenouras', title: 'Cenouras (a energia das cartas)' }, icone('cenoura'), cenouraNum, cenouraBarra)));
+  // No celular a arena toma a tela toda (as cartas ficam ao alcance do dedo, sem rolar a página).
+  if (toque && Math.min(window.innerWidth, window.innerHeight) < 700) ajuste.entrar();
   return h('div', { class: 'pagina arena-pagina' },
     cabecalho({
       titulo: `Arena da Toca: ${titulo}`, icone: 'escudo', voltar: { href: '#/recreacao', texto: 'Recreação' },
       acoes: [h('a', { class: 'btn', href: `#/recreacao/sala/${jt.id}` }, icone('usuarios'), h('span', null, 'Ver a sala'))],
     }),
     h('div', { class: 'arena-jogo' },
-      h('div', { class: 'arena-centro' },
-        h('div', { class: 'arena-topo' }, coroasOutro, h('span', { class: 'arena-tempo' }, icone('relogio'), relogioEl, dobroEl), coroasMeu),
-        h('div', { class: 'arena-moldura' }, tela, sobre, avisoEl),
-        h('div', { class: 'arena-mao' },
-          proximaEl,
-          h('div', { class: 'arena-cartas' }, slots),
-          h('div', { class: 'arena-cenouras', title: 'Cenouras (a energia das cartas)' }, icone('cenoura'), cenouraNum, cenouraBarra))),
+      centro,
       h('aside', { class: 'arena-lado' },
         h('section', { class: 'painel' }, h('div', { class: 'painel-cab' }, h('h2', null, icone(coop ? 'usuarios' : 'trofeu'), 'Quem joga')), ladoLista),
         h('section', { class: 'painel' },
@@ -1587,16 +1615,17 @@ function assistirArena(s0) {
   if (s0.estado?.quadro) leitor.receber(s0.estado.quadro, false);
   animacao = requestAnimationFrame(laco);
 
+  const moldura = h('div', { class: 'arena-moldura' }, visor.tela, sobre);
+  const centro = h('div', { class: 'arena-centro palco' });
+  const { botaoCheia } = ajustarArena(centro, moldura);
+  trocar(centro, h('div', { class: 'arena-topo' }, h('span', { class: 'arena-tempo' }, icone('relogio'), relogioEl), botaoCheia), moldura, placar);
   return h('div', { class: 'pagina arena-pagina' },
     cabecalho({
       titulo: `Arena da Toca: assistindo`, icone: 'olho', voltar: { href: '#/recreacao', texto: 'Recreação' },
       sub: `${jogadores.map(p => p.nome).join(', ')} (${s0.estado?.modo === 'coop' ? 'co-op' : 'versus'})`,
     }),
     h('div', { class: 'arena-jogo' },
-      h('div', { class: 'arena-centro' },
-        h('div', { class: 'arena-topo' }, h('span', { class: 'arena-tempo' }, icone('relogio'), relogioEl)),
-        h('div', { class: 'arena-moldura' }, visor.tela, sobre),
-        placar),
+      centro,
       h('aside', { class: 'arena-lado' },
         h('section', { class: 'painel' },
           h('div', { class: 'painel-cab' }, h('h2', null, icone('olho'), 'Assistindo')),

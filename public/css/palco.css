@@ -1,0 +1,7 @@
+/* Ajuste de tela dos jogos (public/js/ajuste-tela.js): o palco cabe na janela e tem modo tela cheia. */
+.palco { position: relative; width: var(--palco-w, 100%); max-width: 100%; margin-inline: auto; touch-action: manipulation; }
+.palco > canvas { display: block; width: 100%; height: auto; max-width: 100%; }
+.palco-foco { position: fixed; inset: 0; z-index: 900; width: 100vw; height: 100dvh; max-width: none; margin: 0; background: var(--bg); display: grid; place-items: center; }
+.palco-foco > canvas { width: var(--palco-w); height: var(--palco-h); }
+body.tem-palco-foco { overflow: hidden; }
+.botao-tela-cheia { display: inline-flex; align-items: center; gap: 6px; }

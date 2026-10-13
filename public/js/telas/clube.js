@@ -19,6 +19,7 @@ const corPompom = id => CORES_POMPOM[IDS_POMPOM.indexOf(id)] || CORES_POMPOM[0];
 import { desenharIlhaFixa, desenharIlhaViva, MAPA_W, MAPA_H } from '../ilha/centro-mapa.js';
 import { desenhoDoIcone } from '../icones-mapa.js';
 import { menuAdm, podeAdm, admPodeAgir, admVelocidade, admEfeito } from '../adm-jogos.js';
+import { ajustarJogo } from '../ajuste-tela.js';
 
 const VEL = 170; // o mesmo do servidor
 const EMOTES = [
@@ -54,15 +55,22 @@ export async function clube() {
   const meuId = estado.eu.id;
 
   /* ─── Elementos da página ─── */
-  const tela = h('canvas', { class: 'clube-tela', tabindex: '0', 'aria-label': 'O Club Coelho. Clique no chão para andar.' });
+  const tela = h('canvas', { class: 'clube-tela', tabindex: '0', role: 'application', 'aria-label': 'O Club Coelho. Toque ou clique no chão para andar. As setas do teclado também andam e a tecla Enter vai para o chat.' });
   const g = tela.getContext('2d');
   const moedasEl = h('strong', null, num(eu.moedas));
+  const moedasFocoEl = h('strong', null, num(eu.moedas));
   const chip = h('span', { class: 'clube-moedas', title: 'Suas cenouras' }, '🥕 ', moedasEl);
+  const chipFoco = h('span', { class: 'clube-moedas clube-moedas-foco', title: 'Suas cenouras' }, '🥕 ', moedasFocoEl);
   const entrada = h('input', { class: 'input', maxlength: '120', placeholder: 'Escreva e aperte Enter...', 'aria-label': 'Falar' });
   const formChat = h('form', { class: 'clube-falar' }, entrada, h('button', { class: 'btn btn-ouro', type: 'submit', 'aria-label': 'Falar' }, icone('aviao')));
   const botaoDecorar = botao('Decorar', { icone: 'editar', classe: 'btn-pequeno', onclick: () => comecarDecorar() });
   const painelDecorar = h('section', { class: 'painel clube-decorar', hidden: true });
-  const conversa = h('ol', { class: 'clube-conversa', 'aria-live': 'polite' });
+  const conversa = h('ol', { class: 'clube-conversa', 'aria-live': 'polite', 'aria-label': 'Conversa da sala' });
+  const salaNomeEl = h('div', { class: 'clube-sala-nome', 'aria-live': 'polite' }, 'Entrando...');
+  const painelConversa = h('section', { class: 'painel clube-conversa-painel' }, h('div', { class: 'painel-cab' }, h('h2', null, icone('chat'), 'Conversa da sala')), conversa);
+  const toggles = h('div', { class: 'clube-hud-toggles' },
+    [['chat', 'Conversa', 'chat'], ['emotes', 'Emotes', 'estrela'], ['menu', 'Menu', 'menu']].map(([k, nome, ic]) =>
+      h('button', { type: 'button', class: 'btn clube-toggle', 'data-painel': k, 'aria-pressed': 'false', 'aria-label': nome, title: nome, onclick: () => abrirPainel(k) }, icone(ic), h('span', null, nome))));
   const barra = h('div', { class: 'clube-barra' },
     formChat,
     h('div', { class: 'clube-emotes' },
@@ -74,7 +82,8 @@ export async function clube() {
       botao('Loja', { icone: 'loja', classe: 'btn-pequeno', onclick: () => abrirLoja() }),
       botao('Mapa', { icone: 'mapa', classe: 'btn-pequeno', onclick: () => abrirMapa() }),
       botao('Minha toca', { icone: 'casa', classe: 'btn-pequeno', onclick: () => irPara(`toca:${meuId}`) }),
-      botaoDecorar));
+      botaoDecorar),
+    toggles);
 
   /* ─── Estado ─── */
   let sala = null;
@@ -91,6 +100,73 @@ export async function clube() {
   let quadro = 0;
   const inicio = performance.now();
 
+  /* ─── Palco, câmera e tela cheia ─── */
+  // O mundo de cada sala mede W x H. Quando cabe com folga ele aparece inteiro; no celular em pé aparece só um
+  // pedaço (a câmera segue o meu coelho) para o coelho e os textos continuarem legíveis. A tela cheia usa
+  // public/js/ajuste-tela.js; no celular deitado ela liga sozinha (modo foco), com a barra virando botões.
+  const cam = { x: 0, s: 1, px: 1, larg: W, snap: true };
+  const baixo = h('div', { class: 'clube-baixo' }, barra, painelDecorar, painelConversa);
+  const palco = h('div', { class: 'palco clube-palco' }, tela, salaNomeEl);
+  let recusouFoco = false;   // saí da tela cheia automática: só volta quando o celular mudar de posição
+  let focoAuto = false;      // está ligando a tela cheia sozinho (não pode virar tela cheia de verdade)
+  let autoLigado = false;    // a tela cheia de agora foi ligada sozinha: sai sozinha quando o celular volta a ficar em pé
+  let paineisNoPalco = false;
+  // Tela cheia de verdade: a página inteira (e não só o palco), para as janelas da loja, do mapa e dos
+  // minijogos continuarem aparecendo por cima.
+  palco.requestFullscreen = opcoes => (focoAuto || !document.documentElement.requestFullscreen
+    ? Promise.reject(new Error('modo foco'))
+    : document.documentElement.requestFullscreen(opcoes));
+  palco.webkitRequestFullscreen = undefined;
+  const ajuste = ajustarJogo(palco, { proporcao: W / H, compacto: true, aoMudar: aoMudarPalco });
+  ajuste.botao.classList.add('clube-botao-cheia');
+  // Sair da tela cheia (inclusive a automática) vale até o celular mudar de posição. Vem antes do clique do botão.
+  ajuste.botao.addEventListener('click', () => { if (ajuste.ativo()) { recusouFoco = true; autoLigado = false; } }, true);
+  palco.append(h('div', { class: 'clube-hud-topo' },
+    h('a', { class: 'btn clube-sair', href: '#/recreacao', title: 'Voltar para a Recreação', 'aria-label': 'Voltar para a Recreação' }, icone('voltar'), h('span', null, 'Recreação')),
+    chipFoco, ajuste.botao));
+
+  // Quanto de altura a página gasta fora do palco (cabeçalho, barra de botões que fica abaixo).
+  const reservaY = (vw, vh) => Math.min((vw > 960 ? 250 : vw > 640 ? 250 : 320), vh * 0.4);
+  function aoMudarPalco({ cheio }) {
+    const vw = document.documentElement.clientWidth;
+    const vh = window.visualViewport?.height ? Math.round(window.visualViewport.height) : window.innerHeight;
+    const deitado = vw > vh && vh <= 520;
+    if (!deitado) {
+      recusouFoco = false;
+      if (autoLigado) { autoLigado = false; if (cheio) { ajuste.sair(); return; } }
+    }
+    if (deitado && !cheio && !recusouFoco && !focoAuto) {
+      focoAuto = true;
+      ajuste.entrar().finally(() => { focoAuto = false; autoLigado = ajuste.ativo(); });
+      return;
+    }
+    const pai = palco.parentElement?.clientWidth || vw;
+    const limiteW = Math.max(240, Math.min(1100, cheio ? vw : pai));
+    const limiteH = Math.max(200, cheio ? vh - 8 : vh - reservaY(vw, vh));
+    const inteira = Math.min(limiteW / W, limiteH / H);
+    const razao = inteira >= 0.6 ? W / H : Math.min(W / H, Math.max(cheio ? 0.62 : 0.75, limiteW / limiteH));
+    const largura = Math.floor(Math.min(limiteW, limiteH * razao));
+    palco.style.setProperty('--palco-w', `${largura}px`);
+    palco.style.setProperty('--palco-h', `${Math.floor(largura / razao)}px`);
+    arrumarPaineis(cheio);
+  }
+  // Em tela cheia a barra e a conversa viram camadas por cima do palco; fora dela voltam para baixo.
+  function arrumarPaineis(cheio) {
+    if (cheio === paineisNoPalco) return;
+    paineisNoPalco = cheio;
+    palco.dataset.painel = '';
+    for (const b of toggles.children) b.setAttribute('aria-pressed', 'false');
+    (cheio ? palco : baixo).append(barra, painelDecorar, painelConversa);
+  }
+  function abrirPainel(k) {
+    palco.dataset.painel = palco.dataset.painel === k ? '' : k;
+    for (const b of toggles.children) b.setAttribute('aria-pressed', String(b.dataset.painel === palco.dataset.painel));
+  }
+  const fecharPainel = k => { if (palco.dataset.painel === k) abrirPainel(k); };
+  barra.querySelector('.clube-acoes').addEventListener('click', () => fecharPainel('menu'));
+  const limitarCamera = x => (cam.larg >= W ? (W - cam.larg) / 2 : Math.max(0, Math.min(W - cam.larg, x)));
+  const tamanhoDosTextos = () => Math.min(2, Math.max(1, 0.9 / cam.s));
+
   const tipoSala = () => (sala?.startsWith('toca:') ? 'toca' : sala);
   const minhaToca = () => sala === `toca:${meuId}`;
   const corDoPelo = v => cat.get(v?.pelo)?.cor || '#e9dcc3';
@@ -101,7 +177,7 @@ export async function clube() {
     return r;
   };
   const visualDesenho = v => ({ cor: corDoPelo(v), roupa: roupaDe(v) });
-  function mudarMoedas(n) { eu.moedas = n; moedasEl.textContent = num(n); }
+  function mudarMoedas(n) { eu.moedas = n; moedasEl.textContent = num(n); moedasFocoEl.textContent = num(n); }
 
   /* ─── Conexão ─── */
   function irPara(destino) {
@@ -116,6 +192,8 @@ export async function clube() {
     sala = m.sala;
     querSala = m.sala;
     nomeSala = m.nomeSala;
+    salaNomeEl.textContent = nomeSala;
+    cam.snap = true;
     toca = m.toca;
     pessoas = new Map(m.pessoas.map(p => [p.id, novaPessoa(p)]));
     aoChegar = null;
@@ -184,12 +262,15 @@ export async function clube() {
   function emote(k) {
     if (decorando) return;
     enviar('clube:emote', { e: k });
+    fecharPainel('emotes');
   }
 
   /* ─── Andar e clicar ─── */
+  // Do ponto da tela (clique ou toque) para o ponto do mundo da sala, descontando a câmera.
   function pontoDoMouse(ev) {
     const r = tela.getBoundingClientRect();
-    return { x: ((ev.clientX - r.left) / r.width) * W, y: ((ev.clientY - r.top) / r.height) * H };
+    const s = (r.height || 1) / H;
+    return { x: cam.x + (ev.clientX - r.left) / s, y: (ev.clientY - r.top) / s };
   }
   function pontoNaSala(x, y) {
     return (SALAS[tipoSala()]?.pontos || []).find(p => x >= p.x0 && x <= p.x1 && y >= p.y0 && y <= p.y1) || null;
@@ -218,25 +299,63 @@ export async function clube() {
     enviar('clube:andar', { x: tx, y: ty }, { silencioso: true });
   }
 
-  tela.addEventListener('pointerdown', ev => {
-    tela.focus({ preventScroll: true });
+  // O mouse anda ao apertar; o dedo anda ao soltar (e só se não arrastou), para dar para rolar a página
+  // quando o palco ocupa quase a tela toda do celular.
+  let toque = null;       // { id, x, y }: o dedo que está apertando
+  let dica = null;        // { texto, ate, ponto }: o nome do lugar tocado (no toque não existe passar o mouse)
+  function clicarNaSala(ev) {
     const { x, y } = pontoDoMouse(ev);
-    if (decorando) { pegarMovel(x, y, ev); return; }
     const outro = coelhoEm(x, y);
     if (outro) { cartaoDaPessoa(outro); return; }
     const ponto = pontoNaSala(x, y);
-    if (ponto) { andarAte(ponto.ir[0], ponto.ir[1], () => agir(ponto.acao)); return; }
+    if (ponto) {
+      if (ev.pointerType !== 'mouse' && ponto.rotulo) dica = { texto: ponto.rotulo, ate: Date.now() + 2200, ponto };
+      andarAte(ponto.ir[0], ponto.ir[1], () => agir(ponto.acao));
+      return;
+    }
     andarAte(x, y);
+  }
+  tela.addEventListener('pointerdown', ev => {
+    tela.focus({ preventScroll: true });
+    if (decorando) { const { x, y } = pontoDoMouse(ev); pegarMovel(x, y, ev); return; }
+    if (ev.pointerType === 'mouse') { if (ev.button === 0) clicarNaSala(ev); return; }
+    toque = { id: ev.pointerId, x: ev.clientX, y: ev.clientY };
   });
   tela.addEventListener('pointermove', ev => {
     const p = pontoDoMouse(ev);
     mouse = ev.pointerType === 'mouse' ? p : null;
-    if (decorando?.arrastando) { arrastarMovel(p.x, p.y); return; }
+    if (decorando?.arrastando) { arrastarMovel(p.x, p.y, ev); return; }
     sobre = mouse && !decorando ? pontoNaSala(p.x, p.y) : null;
     tela.style.cursor = sobre || (mouse && coelhoEm(p.x, p.y)) ? 'pointer' : decorando ? 'grab' : 'default';
   });
-  tela.addEventListener('pointerup', () => { if (decorando) decorando.arrastando = null; });
+  tela.addEventListener('pointerup', ev => {
+    if (decorando) { decorando.arrastando = null; return; }
+    const t = toque;
+    toque = null;
+    if (t && t.id === ev.pointerId && Math.hypot(ev.clientX - t.x, ev.clientY - t.y) < 14) clicarNaSala(ev);
+  });
+  tela.addEventListener('pointercancel', () => { toque = null; if (decorando) decorando.arrastando = null; });
   tela.addEventListener('pointerleave', () => { mouse = null; sobre = null; });
+  // Teclado: as setas (ou W A S D) andam um pouco; Enter vai para o chat.
+  const PASSOS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1], a: [-1, 0], d: [1, 0], w: [0, -1], s: [0, 1] };
+  let ultimoPasso = 0;
+  tela.addEventListener('keydown', ev => {
+    if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    if (ev.key === 'Enter') {
+      ev.preventDefault();
+      if (paineisNoPalco && palco.dataset.painel !== 'chat') abrirPainel('chat');
+      setTimeout(() => entrada.focus(), 0);
+      return;
+    }
+    const d = PASSOS[ev.key] || PASSOS[ev.key.toLowerCase?.()];
+    const eu_ = pessoas.get(meuId);
+    if (!d || decorando || !eu_) return;
+    ev.preventDefault();
+    const agora = performance.now();
+    if (agora - ultimoPasso < 140) return;
+    ultimoPasso = agora;
+    andarAte(eu_.x + d[0] * 110, eu_.y + d[1] * 80);
+  });
 
   // O que as ações das salas da Ilha (public/js/ilha/) recebem para trabalhar (veja clube-ilha.js).
   let progressoIlha = null;
@@ -279,24 +398,44 @@ export async function clube() {
   /* ─── Desenho ─── */
   function prepararCenario() {
     const tipo = tipoSala();
-    const chave = tipo === 'toca' ? `toca:${toca?.piso}:${toca?.parede}` : tipo;
+    // O fundo guardado tem o dobro da resolução quando a tela é grande ou nítida, para não borrar.
+    const k = cam.px > 1 ? 2 : 1;
+    const chave = `${tipo === 'toca' ? `toca:${toca?.piso}:${toca?.parede}` : tipo}@${k}`;
     if (chave === chaveCenario && cenario) return;
     chaveCenario = chave;
     cenario ??= document.createElement('canvas');
-    cenario.width = W;
-    cenario.height = H;
+    cenario.width = W * k;
+    cenario.height = H * k;
     const c = cenario.getContext('2d');
-    c.clearRect(0, 0, W, H);
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, W * k, H * k);
+    c.setTransform(k, 0, 0, k, 0, 0);
     if (tipo === 'toca') fundoToca(c, toca || {}); else SALAS[tipo]?.fundo?.(c);
   }
 
+  // O canvas acompanha o tamanho que o palco tem na tela (nítido, sem esticar). cam guarda a escala:
+  // s em pixels de CSS por unidade do mundo, px em pixels do canvas, larg quanto do mundo se vê de lado a lado.
   function ajustarTela() {
     const r = tela.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) return false;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const w = Math.max(1, Math.round(r.width * dpr));
     const hh = Math.max(1, Math.round(r.height * dpr));
     if (tela.width !== w || tela.height !== hh) { tela.width = w; tela.height = hh; }
-    g.setTransform(w / W, 0, 0, hh / H, 0, 0);
+    cam.s = r.height / H;
+    cam.px = hh / H;
+    cam.larg = r.width / cam.s;
+    return true;
+  }
+  // A câmera segue o meu coelho (suave); ao entrar numa sala já começa no lugar. Decorando, quem manda é o arrasto.
+  function seguirCamera(dt) {
+    const eu_ = pessoas.get(meuId);
+    let alvo;
+    if (cam.larg >= W) alvo = (W - cam.larg) / 2;
+    else if (!decorando && eu_) alvo = limitarCamera(eu_.x - cam.larg / 2);
+    else alvo = limitarCamera(cam.x);
+    cam.x = cam.snap ? alvo : cam.x + (alvo - cam.x) * Math.min(1, dt * 7);
+    cam.snap = false;
   }
 
   function mover(dt) {
@@ -322,19 +461,25 @@ export async function clube() {
     const dt = Math.min(0.5, desenhar.ultimo ? (agora - desenhar.ultimo) / 1000 : 0);
     desenhar.ultimo = agora;
     if (!tela.isConnected) return;
-    ajustarTela();
+    if (!ajustarTela()) return;
+    g.setTransform(1, 0, 0, 1, 0, 0);
     if (!sala) {
       g.fillStyle = '#0e1811';
-      g.fillRect(0, 0, W, H);
+      g.fillRect(0, 0, tela.width, tela.height);
       g.fillStyle = '#ece0bf';
-      g.font = '700 26px "Cinzel", Georgia, serif';
+      g.font = `700 ${Math.max(16, Math.round(tela.width / 34))}px "Cinzel", Georgia, serif`;
       g.textAlign = 'center';
-      g.fillText('Entrando no clube...', W / 2, H / 2);
+      g.textBaseline = 'middle';
+      g.fillText(rt.conectado ? 'Entrando no clube...' : 'Sem conexão. Tentando de novo...', tela.width / 2, tela.height / 2);
       return;
     }
     try {
       mover(dt);
+      seguirCamera(dt);
       prepararCenario();
+      g.fillStyle = '#0e1811';
+      g.fillRect(0, 0, tela.width, tela.height);
+      g.setTransform(cam.px, 0, 0, cam.px, -cam.x * cam.px, 0);
       g.drawImage(cenario, 0, 0, W, H);
       const def = SALAS[tipoSala()];
       def?.animar?.(g, t);
@@ -386,65 +531,74 @@ export async function clube() {
       for (const p of pessoas.values()) desenharFala(p, agoraMs, t);
       if (decorando) desenharSelecao();
       if (sobre && mouse) desenharRotulo(sobre.rotulo, mouse.x, mouse.y);
-      // Nome da sala
-      g.font = '700 18px "Cinzel", Georgia, serif';
-      const largura = g.measureText(nomeSala).width + 28;
-      g.fillStyle = 'rgba(14,24,17,0.72)';
-      g.beginPath();
-      if (g.roundRect) g.roundRect(12, 12, largura, 32, 10); else g.rect(12, 12, largura, 32);
-      g.fill();
-      g.fillStyle = '#e8c24a';
-      g.textAlign = 'left';
-      g.textBaseline = 'middle';
-      g.fillText(nomeSala, 26, 29);
+      else if (dica && dica.ate > agoraMs) desenharRotulo(dica.texto, (dica.ponto.x0 + dica.ponto.x1) / 2 - 14, dica.ponto.y0 + 30);
+      // O nome da sala fica no HTML por cima do palco (salaNomeEl): texto nítido e do tamanho certo.
     } catch (e) {
       console.error('Club Coelho:', e);
     }
   }
 
+  // Os textos (nomes, balões, rótulos) crescem um pouco quando a sala está pequena na tela (tamanhoDosTextos).
   function desenharNome(p) {
+    const k = tamanhoDosTextos();
+    g.save();
+    g.translate(p.x, p.y);
+    g.scale(k, k);
     g.font = '700 13px "EB Garamond", Georgia, serif';
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     const w = g.measureText(p.nome).width + 14;
-    g.fillStyle = p.id === meuId ? 'rgba(216,177,58,0.92)' : 'rgba(14,24,17,0.7)';
+    g.fillStyle = p.id === meuId ? 'rgba(216,177,58,0.92)' : 'rgba(14,24,17,0.78)';
     g.beginPath();
-    if (g.roundRect) g.roundRect(p.x - w / 2, p.y + 8, w, 18, 9); else g.rect(p.x - w / 2, p.y + 8, w, 18);
+    if (g.roundRect) g.roundRect(-w / 2, 8, w, 18, 9); else g.rect(-w / 2, 8, w, 18);
     g.fill();
     g.fillStyle = p.id === meuId ? '#1b1403' : '#fbf3e0';
-    g.fillText(p.nome, p.x, p.y + 17.5);
+    g.fillText(p.nome, 0, 17.5);
+    g.restore();
   }
 
   function desenharFala(p, agoraMs, t) {
     const topo = p.y - 82;
+    const kt = tamanhoDosTextos();
     if (p.fala && p.fala.ate > agoraMs) {
+      g.save();
+      g.translate(p.x, topo);
+      g.scale(kt, kt);
       g.font = '15px "EB Garamond", Georgia, serif';
       const linhas = quebrarTexto(g, p.fala.texto, 190);
       const w = Math.max(...linhas.map(l => g.measureText(l).width)) + 22;
       const hh = linhas.length * 18 + 12;
-      const y = topo - hh;
+      const y = -hh;
+      // O balão não sai do que a câmera mostra (a ponta continua apontando para quem falou).
+      const lado = (w * kt) / 2 + 6;
+      const cx = Math.max(cam.x + lado, Math.min(cam.x + cam.larg - lado, p.x));
+      const dx = (cx - p.x) / kt;
+      const ponta = Math.max(-w / 2 + 12, Math.min(w / 2 - 12, -dx));
       g.globalAlpha = Math.min(1, (p.fala.ate - agoraMs) / 500);
       g.fillStyle = '#fffaf0';
       g.strokeStyle = '#8a6a44';
       g.lineWidth = 1.5;
       g.beginPath();
-      if (g.roundRect) g.roundRect(p.x - w / 2, y, w, hh, 10); else g.rect(p.x - w / 2, y, w, hh);
+      if (g.roundRect) g.roundRect(dx - w / 2, y, w, hh, 10); else g.rect(dx - w / 2, y, w, hh);
       g.fill();
       g.stroke();
-      g.beginPath(); g.moveTo(p.x - 7, y + hh); g.lineTo(p.x, y + hh + 9); g.lineTo(p.x + 7, y + hh); g.closePath(); g.fill();
+      g.beginPath(); g.moveTo(ponta + dx - 7, y + hh); g.lineTo(0, y + hh + 9); g.lineTo(ponta + dx + 7, y + hh); g.closePath(); g.fill();
       g.fillStyle = '#2a2016';
       g.textAlign = 'center';
       g.textBaseline = 'middle';
-      linhas.forEach((l, k) => g.fillText(l, p.x, y + 15 + k * 18));
-      g.globalAlpha = 1;
+      linhas.forEach((l, k) => g.fillText(l, dx, y + 15 + k * 18));
+      g.restore();
     } else if (p.emote && p.emote.ate > agoraMs) {
       const vida = 1 - (p.emote.ate - agoraMs) / 2800;
+      g.save();
+      g.translate(p.x + 16, topo - 6 - Math.sin(Math.min(1, vida * 3) * Math.PI) * 12);
+      g.scale(kt, kt);
       g.font = '30px serif';
       g.textAlign = 'center';
       g.textBaseline = 'middle';
       g.globalAlpha = vida > 0.85 ? (1 - vida) / 0.15 : 1;
-      g.fillText(EMOJI[p.emote.e] || '', p.x + 16, topo - 6 - Math.sin(Math.min(1, vida * 3) * Math.PI) * 12);
-      g.globalAlpha = 1;
+      g.fillText(EMOJI[p.emote.e] || '', 0, 0);
+      g.restore();
     }
     if (p.dancando) {
       g.font = '700 16px serif';
@@ -454,28 +608,33 @@ export async function clube() {
   }
 
   function desenharRotulo(texto, x, y) {
+    const k = tamanhoDosTextos();
+    g.save();
     g.font = '700 14px "Cinzel", Georgia, serif';
     const w = g.measureText(texto).width + 20;
-    const bx = Math.min(W - w - 6, Math.max(6, x + 14));
-    const by = Math.max(6, y - 34);
-    g.fillStyle = 'rgba(14,24,17,0.9)';
+    const bx = Math.min(cam.x + cam.larg - w * k - 6, Math.max(cam.x + 6, x + 14));
+    const by = Math.max(6, y - 34 * k);
+    g.translate(bx, by);
+    g.scale(k, k);
+    g.fillStyle = 'rgba(14,24,17,0.92)';
     g.strokeStyle = '#b8922a';
     g.lineWidth = 1.5;
     g.beginPath();
-    if (g.roundRect) g.roundRect(bx, by, w, 26, 8); else g.rect(bx, by, w, 26);
+    if (g.roundRect) g.roundRect(0, 0, w, 26, 8); else g.rect(0, 0, w, 26);
     g.fill();
     g.stroke();
     g.fillStyle = '#e8c24a';
     g.textAlign = 'left';
     g.textBaseline = 'middle';
-    g.fillText(texto, bx + 10, by + 13.5);
+    g.fillText(texto, 10, 13.5);
+    g.restore();
   }
 
   /* ─── Cartão de quem foi clicado ─── */
   function cartaoDaPessoa(p) {
     const previa = previaCoelho(p.visual, 160, 2.6);
     const m = modal({
-      titulo: p.nome, tamanho: 'pequeno',
+      titulo: p.nome, tamanho: 'pequeno', classe: 'clube-folha',
       corpo: h('div', { class: 'clube-cartao' }, previa,
         h('div', { class: 'clube-cartao-botoes' },
           botao('Acenar', { classe: 'btn-ouro', onclick: () => { emote('oi'); m.fechar(); } }),
@@ -577,7 +736,7 @@ export async function clube() {
     desenharAbas();
     desenharGrade();
     modal({
-      titulo: 'Meu coelho', tamanho: 'grande',
+      titulo: 'Meu coelho', tamanho: 'grande', classe: 'clube-folha',
       corpo: h('div', { class: 'clube-guarda' }, h('div', { class: 'clube-guarda-previa' }, previa), h('div', null, abas, grade)),
       rodape: [botao('Comprar mais coisas', { icone: 'loja', onclick: () => abrirLoja() })],
     });
@@ -628,7 +787,7 @@ export async function clube() {
     }
     desenharAbas();
     desenharGrade();
-    modal({ titulo: 'Armarinho da Dona Felpuda', tamanho: 'grande', corpo: h('div', { class: 'clube-loja' }, saldo, abas, grade) });
+    modal({ titulo: 'Armarinho da Dona Felpuda', tamanho: 'grande', classe: 'clube-folha', corpo: h('div', { class: 'clube-loja' }, saldo, abas, grade) });
   }
 
   /* ─── Mapa ─── */
@@ -636,7 +795,7 @@ export async function clube() {
   function abrirMapa(soTocas = false) {
     const corpo = h('div', { class: 'clube-mapa' }, h('p', { class: 'painel-vazio' }, 'Carregando...'));
     mapaAberto = { corpo, soTocas, busca: '' };
-    const m = modal({ titulo: soTocas ? 'Tocas dos moradores' : 'Mapa da Ilha do Club Coelho', tamanho: 'grande', corpo, aoFechar: () => { mapaAberto = null; } });
+    const m = modal({ titulo: soTocas ? 'Tocas dos moradores' : 'Mapa da Ilha do Club Coelho', tamanho: 'grande', classe: 'clube-folha', corpo, aoFechar: () => { mapaAberto = null; } });
     mapaAberto.m = m;
     enviar('clube:mapa', {});
   }
@@ -736,6 +895,8 @@ export async function clube() {
     decorando = { toca: JSON.parse(JSON.stringify(toca)), original: toca, sel: null, arrastando: null };
     aoChegar = null;
     painelDecorar.hidden = false;
+    palco.dataset.decorando = '1';
+    palco.dataset.painel = '';
     desenharPainelDecorar();
   }
   function pararDecorar(salvar) {
@@ -744,6 +905,7 @@ export async function clube() {
     const original = decorando.original;
     decorando = null;
     painelDecorar.hidden = true;
+    delete palco.dataset.decorando;
     if (!salvar) { if (minhaToca()) toca = original; return; }
     put('/api/clube/toca', rascunho).then(r => { toca = { ...toca, ...r.toca }; eu.toca = r.toca; aviso('Toca decorada!'); }).catch(e => aviso(e.message, 'erro'));
   }
@@ -778,6 +940,7 @@ export async function clube() {
               const m = { id: i.id, x: 160 + ((n * 173) % 680), y: info.parede ? 150 + (n % 2) * 60 : 420 + (n % 3) * 50, v: 0 };
               t.moveis.push(m);
               decorando.sel = m;
+              cam.x = limitarCamera(m.x - cam.larg / 2);   // mostra onde o móvel apareceu
               desenharPainelDecorar();
             },
           }, previaItem(i, 64), h('span', null, i.nome), h('small', null, n > 0 ? `${n} para pôr` : 'todos na toca'));
@@ -801,11 +964,17 @@ export async function clube() {
     const lista = [...decorando.toca.moveis].sort((a, b) => b.y - a.y);
     const m = lista.find(k => { const [x0, y0, x1, y1] = caixaMovel(k); return x >= x0 && x <= x1 && y >= y0 && y <= y1; }) || null;
     decorando.sel = m;
-    decorando.arrastando = m ? { m, dx: m.x - x, dy: m.y - y } : null;
-    if (m) tela.setPointerCapture?.(ev.pointerId);
+    // Sem móvel embaixo do dedo: arrastar leva a câmera (quando a sala não cabe inteira na tela).
+    decorando.arrastando = m ? { m, dx: m.x - x, dy: m.y - y } : { pan: true, de: ev.clientX, camX: cam.x };
+    tela.setPointerCapture?.(ev.pointerId);
     desenharPainelDecorar();
   }
-  function arrastarMovel(x, y) {
+  function arrastarMovel(x, y, ev) {
+    if (decorando.arrastando.pan) {
+      const { de, camX } = decorando.arrastando;
+      cam.x = limitarCamera(camX - (ev.clientX - de) / cam.s);
+      return;
+    }
     const { m, dx, dy } = decorando.arrastando;
     const info = MOVEIS[m.id] || {};
     m.x = Math.round(Math.max(60, Math.min(940, x + dx)));
@@ -959,11 +1128,9 @@ export async function clube() {
   return h('div', { class: 'pagina clube' },
     cabecalho({
       titulo: 'Club Coelho', icone: 'balao', voltar: { href: '#/recreacao', texto: 'Recreação' },
-      sub: 'Passeie com o seu coelho, converse, dance e decore a sua toca. Clique no chão para andar e nas portas para entrar.',
+      sub: 'Passeie com o seu coelho, converse, dance e decore a sua toca. Toque ou clique no chão para andar e nas portas para entrar.',
       acoes: [chip],
     }),
-    h('div', { class: 'clube-palco' }, tela),
-    barra,
-    painelDecorar,
-    h('section', { class: 'painel clube-conversa-painel' }, h('div', { class: 'painel-cab' }, h('h2', null, icone('chat'), 'Conversa da sala')), conversa));
+    palco,
+    baixo);
 }

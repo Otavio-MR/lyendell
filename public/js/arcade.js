@@ -25,6 +25,7 @@ import { juntoNoJogo, sorteJunto, textoDoFimJunto } from './junto.js';
 import { segredosDoJogo, SEGREDOS } from './segredos.js';
 import { menuAdm, admDirecao, admPodeAgir, admVelocidade } from './adm-jogos.js';
 import { nomeDe } from './sprites.js';
+import { ajustarJogo } from './ajuste-tela.js';
 
 const PASSO = 1 / 60;
 const TECLAS = {
@@ -113,8 +114,9 @@ function novoCanvas(def, classe = '') {
   });
 }
 
-// O canvas cabe na altura da janela (sem precisar rolar a página para jogar).
-const larguraMaxima = def => `calc((100vh - 230px) * ${def.largura} / ${def.altura})`;
+// Quem joga de celular na horizontal tem pouca altura: nesse caso o jogo ocupa a tela toda (modo foco).
+const telaBaixa = () => Math.min(window.innerWidth, window.innerHeight) < 700;
+const deitado = () => window.innerWidth > window.innerHeight * 1.1;
 
 /* ─── A tela do jogo ─── */
 
@@ -126,7 +128,11 @@ export function telaArcade(def) {
   const pontosEl = h('strong', null, '0');
   const recordeEl = h('strong', null, '...');
   const plateiaEl = h('span', { class: 'plateia', hidden: true });
-  const botaoSom = h('button', { type: 'button', class: 'btn-icone arcade-som', onclick: () => alternarSom() });
+  const botaoSom = h('button', { type: 'button', class: 'btn-icone arcade-ferr arcade-som', onclick: () => alternarSom() });
+  const botaoPausa = h('button', { type: 'button', class: 'btn-icone arcade-ferr arcade-pausa', onclick: () => alternarPausa() });
+  const linkSair = h('a', { class: 'btn-icone arcade-ferr arcade-sair', href: '#/recreacao', title: 'Sair do jogo', 'aria-label': 'Sair do jogo' }, icone('sair'));
+  const palco = h('div', { class: 'palco arcade-palco' });
+  const moldura = h('div', { class: 'cobra-moldura arcade-moldura' });
   const ranking = h('div');
   const toque = matchMedia('(pointer: coarse)').matches;
 
@@ -168,6 +174,18 @@ export function telaArcade(def) {
     trocar(botaoSom, icone(mudo ? 'mudo' : 'volume'));
     botaoSom.title = mudo ? 'Ligar o som' : 'Desligar o som';
     botaoSom.setAttribute('aria-label', botaoSom.title);
+    botaoSom.setAttribute('aria-pressed', mudo ? 'true' : 'false');
+  }
+  function desenharBotaoPausa() {
+    const pausado = situacao === 'pausado';
+    trocar(botaoPausa, icone(pausado ? 'play' : 'pausa'));
+    botaoPausa.title = pausado ? 'Continuar' : 'Pausar (P)';
+    botaoPausa.setAttribute('aria-label', pausado ? 'Continuar' : 'Pausar');
+    botaoPausa.disabled = situacao !== 'jogando' && !pausado;
+  }
+  function alternarPausa() {
+    if (situacao === 'jogando') pausar(); else if (situacao === 'pausado') comecar();
+    tela.focus({ preventScroll: true });
   }
   function alternarSom() {
     mudo = !mudo;
@@ -196,6 +214,9 @@ export function telaArcade(def) {
     mostrarSobre();
     tela.focus({ preventScroll: true });
     som('passo');
+    // No celular o jogo toma a tela toda: sem a página em volta e sem nada cobrindo os botões.
+    if (toque && telaBaixa() && !ajuste.ativo()) ajuste.entrar();
+    else if (!ajuste.ativo()) palco.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
 
   function pausar() {
@@ -229,15 +250,18 @@ export function telaArcade(def) {
   }
   const anexarAoFim = el => { const caixa = sobre.querySelector('.cobra-caixa'); if (caixa && situacao === 'fim') caixa.insertBefore(el, caixa.lastChild); };
 
+  const linkVoltar = () => h('a', { class: 'btn btn-fantasma', href: '#/recreacao' }, icone('voltar'), h('span', null, 'Sair do jogo'));
   function mostrarSobre() {
+    desenharBotaoPausa();
+    palco.classList.toggle('jogando', situacao === 'jogando');
     if (situacao === 'jogando') { sobre.hidden = true; return; }
     sobre.hidden = false;
     const instr = toque ? def.instrucoes?.toque : def.instrucoes?.teclado;
     if (situacao === 'inicio' && jt) {
       trocar(sobre, h('div', { class: 'cobra-caixa' }, h('h2', null, 'Prepare-se!'),
         h('p', null, jt.modo === 'coop' ? 'Todos juntos, do mesmo lado.' : 'Todos juntos, cada um por si.'),
-        def.subJunto?.[jt.modo] && h('p', null, def.subJunto[jt.modo]),
-        instr && h('p', { class: 'suave' }, instr)));
+        def.subJunto?.[jt.modo] && h('p', { class: 'arcade-sub' }, def.subJunto[jt.modo]),
+        instr && h('p', { class: 'suave arcade-instr' }, instr)));
     } else if (situacao === 'fim' && jt) {
       trocar(sobre, h('div', { class: 'cobra-caixa' },
         h('h2', null, 'Fim de jogo!'),
@@ -246,18 +270,23 @@ export function telaArcade(def) {
     } else if (situacao === 'inicio') {
       trocar(sobre, h('div', { class: 'cobra-caixa' },
         h('h2', null, def.nome),
-        h('p', null, def.sub),
-        instr && h('p', { class: 'suave' }, instr),
-        botao('Começar', { classe: 'btn-ouro', icone: 'frente', onclick: comecar })));
+        h('p', { class: 'arcade-sub' }, def.sub),
+        instr && h('p', { class: 'suave arcade-instr' }, instr),
+        botao('Começar', { classe: 'btn-ouro btn-grande', icone: 'frente', onclick: comecar })));
     } else if (situacao === 'pausado') {
-      trocar(sobre, h('div', { class: 'cobra-caixa' }, h('h2', null, 'Pausado'), botao('Continuar', { classe: 'btn-ouro', icone: 'play', onclick: comecar })));
+      trocar(sobre, h('div', { class: 'cobra-caixa' }, h('h2', null, 'Pausado'),
+        botao('Continuar', { classe: 'btn-ouro btn-grande', icone: 'play', onclick: comecar }),
+        h('div', { class: 'arcade-sobre-acoes' },
+          botao('Recomeçar', { icone: 'aleatorio', onclick: () => { novoJogo(); comecar(); } }),
+          linkVoltar())));
     } else {
       const r = jogo?.resumo?.() || {};
       trocar(sobre, h('div', { class: 'cobra-caixa' },
         h('h2', null, r.titulo || 'Fim de jogo'),
         h('p', { class: 'cobra-placar' }, `${num(Math.floor(jogo?.pontos || 0))} pontos`),
         (r.linhas || []).map(l => h('p', null, l)),
-        botao('Jogar de novo', { classe: 'btn-ouro', icone: 'aleatorio', onclick: () => { novoJogo(); comecar(); } })));
+        botao('Jogar de novo', { classe: 'btn-ouro btn-grande', icone: 'aleatorio', onclick: () => { novoJogo(); comecar(); } }),
+        linkVoltar()));
     }
   }
 
@@ -292,6 +321,7 @@ export function telaArcade(def) {
       juntar();
       return;
     }
+    if (e.code === 'KeyF' && !e.repeat && !e.ctrlKey && !e.metaKey) { e.preventDefault(); ajuste.alternar(); return; }
     if (e.code === 'KeyP' || e.code === 'Escape') {
       e.preventDefault();
       if (situacao === 'jogando') pausar(); else if (situacao === 'pausado') comecar();
@@ -329,8 +359,10 @@ export function telaArcade(def) {
     return b;
   }
   const c = def.controles || {};
+  // A cruz: com cima e baixo é a cruz inteira; só com baixo (Super Coelho) fica numa fileira; sem lados (Corrida) é só o "baixo".
+  const formaCruz = c.semLados ? 'so-baixo' : c.cima && c.baixo ? 'cruz-completa' : c.baixo || c.cima ? 'fileira-3' : 'fileira-2';
   const controles = h('div', { class: 'arcade-controles' },
-    h('div', { class: `arcade-cruz ${c.cima || c.baixo ? 'com-cima' : ''}`.trim() },
+    h('div', { class: `arcade-cruz ${formaCruz}` },
       c.cima && botaoToque('cima', icone('cima'), 'b-cima', 'Para cima'),
       !c.semLados && botaoToque('esq', icone('voltar'), 'b-esq', 'Para a esquerda'), // semLados: jogos que só pulam e abaixam
       !c.semLados && botaoToque('dir', icone('frente'), 'b-dir', 'Para a direita'),
@@ -532,26 +564,54 @@ export function telaArcade(def) {
     }).catch(() => {});
   }
 
+  /* O ajuste de tela: o jogo cabe na janela (largura e altura), acompanha a rotação e tem tela cheia */
+
+  const precisaGirar = def.largura / def.altura > 1.4;
+  const controlesNoFluxo = cheio => toque && !(cheio && deitado());
+  // O que sobra da altura em volta do jogo: a barra de cima e, no celular em pé, os botões de toque embaixo.
+  function margemVertical(cheio) {
+    const barraAlt = barra.offsetHeight || 44;
+    const dica = precisaGirar && toque && cheio && !deitado() ? 28 : 0;
+    const ctl = controlesNoFluxo(cheio) ? (controles.offsetHeight || 150) + 10 : 0;
+    if (cheio) return barraAlt + ctl + dica + 8;
+    const topo = palco.getBoundingClientRect().top + window.scrollY;
+    return topo + (palco.offsetHeight - moldura.offsetHeight) + 18 + (toque ? 70 : 0); // 70: a faixa da trilha sonora no fim da tela
+  }
+  const ajuste = ajustarJogo(palco, {
+    proporcao: def.largura / def.altura, maxLargura: 1200, compacto: true, travarDeitado: precisaGirar && toque, escapeSai: false,
+    margemY: margemVertical,
+    aoMudar: ({ largura, altura, cheio }) => {
+      palco.classList.toggle('arcade-pequeno', altura < 300 || largura < 380);
+      palco.classList.toggle('ctl-sobre', cheio && toque && deitado());
+      palco.classList.toggle('arcade-largo-palco', precisaGirar);
+    },
+  });
+  if (document.fonts?.ready) document.fonts.ready.then(() => ajuste.medir());
+
   desenharBotaoSom();
   novoJogo();
   if (!jt) carregarRanking();
   quadro = requestAnimationFrame(passo);
 
-  return h('div', { class: 'pagina' },
+  const barra = h('div', { class: 'arcade-barra' },
+    h('div', { class: 'arcade-placar' },
+      h('span', { class: 'arcade-pontos' }, 'Pontos: ', pontosEl),
+      !jt && h('span', { class: 'arcade-recorde' }, icone('trofeu'), h('span', { class: 'arcade-rec-txt' }, 'Recorde: '), recordeEl),
+      plateiaEl),
+    h('div', { class: 'arcade-ferramentas' }, !jt && botaoPausa, botaoSom, ajuste.botao, linkSair));
+  ajuste.botao.classList.add('arcade-ferr');
+  moldura.append(tela, sobre);
+  trocar(palco, barra, moldura,
+    precisaGirar && h('p', { class: 'arcade-dica-giro' }, icone('expandir'), ' Deite o celular para ver o jogo maior.'),
+    controles);
+
+  return h('div', { class: 'pagina pagina-arcade' },
     cabecalho({
       titulo: jt ? `${def.nome}: ${jt.modo === 'coop' ? 'co-op' : 'versus'}` : def.nome, icone: def.icone, voltar: { href: '#/recreacao', texto: 'Recreação' },
-      sub: jt ? def.subJunto?.[jt.modo] || def.sub : def.sub,
     }),
     // Jogo largo (como o Super Coelho): a tela usa a largura toda e o ranking vai para baixo.
     h('div', { class: `jogo-solo ${def.largura / def.altura > 1.4 ? 'arcade-largo' : ''}`.trim() },
-      h('div', { class: 'jogo-area arcade-area', style: { maxWidth: larguraMaxima(def) } },
-        h('div', { class: 'cobra-placar-linha' },
-          h('span', null, 'Pontos: ', pontosEl),
-          plateiaEl,
-          !jt && h('span', null, icone('trofeu'), ' Recorde: ', recordeEl),
-          botaoSom),
-        h('div', { class: 'cobra-moldura arcade-moldura' }, tela, sobre),
-        controles),
+      h('div', { class: 'jogo-area arcade-area' }, palco),
       h('aside', { class: 'jogo-lateral arcade-lateral' },
         jt ? jt.painel : h('section', { class: 'painel' },
           h('div', { class: 'painel-cab' }, h('h2', null, icone('trofeu'), 'Melhores')),
@@ -566,7 +626,7 @@ export function telaArcade(def) {
 
 // O visor de quem assiste, enquanto o módulo do jogo ainda está chegando.
 export function visorArcade(carregar) {
-  const el = h('div', { class: 'jogo-area arcade-area' }, h('div', { class: 'carregando-tela' }, h('span', { class: 'giro' })));
+  const el = h('div', { class: 'jogo-area arcade-area' }, h('div', { class: 'carregando-tela', role: 'status', 'aria-label': 'Abrindo o jogo' }, h('span', { class: 'giro' })));
   let visor = null;
   let ultimo = null;
   let parado = false;
@@ -600,10 +660,18 @@ export function assistirArcade(def) {
   }
   quadro = requestAnimationFrame(laco);
   const TEXTO = { inicio: 'Preparando o jogo...', pausado: 'Pausado' };
+  const moldura = h('div', { class: 'cobra-moldura arcade-moldura' }, tela, aviso_);
+  const palco = h('div', { class: 'palco arcade-palco arcade-espectador' });
+  const ajuste = ajustarJogo(palco, {
+    proporcao: def.largura / def.altura, maxLargura: 1200, compacto: true,
+    margemY: cheio => (cheio ? palco.firstChild.offsetHeight + 10 : palco.getBoundingClientRect().top + window.scrollY + (palco.offsetHeight - moldura.offsetHeight) + 24),
+    aoMudar: ({ largura, altura }) => palco.classList.toggle('arcade-pequeno', altura < 300 || largura < 380),
+  });
+  palco.append(h('div', { class: 'arcade-barra' },
+    h('div', { class: 'arcade-placar' }, h('span', { class: 'arcade-pontos' }, 'Pontos: ', pontosEl)),
+    h('div', { class: 'arcade-ferramentas' }, ajuste.botao)), moldura);
   return {
-    el: h('div', { class: 'jogo-area arcade-area', style: { maxWidth: larguraMaxima(def) } },
-      h('div', { class: 'cobra-placar-linha' }, h('span', null, 'Pontos: ', pontosEl)),
-      h('div', { class: 'cobra-moldura arcade-moldura' }, tela, aviso_)),
+    el: h('div', { class: 'jogo-area arcade-area' }, palco),
     quadro(q) {
       ultimoQuadro = q;
       pontosEl.textContent = num(q.p || 0);

@@ -58,9 +58,20 @@ export async function api(metodo, url, corpo) {
       estado.eu = null;
       window.dispatchEvent(new Event('sessao-expirada'));
     }
-    throw new ErroApi(json?.erro || 'Algo deu errado.', resp.status);
+    throw new ErroApi(json?.erro || mensagemDoStatus(resp.status), resp.status);
   }
   return json;
+}
+
+// Quando o servidor não explica o erro, diz pelo menos o que aconteceu e o que fazer.
+function mensagemDoStatus(status) {
+  if (status === 401) return 'Sua sessão terminou. Entre de novo.';
+  if (status === 403) return 'Você não tem permissão para fazer isso.';
+  if (status === 404) return 'Não encontramos isso. Pode ter sido apagado por outra pessoa.';
+  if (status === 413) return 'O arquivo é grande demais. Escolha um menor.';
+  if (status === 429) return 'Muitas tentativas seguidas. Espere um instante e tente de novo.';
+  if (status >= 500) return 'O servidor teve um problema. Tente de novo em instantes.';
+  return 'Algo deu errado. Tente de novo.';
 }
 export const get = url => api('GET', url);
 export const post = (url, corpo = {}) => api('POST', url, corpo);
@@ -241,6 +252,8 @@ export const ICONES = {
   barril: '<path d="M7 3h10c1.4 2.6 2 5.6 2 9s-.6 6.4-2 9H7c-1.4-2.6-2-5.6-2-9s.6-6.4 2-9z"/><path d="M5.6 7.5h12.8M5.6 16.5h12.8"/><path d="M12 3v18"/>',
   cenoura: '<path d="M14.5 9.5 4 20l-.5-.5L14 9"/><path d="M14.6 9.4c1.6 1.6 1.5 3.6-.2 5.3L6.2 18.3 3.7 20.3l2-2.5 3.6-8.2c1.7-1.7 3.7-1.8 5.3-.2z"/><path d="M14.5 9.5c.4-2.4 1.6-4.2 3.6-5M14.5 9.5c2.4-.4 4.2-1.6 5-3.6M14.5 9.5 19 5"/><path d="M8.5 13.2l1.4 1.4M10.6 11.2l1.2 1.2"/>',
   estrada: '<path d="M8 3 4 21M16 3l4 18"/><path d="M12 4v2.5M12 10v3M12 16.5V20"/>',
+  // Tela cheia dos jogos (cantos para fora)
+  expandir: '<path d="M4 9V4h5"/><path d="M20 9V4h-5"/><path d="M4 15v5h5"/><path d="M20 15v5h-5"/>',
   // Escola Luckham: o capelo de formatura
   capelo: '<path d="M2 9.5 12 5l10 4.5-10 4.5z"/><path d="M6.5 11.8V16c0 1.5 2.5 3 5.5 3s5.5-1.5 5.5-3v-4.2"/><path d="M22 9.5V15"/>',
   balao: '<path d="M12 3c3.6 0 6 2.8 6 6.3 0 3.8-3 7-6 7.7-3-.7-6-3.9-6-7.7C6 5.8 8.4 3 12 3z"/><path d="M11 17l-.8 1.6h3.6L13 17"/><path d="M12 18.6c0 1.2-1.2 1.5-1.2 2.4"/><path d="M9.3 7.2c.5-1 1.3-1.6 2.2-1.8"/>',
@@ -256,13 +269,40 @@ export function icone(nome, classe = '') {
   return svg;
 }
 
+// Se o clique devolve uma promessa (ação que fala com o servidor), o botão fica ocupado até ela terminar:
+// não dá para clicar duas vezes sem querer, e o círculo de "carregando" aparece se demorar.
+// Trava de segurança: depois de 12 s o botão volta ao normal de qualquer jeito.
+function comOcupado(fn) {
+  if (typeof fn !== 'function') return fn;
+  return function (e) {
+    const el = e?.currentTarget;
+    if (el?.classList.contains('ocupado')) { e.preventDefault(); return undefined; } // ainda terminando o clique anterior
+    const r = fn.call(this, e);
+    if (el && r && typeof r.then === 'function') {
+      el.classList.add('ocupado');
+      el.setAttribute('aria-busy', 'true');
+      let livre = false;
+      const soltar = () => {
+        if (livre) return;
+        livre = true;
+        clearTimeout(trava);
+        el.classList.remove('ocupado');
+        el.removeAttribute('aria-busy');
+      };
+      const trava = setTimeout(soltar, 12000);
+      r.then(soltar, soltar);
+    }
+    return r;
+  };
+}
+
 export function botao(texto, { icone: ic, classe = '', onclick, tipo = 'button', titulo, desativado } = {}) {
-  return h('button', { class: `btn ${classe}`.trim(), type: tipo, onclick, title: titulo, disabled: desativado },
+  return h('button', { class: `btn ${classe}`.trim(), type: tipo, onclick: comOcupado(onclick), title: titulo, disabled: desativado },
     ic && icone(ic), texto && h('span', null, texto));
 }
 
 export function botaoIcone(ic, rotulo, onclick, classe = '') {
-  return h('button', { class: `btn-icone ${classe}`.trim(), type: 'button', title: rotulo, 'aria-label': rotulo, onclick }, icone(ic));
+  return h('button', { class: `btn-icone ${classe}`.trim(), type: 'button', title: rotulo, 'aria-label': rotulo, onclick: comOcupado(onclick) }, icone(ic));
 }
 
 export function cabecalho({ titulo, sub, icone: ic, acoes = [], voltar }) {
@@ -347,67 +387,149 @@ export function barra(valor, total) {
 /* ─── Avisos, modais e confirmações ──────────────── */
 
 export function aviso(mensagem, tipo = 'ok') {
-  const el = h('div', { class: `toast ${tipo}`, role: 'status' }, icone(tipo === 'erro' ? 'alerta' : 'check'), h('span', null, mensagem));
-  document.getElementById('toasts').append(el);
-  setTimeout(() => { el.classList.add('saindo'); setTimeout(() => el.remove(), 300); }, tipo === 'erro' ? 5000 : 3200);
+  const lista = document.getElementById('toasts');
+  if (!lista) return;
+  const el = h('div', { class: `toast ${tipo}`, role: tipo === 'erro' ? 'alert' : 'status', title: 'Toque para fechar' }, icone(tipo === 'erro' ? 'alerta' : 'check'), h('span', null, mensagem));
+  // No máximo quatro avisos empilhados: o mais antigo sai para dar lugar ao novo.
+  while ((lista.children?.length || 0) >= 4 && lista.firstElementChild) lista.firstElementChild.remove();
+  lista.append(el);
+  let fechado = false;
+  const fechar = () => {
+    if (fechado) return;
+    fechado = true;
+    el.classList.add('saindo');
+    setTimeout(() => el.remove(), 300);
+  };
+  // Mensagem comprida precisa de mais tempo para ser lida.
+  const tempo = Math.max(tipo === 'erro' ? 5000 : 3200, String(mensagem).length * 55);
+  let relogio = setTimeout(fechar, tempo);
+  el.addEventListener('click', fechar);
+  el.addEventListener('pointerenter', () => clearTimeout(relogio));
+  el.addEventListener('pointerleave', () => { relogio = setTimeout(fechar, 1800); });
 }
 
 const pilha = [];
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && pilha.length) pilha[pilha.length - 1].fechar();
+  if (e.key === 'Escape' && pilha.length && !e.defaultPrevented) pilha[pilha.length - 1].pedirFechar();
 });
 
-export function modal({ titulo, corpo, rodape, tamanho = '', classe = '', fecharFora = true, aoFechar } = {}) {
+const FOCAVEIS = 'a[href], button:not([disabled]), input:not([disabled]):not([type=hidden]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+// Enquanto há janela aberta, o resto da página fica "desligado" (sem foco, sem leitor de tela).
+function atualizarFundo() {
+  const app = document.getElementById('app');
+  if (app) app.inert = pilha.length > 0;
+}
+
+let contadorModal = 0;
+export function modal({ titulo, corpo, rodape, tamanho = '', classe = '', fecharFora = true, aoFechar, antesDeFechar } = {}) {
   const fundo = h('div', { class: 'modal-fundo' });
-  const caixa = h('div', { class: `modal ${tamanho} ${classe}`.trim(), role: 'dialog', 'aria-modal': 'true' });
+  const idTitulo = `modal-t-${++contadorModal}`;
+  const caixa = h('div', {
+    class: `modal ${tamanho} ${classe}`.trim(), role: 'dialog', 'aria-modal': 'true', tabindex: '-1',
+    'aria-labelledby': titulo ? idTitulo : null, 'aria-label': titulo ? null : 'Janela',
+  });
+  const voltarPara = (typeof HTMLElement !== "undefined" && document.activeElement instanceof HTMLElement) ? document.activeElement : null;
   let fechado = false;
   const m = {
     caixa,
     fechar() {
       if (fechado) return;
       fechado = true;
-      pilha.splice(pilha.indexOf(m), 1);
+      const i = pilha.indexOf(m);
+      if (i >= 0) pilha.splice(i, 1);
       fundo.classList.add('saindo');
       setTimeout(() => fundo.remove(), 160);
       if (!pilha.length) document.body.classList.remove('sem-rolagem');
+      atualizarFundo();
       aoFechar?.();
+      // Devolve o foco a quem abriu a janela (se ainda estiver na tela), para o teclado não se perder.
+      if (voltarPara?.isConnected) setTimeout(() => { try { voltarPara.focus({ preventScroll: true }); } catch { /* sem foco */ } }, 0);
+    },
+    // Fechar como a pessoa pediu (Esc, X, fundo): se a janela tem algo por salvar, pergunta antes.
+    async pedirFechar() {
+      if (fechado || m.perguntando) return;
+      if (antesDeFechar) {
+        m.perguntando = true;
+        let ok = true;
+        try { ok = await antesDeFechar(); } finally { m.perguntando = false; }
+        if (!ok) return;
+      }
+      m.fechar();
     },
   };
   if (titulo) {
     caixa.append(h('header', { class: 'modal-cab' },
-      h('h2', null, titulo),
-      botaoIcone('x', 'Fechar', () => m.fechar())));
+      h('h2', { id: idTitulo }, titulo),
+      botaoIcone('x', 'Fechar', () => m.pedirFechar())));
   }
   caixa.append(h('div', { class: 'modal-corpo' }, corpo));
   if (rodape) caixa.append(h('footer', { class: 'modal-rodape' }, rodape));
   fundo.append(caixa);
-  if (fecharFora) fundo.addEventListener('mousedown', e => { if (e.target === fundo) m.fechar(); });
+  if (fecharFora) fundo.addEventListener('mousedown', e => { if (e.target === fundo) m.pedirFechar(); });
+  // Tab fica preso dentro da janela de cima.
+  fundo.addEventListener('keydown', e => {
+    if (e.key !== 'Tab' || pilha[pilha.length - 1] !== m) return;
+    const itens = [...caixa.querySelectorAll(FOCAVEIS)].filter(x => x.offsetParent !== null || x === document.activeElement);
+    if (!itens.length) { e.preventDefault(); caixa.focus(); return; }
+    const primeiro = itens[0];
+    const ultimo = itens[itens.length - 1];
+    if (e.shiftKey && (document.activeElement === primeiro || document.activeElement === caixa)) { e.preventDefault(); ultimo.focus(); }
+    else if (!e.shiftKey && document.activeElement === ultimo) { e.preventDefault(); primeiro.focus(); }
+  });
   document.body.append(fundo);
   document.body.classList.add('sem-rolagem');
   pilha.push(m);
-  setTimeout(() => caixa.querySelector('[autofocus], input:not([type=hidden]):not([type=file]):not([disabled]), textarea, select')?.focus(), 30);
+  atualizarFundo();
+  setTimeout(() => {
+    if (fechado) return;
+    const alvo = caixa.querySelector('[autofocus], input:not([type=hidden]):not([type=file]):not([disabled]), textarea, select');
+    // Sem campo para preencher: o foco vai para a própria janela (o leitor de tela lê o título).
+    (alvo || caixa).focus({ preventScroll: true });
+  }, 30);
   return m;
 }
 
 // Modal com formulário: cuida do botão de enviar, do "carregando" e da mensagem de erro.
 // aoEnviar pode devolver false para manter o modal aberto.
+// Campos com o atributo required vazios são apontados antes de enviar. Se a pessoa mexeu e tenta sair, pergunta antes de perder.
 let contadorForm = 0;
 export function modalForm({ titulo, conteudo, textoOk = 'Salvar', classeOk = 'btn-ouro', tamanho = '', extraRodape, aoEnviar }) {
   const id = `form-${++contadorForm}`;
   const erroEl = h('p', { class: 'form-erro', role: 'alert', hidden: true });
   const ok = h('button', { class: `btn ${classeOk}`, type: 'submit', form: id }, textoOk);
   const form = h('form', { class: 'form', id, novalidate: true }, conteudo, erroEl);
+  let mexeu = false;
+  let enviado = false;
+  form.addEventListener('input', () => { mexeu = true; });
+  form.addEventListener('change', () => { mexeu = true; });
   const m = modal({
     titulo, tamanho, fecharFora: false, corpo: form,
-    rodape: [extraRodape, h('span', { class: 'espaco' }), h('button', { class: 'btn', type: 'button', onclick: () => m.fechar() }, 'Cancelar'), ok],
+    antesDeFechar: () => (mexeu && !enviado
+      ? confirmar('O que você preencheu aqui ainda não foi salvo e vai se perder.', { titulo: 'Sair sem salvar?', ok: 'Sair sem salvar', cancelar: 'Continuar editando', perigo: true })
+      : true),
+    rodape: [extraRodape, h('span', { class: 'espaco' }), h('button', { class: 'btn', type: 'button', onclick: () => m.pedirFechar() }, 'Cancelar'), ok],
   });
+  const apontar = el => {
+    const rotulo = el.closest('label')?.querySelector('.campo-rotulo')?.textContent?.replace(/\s*\*\s*$/, '').trim();
+    el.setAttribute('aria-invalid', 'true');
+    el.addEventListener('input', () => el.removeAttribute('aria-invalid'), { once: true });
+    erroEl.textContent = rotulo ? `Preencha o campo "${rotulo}".` : 'Preencha os campos obrigatórios.';
+    erroEl.hidden = false;
+    el.focus();
+    el.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+  };
   form.addEventListener('submit', async e => {
     e.preventDefault();
     erroEl.hidden = true;
+    form.querySelectorAll('[aria-invalid]').forEach(x => x.removeAttribute('aria-invalid'));
+    const vazio = [...form.querySelectorAll('input[required], textarea[required], select[required]')]
+      .find(x => !x.disabled && x.offsetParent !== null && !['checkbox', 'radio', 'file'].includes(x.type) && !String(x.value).trim());
+    if (vazio) { apontar(vazio); return; }
     ok.disabled = true;
     ok.classList.add('carregando');
     try {
-      if ((await aoEnviar(form, m)) !== false) m.fechar();
+      if ((await aoEnviar(form, m)) !== false) { enviado = true; m.fechar(); }
     } catch (err) {
       erroEl.textContent = err.message;
       erroEl.hidden = false;
@@ -421,16 +543,18 @@ export function modalForm({ titulo, conteudo, textoOk = 'Salvar', classeOk = 'bt
   return m;
 }
 
-export function confirmar(mensagem, { titulo = 'Tem certeza?', ok = 'Confirmar', perigo = false } = {}) {
+export function confirmar(mensagem, { titulo = 'Tem certeza?', ok = 'Confirmar', cancelar = 'Cancelar', perigo = false } = {}) {
   return new Promise(resolve => {
     let resposta = false;
     const m = modal({
       titulo, tamanho: 'pequeno', aoFechar: () => resolve(resposta),
+      classe: 'modal-confirmar',
       corpo: h('p', { class: 'confirmar-texto' }, mensagem),
       rodape: [
         h('span', { class: 'espaco' }),
-        h('button', { class: 'btn', type: 'button', onclick: () => m.fechar() }, 'Cancelar'),
-        h('button', { class: `btn ${perigo ? 'btn-perigo' : 'btn-ouro'}`, type: 'button', autofocus: true, onclick: () => { resposta = true; m.fechar(); } }, ok),
+        // Ação que não tem volta: o foco começa em "Cancelar", para um Enter distraído não apagar nada.
+        h('button', { class: 'btn', type: 'button', autofocus: perigo, onclick: () => m.fechar() }, cancelar),
+        h('button', { class: `btn ${perigo ? 'btn-perigo' : 'btn-ouro'}`, type: 'button', autofocus: !perigo, onclick: () => { resposta = true; m.fechar(); } }, ok),
       ],
     });
   });
@@ -450,11 +574,18 @@ export async function tentar(fn, sucesso) {
 
 /* ─── Campos de formulário ────────────────────────── */
 
+let contadorAjuda = 0;
 export function campo(rotulo, entrada, { ajuda, obrigatorio, classe = '' } = {}) {
+  const idAjuda = ajuda ? `ajuda-${++contadorAjuda}` : null;
+  // O leitor de tela lê a dica junto do campo e sabe que ele é obrigatório.
+  if (typeof HTMLElement !== "undefined" && entrada instanceof HTMLElement && entrada.matches('input, select, textarea')) {
+    if (idAjuda) entrada.setAttribute('aria-describedby', idAjuda);
+    if (obrigatorio) entrada.setAttribute('aria-required', 'true');
+  }
   return h('label', { class: `campo ${classe}`.trim() },
     h('span', { class: 'campo-rotulo' }, rotulo, obrigatorio && h('b', { class: 'obrig', title: 'Obrigatório' }, ' *')),
     entrada,
-    ajuda && h('small', { class: 'campo-ajuda' }, ajuda));
+    ajuda && h('small', { class: 'campo-ajuda', id: idAjuda }, ajuda));
 }
 
 export function interruptor(rotulo, ligado, aoMudar, ajuda) {

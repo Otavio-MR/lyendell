@@ -32,7 +32,7 @@ function abrirJanela({ titulo, largura, altura, classe = '', terminar, montar })
   const limpezas = [];
   const m = modal({
     titulo, tamanho: 'grande', classe: `minijogo ${classe}`.trim(), fecharFora: false,
-    corpo: h('div', { class: 'minijogo-corpo' }, h('div', { class: 'minijogo-moldura' }, tela, sobre), extra),
+    corpo: h('div', { class: 'minijogo-corpo' }, h('div', { class: 'minijogo-moldura', style: { '--razao': String(largura / altura) } }, tela, sobre), extra),
     aoFechar: () => { parado = true; cancelAnimationFrame(quadro); limpezas.forEach(f => f()); },
   });
   const ajustar = () => {

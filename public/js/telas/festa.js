@@ -9,6 +9,7 @@ import { CORES_JUNTO, sorteJunto } from '../junto.js';
 import { som } from '../arcade.js';
 import { registrarPecas, desenharSprite, aoMudarSprites } from '../sprites.js';
 import { admDirecao, admPodeAgir, admVelocidade } from '../adm-jogos.js';
+import { ajustarJogo } from '../ajuste-tela.js';
 
 const L = 1200;
 const A = 800;
@@ -533,8 +534,10 @@ export function criarTelaFesta(id, { sair, sairJa }) {
       juntar();
     };
     const aoSoltar = ev => { const k = TECLAS[ev.code]; if (k) { presos.delete(k); juntar(); } };
+    const aoPerderFoco = () => { presos.clear(); juntar(); }; // trocou de janela: ninguém fica "andando" sozinho
     document.addEventListener('keydown', aoApertar);
     document.addEventListener('keyup', aoSoltar);
+    window.addEventListener('blur', aoPerderFoco);
     // Botões de toque
     const b = def.botoes || {};
     const botaoToque = (k, rotulo) => {
@@ -587,14 +590,34 @@ export function criarTelaFesta(id, { sair, sairJa }) {
     };
     raf = requestAnimationFrame(passo);
     setTimeout(() => canvas.focus({ preventScroll: true }), 50);
+    // O minijogo cabe na janela (largura e altura), acompanha a rotação do celular e tem tela cheia.
+    const toque = matchMedia('(pointer: coarse)').matches;
+    const deitado = () => window.innerWidth > window.innerHeight * 1.1;
+    const moldura = h('div', { class: 'festa-mini-moldura' }, canvas);
+    const raiz = h('div', { class: 'festa-mini palco' });
+    const barra = h('div', { class: 'festa-mini-barra' });
+    const ajuste = ajustarJogo(raiz, {
+      proporcao: 640 / 400, maxLargura: 900, compacto: true, travarDeitado: toque, escapeSai: true,
+      margemY: cheio => {
+        const resto = barra.offsetHeight + (toque && !(cheio && deitado()) ? controles.offsetHeight + 8 : 0) + 8;
+        return cheio ? resto + 8 : raiz.getBoundingClientRect().top + window.scrollY + resto + 24 + (toque ? 70 : 0);
+      },
+      aoMudar: ({ cheio }) => raiz.classList.toggle('ctl-sobre', cheio && toque && deitado()),
+    });
+    ajuste.botao.classList.add('arcade-ferr');
+    trocar(barra, h('span', { class: 'suave' }, m.nome || ''), ajuste.botao);
+    trocar(raiz, barra, moldura, controles);
+    // No celular o minijogo toma a tela toda: os botões ficam ao alcance do dedo e nada rola.
+    if (toque && Math.min(window.innerWidth, window.innerHeight) < 700) ajuste.entrar();
     return {
-      el: h('div', { class: 'festa-mini' }, h('div', { class: 'festa-mini-moldura' }, canvas), controles),
+      el: raiz,
       acertarRelogio: inicioEm => { if (inicioEm != null) inicioLocal = Math.min(inicioLocal, Date.now() + inicioEm); },
       parar() {
         cancelAnimationFrame(raf);
         tirar.forEach(f => f());
         document.removeEventListener('keydown', aoApertar);
         document.removeEventListener('keyup', aoSoltar);
+        window.removeEventListener('blur', aoPerderFoco);
       },
     };
   }

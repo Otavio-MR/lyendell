@@ -1,0 +1,201 @@
+/* ux-clube: ajustes de usabilidade (carregado depois do estilo.css, então vence em caso de empate).
+   Club Coelho, Ilha e minijogos: sala que cabe na janela, tela cheia, toque confortável e janelas em folha. */
+
+/* ─── Palco da sala ─────────────────────────────── */
+.clube-palco { width: var(--palco-w, 100%); max-width: 100%; margin: 0 auto; touch-action: manipulation; }
+.clube-palco > .clube-tela { width: 100%; height: var(--palco-h, 60vw); max-height: none; aspect-ratio: auto; touch-action: pan-y; }
+.clube-palco[data-decorando] > .clube-tela { touch-action: none; }
+.clube-tela:focus-visible { outline: 2px solid var(--ouro-l); outline-offset: 2px; }
+.clube-sala-nome {
+  position: absolute; z-index: 2; left: 10px; top: 10px; max-width: calc(100% - 76px); padding: 5px 12px; border-radius: 10px; pointer-events: none;
+  background: rgba(14, 24, 17, 0.8); border: 1px solid rgba(184, 146, 42, 0.45); color: var(--ouro-l);
+  font: 700 clamp(0.85rem, 2.4vw, 1.1rem) / 1.2 var(--f-titulo); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.clube-hud-topo { position: absolute; z-index: 3; top: 8px; right: 8px; display: flex; align-items: center; gap: 8px; }
+.clube-botao-cheia { width: 44px; height: 44px; border-radius: 12px; background: rgba(14, 24, 17, 0.82); border: 1px solid var(--borda-2); color: var(--texto); backdrop-filter: blur(3px); }
+.clube-botao-cheia:hover { background: var(--sup-3); border-color: var(--ouro-d); color: var(--ouro-l); }
+.clube-botao-cheia .ico { width: 22px; height: 22px; }
+.clube-sair, .clube-moedas-foco { display: none; }
+.clube-moedas-foco { padding: 8px 14px; background: rgba(14, 24, 17, 0.82); font-size: 1rem; }
+.clube-sair { background: rgba(14, 24, 17, 0.82); min-height: 44px; backdrop-filter: blur(3px); }
+
+/* A sala em tela cheia (ajuste-tela.js: .palco-foco): barra e conversa viram camadas por cima */
+.clube-palco.palco-foco { touch-action: none; width: 100vw; max-width: none; margin: 0; }
+.palco-foco > .clube-tela { width: var(--palco-w); height: var(--palco-h); border-radius: 0; border: 0; box-shadow: none; touch-action: none; }
+.palco-foco .clube-sala-nome { left: calc(10px + env(safe-area-inset-left)); top: calc(10px + env(safe-area-inset-top)); }
+.palco-foco .clube-hud-topo { top: calc(8px + env(safe-area-inset-top)); right: calc(8px + env(safe-area-inset-right)); }
+.palco-foco .clube-sair, .palco-foco .clube-moedas-foco { display: inline-flex; }
+.palco-foco .clube-sala-nome { max-width: calc(100% - 330px); }
+@media (max-width: 560px) {
+  .palco-foco .clube-sair span { display: none; }
+  .palco-foco .clube-sair { padding-inline: 12px; }
+  .palco-foco .clube-sala-nome { top: calc(62px + env(safe-area-inset-top)); max-width: calc(100% - 20px); }
+}
+.clube-hud-toggles { display: none; gap: 8px; }
+.palco-foco .clube-barra {
+  position: absolute; z-index: 4; left: 0; right: 0; bottom: 0; margin: 0; max-width: none; flex-direction: column; flex-wrap: nowrap; align-items: center; gap: 8px;
+  padding: 24px calc(8px + env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left));
+  background: linear-gradient(0deg, rgba(6, 10, 7, 0.88), rgba(6, 10, 7, 0)); pointer-events: none;
+}
+.palco-foco .clube-barra > * { pointer-events: auto; }
+.palco-foco .clube-falar, .palco-foco .clube-emotes, .palco-foco .clube-acoes {
+  display: none; justify-content: center; max-width: min(620px, 100%); padding: 8px; border-radius: 14px; background: rgba(14, 24, 17, 0.95); border: 1px solid var(--borda-2);
+}
+.palco-foco[data-painel="chat"] .clube-falar { display: flex; width: min(620px, 100%); flex: none; }
+.palco-foco[data-painel="emotes"] .clube-emotes, .palco-foco[data-painel="menu"] .clube-acoes { display: flex; }
+.palco-foco .clube-hud-toggles { display: flex; }
+.palco-foco[data-decorando] .clube-barra { display: none; }
+.clube-toggle { min-height: 44px; background: rgba(14, 24, 17, 0.9); }
+.clube-toggle[aria-pressed="true"] { background: var(--ouro-fundo); border-color: var(--ouro); color: var(--ouro-l); }
+.palco-foco > .clube-conversa-painel {
+  display: none; position: absolute; z-index: 4; left: calc(8px + env(safe-area-inset-left)); bottom: calc(138px + env(safe-area-inset-bottom)); width: min(420px, calc(100% - 16px));
+  max-height: min(42%, 240px); margin: 0; padding: 10px 12px; overflow: auto; background: rgba(14, 24, 17, 0.95);
+}
+.palco-foco[data-painel="chat"] > .clube-conversa-painel { display: block; }
+.palco-foco > .clube-conversa-painel .painel-cab { display: none; }
+.palco-foco .clube-conversa { max-height: none; }
+/* Decorar a toca em tela cheia: a folha de móveis fica embaixo (em pé) ou do lado (deitado) */
+.palco-foco[data-decorando] { align-items: start; padding-top: 0; }
+.palco-foco > .clube-decorar {
+  position: absolute; z-index: 5; left: 0; right: 0; bottom: 0; margin: 0; max-width: none; max-height: 44%; overflow: auto; border-radius: 16px 16px 0 0; gap: 8px;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom)); background: var(--sup); box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.5);
+}
+.palco-foco > .clube-decorar > p.suave { display: none; }
+.palco-foco > .clube-decorar .clube-grade.moveis { display: flex; max-height: none; overflow-x: auto; overflow-y: hidden; padding-bottom: 6px; }
+.palco-foco > .clube-decorar .clube-grade.moveis .clube-item { flex: 0 0 104px; }
+@media (orientation: landscape) and (max-height: 520px) {
+  .palco-foco[data-decorando] { justify-items: start; }
+  .palco-foco > .clube-decorar { left: auto; top: 0; width: clamp(230px, 34%, 320px); max-height: none; border-radius: 16px 0 0 16px; box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5); }
+  .palco-foco > .clube-decorar .clube-grade.moveis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: visible; }
+  .palco-foco > .clube-decorar .clube-grade.moveis .clube-item { flex: none; }
+  .palco-foco .clube-sala-nome { max-width: 36%; }
+}
+/* Celular deitado: os três botões viram uma coluna de ícones na lateral (sobra faixa dos dois lados do palco) */
+@media (orientation: landscape) and (max-height: 520px) {
+  .palco-foco .clube-barra { flex-direction: row; align-items: flex-end; justify-content: flex-start; padding: 8px calc(8px + env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left)); background: none; }
+  .palco-foco .clube-hud-toggles { order: -1; flex-direction: column; }
+  .palco-foco .clube-toggle { width: 48px; padding: 0; }
+  .palco-foco .clube-toggle span { display: none; }
+  .palco-foco .clube-toggle .ico { width: 22px; height: 22px; }
+  .palco-foco .clube-falar, .palco-foco .clube-emotes, .palco-foco .clube-acoes { max-width: min(560px, calc(100vw - 80px)); }
+  .palco-foco > .clube-conversa-painel { left: calc(64px + env(safe-area-inset-left)); bottom: calc(80px + env(safe-area-inset-bottom)); max-height: min(50%, 190px); }
+}
+/* Modais abertos com a sala em tela cheia ficam por cima dela */
+body.tem-palco-foco .modal-fundo { z-index: 1000; }
+body.tem-palco-foco #toasts { z-index: 1100; }
+
+/* ─── Barra de baixo, chat e decorar ───────────────── */
+.clube-baixo { width: 100%; max-width: 1200px; margin: 0 auto; }
+.clube-baixo > .clube-barra { max-width: none; }
+.clube-emote { min-width: 44px; height: 44px; }
+.clube-emote:focus-visible, .clube-item:focus-visible { outline: 2px solid var(--ouro-l); outline-offset: 2px; }
+.clube-falar .input { min-height: 44px; }
+.clube-falar .btn { min-width: 52px; }
+.clube .btn-pequeno { min-height: 40px; padding-inline: 0.9rem; }
+@media (pointer: coarse), (max-width: 760px) {
+  .clube .btn, .clube .btn-pequeno, .clube .seg { min-height: 44px; }
+  .clube .seg { display: inline-flex; align-items: center; padding-inline: 16px; }
+  .clube-emotes { gap: 6px; }
+  .clube-item { min-height: 44px; }
+  .clube-decorar select.input { min-height: 44px; }
+  .clube-decorar .mapa-check { min-height: 44px; }
+}
+.clube-conversa li { overflow-wrap: anywhere; font-size: 1rem; }
+.clube-decorar-opcoes .campo { flex: 1 1 160px; }
+
+/* ─── Janelas do clube em folha (celular) ──────────── */
+.clube-folha .clube-grade .clube-item { min-height: 0; }
+.clube-item.loja { align-content: start; }
+.clube-item.loja > strong { display: grid; align-items: center; min-height: 2.5em; }
+.clube-item.loja .btn { min-height: 44px; width: 100%; }
+@media (max-width: 640px) {
+  .clube-folha .modal-corpo { padding: 12px 14px 20px; }
+  .clube-folha .clube-grade, .clube-folha .clube-grade.loja { max-height: none; overflow: visible; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+  .clube-folha .clube-abas { position: sticky; top: -12px; z-index: 3; margin: 0 -14px 10px; padding: 8px 14px; background: var(--sup); flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--borda); }
+  .clube-folha .clube-abas::-webkit-scrollbar { display: none; }
+  .clube-folha .seg { flex: none; }
+  .clube-guarda { gap: 10px; }
+  .clube-guarda-previa { position: sticky; top: -12px; z-index: 4; padding: 4px; }
+  .clube-guarda-previa canvas { width: 120px !important; height: 120px !important; }
+  .clube-saldo { font-size: 1rem; }
+  .clube-tocas { max-height: none; overflow: visible; }
+  .clube-toca-linha .btn { min-height: 44px; }
+}
+
+/* ─── Mapa da ilha ─────────────────────────────────── */
+.ilha-marco-icone { position: relative; }
+.ilha-marco-icone::after { content: ''; position: absolute; inset: -6px; }
+.ilha-marco:focus-visible { outline: none; }
+.ilha-marco:focus-visible .ilha-marco-icone { outline: 3px solid #fff; outline-offset: 2px; }
+.ilha-mapa-info .btn { min-height: 44px; }
+@media (max-width: 640px) {
+  .ilha-mapa-bloco { overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+  .ilha-mapa { min-width: 620px; }
+  .ilha-marco-icone { width: 34px; height: 34px; }
+  .ilha-marco-icone .ico { width: 18px; height: 18px; }
+  .ilha-marco-icone::after { inset: -5px; }
+  .ilha-marco-nome { display: block; font-size: 0.7rem; }
+  .ilha-mapa-info { position: sticky; left: 0; margin-top: 8px; width: calc(100vw - 60px); max-width: 100%; }
+}
+
+/* ─── Cabeçalho mais enxuto no celular ─────────────── */
+@media (max-width: 640px) {
+  .pagina.clube .pag-cab { flex-wrap: nowrap; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .pagina.clube .pag-cab-texto { flex: 1 1 auto; }
+  .pagina.clube .pag-sub { display: none; }
+  .pagina.clube .pag-acoes { width: auto; flex: none; }
+  .pagina.clube .pag-titulo { font-size: 1.35rem; gap: 8px; }
+  .pagina.clube .pag-icone { display: none; }
+  .pagina.clube .voltar { margin-bottom: 2px; min-height: 32px; }
+  .clube-moedas { padding: 4px 12px; font-size: 1rem; }
+  .clube-baixo { margin-top: 0; }
+  .clube-baixo > .clube-barra { margin-top: 10px; }
+  .clube-falar { flex: 1 1 100%; max-width: none; }
+  .clube-emotes { justify-content: center; }
+  .clube-acoes { justify-content: center; }
+}
+
+/* ─── Minijogos: o jogo cabe na altura da janela ───── */
+.minijogo-moldura { width: min(100%, calc((100dvh - var(--mj-reserva, 210px)) * var(--razao, 1.6))); margin-inline: auto; }
+.minijogo-tela { margin-inline: auto; }
+.minijogo-tela:focus-visible { box-shadow: 0 0 0 2px var(--ouro); }
+.modal.minijogo { max-height: calc(100dvh - 16px); }
+.minijogo .minijogo-botoes .btn, .minijogo .cobra-caixa .btn { min-height: 44px; }
+.danca-botao { min-height: 56px; }
+@media (pointer: coarse) { .minijogo-moldura { --mj-reserva: 260px; } }
+@media (max-width: 640px) {
+  .modal.minijogo { max-height: 100dvh; border-radius: 16px 16px 0 0; }
+  .minijogo .modal-cab { padding: 8px 8px 8px 14px; }
+  .minijogo .modal-corpo { padding: 6px 10px 12px; }
+  .minijogo-moldura { --mj-reserva: 190px; }
+}
+/* Celular deitado: janela cheia, o jogo à esquerda e os botões ao lado */
+@media (orientation: landscape) and (max-height: 520px) {
+  .minijogo.modal { max-width: none; width: 100%; max-height: 100dvh; border-radius: 0; margin: 0; }
+  .modal-fundo:has(.minijogo) { padding: 0; align-items: stretch; }
+  .minijogo .modal-cab { padding: 2px 6px 2px 14px; min-height: 0; }
+  .minijogo .modal-cab h2 { font-size: 0.95rem; }
+  .minijogo .modal-corpo { padding: 4px 10px 6px; }
+  .minijogo-corpo { grid-template-columns: minmax(0, 1fr) minmax(0, auto); align-items: start; }
+  .minijogo-corpo > .minijogo-extra { max-width: 240px; align-self: center; }
+  .minijogo-corpo > .minijogo-extra:empty { display: none; }
+  .minijogo-moldura { --mj-reserva: 78px; margin-inline: 0; }
+}
+/* A caixa de instruções e de fim dos minijogos (fica por cima do jogo): rola quando o jogo é pequeno, sem esconder o botão */
+.minijogo-sobre { overflow-y: auto; display: grid; padding: 8px; overscroll-behavior: contain; }
+.minijogo-sobre > .cobra-caixa { margin: auto; max-width: 100%; max-height: 100%; overflow-y: auto; }
+@media (max-width: 640px), (max-height: 520px) {
+  .minijogo-sobre > .cobra-caixa { padding: 12px 14px; gap: 6px; }
+  .minijogo-sobre .cobra-caixa h2 { font-size: 1.1rem; }
+  .minijogo-sobre .cobra-caixa p { font-size: 0.95rem; line-height: 1.3; }
+  .minijogo-sobre .cobra-caixa .minijogo-botoes { gap: 6px; }
+}
+/* Botão de fechar e botões pequenos das janelas do clube e da ilha: alvo de toque confortável */
+.minijogo .modal-cab .btn-icone, .clube-folha .modal-cab .btn-icone { width: 44px; height: 44px; }
+.minijogo .modal-corpo .btn-pequeno, .ilha-roteiros .btn-pequeno, .ilha-livro-nav .btn { min-height: 44px; }
+@media (orientation: landscape) and (max-height: 520px) {
+  .minijogo-corpo:has(> .minijogo-extra:empty) .minijogo-moldura { margin-inline: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ilha-marco.aqui .ilha-marco-icone { animation: none; }
+}

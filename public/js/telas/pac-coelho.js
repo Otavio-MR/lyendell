@@ -1,13 +1,14 @@
 // Pac-Coelho: o coelho da Casa Luckham come as moedas (Lírios) e foge das raposas.
 // Moeda grande deixa as raposas com medo por alguns segundos; a cenoura é o bônus.
 
-import { h, trocar, icone, botao, cabecalho, aviso, get, post, pode, aoSair, estado, num } from '../core.js';
+import { h, trocar, icone, botao, botaoIcone, cabecalho, aviso, get, post, pode, aoSair, estado, num } from '../core.js';
 import { rt, ouvir, transmitir, enviarQuadro, pararTransmissao } from '../tempo-real.js';
 import { juntoNoJogo } from '../junto.js';
 import { segredosDoJogo, SEGREDOS } from '../segredos.js';
 import { menuAdm, admDirecao, admPodeAgir, admVelocidade } from '../adm-jogos.js';
 import { desenharParte } from '../roupas-coelho.js';
 import { sombrear } from '../desenho-coelho.js';
+import { palcoDoJogo, dentroDaTelaCheia, encaixarNoPalco } from '../jogo-palco.js';
 import { registrarPecas, desenharSprite, temSprite, aoMudarSprites, nomeDe } from '../sprites.js';
 
 const MAPA = [
@@ -721,6 +722,8 @@ export function pacCoelho() {
   const vidasEl = h('span', { class: 'pac-vidas' });
   const sobre = h('div', { class: 'cobra-sobre' });
   const ranking = h('div');
+  const palco = h('div', { class: 'cobra-moldura pac-moldura' }, tela, sobre);
+  const botaoPausa = botaoIcone('pausa', 'Pausar', () => (['jogando', 'pronto'].includes(situacao) ? pausar() : comecar()), 'btn-pausa');
 
   let moedas, totalMoedas, comidas, pac, querDir, raposas;
   let pontos = 0;
@@ -1130,6 +1133,10 @@ export function pacCoelho() {
   }
 
   function mostrarSobre(extra) {
+    const rodando = ['jogando', 'pronto'].includes(situacao);
+    botaoPausa.title = rodando ? 'Pausar' : situacao === 'fim' ? 'Jogar de novo' : situacao === 'inicio' ? 'Começar' : 'Continuar';
+    botaoPausa.setAttribute('aria-label', botaoPausa.title);
+    trocar(botaoPausa, icone(rodando ? 'pausa' : 'play'));
     if (!['inicio', 'pausado', 'fim'].includes(situacao)) { sobre.hidden = true; return; }
     sobre.hidden = false;
     const toque = matchMedia('(pointer: coarse)').matches;
@@ -1312,20 +1319,25 @@ export function pacCoelho() {
   carregarRanking();
   quadro = requestAnimationFrame(passo);
 
+  const botoesPlacar = h('span', { class: 'placar-botoes' }, botaoPausa);
+  const placar = h('div', { class: 'cobra-placar-linha' },
+    h('span', null, 'Pontos: ', pontosEl),
+    h('span', null, 'Nível ', nivelEl),
+    vidasEl,
+    plateiaEl,
+    h('span', null, icone('trofeu'), ' ', recordeEl),
+    botoesPlacar);
+  const dpad = h('div', { class: 'dpad', 'aria-label': 'Controles de direção' },
+    seta('cima', CIMA, 'Para cima'), seta('voltar', ESQ, 'Para a esquerda'),
+    seta('frente', DIR, 'Para a direita'), seta('baixo', BAIXO, 'Para baixo'));
+  const areaJogo = h('div', { class: 'jogo-area pac-area' }, placar, palco, dpad);
+  const ajuste = palcoDoJogo(palco, { proporcao: 28 / 31, abaixo: () => [dpad], dentro: () => dentroDaTelaCheia(placar, dpad), aoMudar: ({ cheio }) => encaixarNoPalco(cheio, palco, placar, dpad, areaJogo) });
+  botoesPlacar.append(ajuste.botao);
+
   return h('div', { class: 'pagina' },
     cabecalho({ titulo: 'Pac-Coelho', icone: 'coelho', voltar: { href: '#/recreacao', texto: 'Recreação' }, sub: 'O coelho da Casa Luckham atrás dos Lírios, com as raposas no encalço.' }),
     h('div', { class: 'jogo-solo' },
-      h('div', { class: 'jogo-area pac-area' },
-        h('div', { class: 'cobra-placar-linha' },
-          h('span', null, 'Pontos: ', pontosEl),
-          h('span', null, 'Nível ', nivelEl),
-          vidasEl,
-          plateiaEl,
-          h('span', null, icone('trofeu'), ' ', recordeEl)),
-        h('div', { class: 'cobra-moldura pac-moldura' }, tela, sobre),
-        h('div', { class: 'dpad' },
-          seta('cima', CIMA, 'Para cima'), seta('voltar', ESQ, 'Para a esquerda'),
-          seta('frente', DIR, 'Para a direita'), seta('baixo', BAIXO, 'Para baixo'))),
+      areaJogo,
       h('aside', { class: 'jogo-lateral pac-lateral' },
         h('section', { class: 'painel' },
           h('div', { class: 'painel-cab' }, h('h2', null, icone('trofeu'), 'Melhores')),

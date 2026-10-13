@@ -11,6 +11,7 @@ import { abrirJunto } from './junto.js';
 import { desenharCoelho, elipse, sombrear, sorte } from '../desenho-coelho.js';
 import { registrarPecas, desenharSprite, aoMudarSprites, nomeDe as nomeDaPeca, nomeTrocado, usarNomeDaPeca } from '../sprites.js';
 import { admDirecao, admVelocidade } from '../adm-jogos.js';
+import { ajustarJogo, iconeReduzir } from '../ajuste-tela.js';
 
 /* ─── As mesmas regras do servidor (src/junto-batalha.js) ─── */
 
@@ -587,6 +588,20 @@ function telaJogo(jt) {
   const fimEl = h('div', { class: 'bt-fim', hidden: true });
   const comecoEl = h('div', { class: 'bt-preparo' }, h('h2', null, 'Prepare-se!'), h('p', null, 'O balão vai cruzar a ilha. Pule quando quiser cair.'));
   const palco = h('div', { class: `bt-palco ${toque ? 'bt-toque' : ''}`.trim() });
+  const botaoCheia = h('button', { type: 'button', class: 'bt-icone', onclick: () => ajuste.alternar() }, icone('expandir'));
+  const rotularCheia = cheio => {
+    botaoCheia.title = cheio ? 'Sair da tela cheia (F)' : 'Tela cheia (F)';
+    botaoCheia.setAttribute('aria-label', cheio ? 'Sair da tela cheia' : 'Tela cheia');
+    trocar(botaoCheia, cheio ? iconeReduzir() : icone('expandir'));
+  };
+  // O palco do jogo ocupa o que sobra da altura da janela (veja --bt-topo no ux-acao.css) e vira tela cheia sob demanda.
+  const ajuste = ajustarJogo(palco, {
+    proporcao: 1, margemY: 0, travarDeitado: toque,
+    aoMudar: ({ cheio }) => {
+      rotularCheia(cheio);
+      if (!cheio) palco.style.setProperty('--bt-topo', `${Math.round(palco.getBoundingClientRect().top + window.scrollY)}px`);
+    },
+  });
 
   let mapa = null;
   let fundo = null;
@@ -1420,10 +1435,8 @@ function telaJogo(jt) {
   camada.addEventListener('pointerup', soltarToque);
   camada.addEventListener('pointercancel', soltarToque);
 
-  function telaCheia() {
-    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
-    else palco.requestFullscreen?.().catch(() => {});
-  }
+  // Tela cheia (ou modo foco, no iPhone): o ajuste de tela cuida do tamanho, da rotação e da saída.
+  function telaCheia() { ajuste.alternar(); }
 
   const botaoToque = (texto, a, cls) => h('button', { type: 'button', class: `bt-btoque ${cls}`, onpointerdown: e => { e.preventDefault(); e.stopPropagation(); a(); } }, texto);
   const botoesToque = toque && h('div', { class: 'bt-botoes-toque' },
@@ -1449,6 +1462,8 @@ function telaJogo(jt) {
   jt.aoQuadro = q => { try { receber(q); } catch (e) { console.error('Batalha da Toca:', e); } };
   receber(jt.estado()?.quadro);
   animacao = requestAnimationFrame(laco);
+  // No celular o jogo toma a tela toda desde o começo (sem a página em volta e sem nada cobrindo os botões).
+  if (toque && Math.min(window.innerWidth, window.innerHeight) < 700) ajuste.entrar();
 
   trocar(palco,
     tela,
@@ -1462,7 +1477,7 @@ function telaJogo(jt) {
       h('button', { type: 'button', class: 'bt-mini-botao', onclick: abrirMapa, 'aria-label': 'Abrir o mapa' }, miniTela),
       feedEl),
     h('div', { class: 'bt-cantos' },
-      h('button', { type: 'button', class: 'bt-icone', onclick: telaCheia, title: 'Tela cheia (F)', 'aria-label': 'Tela cheia' }, icone('frente')),
+      botaoCheia,
       !toque && h('button', { type: 'button', class: 'bt-icone', onclick: abrirMapa, title: 'Mapa (M)', 'aria-label': 'Mapa' }, icone('mapa'))),
     avisoEl,
     dicaEl,

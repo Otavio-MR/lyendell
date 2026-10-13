@@ -60,7 +60,7 @@ function abrirJanela(ctx, { titulo, largura, altura, jogo, montar }) {
   const limpezas = [];
   const m = modal({
     titulo, tamanho: 'grande', classe: 'minijogo', fecharFora: false,
-    corpo: h('div', { class: 'minijogo-corpo' }, h('div', { class: 'minijogo-moldura' }, tela, sobre), extra),
+    corpo: h('div', { class: 'minijogo-corpo' }, h('div', { class: 'minijogo-moldura', style: { '--razao': String(largura / altura) } }, tela, sobre), extra),
     aoFechar: () => { parado = true; cancelAnimationFrame(quadro); limpezas.forEach(f => f()); },
   });
   const ajustar = () => {
