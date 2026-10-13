@@ -345,6 +345,33 @@ fez o **juramento** (e quando) e quem registrou e em que dia. Idade, profissão,
 civil ficam de fora de propósito, porque mudam. Se um dia o formulário do livro ganhar os campos
 **Naturalidade**, **Data de nascimento** ou **Gênero**, eles entram no documento sozinhos.
 
+## Escola Luckham
+
+Um sistema próprio da escola, **fora do Tabelionato**, no menu **Escola Luckham** (Cidade). Veio do jornal
+"A Escola Luckham convoca!": as seis disciplinas (História de Eldoria, Matemática e Economia, Geografia de
+Eldoria, Autodefesa, Linguagem e Etiqueta), matrículas de 1 a 16 anos, **um professor titular e um substituto
+de confiança por disciplina**, o lema e como se inscrever. Tudo isso é editável em **Configurações**.
+
+**Cargos**: o **Diretor da Escola** (Lorde Evran Luckham, no jornal) faz a inscrição de alunos e professores e
+cuida de tudo (`escola.gerir`); o **Professor da Escola** vê os alunos, faz a chamada e lança notas; a Família
+Nobre tem tudo. Todo morador vê o mural da escola (disciplinas, titulares e substitutos, turmas e aulas), mas só
+quem trabalha nela vê alunos, notas e frequência.
+
+**O que tem**: alunos (matrícula numerada sem buracos, responsável, turma, situação: em análise, matriculado,
+afastado, concluído, desligado), professores (inscrição "em avaliação", depois titular ou substituto, com troca
+guiada quando o lugar já tem dono), disciplinas, turmas com vagas e faixa de idade, aulas com **chamada**
+(presente, falta, justificada; a justificada conta como presença), **notas** com peso, **boletim** e média,
+frequência, e o **histórico** de tudo o que mudou. O boletim e a carteirinha do aluno saem como livro `.book`.
+
+**Regras**: a faixa de idade é da configuração; a mesma pessoa não se matricula duas vezes; turma cheia não
+aceita mais ninguém; titular e substituto são únicos por disciplina (garantido no banco); aluno com frequência ou
+notas não é apagado (vira "desligado"). Aprovado com média igual ou maior que a média de aprovação (6 por padrão).
+
+**Do Tabelionato**: ao atualizar, os livros da escola que já existiam lá (os que têm "escola" no nome, como Corpo
+Docente e Matrículas) são **trazidos para cá** (alunos, professores e substitutos, mantendo os números) e saem do
+Tabelionato; nada é apagado, os livros ficam guardados. Registro que ainda aguardava aprovação entra como
+matriculado com uma observação explicando.
+
 ## A Grande Nadir (a IA da Casa)
 
 No menu, **A Grande Nadir** (`#/nadir`): a Coelha Mãe Sagrada responde sobre o mundo de Eldoria, a fé, a Casa
