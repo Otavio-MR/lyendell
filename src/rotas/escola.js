@@ -74,9 +74,10 @@ async function turmasComContagem(req) {
   }));
 }
 
-async function listaDeAulas(req, { de, ate, disciplina_id, turma_id, situacao, limite = 300 } = {}) {
+async function listaDeAulas(req, { id, de, ate, disciplina_id, turma_id, situacao, limite = 300 } = {}) {
   const cond = [];
   const args = [];
+  if (id) { cond.push('a.id = ?'); args.push(id); }
   if (de) { cond.push('a.data >= ?'); args.push(de); }
   if (ate) { cond.push('a.data <= ?'); args.push(ate); }
   if (disciplina_id) { cond.push('a.disciplina_id = ?'); args.push(disciplina_id); }
@@ -539,7 +540,7 @@ async function esperadosDaAula(aula) {
 }
 
 r.get('/aulas/:id', exigirAlunos, async (req, res) => {
-  const aula = (await listaDeAulas(req, {})).find(a => a.id === idDaRota(req));
+  const aula = (await listaDeAulas(req, { id: idDaRota(req) }))[0];
   if (!aula) throw erro(404, 'Aula não encontrada.');
   res.json({ aula, esperados: await esperadosDaAula(aula) });
 });

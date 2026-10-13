@@ -29,6 +29,7 @@ import { iniciarEfeitosAdm } from './adm-jogos.js';
 
 const app = document.getElementById('app');
 
+// adulto: não aparece para personagem criança.
 // perm: aparece para quem tem alguma dessas permissões. morador: só para os moradores (os Aliados, convidados
 // de outras casas, não veem). modulo: módulo de livros, que aparece para quem vê o módulo ou, para os Aliados,
 // quando ele tem livros marcados para Convidados e Aliados.
@@ -43,6 +44,7 @@ const MENU = [
     { rota: '/juramento', nome: 'Juramento', icone: 'bandeira', perm: ['tabelionato.ver', 'aliados.ver'] },
     { rota: '/leis', nome: 'Leis de Lyendell', icone: 'balanca', modulo: 'leis' },
     { rota: '/atividades', nome: 'Mural de Atividades', icone: 'tarefas', perm: ['atividades.ver', 'aliados.ver'] },
+    { rota: '/escola', nome: 'Escola Luckham', icone: 'capelo', perm: ['escola.ver'], adulto: true },
     { rota: '/galeria', nome: 'Galeria', icone: 'imagem', perm: ['galeria.ver'] },
     { rota: '/recreacao', nome: 'Recreação', icone: 'jogos', perm: ['recreacao.usar'] },
     { rota: '/clube', nome: 'Club Coelho', icone: 'balao', perm: ['recreacao.usar'] },
@@ -92,6 +94,8 @@ const ROTAS = [
   // Gestão Financeira: carregada só quando alguém abre (o arquivo é grande e poucos usam).
   [/^\/financas(?:\/([a-z]+))?$/, async aba => (await import('./telas/financas.js')).financas(aba || 'visao')],
   [/^\/financas\/(folha|cidadao)\/(\d+)$/, async (aba, id) => (await import('./telas/financas.js')).financas(aba, id)],
+  // Escola Luckham: #/escola/<aba>; com número, abre a ficha do aluno (#/escola/alunos/12) ou a chamada (#/escola/aulas/5).
+  [/^\/escola(?:\/([a-z]+))?(?:\/(\d+))?$/, async (aba, id) => (await import('./telas/escola.js')).escola(aba || 'visao', id ? Number(id) : null)],
   [/^\/recreacao$/, () => recreacao()],
   [/^\/clube$/, () => clube()],
   [/^\/bobo$/, () => caixaDePegadinhas()],
@@ -192,7 +196,7 @@ function montar() {
   document.body.classList.toggle('modo-crianca', crianca);
   const nav = h('nav', { class: 'menu', 'aria-label': 'Menu principal' },
     MENU.map(s => {
-      const itens = s.itens.filter(i => (!i.morador || ehMorador()) && (i.modulo ? veModulo(i.modulo) : !i.perm || podeAlgum(...i.perm)));
+      const itens = s.itens.filter(i => (!i.morador || ehMorador()) && (!i.adulto || !crianca) && (i.modulo ? veModulo(i.modulo) : !i.perm || podeAlgum(...i.perm)));
       if (!itens.length) return null;
       return h('div', { class: 'menu-secao' },
         h('p', { class: 'menu-titulo' }, crianca ? SECOES_CRIANCA[s.secao] || s.secao : s.secao),

@@ -241,6 +241,8 @@ export const ICONES = {
   barril: '<path d="M7 3h10c1.4 2.6 2 5.6 2 9s-.6 6.4-2 9H7c-1.4-2.6-2-5.6-2-9s.6-6.4 2-9z"/><path d="M5.6 7.5h12.8M5.6 16.5h12.8"/><path d="M12 3v18"/>',
   cenoura: '<path d="M14.5 9.5 4 20l-.5-.5L14 9"/><path d="M14.6 9.4c1.6 1.6 1.5 3.6-.2 5.3L6.2 18.3 3.7 20.3l2-2.5 3.6-8.2c1.7-1.7 3.7-1.8 5.3-.2z"/><path d="M14.5 9.5c.4-2.4 1.6-4.2 3.6-5M14.5 9.5c2.4-.4 4.2-1.6 5-3.6M14.5 9.5 19 5"/><path d="M8.5 13.2l1.4 1.4M10.6 11.2l1.2 1.2"/>',
   estrada: '<path d="M8 3 4 21M16 3l4 18"/><path d="M12 4v2.5M12 10v3M12 16.5V20"/>',
+  // Escola Luckham: o capelo de formatura
+  capelo: '<path d="M2 9.5 12 5l10 4.5-10 4.5z"/><path d="M6.5 11.8V16c0 1.5 2.5 3 5.5 3s5.5-1.5 5.5-3v-4.2"/><path d="M22 9.5V15"/>',
   balao: '<path d="M12 3c3.6 0 6 2.8 6 6.3 0 3.8-3 7-6 7.7-3-.7-6-3.9-6-7.7C6 5.8 8.4 3 12 3z"/><path d="M11 17l-.8 1.6h3.6L13 17"/><path d="M12 18.6c0 1.2-1.2 1.5-1.2 2.4"/><path d="M9.3 7.2c.5-1 1.3-1.6 2.2-1.8"/>',
 };
 export const NOMES_ICONES = Object.keys(ICONES);
@@ -409,6 +411,7 @@ export function modalForm({ titulo, conteudo, textoOk = 'Salvar', classeOk = 'bt
     } catch (err) {
       erroEl.textContent = err.message;
       erroEl.hidden = false;
+      erroEl.scrollIntoView?.({ block: 'nearest' }); // formulário comprido: leva a mensagem à vista
     } finally {
       ok.disabled = false;
       ok.classList.remove('carregando');

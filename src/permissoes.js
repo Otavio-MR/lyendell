@@ -110,7 +110,7 @@ const TODAS = CATALOGO.flatMap(g => g.itens.map(i => i.chave));
 // Nada de registrar, editar, apagar, aprovar, publicar ou administrar (isso é coisa de gente grande).
 // A parte dos Aliados (convidados de outras casas) também fica de fora.
 const PERMITIDAS_CRIANCA = new Set([
-  ...TODAS.filter(p => p.endsWith('.ver') && p !== 'usuarios.ver' && p !== 'diario.ver' && p !== 'aliados.ver' && p !== 'financas.ver'),
+  ...TODAS.filter(p => p.endsWith('.ver') && p !== 'usuarios.ver' && p !== 'diario.ver' && p !== 'aliados.ver' && p !== 'financas.ver' && p !== 'escola.ver'),
   'atividades.participar', 'recreacao.usar', 'bobo.pegadinhas', 'nadir.usar',
 ]);
 // Coisas só do Bobo da Corte: nem a Família Nobre recebe junto com "tudo".

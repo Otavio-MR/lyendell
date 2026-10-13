@@ -3485,3 +3485,201 @@ button.fin-cel:hover { border-color: var(--ouro); color: var(--ouro-l); }
 
 /* Lista de situações (quem entra na lista de moradores) */
 .marcadores { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+
+/* ─── Escola Luckham ─────────────────────────────── */
+/* O mural, os alunos, os professores, as aulas e as notas (telas/escola*.js). */
+.escola-abas { row-gap: 0; }
+.escola-corpo { display: grid; gap: 18px; min-width: 0; }
+.escola-corpo > * { min-width: 0; }
+.escola-corpo .painel + .painel { margin-top: 0; }
+.escola-corpo > .nota { margin-bottom: 0; }
+.escola-painel { min-width: 0; }
+.escola-painel > a:last-child { display: inline-block; margin-top: 12px; font-size: 0.95rem; }
+.escola-painel > .btn:last-child { margin-top: 12px; }
+.escola-painel .painel-cab { flex-wrap: wrap; }
+.escola-carregando { min-height: 24vh; }
+.escola-vazio { margin: 0; }
+.escola-tabela-vazia { border: 1px dashed var(--borda-2); border-radius: var(--raio); }
+.escola-vazio-grande { display: grid; justify-items: center; gap: 12px; padding: 34px 18px; text-align: center; color: var(--suave); font-style: italic; border: 1px dashed var(--borda-2); border-radius: var(--raio); }
+.escola-ferramentas { margin-bottom: 0; }
+.escola-ferramentas .filtro { flex: 0 1 220px; max-width: 260px; }
+.escola-barra-acoes { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+.escola-sub { font-family: var(--f-titulo); font-size: 0.85rem; letter-spacing: 0.06em; color: var(--texto-2); margin: 18px 0 8px; }
+.escola-legenda { font-size: 0.92rem; margin-top: 10px; }
+
+/* Etiquetas e cores de situação */
+.etiqueta.escola-bom { color: var(--verde); background: var(--verde-fundo); border-color: rgba(127, 176, 105, 0.35); }
+.etiqueta.escola-ouro { color: var(--ouro-l); background: var(--ouro-fundo); border-color: rgba(216, 177, 58, 0.45); }
+.etiqueta.escola-ruim { color: #f08466; background: var(--vermelho-fundo); border-color: rgba(216, 103, 74, 0.45); }
+.etiqueta.escola-azul { color: var(--azul); background: rgba(126, 166, 201, 0.12); border-color: rgba(126, 166, 201, 0.4); }
+.escola-ruim-texto { color: #f08466; }
+.escola-bom-texto { color: var(--verde); }
+
+/* O mural: no jeito do jornal "A Escola Luckham convoca!" */
+.escola-mural {
+  position: relative; display: flex; align-items: center; gap: 22px; padding: 26px 30px; border-radius: var(--raio); color: var(--tinta);
+  background: radial-gradient(900px 300px at 80% -20%, rgba(255, 255, 255, 0.35), transparent 60%), linear-gradient(160deg, var(--pergaminho), var(--pergaminho-2));
+  border: 1px solid #b59b5a; box-shadow: 0 0 0 4px var(--bg), 0 0 0 5px rgba(216, 177, 58, 0.55), var(--sombra);
+}
+.escola-mural::before { content: ''; position: absolute; inset: 8px; border: 1px solid rgba(106, 86, 54, 0.45); border-radius: 8px; pointer-events: none; }
+.escola-mural-brasao { width: 96px; height: 96px; object-fit: contain; flex: none; filter: drop-shadow(0 2px 3px rgba(44, 34, 20, 0.35)); }
+.escola-mural-texto { min-width: 0; display: grid; gap: 6px; }
+.escola-mural-sobre { font-family: var(--f-titulo); font-size: 0.78rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--tinta-2); }
+.escola-mural h2 { font-family: var(--f-titulo); font-size: clamp(1.5rem, 3.4vw, 2.3rem); letter-spacing: 0.04em; color: var(--tinta); line-height: 1.15; overflow-wrap: anywhere; }
+.escola-lema { font-family: var(--f-destaque); font-style: italic; font-size: 1.3rem; color: var(--tinta-2); line-height: 1.3; }
+.escola-mural-selos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.escola-selo { display: inline-flex; align-items: center; gap: 6px; padding: 3px 12px; border-radius: 999px; background: rgba(44, 34, 20, 0.08); border: 1px solid rgba(106, 86, 54, 0.4); font-size: 0.92rem; color: var(--tinta); }
+.escola-selo .ico { width: 15px; height: 15px; color: #8c6d15; }
+.escola-avisos { display: grid; gap: 8px; }
+.escola-avisos .nota { margin-bottom: 0; }
+.escola-numeros { margin-bottom: 0; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.escola-numero strong { font-size: 1.5rem; }
+.escola-numero-alerta { border-color: rgba(216, 177, 58, 0.5); }
+.escola-editais { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
+.escola-editais:empty { display: none; }
+.escola-papel { padding: 20px 22px; border-radius: var(--raio); background: linear-gradient(165deg, rgba(239, 227, 195, 0.09), var(--sup) 65%); border: 1px solid var(--borda-2); border-top: 3px solid var(--ouro-d); }
+.escola-papel h3 { display: flex; align-items: center; gap: 10px; font-family: var(--f-titulo); font-size: 1rem; color: var(--ouro); letter-spacing: 0.04em; margin-bottom: 10px; }
+.escola-papel-texto { display: grid; gap: 8px; color: var(--texto-2); font-size: 1.05rem; overflow-wrap: anywhere; }
+.escola-disciplinas { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.escola-disciplina { display: grid; gap: 10px; align-content: start; padding: 16px; border-radius: var(--raio); background: var(--sup-2); border: 1px solid var(--borda); }
+.escola-disciplina h3 { font-family: var(--f-destaque); font-size: 1.3rem; color: var(--ouro-l); line-height: 1.2; overflow-wrap: anywhere; }
+.escola-docente { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.escola-docente-texto { display: grid; min-width: 0; }
+.escola-docente-texto small { color: var(--suave); font-size: 0.8rem; }
+.escola-docente-texto strong { font-weight: 600; overflow-wrap: anywhere; }
+.escola-docente-texto em { color: var(--suave); }
+.escola-vaga-marca { display: grid; place-items: center; flex: none; width: 46px; height: 46px; border-radius: 50%; border: 1px dashed var(--borda-2); color: var(--suave); }
+.escola-vaga-marca .ico { width: 20px; height: 20px; }
+.escola-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.escola-lista li { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: var(--raio-p); background: var(--sup-2); }
+.escola-lista-texto { display: grid; flex: 1; min-width: 0; }
+.escola-lista-texto strong { font-weight: 600; overflow-wrap: anywhere; }
+.escola-lista-texto small { font-size: 0.88rem; overflow-wrap: anywhere; }
+.escola-data { display: grid; min-width: 72px; text-align: center; padding: 4px 8px; border-radius: var(--raio-p); background: var(--ouro-fundo); border: 1px solid rgba(216, 177, 58, 0.25); }
+.escola-data strong { font-family: var(--f-titulo); font-size: 0.82rem; color: var(--ouro-l); text-transform: capitalize; }
+.escola-data small { color: var(--suave); font-size: 0.82rem; }
+.escola-rodape-mural { text-align: center; font-family: var(--f-destaque); font-style: italic; font-size: 1.25rem; color: var(--texto-2); padding: 8px 12px 0; }
+
+/* Alunos: a lista em cartões */
+.escola-situacoes { margin-bottom: 14px; }
+.escola-alunos-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.escola-aluno {
+  display: grid; gap: 12px; align-content: start; padding: 16px; border-radius: var(--raio); background: var(--sup); border: 1px solid var(--borda);
+  color: var(--texto); transition: border-color 0.15s, transform 0.15s;
+}
+.escola-aluno:hover { color: var(--texto); border-color: var(--ouro-d); transform: translateY(-2px); }
+.escola-aluno-em_analise { border-left: 3px solid var(--ouro); }
+.escola-aluno-desligado, .escola-aluno-concluido { opacity: 0.8; }
+.escola-aluno-topo { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.escola-aluno-nome { display: grid; min-width: 0; }
+.escola-aluno-nome strong { font-family: var(--f-destaque); font-size: 1.2rem; line-height: 1.2; overflow-wrap: anywhere; }
+.escola-aluno-linhas { display: flex; flex-wrap: wrap; gap: 6px; }
+.escola-aluno-notas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding-top: 10px; border-top: 1px solid var(--borda); }
+.escola-aluno-notas span { display: grid; }
+.escola-aluno-notas small { font-family: var(--f-titulo); font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--suave); }
+.escola-aluno-notas strong { font-family: var(--f-titulo); font-size: 1.15rem; }
+
+/* Alunos: a ficha */
+.escola-ficha-topo { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+.escola-ficha-id { flex: 1 1 260px; min-width: 0; display: grid; gap: 10px; }
+.escola-ficha-id h2 { font-family: var(--f-destaque); font-size: 2rem; color: var(--texto); line-height: 1.15; overflow-wrap: anywhere; }
+.escola-ficha-acoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.escola-ficha-grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
+.escola-ficha-grade .painel + .painel { margin-top: 0; }
+.escola-dl { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr); gap: 6px 16px; margin: 0; }
+.escola-dl dt { color: var(--suave); font-size: 0.95rem; }
+.escola-dl dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; white-space: pre-line; }
+.escola-freq { display: grid; gap: 10px; }
+.escola-freq-cab { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.escola-freq-cab strong { font-family: var(--f-titulo); font-size: 2rem; line-height: 1; }
+.escola-freq .nota { margin: 0; }
+.escola-boletim-total { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; margin-top: 12px; font-size: 1.05rem; }
+.escola-boletim-total strong { font-family: var(--f-titulo); color: var(--ouro-l); }
+.escola-historico { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.escola-historico > li { display: grid; gap: 2px; padding: 10px 12px; border-radius: var(--raio-p); background: var(--sup-2); border-left: 2px solid var(--ouro-d); }
+.escola-hist-topo { display: flex; justify-content: space-between; gap: 4px 12px; flex-wrap: wrap; }
+.escola-hist-topo .suave { font-size: 0.9rem; }
+.escola-hist-detalhe { color: var(--texto-2); overflow-wrap: anywhere; }
+
+/* Professores */
+.escola-docentes-area { display: grid; gap: 18px; }
+.escola-docentes-area .painel + .painel { margin-top: 0; }
+.escola-docentes { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.escola-professor { display: flex; gap: 12px; align-items: flex-start; padding: 14px; border-radius: var(--raio); background: var(--sup-2); border: 1px solid var(--borda); min-width: 0; }
+.escola-professor-titular { border-color: rgba(127, 176, 105, 0.5); }
+.escola-professor-substituto { border-color: rgba(126, 166, 201, 0.45); }
+.escola-professor-vago { border-style: dashed; background: transparent; }
+.escola-professor-corpo { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.escola-professor-corpo strong { font-family: var(--f-destaque); font-size: 1.2rem; line-height: 1.2; overflow-wrap: anywhere; }
+.escola-professor-obs { color: var(--texto-2); font-size: 0.95rem; white-space: pre-line; overflow-wrap: anywhere; margin-top: 4px; }
+.escola-professor-acoes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.escola-desligados { margin-top: 14px; }
+.escola-desligados > summary { cursor: pointer; color: var(--suave); margin-bottom: 10px; }
+
+/* Turmas e disciplinas */
+.escola-cartoes { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.escola-cartao { display: grid; gap: 10px; align-content: start; padding: 16px; border-radius: var(--raio); background: var(--sup-2); border: 1px solid var(--borda); min-width: 0; }
+.escola-cartao.escola-inativa { opacity: 0.7; border-style: dashed; }
+.escola-cartao-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.escola-cartao-cab h3 { font-family: var(--f-destaque); font-size: 1.3rem; color: var(--ouro-l); line-height: 1.2; overflow-wrap: anywhere; }
+.escola-cartao-acoes { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* Aulas e chamada */
+.escola-linha-cancelada td { opacity: 0.6; }
+.escola-linha-cancelada td.acoes-linha { opacity: 1; }
+.escola .tabela .acoes-linha { white-space: nowrap; text-align: right; }
+.escola .tabela .acoes-linha > * + * { margin-left: 6px; }
+.escola-chamada-topo { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.escola-chamada-topo h2 { font-family: var(--f-destaque); font-size: 1.9rem; color: var(--ouro-l); line-height: 1.15; }
+.escola-chamada-data { color: var(--texto); font-size: 1.1rem; }
+.escola-chamada-barra { display: flex; align-items: center; justify-content: space-between; gap: 10px 16px; flex-wrap: wrap; margin-bottom: 12px; }
+.escola-chamada-resumo { display: flex; flex-wrap: wrap; gap: 6px; }
+.escola-chamada-lista { display: grid; gap: 8px; margin-bottom: 14px; }
+.escola-chamada-linha { display: grid; grid-template-columns: minmax(180px, 1fr) auto minmax(150px, 240px); align-items: center; gap: 10px 16px; padding: 10px 12px; border-radius: var(--raio-p); background: var(--sup-2); border: 1px solid var(--borda); }
+.escola-chamada-aluno { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.escola-chamada-aluno strong { overflow-wrap: anywhere; }
+.escola-marcas { display: flex; gap: 6px; flex-wrap: wrap; }
+.escola-marca { min-height: 38px; padding: 4px 14px; border-radius: 999px; border: 1px solid var(--borda-2); background: transparent; color: var(--texto-2); cursor: pointer; font-size: 0.95rem; }
+.escola-marca:hover:not(:disabled) { border-color: var(--ouro-d); }
+.escola-marca:disabled { cursor: default; opacity: 0.6; }
+.escola-marca-presente.ativa { color: var(--verde); background: var(--verde-fundo); border-color: rgba(127, 176, 105, 0.6); }
+.escola-marca-falta.ativa { color: #f08466; background: var(--vermelho-fundo); border-color: rgba(216, 103, 74, 0.6); }
+.escola-marca-justificada.ativa { color: var(--ouro-l); background: var(--ouro-fundo); border-color: rgba(216, 177, 58, 0.6); }
+
+/* Notas */
+.escola-nota-aluno { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.escola-nota-aluno strong { overflow-wrap: anywhere; }
+.escola-nota-celula { min-width: 52px; min-height: 34px; padding: 2px 10px; border-radius: 8px; border: 1px solid var(--borda-2); background: var(--sup-2); color: var(--texto); font-family: var(--f-titulo); font-size: 0.92rem; cursor: pointer; }
+.escola-nota-celula:hover { border-color: var(--ouro); color: var(--ouro-l); }
+.escola-nota-celula.vazia { border-style: dashed; color: var(--suave); background: transparent; }
+.escola-notas-form { display: grid; gap: 8px; }
+.escola-notas-linha { display: grid; grid-template-columns: minmax(0, 1fr) 120px; align-items: center; gap: 12px; padding: 6px 10px; border-radius: var(--raio-p); background: var(--sup-2); }
+
+/* Configurações */
+.escola-config { max-width: 980px; }
+
+@media (max-width: 960px) {
+  .escola-chamada-linha { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .escola-abas { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; }
+  .escola-mural { flex-direction: column; text-align: center; padding: 22px 16px; }
+  .escola-mural-brasao { width: 72px; height: 72px; }
+  .escola-mural-selos { justify-content: center; }
+  .escola-lema { font-size: 1.15rem; }
+  .escola-numeros { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .escola-numero { padding: 12px; column-gap: 10px; }
+  .escola-numero .numero-icone { width: 36px; height: 36px; }
+  .escola-numero strong { font-size: 1.2rem; }
+  .escola-editais, .escola-ficha-grade { grid-template-columns: minmax(0, 1fr); }
+  .escola-alunos-grade, .escola-cartoes, .escola-docentes, .escola-disciplinas { grid-template-columns: minmax(0, 1fr); }
+  .escola-ferramentas .filtro { flex: 1 1 140px; max-width: none; }
+  .escola-ficha-topo { justify-content: center; text-align: center; }
+  .escola-ficha-id .escola-aluno-linhas, .escola-ficha-acoes { justify-content: center; }
+  .escola-ficha-id h2 { font-size: 1.6rem; }
+  .escola-marca { flex: 1; }
+  .escola-notas-linha { grid-template-columns: minmax(0, 1fr) 96px; }
+  .escola .tabela .acoes-linha { white-space: normal; text-align: left; }
+  .escola .tabela .acoes-linha > * + * { margin-left: 0; }
+  .escola-chamada-topo h2 { font-size: 1.5rem; }
+}
