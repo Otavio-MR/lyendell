@@ -4,7 +4,7 @@ import {
   aviso, tentar, campo, interruptor, enviarImagem, dataHora, dataCurta, num, normalizar, ErroApi,
   textoDuracao, listaDeNomes, relativo, chipAliados, ehMorador,
 } from '../core.js';
-import { livroDeRegistro, livroDeRegistros } from '../livro-mc.js';
+import { livroDeRegistro, livroDeRegistros, livroDeMoradores, documentoDeIdentidade, modeloDePessoas } from '../livro-mc.js';
 import { verPagamentos, resumoCobranca } from './pagamentos.js';
 import { nomeInfantil } from '../crianca.js';
 
@@ -358,6 +358,11 @@ export async function livro(m, id, abrir = null) {
             if (!visiveis.length) return aviso('Não há registros para colocar no livro.', 'erro');
             livroDeRegistros(info.titulo, l, visiveis, estado.eu.nome).baixar();
           },
+        }),
+        modeloDePessoas(info.titulo, l) === 'moradores' && botao('Lista de moradores', {
+          icone: 'baixar', classe: 'btn-pequeno',
+          titulo: 'Baixa a relação oficial dos moradores (nome, profissão e idade) como um livro bonito para o mod Scribble',
+          onclick: () => listaDeMoradores(l, d.registros),
         })),
       lista);
     filtrar();
@@ -369,6 +374,65 @@ export async function livro(m, id, abrir = null) {
     if (reg) setTimeout(() => verRegistro(m, d, reg, carregar, abrirDepois), 0);
   }
   return raiz;
+}
+
+/* ─── Lista de moradores e documento de identidade ── */
+
+// A relação dos moradores para entregar ao Império: a Tabeliã escolhe quem entra (por situação) e a ordem.
+// Só entram registros aprovados; por padrão ficam de fora os Falecidos e os Exilados.
+function listaDeMoradores(l, registros) {
+  const aprovados = registros.filter(r => !r.situacao || r.situacao === 'aprovado');
+  if (!aprovados.length) return aviso('Não há moradores aprovados para colocar na lista.', 'erro');
+  const campoSituacao = l.campos.find(c => c.id === 'situacao' || normalizar(c.nome).replace(/:\s*$/, '') === 'situacao');
+  const contagem = new Map();
+  for (const r of aprovados) {
+    const s = (campoSituacao && r.dados[campoSituacao.id]) || '';
+    contagem.set(s, (contagem.get(s) || 0) + 1);
+  }
+  const FORA = new Set(['falecido', 'exilado']);
+  const marcadas = new Set([...contagem.keys()].filter(s => !FORA.has(normalizar(s))));
+  let ordem = 'alfabetica';
+  const total = () => aprovados.filter(r => marcadas.has((campoSituacao && r.dados[campoSituacao.id]) || '')).length;
+  const resumo = h('p', { class: 'suave' });
+  const atualizar = () => { resumo.textContent = `${total()} ${total() === 1 ? 'morador entra' : 'moradores entram'} na lista.`; };
+  atualizar();
+  modalForm({
+    titulo: 'Lista de moradores para o Império', textoOk: 'Baixar o livro', classeOk: 'btn-ouro',
+    conteudo: [
+      h('p', { class: 'form-intro' }, 'Um livro bonito com o nome, a profissão e a idade de cada morador, para apresentar ao Império. Só moradores (Nobres e Outros não entram).'),
+      campoSituacao && contagem.size > 1 && h('div', { class: 'campo' },
+        h('span', { class: 'campo-rotulo' }, 'Quem entra'),
+        h('div', { class: 'marcadores' }, [...contagem].map(([s, n]) => h('label', { class: 'marcador' },
+          h('input', { type: 'checkbox', checked: marcadas.has(s), onchange: e => { if (e.target.checked) marcadas.add(s); else marcadas.delete(s); atualizar(); } }),
+          h('span', null, `${s || 'Sem situação'} (${n})`))))),
+      h('div', { class: 'campo' },
+        h('span', { class: 'campo-rotulo' }, 'Ordem'),
+        h('div', { class: 'segmentado' }, [['alfabetica', 'Pelo nome'], ['registro', 'Pelo número do registro']].map(([v, n]) => h('button', {
+          type: 'button', class: `seg ${ordem === v ? 'ativo' : ''}`.trim(),
+          onclick: e => { ordem = v; e.currentTarget.parentElement.querySelectorAll('.seg').forEach(b => b.classList.toggle('ativo', b === e.currentTarget)); },
+        }, n)))),
+      resumo,
+    ],
+    aoEnviar: async () => {
+      const entram = aprovados.filter(r => marcadas.has((campoSituacao && r.dados[campoSituacao.id]) || ''));
+      if (!entram.length) throw new Error('Marque pelo menos uma situação.');
+      livroDeMoradores(l, entram, estado.eu.nome, { ordem }).baixar('Moradores de Lyendell');
+    },
+  });
+}
+
+// O documento de identidade da pessoa registrada. Moradores e Nobres mostram se já fizeram o juramento.
+async function baixarIdentidade(m, l, r) {
+  let juramento = null;
+  const modelo = modeloDePessoas(MODULOS[m].titulo, l);
+  if (modelo === 'moradores' || modelo === 'nobres') {
+    try {
+      const j = await get('/api/juramento');
+      const jurou = j.juraram.find(p => p.registro_id === r.id);
+      juramento = { jurou: !!jurou, em: jurou?.desde || null };
+    } catch { juramento = null; } // sem acesso ao juramento: o documento sai sem essa linha
+  }
+  documentoDeIdentidade(MODULOS[m].titulo, l, r, juramento, estado.eu.nome).baixar();
 }
 
 /* ─── Ver registro (como documento oficial) ───────── */
@@ -432,6 +496,10 @@ function verRegistro(m, d, r, recarregar, reabrir) {
       h('span', { class: 'espaco' }),
       aprovado && l.cobranca && botao('Pagamentos', { icone: 'moeda', onclick: () => verPagamentos(r.id, recarregar) }),
       cartaz && botao('Baixar cartaz', { icone: 'imagem', titulo: 'Baixa o cartaz de procurado como imagem (PNG)', onclick: () => baixarCartaz(dadosDoCartaz(l, r.dados)) }),
+      aprovado && modeloDePessoas(MODULOS[m].titulo, l) && botao('Documento de identidade', {
+        icone: 'baixar', titulo: 'Baixa o documento de identidade desta pessoa (um livro com os dados que quase nunca mudam) para o mod Scribble',
+        onclick: () => baixarIdentidade(m, l, r),
+      }),
       botao('Baixar .book', {
         icone: 'baixar', titulo: 'Baixa este registro como livro para o mod Scribble',
         onclick: () => livroDeRegistro(MODULOS[m].titulo, l, r, estado.eu.nome).baixar(),

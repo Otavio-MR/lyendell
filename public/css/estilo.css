@@ -3482,3 +3482,6 @@ button.fin-cel:hover { border-color: var(--ouro); color: var(--ouro-l); }
 .anuncio-emojis { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
 .anuncio-emoji { width: 34px; height: 32px; border-radius: 8px; border: 1px solid var(--borda); background: var(--sup-2); font-size: 1.05rem; line-height: 1; cursor: pointer; }
 .anuncio-emoji:hover { border-color: var(--ouro); }
+
+/* Lista de situações (quem entra na lista de moradores) */
+.marcadores { display: flex; flex-wrap: wrap; gap: 8px 18px; }

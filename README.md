@@ -327,6 +327,24 @@ for comprido demais, o que não cabe passa para a página seguinte.
 
 Anúncios, atividades e pagamentos continuam no estilo antigo (moldura e cabeçalhos com ✦).
 
+### Lista de moradores (para o Império)
+
+No livro **Registro de Moradores**, o botão **Lista de moradores** monta um livro bonito com o **nome, a
+profissão e a idade** de cada morador: capa do Tabelionato, quatro moradores por página, o total e a assinatura
+da Casa. Só entram Moradores (Nobres e Outros não) com registro aprovado. Antes de baixar, a Tabeliã escolhe
+quem entra pela **Situação** (por padrão ficam de fora os Falecidos e os Exilados; Ativo, Viajando e Inativo
+entram) e a ordem (pelo nome, ou pelo número do registro). Profissão ou idade em branco (ou só um traço) saem
+como "sem profissão" e "sem idade".
+
+### Documento de identidade
+
+Na ficha de cada Morador, Nobre ou Outro aprovado, o botão **Documento de identidade** baixa um livro para
+entregar à pessoa, como um RG: capa com o nome e o número do registro e, nas páginas de dentro, só o que
+**quase nunca muda**: o **Endereço** (nick), o tipo e o número do registro, a data de chegada à Capital, se já
+fez o **juramento** (e quando) e quem registrou e em que dia. Idade, profissão, residência, cargo e estado
+civil ficam de fora de propósito, porque mudam. Se um dia o formulário do livro ganhar os campos
+**Naturalidade**, **Data de nascimento** ou **Gênero**, eles entram no documento sozinhos.
+
 ## A Grande Nadir (a IA da Casa)
 
 No menu, **A Grande Nadir** (`#/nadir`): a Coelha Mãe Sagrada responde sobre o mundo de Eldoria, a fé, a Casa

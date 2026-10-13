@@ -322,11 +322,16 @@ const CAMPOS_FICHA = {
   endereco: ['residencia', 'moradia', 'onde mora', 'endereco'], // a linha "Endereço" do modelo de Outros: onde a pessoa mora
   familia: ['a qual familia pertence', 'familia'],
   cargoFamilia: ['cargo na familia'],
+  // Só o documento de identidade usa estes: dados que quase nunca mudam (se o formulário tiver o campo).
+  chegada: ['data de chegada', 'chegada'],
+  naturalidade: ['naturalidade', 'local de nascimento', 'nasceu em', 'cidade natal'],
+  nascimento: ['data de nascimento', 'nascimento'],
 };
 // O id que o site deu ao campo quando criou o livro: continua o mesmo se a Tabeliã trocar o nome do campo.
 const IDS_FICHA = {
   nickname: 'nickname', nome: 'nome', idade: 'idade', cargo: 'cargo', residencia: 'residencia', estadoCivil: 'estado_civil',
   profissao: 'profissao', genero: 'genero', endereco: 'endereco', familia: 'familia', cargoFamilia: 'cargo_familia',
+  chegada: 'chegada',
 };
 // Na capa vai o nome (ou o nick, no de Outros) da pessoa registrada.
 const LINHAS_CAPA = ['nickname', 'nome'];
@@ -482,8 +487,12 @@ function paginasDosCampos(livro, reg, rodape, { ficha = false } = {}) {
     blocos.push([`${umaLinha(c.nome).replace(/:\s*$/, '')}:`, ...linhasValor, '']);
   }
   blocos.push(rodape.split('\n'));
+  return paginarBlocos(blocos);
+}
 
-  // Enche as páginas sem separar um campo do seu valor (a não ser que ele sozinho passe de uma página).
+// Enche as páginas sem separar um campo do seu valor (a não ser que ele sozinho passe de uma página).
+// Cada bloco é uma lista de linhas já com os códigos de cor (§).
+function paginarBlocos(blocos) {
   const paginas = [];
   let atual = ['§4'];
   let ocupadas = 1;
@@ -702,6 +711,84 @@ export function livroDosJuramentados(pessoas, autor) {
   ]));
   mc.bloco(assinatura(texto('Pela honra. Pela lealdade. Pela Casa Luckham.', '4', { centro: true })));
   return mc;
+}
+
+/* ─── Lista de moradores e documento de identidade ─── */
+
+// Qual modelo de ficha o livro tem ('moradores', 'nobres', 'outros') ou null: só esses são livros de pessoas.
+export const modeloDePessoas = (nomeModulo, livro) => modeloDoLivro(nomeModulo, livro);
+
+// Campo de formulário que ficou só com traço ou ponto ("-") conta como vazio.
+const valorOuNada = v => { const s = umaLinha(v); return /^[-.]*$/.test(s) ? '' : s; };
+
+// A relação oficial dos moradores (nome, profissão e idade), para entregar ao Império. Vai um livro bonito de
+// registros: capa, quatro moradores por página e a assinatura do Tabelionato. registros: só os que devem entrar.
+// ordem: 'alfabetica' (padrão) ou 'registro' (pelo número do registro).
+export function livroDeMoradores(livro, registros, autor, { ordem = 'alfabetica' } = {}) {
+  const pessoas = registros.map(r => {
+    const f = leitorDaFicha(livro, r, ['nome', 'nickname', 'idade', 'profissao']);
+    const idade = valorOuNada(f('idade'));
+    return {
+      numero: r.numero ?? Infinity, nome: umaLinha(f('nome') || f('nickname')), profissao: valorOuNada(f('profissao')),
+      idade: /^\d+$/.test(idade) ? `${idade} ${idade === '1' ? 'ano' : 'anos'}` : idade,
+    };
+  }).filter(p => p.nome).sort((a, b) => (ordem === 'registro'
+    ? a.numero - b.numero
+    : 0) || a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }));
+
+  const mc = new LivroMC('Moradores de Lyendell', autor);
+  mc.capa(capaPadrao('TABELIONATO', 'DE LYENDELL', [
+    ...texto('RELAÇÃO DE', '4', { centro: true, negrito: true }),
+    ...texto('MORADORES', '4', { centro: true, negrito: true }),
+    L(ORN.estrela, '8'),
+    ...texto(`${pessoas.length} ${pessoas.length === 1 ? 'morador' : 'moradores'}`, '0', { centro: true }),
+    ...texto(`Lyendell, ${hojeBr()}`, '8', { centro: true }),
+  ]));
+  pessoas.forEach((p, i) => mc.bloco([
+    ...texto(`${i + 1}. ${p.nome}`, '0', { negrito: true }),
+    ...texto(`${p.profissao || 'sem profissão'}, ${p.idade || 'sem idade'}`, '4'),
+    vazia(),
+  ]));
+  mc.bloco(assinatura([
+    ...texto(`Total: ${pessoas.length} ${pessoas.length === 1 ? 'morador' : 'moradores'}`, '0', { centro: true }),
+    ...texto('Emitida pelo Tabelionato de Lyendell.', '8', { centro: true }),
+  ]), { novaPagina: false });
+  return mc;
+}
+
+// O documento de identidade de quem foi registrado (Moradores, Nobres ou Outros): uma "carteira" para a pessoa
+// carregar. Só entram dados que quase nunca mudam: nome, endereço, número do registro, naturalidade e
+// nascimento (se o formulário do livro tiver esses campos), chegada, juramento e quem registrou.
+// Idade, profissão, residência, cargo e estado civil ficam de fora, porque mudam.
+// juramento: { jurou, em } para Moradores e Nobres; null para Outros (que não juram).
+export function documentoDeIdentidade(nomeModulo, livro, reg, juramento, autor) {
+  const modelo = modeloDoLivro(nomeModulo, livro) || 'moradores';
+  const v = leitorDaFicha(livro, reg, ['nome', 'nickname', 'chegada', 'naturalidade', 'nascimento', 'genero', 'familia']);
+  const nome = umaLinha(v('nome') || v('nickname')) || '---';
+  const nick = valorOuNada(v('nickname'));
+  const linha = (rotulo, valor) => (valorOuNada(valor) ? [`${rotulo}:`, `§0${umaLinha(valor)}§4`, ''] : null);
+  const quem = umaLinha(reg.revisado_por_nome) || quemRegistrou(reg);
+  const quando = reg.revisado_em ? dataHora(reg.revisado_em) : quandoRegistrou(reg);
+  const tipo = { moradores: 'Morador', nobres: 'Nobre', outros: 'Outro' }[modelo];
+  // O nome já está grande na capa, então a página de dados começa pelo endereço.
+  const blocos = [
+    nick && nick !== nome ? linha('Endereço', nick) : null,
+    linha('Registro', `${tipo}, nº ${numeroDoRegistro(reg)}`),
+    linha('Gênero', v('genero')),
+    linha('Nascimento', v('nascimento')),
+    linha('Naturalidade', v('naturalidade')),
+    modelo === 'outros' ? linha('Família', v('familia')) : null,
+    linha('Chegada à Capital', v('chegada')),
+    juramento ? linha('Juramento', juramento.jurou ? `Feito${juramento.em ? ` em ${dataCurta(juramento.em)}` : ''}` : 'Ainda não feito') : null,
+    [...quebrar('Vale perante a Casa Luckham e a Guarda do Coelho.').map(t => `§8${t}`), ''],
+    [`§8${SEP}`, `§0Registrado por: ${quem}`, `em ${quando}§8`, SEP, FIM],
+  ].filter(Boolean);
+  const capa = capaDaFicha({
+    cor: modelo === 'nobres' ? '6' : modelo === 'outros' ? '3' : '2', fecho: modelo === 'moradores' ? '' : '§2',
+    cabecalho: ['      CASA LUCKHAM', '      DE LYENDELL'], tipo: ['      Documento de', '       Identidade'],
+    numero: numeroDoRegistro(reg), titulo: nome,
+  });
+  return new LivroPronto(`Identidade ${nome}`, autor, caberNasPaginas([capa, ...paginarBlocos(blocos)]));
 }
 
 // As marcas de **negrito**, *itálico*, __sublinhado__ e ~~riscado~~ dos anúncios (as mesmas de texto-formatado.js),
