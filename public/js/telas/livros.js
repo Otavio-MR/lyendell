@@ -416,14 +416,17 @@ function listaDeMoradores(l, registros) {
     aoEnviar: async () => {
       const entram = aprovados.filter(r => marcadas.has((campoSituacao && r.dados[campoSituacao.id]) || ''));
       if (!entram.length) throw new Error('Marque pelo menos uma situação.');
-      livroDeMoradores(l, entram, estado.eu.nome, { ordem }).baixar('Moradores de Lyendell');
+      livroDeMoradores(l, entram, estado.eu.nome, { ordem, tabeliao: await nomeDaTabelia() }).baixar('Moradores de Lyendell');
     },
   });
 }
 
 // O documento de identidade da pessoa registrada: nome, endereço (nick), residência e cargo.
-function baixarIdentidade(m, l, r) {
-  documentoDeIdentidade(MODULOS[m].titulo, l, r, estado.eu.nome).baixar();
+// Ela assina: o nome da Tabeliã vem do cargo "Tabeliã" (sem ele, sai só "Tabelionato de Lyendell").
+const nomeDaTabelia = async () => { try { return (await get('/api/tabeliao')).nome || ''; } catch { return ''; } };
+
+async function baixarIdentidade(m, l, r) {
+  documentoDeIdentidade(MODULOS[m].titulo, l, r, estado.eu.nome, { tabeliao: await nomeDaTabelia() }).baixar();
 }
 
 /* ─── Ver registro (como documento oficial) ───────── */

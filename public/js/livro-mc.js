@@ -718,13 +718,23 @@ export function livroDosJuramentados(pessoas, autor) {
 // Qual modelo de ficha o livro tem ('moradores', 'nobres', 'outros') ou null: só esses são livros de pessoas.
 export const modeloDePessoas = (nomeModulo, livro) => modeloDoLivro(nomeModulo, livro);
 
+// A assinatura da Tabeliã no fim dos documentos do Tabelionato: "Assinado", o nome e o cargo.
+// Em texto puro (pronto) quando for numa página de ficha; em linhas do livro nas listas.
+function assinaturaDaTabelia(nome, pronto = false) {
+  const n = umaLinha(nome);
+  if (pronto) return n ? ['§8Assinado,', `§0${n}`, '§8Tabeliã de Lyendell'] : ['§8Assinado pelo Tabelionato', '§8de Lyendell'];
+  return n
+    ? [...texto('Assinado,', '8', { centro: true }), ...texto(n, '0', { centro: true, negrito: true }), ...texto('Tabeliã de Lyendell', '8', { centro: true })]
+    : texto('Emitida pelo Tabelionato de Lyendell.', '8', { centro: true });
+}
+
 // Campo de formulário que ficou só com traço ou ponto ("-") conta como vazio.
 const valorOuNada = v => { const s = umaLinha(v); return /^[-.]*$/.test(s) ? '' : s; };
 
 // A relação oficial dos moradores (nome, profissão e idade), para entregar ao Império. Vai um livro bonito de
 // registros: capa, quatro moradores por página e a assinatura do Tabelionato. registros: só os que devem entrar.
 // ordem: 'alfabetica' (padrão) ou 'registro' (pelo número do registro).
-export function livroDeMoradores(livro, registros, autor, { ordem = 'alfabetica' } = {}) {
+export function livroDeMoradores(livro, registros, autor, { ordem = 'alfabetica', tabeliao = '' } = {}) {
   const pessoas = registros.map(r => {
     const f = leitorDaFicha(livro, r, ['nome', 'nickname', 'idade', 'profissao']);
     const idade = valorOuNada(f('idade'));
@@ -751,7 +761,7 @@ export function livroDeMoradores(livro, registros, autor, { ordem = 'alfabetica'
   ]));
   mc.bloco(assinatura([
     ...texto(`Total: ${pessoas.length} ${pessoas.length === 1 ? 'morador' : 'moradores'}`, '0', { centro: true }),
-    ...texto('Emitida pelo Tabelionato de Lyendell.', '8', { centro: true }),
+    ...assinaturaDaTabelia(tabeliao),
   ]), { novaPagina: false });
   return mc;
 }
@@ -760,7 +770,7 @@ export function livroDeMoradores(livro, registros, autor, { ordem = 'alfabetica'
 // carregar, só com o essencial: nome (na capa), endereço (o nick), residência e cargo (se a pessoa tiver).
 // Em Outros: nome, endereço, residência em Lyendell, a família a que pertence e o cargo nela.
 // Nada de idade, profissão, estado civil nem dados do registro.
-export function documentoDeIdentidade(nomeModulo, livro, reg, autor) {
+export function documentoDeIdentidade(nomeModulo, livro, reg, autor, { tabeliao = '' } = {}) {
   const modelo = modeloDoLivro(nomeModulo, livro) || 'moradores';
   const v = leitorDaFicha(livro, reg, ['nome', 'nickname', 'residencia', 'cargo', 'familia', 'cargoFamilia']);
   const nome = umaLinha(v('nome') || v('nickname')) || '---';
@@ -774,7 +784,7 @@ export function documentoDeIdentidade(nomeModulo, livro, reg, autor) {
       ? [linha('Família', v('familia')), linha('Cargo na família', v('cargoFamilia') || v('cargo'))]
       : [linha('Cargo', v('cargo'))]),
     [...quebrar('Vale perante a Casa Luckham e a Guarda do Coelho.').map(t => `§8${t}`), ''],
-    [`§8${SEP}`, FIM],
+    [`§8${SEP}`, ...assinaturaDaTabelia(tabeliao || reg.revisado_por_nome, true), `§8${SEP}`, FIM],
   ].filter(Boolean);
   const capa = capaDaFicha({
     cor: modelo === 'nobres' ? '6' : modelo === 'outros' ? '3' : '2', fecho: modelo === 'moradores' ? '' : '§2',
