@@ -21,7 +21,7 @@ const TAMANHOS = ['grande', 'medio', 'pequeno'];
 const PAPEIS = ['mora', 'trabalha'];
 const TIPOS_FOTO = ['exterior', 'interior'];
 // Telas do site que um prédio pode abrir (ex.: o Senado abre o Congresso).
-const PAGINAS = ['', '/tabelionato', '/guarda', '/hospital', '/congresso', '/leis', '/recreacao', '/galeria', '/atividades', '/anuncios'];
+const PAGINAS = ['', '/tabelionato', '/guarda', '/hospital', '/congresso', '/leis', '/recreacao', '/galeria', '/atividades', '/anuncios', '/escola'];
 
 const json = (v, padrao = []) => { try { return JSON.parse(v || ''); } catch { return padrao; } };
 

@@ -14,6 +14,17 @@ const CATEGORIAS = {
   outro: 'Outros saberes',
 };
 
+// A Escola Luckham (do jornal). Também entra no Livro de bancos que já existiam (migração v34 em db.js).
+const SABER_ESCOLA = {
+  categoria: 'cidade', titulo: 'A Escola Luckham', apelidos: 'escola, aulas, alunos, professores, matrícula, disciplinas',
+  texto: `A Escola Luckham é a escola de Lyendell, dirigida pelo Lorde Evran Luckham (o Diretor da Escola). Tem sistema próprio no site, em Escola Luckham, fora do Tabelionato.
+Pela educação, pelo conhecimento e pelo futuro de Eldoria. As matrículas são abertas a crianças e jovens de 1 a 16 anos, sem distinção de origem ou Casa.
+As disciplinas: História de Eldoria; Matemática e Economia; Geografia de Eldoria; Autodefesa; Linguagem (falar, ler e escrever); Etiqueta.
+Cada disciplina tem um professor titular e, se necessário, um substituto de confiança, escolhidos entre os inscritos.
+Para inscrever um aluno ou se candidatar a professor: procurar o Lorde Evran Luckham ou alguém do Tabelionato de Lyendell, incluindo a Srta. Layla Weeslay.
+Só quem trabalha na escola vê a lista de alunos, as notas e a frequência.`,
+};
+
 const SABER_PADRAO = [
   /* ─── A fé ─── */
   { categoria: 'fe', titulo: 'A Grande Nadir', apelidos: 'Nadir, Mãe Nadir, Coelha Mãe, Coelha Mãe Sagrada',
@@ -92,6 +103,7 @@ A Biblioteca guarda livros publicados por terceiros, doados ou comprados, para e
 O Bobo da Corte alegra a cidade com piadas e pegadinhas.
 Os Aliados são convidados de outras casas: não são moradores.
 Em Lyendell, o "Endereço" de uma pessoa é o nome pelo qual ela é chamada no jogo; a "Residência" é a rua e o número da casa.` },
+  SABER_ESCOLA,
   { categoria: 'cidade', titulo: 'O Raposo', apelidos: 'raposa, raposos, vilão',
     texto: `Nas histórias e brincadeiras da Toca, o Raposo é o grande rival dos coelhos: é ele quem ataca à noite no jogo Lyendell Dorme, quem joga os barris e quem leva a Princesa Cenoura. Há até uma Rua Raposo na Capital.` },
 
@@ -160,4 +172,4 @@ Frase: "Eu sou eu e ninguém é mais eu do que eu mesmo."` },
     texto: 'O bardo da Casa Luckham. A sua música e o seu talento com incontáveis instrumentos fazem dele uma presença essencial, tanto nos momentos bons quanto nos ruins da família e da casa. Onde há Osiris, há canção.' },
 ];
 
-module.exports = { SABER_PADRAO, CATEGORIAS };
+module.exports = { SABER_PADRAO, SABER_ESCOLA, CATEGORIAS };

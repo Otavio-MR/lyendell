@@ -791,6 +791,62 @@ export function documentoDeIdentidade(nomeModulo, livro, reg, juramento, autor) 
   return new LivroPronto(`Identidade ${nome}`, autor, caberNasPaginas([capa, ...paginarBlocos(blocos)]));
 }
 
+/* ─── Escola Luckham: boletim e carteirinha ─── */
+
+const notaBr = n => (n == null ? '-' : Number(n).toFixed(1).replace('.', ','));
+const SITUACAO_NA_ESCOLA = { aprovado: 'aprovado', recuperacao: 'em recuperação', sem_notas: 'sem notas' };
+
+// O boletim do aluno: cada disciplina com as notas, a média e a situação, e no fim a média geral e a frequência.
+// aluno.frequencia (opcional): { percentual, total } da API; sem ela, a frequência não aparece.
+export function boletimDoAluno(aluno, boletim, config, autor) {
+  const nomeEscola = umaLinha(config?.nome) || 'Escola Luckham';
+  const mc = new LivroMC(`Boletim ${umaLinha(aluno.nome)}`, autor);
+  mc.capa(capaPadrao(nomeEscola.toUpperCase(), 'BOLETIM', [
+    ...texto(aluno.nome, '4', { centro: true, negrito: true }),
+    L(ORN.estrela, '8'),
+    ...texto(aluno.numero ? `Matrícula nº ${String(aluno.numero).padStart(4, '0')}` : 'Aluno da escola', '0', { centro: true }),
+    ...texto(`Lyendell, ${hojeBr()}`, '8', { centro: true }),
+  ]));
+  for (const d of boletim.disciplinas) {
+    mc.bloco([
+      ...texto(d.disciplina_nome, '0', { negrito: true }),
+      ...(d.notas.length
+        ? d.notas.flatMap(n => texto(`${n.titulo}: ${notaBr(n.nota)}${Number(n.peso) !== 1 ? ` (x${notaBr(n.peso).replace(',0', '')})` : ''}`, '4'))
+        : texto('Ainda sem notas.', '8')),
+      ...(d.media == null ? [] : texto(`Média ${notaBr(d.media)}, ${SITUACAO_NA_ESCOLA[d.situacao]}`, d.situacao === 'aprovado' ? '2' : 'c')),
+      vazia(),
+    ]);
+  }
+  const f = aluno.frequencia;
+  mc.bloco(assinatura([
+    ...texto(boletim.media_geral == null ? 'Sem média geral ainda.' : `Média geral ${notaBr(boletim.media_geral)}, ${SITUACAO_NA_ESCOLA[boletim.situacao]}`, '0', { centro: true }),
+    ...(f?.total ? texto(`Frequência ${f.percentual}% em ${f.total} ${f.total === 1 ? 'chamada' : 'chamadas'}`, '4', { centro: true }) : []),
+    ...texto(`Média para passar: ${notaBr(boletim.media_aprovacao)}`, '8', { centro: true }),
+    ...(config?.diretor ? texto(`Direção: ${umaLinha(config.diretor)}`, '8', { centro: true }) : []),
+  ]), { novaPagina: false });
+  return mc;
+}
+
+// A carteirinha do aluno: só dados que quase não mudam (nome, número, endereço, responsável, data da matrícula).
+export function carteirinhaDoAluno(aluno, config, autor) {
+  const nomeEscola = umaLinha(config?.nome) || 'Escola Luckham';
+  const nome = umaLinha(aluno.nome) || '---';
+  const linha = (rotulo, valor) => (valorOuNada(valor) ? [`${rotulo}:`, `§0${umaLinha(valor)}§4`, ''] : null);
+  const blocos = [
+    linha('Endereço', aluno.endereco),
+    linha('Responsável', aluno.responsavel_nome),
+    linha('Matriculado em', aluno.data_matricula ? dataCurta(aluno.data_matricula) : ''),
+    [...quebrar(umaLinha(config?.lema) || 'Pela educação, pelo conhecimento e pelo futuro de Eldoria.').map(t => `§8${t}`), ''],
+    [`§8${SEP}`, `§0Direção: ${umaLinha(config?.diretor) || 'Casa Luckham'}`, `${nomeEscola}§8`, SEP, FIM],
+  ].filter(Boolean);
+  const capa = capaDaFicha({
+    cor: '9', fecho: '',
+    cabecalho: [`      ${nomeEscola.toUpperCase()}`, '      DE LYENDELL'], tipo: ['      Carteira do', '        Aluno'],
+    numero: aluno.numero ? String(aluno.numero).padStart(4, '0') : '----', titulo: nome,
+  });
+  return new LivroPronto(`Carteirinha ${nome}`, autor, caberNasPaginas([capa, ...paginarBlocos(blocos)]));
+}
+
 // As marcas de **negrito**, *itálico*, __sublinhado__ e ~~riscado~~ dos anúncios (as mesmas de texto-formatado.js),
 // tiradas para o livro.
 const semMarcas = t => String(t || '')

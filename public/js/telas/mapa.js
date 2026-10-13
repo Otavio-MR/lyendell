@@ -304,6 +304,7 @@ const TAMANHOS = { grande: 'Grande (prédio importante)', medio: 'Médio', peque
 const PAGINAS = {
   '': 'Nenhuma', '/tabelionato': 'Tabelionato', '/guarda': 'Guarda do Coelho', '/hospital': 'Hospital', '/congresso': 'Congresso',
   '/leis': 'Leis de Lyendell', '/recreacao': 'Recreação', '/galeria': 'Galeria', '/atividades': 'Mural de Atividades', '/anuncios': 'Mural de Anúncios',
+  '/escola': 'Escola Luckham',
 };
 
 const nomeDaCasa = c => c.texto || c.moradores?.[0]?.nome || SITUACAO[c.situacao];

@@ -8,7 +8,7 @@ const { CASAS_PADRAO } = require('./casas-padrao');
 const { PREDIOS_PADRAO } = require('./predios-padrao');
 const { PERGUNTAS_PADRAO } = require('./perguntas-padrao');
 const { PROFISSOES_PADRAO, TURNOS_SEMANA, SALDO_INICIAL, CONFIG_PADRAO } = require('./financas-padrao');
-const { SABER_PADRAO } = require('./nadir-padrao');
+const { SABER_PADRAO, SABER_ESCOLA } = require('./nadir-padrao');
 const { semearEscola, importarEscola } = require('./escola-padrao');
 const { linha, chaveNome } = require('./util');
 
@@ -933,6 +933,10 @@ async function migrar() {
     await criarCargo('Professor da Escola');
     await darPermissoes({ base: ['escola.ver'], 'Família Nobre': ['escola.ver', 'escola.alunos', 'escola.lecionar', 'escola.gerir'] });
     await semearEscola(db);
+    // Nadir já semeada: ensina a ela sobre a escola (num banco novo, o Livro ainda será semeado com tudo).
+    if (await db.get("SELECT valor FROM meta WHERE chave = 'nadir_semeada'") && !await db.get('SELECT id FROM nadir_saber WHERE titulo = ?', SABER_ESCOLA.titulo)) {
+      await db.run("INSERT INTO nadir_saber (categoria, titulo, apelidos, texto, criado_por_nome) VALUES (?, ?, ?, ?, 'Sistema')", SABER_ESCOLA.categoria, SABER_ESCOLA.titulo, SABER_ESCOLA.apelidos, SABER_ESCOLA.texto);
+    }
     const r = await importarEscola(db);
     if (r.livros.length) console.log(`Escola: ${r.alunos} aluno(s) e ${r.professores} professor(es) trazidos do Tabelionato${r.disciplinas.length ? `; disciplinas novas: ${r.disciplinas.join(', ')}` : ''}.`);
   }
