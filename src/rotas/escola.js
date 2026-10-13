@@ -400,7 +400,7 @@ async function lerAluno(body, atual = {}, config) {
 async function conferirDuplicado(a, exceto = 0) {
   const lista = await db.all("SELECT id, nome, endereco FROM escola_alunos WHERE situacao NOT IN ('desligado') AND id <> ?", exceto);
   const dup = lista.find(x => (a.endereco && x.endereco && chaveNome(x.endereco) === chaveNome(a.endereco)) || chaveNome(x.nome) === chaveNome(a.nome));
-  if (dup) throw erro(409, `${dup.nome} já está na escola${dup.endereco ? ` (endereço ${dup.endereco})` : ''}. A mesma pessoa não se matricula duas vezes.`);
+  if (dup) throw erro(409, `${dup.nome} já está na escola${dup.endereco ? ` (endereço ${dup.endereco}, o nick)` : ''}. A mesma pessoa não se matricula duas vezes.`);
 }
 
 async function conferirVaga(turmaId, exceto = 0) {

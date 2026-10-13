@@ -102,11 +102,11 @@ export function formAluno(aluno, turmas, ctx, aoSalvar) {
   const envio = { n: 0 };
   const nome = entradaTexto(a.nome, { maxlength: '80', autocomplete: 'off' });
   const idade = entradaNumero(a.idade ?? '', { step: '1', min: '0', max: '120', inputmode: 'numeric' });
-  const endereco = entradaTexto(a.endereco, { maxlength: '60', placeholder: 'Ex.: Rua das Flores, 12' });
+  const endereco = entradaTexto(a.endereco, { maxlength: '60', placeholder: 'O nick, como no Registro de Moradores' });
   const procedencia = entradaTexto(a.procedencia, { maxlength: '80', placeholder: 'Ex.: Vale do Norte, Porto Alvo' });
   const respNome = entradaTexto(a.responsavel_nome, { maxlength: '80' });
   const respEndereco = entradaTexto(a.responsavel_endereco, { maxlength: '60' });
-  const respProcedencia = entradaTexto(a.responsavel_procedencia, { maxlength: '80', placeholder: 'Se vem de fora de Lyendell' });
+  const respProcedencia = entradaTexto(a.responsavel_procedencia, { maxlength: '80', placeholder: 'Cidade ou região, se for de fora' });
   const turma = selecao(opcoesDeTurma(turmas, a.turma_id), a.turma_id ?? '');
   const data = entradaData(a.data_matricula || '');
   const etapa = entradaTexto(a.etapa, { maxlength: '400', placeholder: 'Ex.: alfabetização, primeiro ano' });
@@ -121,11 +121,11 @@ export function formAluno(aluno, turmas, ctx, aoSalvar) {
       h('div', { class: 'form-grade' },
         campo('Nome do aluno', nome, { obrigatorio: true }),
         campo('Idade', idade, { obrigatorio: true, ajuda: 'Em anos.' }),
-        campo('Endereço do aluno', endereco, { ajuda: 'Deixe vazio se o aluno não mora em Lyendell.' }),
-        campo('Vem de (cidade ou região)', procedencia, { ajuda: 'Para quem vem de fora de Lyendell, no lugar do endereço.' }),
+        campo('Endereço do aluno', endereco, { ajuda: 'O nick dele, como no Tabelionato. Vazio se não tem.' }),
+        campo('Vem de (cidade ou região)', procedencia, { ajuda: 'A cidade ou região de onde a pessoa vem, se for de fora de Lyendell.' }),
         campo('Turma', turma),
         campo('Nome do responsável', respNome),
-        campo('Endereço do responsável', respEndereco),
+        campo('Endereço do responsável', respEndereco, { ajuda: 'O nick dele.' }),
         campo('Responsável vem de', respProcedencia),
         novo ? campo('Situação inicial', situacao) : null,
         campo('Data da matrícula', data, { ajuda: novo ? 'Vazio usa o dia de hoje.' : null }),
@@ -421,7 +421,7 @@ function formProfessor(p, disciplinas, ctx, disciplinaInicial = null) {
   let fotoUrl = x.foto || '';
   const envio = { n: 0 };
   const nome = entradaTexto(x.nome, { maxlength: '80', autocomplete: 'off' });
-  const endereco = entradaTexto(x.endereco, { maxlength: '60', placeholder: 'Ex.: Rua das Flores, 12' });
+  const endereco = entradaTexto(x.endereco, { maxlength: '60', placeholder: 'O nick, como no Registro de Moradores' });
   const procedencia = entradaTexto(x.procedencia, { maxlength: '80', placeholder: 'Ex.: Vale do Norte, Porto Alvo' });
   const travada = !novo && ['titular', 'substituto'].includes(x.situacao);
   const sel = selecao([['', 'Escolha a disciplina'], ...disciplinas.map(d => [String(d.id), d.nome])], x.disciplina_id ?? disciplinaInicial ?? '', { disabled: travada || null });
@@ -433,8 +433,8 @@ function formProfessor(p, disciplinas, ctx, disciplinaInicial = null) {
       novo && h('p', { class: 'form-intro' }, 'O professor entra "em avaliação". Depois você escolhe o titular e o substituto de cada disciplina. Quem leciona duas disciplinas se inscreve duas vezes.'),
       h('div', { class: 'form-grade' },
         campo('Nome', nome, { obrigatorio: true }),
-        campo('Endereço', endereco, { ajuda: 'Deixe vazio se não mora em Lyendell.' }),
-        campo('Vem de (cidade ou região)', procedencia, { ajuda: 'Para quem vem de fora de Lyendell, no lugar do endereço.' }),
+        campo('Endereço', endereco, { ajuda: 'O nick dele, como no Tabelionato. Vazio se não tem.' }),
+        campo('Vem de (cidade ou região)', procedencia, { ajuda: 'A cidade ou região de onde a pessoa vem, se for de fora de Lyendell.' }),
         campo('Disciplina', sel, { obrigatorio: true, ajuda: travada ? 'Titular e substituto não mudam de disciplina: troque a situação antes.' : null }),
         campo('Data de ingresso', ingresso, { ajuda: novo ? 'Vazio usa o dia de hoje.' : null }),
         h('div', { class: 'campo largo' }, h('span', { class: 'campo-rotulo' }, 'Foto'), entradaImagem(fotoUrl, v => { fotoUrl = v; }, envio)),

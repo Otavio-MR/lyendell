@@ -364,7 +364,7 @@ guiada quando o lugar já tem dono), disciplinas, turmas com vagas e faixa de id
 frequência, e o **histórico** de tudo o que mudou. O boletim e a carteirinha do aluno saem como livro `.book`.
 
 **De fora de Lyendell**: quem não mora na Capital (aluno, responsável ou professor) não precisa de endereço:
-no formulário há o campo **Vem de (cidade ou região)**. O endereço pode ficar vazio, e a região aparece na
+o **Endereço** é o nick da pessoa, como em todo o site, e quem não tem usa o campo **Vem de (cidade ou região)**. O endereço pode ficar vazio, e a região aparece na
 ficha, na lista de professores e na carteirinha.
 
 **Regras**: a faixa de idade é da configuração; a mesma pessoa não se matricula duas vezes; turma cheia não
