@@ -92,6 +92,12 @@ const CATALOGO = [
     { chave: 'financas.aprovar', nome: 'Aprovar, rejeitar e pagar folhas de pagamento e estornar movimentações (Mestre da Moeda)' },
     { chave: 'financas.excecao', nome: 'Autorizar pagamento ou saída acima do saldo disponível do tesouro (sempre com justificativa)' },
   ] },
+  { grupo: 'Escola Luckham', itens: [
+    { chave: 'escola.ver', nome: 'Ver a Escola Luckham: as disciplinas, os professores titulares, as turmas e o calendário de aulas' },
+    { chave: 'escola.alunos', nome: 'Ver os alunos, as matrículas, a frequência e os boletins' },
+    { chave: 'escola.lecionar', nome: 'Fazer a chamada das aulas e lançar notas' },
+    { chave: 'escola.gerir', nome: 'Matricular alunos, inscrever professores, criar disciplinas, turmas e aulas e configurar a escola (Diretor da Escola)' },
+  ] },
   { grupo: 'Nadir', itens: [
     { chave: 'nadir.usar', nome: 'Conversar com a Grande Nadir (ela só conta o que a pessoa já pode ver no site)' },
     { chave: 'nadir.ensinar', nome: 'Escrever no Livro de Nadir (o que ela sabe sobre o mundo, a Casa e as pessoas) e ver as perguntas feitas a ela' },
@@ -119,7 +125,7 @@ const SO_DO_ADMIN = new Set(['jogos.admin']);
 const VALIDAS = new Set(TODAS);
 
 // Todo usuário é morador (menos quem tem um cargo que "não é morador", como os Aliados): estas permissões valem para eles.
-const MORADOR = ['tabelionato.ver', 'guarda.ver', 'congresso.ver', 'congresso.propor', 'leis.ver', 'galeria.ver', 'anuncios.ver', 'atividades.ver', 'atividades.participar', 'recreacao.usar', 'nadir.usar'];
+const MORADOR = ['tabelionato.ver', 'guarda.ver', 'congresso.ver', 'congresso.propor', 'leis.ver', 'galeria.ver', 'anuncios.ver', 'atividades.ver', 'atividades.participar', 'recreacao.usar', 'nadir.usar', 'escola.ver'];
 // Quem está acima de morador publica anúncios, cria atividades e envia fotos.
 const MEMBRO = ['anuncios.publicar', 'atividades.criar', 'galeria.enviar'];
 const acoes = (modulo, ...lista) => lista.map(a => `${modulo}.${a}`);
@@ -200,6 +206,12 @@ const CARGOS_PADRAO = [
   { nome: 'Mestre da Moeda', cor: '#c9a227',
     descricao: 'Cuida do tesouro da Capital: profissões e salários, presenças, produção entregue, folhas de pagamento e movimentações em Lírios.',
     permissoes: [...MEMBRO, 'financas.ver', 'financas.gerir', 'financas.aprovar'] },
+  { nome: 'Diretor da Escola', cor: '#6aa6d8',
+    descricao: 'Dirige a Escola Luckham: inscreve e matricula alunos, inscreve e escolhe os professores, cria disciplinas, turmas e aulas, faz a chamada, lança notas e cuida de tudo na escola.',
+    permissoes: [...MEMBRO, 'escola.ver', 'escola.alunos', 'escola.lecionar', 'escola.gerir'] },
+  { nome: 'Professor da Escola', cor: '#8fb86a',
+    descricao: 'Dá aulas na Escola Luckham: vê os alunos, faz a chamada das aulas e lança as notas.',
+    permissoes: ['escola.ver', 'escola.alunos', 'escola.lecionar'] },
 ];
 
 module.exports = { CATALOGO, TODAS, VALIDAS, PERMITIDAS_CRIANCA, CARGOS_PADRAO, DESCRICOES, EXCLUSIVAS, MODULOS, SO_DO_BOBO, SO_DOS_ALIADOS, SO_DA_MOEDA };

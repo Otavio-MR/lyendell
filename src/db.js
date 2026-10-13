@@ -9,6 +9,7 @@ const { PREDIOS_PADRAO } = require('./predios-padrao');
 const { PERGUNTAS_PADRAO } = require('./perguntas-padrao');
 const { PROFISSOES_PADRAO, TURNOS_SEMANA, SALDO_INICIAL, CONFIG_PADRAO } = require('./financas-padrao');
 const { SABER_PADRAO } = require('./nadir-padrao');
+const { semearEscola, importarEscola } = require('./escola-padrao');
 const { linha, chaveNome } = require('./util');
 
 // Na internet o banco fica no Turso (TURSO_DATABASE_URL + TURSO_AUTH_TOKEN).
@@ -695,11 +696,140 @@ CREATE TABLE IF NOT EXISTS nadir_perguntas (
   criado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_nadir_perguntas_dia ON nadir_perguntas(dia, usuario_id);
+
+-- A Escola Luckham (v34): disciplinas, corpo docente, turmas, alunos, aulas com chamada e notas.
+-- Os livros "Corpo Docente" e "Matrículas" que a escola tinha no Tabelionato foram trazidos para cá (escola-padrao.js).
+CREATE TABLE IF NOT EXISTS escola_disciplinas (
+  id INTEGER PRIMARY KEY,
+  nome TEXT NOT NULL,
+  chave TEXT NOT NULL UNIQUE,
+  descricao TEXT NOT NULL DEFAULT '',
+  ativa INTEGER NOT NULL DEFAULT 1,
+  ordem INTEGER NOT NULL DEFAULT 0,
+  criado_por_nome TEXT NOT NULL DEFAULT '',
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Uma linha por professor em cada disciplina (quem se inscreve em duas tem duas linhas).
+-- situacao: avaliacao (inscrito), titular, substituto, afastado, desligado.
+CREATE TABLE IF NOT EXISTS escola_professores (
+  id INTEGER PRIMARY KEY,
+  disciplina_id INTEGER NOT NULL,
+  nome TEXT NOT NULL,
+  endereco TEXT NOT NULL DEFAULT '',
+  foto TEXT,
+  situacao TEXT NOT NULL DEFAULT 'avaliacao',
+  ingresso TEXT,
+  observacoes TEXT NOT NULL DEFAULT '',
+  origem_registro_id INTEGER,
+  criado_por_nome TEXT NOT NULL DEFAULT '',
+  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  atualizado_por_nome TEXT,
+  atualizado_em TEXT
+);
+-- Um titular e um substituto por disciplina (o banco recusa o segundo, mesmo com dois cliques juntos).
+CREATE UNIQUE INDEX IF NOT EXISTS escola_um_titular ON escola_professores(disciplina_id) WHERE situacao = 'titular';
+CREATE UNIQUE INDEX IF NOT EXISTS escola_um_substituto ON escola_professores(disciplina_id) WHERE situacao = 'substituto';
+
+CREATE TABLE IF NOT EXISTS escola_turmas (
+  id INTEGER PRIMARY KEY,
+  nome TEXT NOT NULL,
+  descricao TEXT NOT NULL DEFAULT '',
+  idade_min INTEGER,
+  idade_max INTEGER,
+  horario TEXT NOT NULL DEFAULT '',
+  local TEXT NOT NULL DEFAULT '',
+  vagas INTEGER,
+  ativa INTEGER NOT NULL DEFAULT 1,
+  ordem INTEGER NOT NULL DEFAULT 0,
+  criado_por_nome TEXT NOT NULL DEFAULT '',
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- situacao: em_analise (inscrito), matriculado, afastado, concluido, desligado. O número da matrícula sai
+-- quando vira matriculado pela primeira vez, corrido e sem buracos.
+CREATE TABLE IF NOT EXISTS escola_alunos (
+  id INTEGER PRIMARY KEY,
+  numero INTEGER,
+  nome TEXT NOT NULL,
+  endereco TEXT NOT NULL DEFAULT '',
+  foto TEXT,
+  idade INTEGER,
+  responsavel_nome TEXT NOT NULL DEFAULT '',
+  responsavel_endereco TEXT NOT NULL DEFAULT '',
+  turma_id INTEGER,
+  situacao TEXT NOT NULL DEFAULT 'em_analise',
+  data_matricula TEXT,
+  etapa TEXT NOT NULL DEFAULT '',
+  observacoes TEXT NOT NULL DEFAULT '',
+  origem_registro_id INTEGER,
+  criado_por_nome TEXT NOT NULL DEFAULT '',
+  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  atualizado_por_nome TEXT,
+  atualizado_em TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS escola_numero_unico ON escola_alunos(numero) WHERE numero IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_escola_alunos_turma ON escola_alunos(turma_id);
+
+-- situacao: agendada, realizada, cancelada.
+CREATE TABLE IF NOT EXISTS escola_aulas (
+  id INTEGER PRIMARY KEY,
+  disciplina_id INTEGER NOT NULL,
+  turma_id INTEGER,
+  professor_id INTEGER,
+  data TEXT NOT NULL,
+  hora TEXT NOT NULL DEFAULT '',
+  tema TEXT NOT NULL DEFAULT '',
+  local TEXT NOT NULL DEFAULT '',
+  situacao TEXT NOT NULL DEFAULT 'agendada',
+  observacao TEXT NOT NULL DEFAULT '',
+  criado_por_nome TEXT NOT NULL DEFAULT '',
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_escola_aulas_data ON escola_aulas(data);
+
+-- situacao: presente, falta, justificada (falta abonada).
+CREATE TABLE IF NOT EXISTS escola_presencas (
+  id INTEGER PRIMARY KEY,
+  aula_id INTEGER NOT NULL,
+  aluno_id INTEGER NOT NULL,
+  situacao TEXT NOT NULL,
+  observacao TEXT NOT NULL DEFAULT '',
+  registrado_por_nome TEXT NOT NULL DEFAULT '',
+  registrado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (aula_id, aluno_id)
+);
+CREATE INDEX IF NOT EXISTS idx_escola_presencas_aluno ON escola_presencas(aluno_id);
+
+CREATE TABLE IF NOT EXISTS escola_notas (
+  id INTEGER PRIMARY KEY,
+  aluno_id INTEGER NOT NULL,
+  disciplina_id INTEGER NOT NULL,
+  titulo TEXT NOT NULL,
+  data TEXT NOT NULL,
+  nota REAL NOT NULL,
+  peso REAL NOT NULL DEFAULT 1,
+  observacao TEXT NOT NULL DEFAULT '',
+  lancado_por_nome TEXT NOT NULL DEFAULT '',
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_escola_notas_aluno ON escola_notas(aluno_id, disciplina_id);
+
+CREATE TABLE IF NOT EXISTS escola_historico (
+  id INTEGER PRIMARY KEY,
+  entidade TEXT NOT NULL,
+  entidade_id INTEGER,
+  acao TEXT NOT NULL,
+  detalhe TEXT NOT NULL DEFAULT '',
+  usuario_nome TEXT NOT NULL DEFAULT '',
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_escola_historico ON escola_historico(entidade, entidade_id);
 `;
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 33;
+const VERSAO = 34;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -796,6 +926,16 @@ async function migrar() {
   if (versao < 30) await darPermissoes({ Aliados: ['aliados.ver', 'anuncios.ver', 'congresso.ver', 'leis.ver', 'galeria.ver', 'recreacao.usar'] });
   // v31: Gestão Financeira. As tabelas novas vêm do ESQUEMA; aqui entram o cargo Mestre da Moeda e a
   // leitura para a Família Nobre. As profissões e o saldo inicial do tesouro entram uma vez só (semear).
+  // v34: a Escola Luckham. Todo morador vê a escola; os cargos Diretor da Escola e Professor da Escola nascem
+  // aqui. Os registros do Corpo Docente e das Matrículas que estavam no Tabelionato vêm para o sistema da escola.
+  if (versao < 34) {
+    await criarCargo('Diretor da Escola');
+    await criarCargo('Professor da Escola');
+    await darPermissoes({ base: ['escola.ver'], 'Família Nobre': ['escola.ver', 'escola.alunos', 'escola.lecionar', 'escola.gerir'] });
+    await semearEscola(db);
+    const r = await importarEscola(db);
+    if (r.livros.length) console.log(`Escola: ${r.alunos} aluno(s) e ${r.professores} professor(es) trazidos do Tabelionato${r.disciplinas.length ? `; disciplinas novas: ${r.disciplinas.join(', ')}` : ''}.`);
+  }
   // v33: a Grande Nadir. Todo morador conversa com ela; a Família Nobre escreve no Livro de Nadir.
   // As tabelas vêm do ESQUEMA e o Livro começa com o que está em nadir-padrao.js (semear, uma vez só).
   if (versao < 33) await darPermissoes({ base: ['nadir.usar'], 'Família Nobre': ['nadir.usar', 'nadir.ensinar'] });
@@ -1205,6 +1345,9 @@ async function semear() {
     ]);
   }
 
+  // A Escola Luckham: as seis disciplinas do jornal e os textos da escola, uma vez só.
+  await semearEscola(db);
+
   // O Livro de Nadir começa com o que já se sabe da fé, do mundo, da Casa, da cidade e das pessoas, uma vez só.
   // Depois é a Família Nobre quem escreve: o que for apagado ou mudado pelo site não volta.
   if (!await db.get("SELECT valor FROM meta WHERE chave = 'nadir_semeada'")) {
@@ -1245,7 +1388,9 @@ async function faxina() {
       AND NOT EXISTS (SELECT 1 FROM usuarios WHERE usuarios.capa = '/uploads/' || arquivos.nome)
       AND NOT EXISTS (SELECT 1 FROM musicas WHERE musicas.url = '/uploads/' || arquivos.nome)
       AND NOT EXISTS (SELECT 1 FROM registros WHERE instr(registros.dados, arquivos.nome) > 0)
-      AND NOT EXISTS (SELECT 1 FROM predios WHERE instr(predios.fotos, arquivos.nome) > 0)`);
+      AND NOT EXISTS (SELECT 1 FROM predios WHERE instr(predios.fotos, arquivos.nome) > 0)
+      AND NOT EXISTS (SELECT 1 FROM escola_alunos WHERE escola_alunos.foto = '/uploads/' || arquivos.nome)
+      AND NOT EXISTS (SELECT 1 FROM escola_professores WHERE escola_professores.foto = '/uploads/' || arquivos.nome)`);
 }
 
 async function iniciarBanco() {
