@@ -1,5 +1,6 @@
 import { estado, get, h, icone, modal, botao, chipCargo, chipCrianca, chipAliados, barra, num, pacotes, relativo, dataCurta, seloNivel, avatarPessoa, normalizar, pode, avatar, ehMorador, veModulo } from '../core.js';
 import { semFormatacao } from '../texto-formatado.js';
+import { emblemaNadir, perguntarANadir } from './nadir.js';
 import { MENU_CRIANCA, falaDoDia, curiosidadeDoDia } from '../crianca.js';
 import { barraNivel } from './pessoas.js';
 import { MODULOS } from './livros.js';
@@ -237,6 +238,18 @@ function inicioAliado(d, procurados, convite) {
     gradeMurais(d));
 }
 
+// A Grande Nadir na tela inicial: dá para perguntar daqui mesmo (a resposta vem na tela dela).
+function chamadaNadir() {
+  if (!pode('nadir.usar')) return null;
+  const pergunta = h('input', { class: 'input', maxlength: '600', placeholder: 'Quem é Niko? Como nasceu a Casa Luckham?', 'aria-label': 'Pergunte à Nadir' });
+  return h('section', { class: 'nadir-chamada' },
+    emblemaNadir(),
+    h('div', { class: 'nadir-chamada-texto' },
+      h('div', null, h('strong', null, 'Pergunte à Grande Nadir'), h('small', null, ' · a Coelha Mãe sabe do mundo, da Casa e de cada um')),
+      h('form', { onsubmit: e => { e.preventDefault(); if (pergunta.value.trim()) perguntarANadir(pergunta.value.trim()); else location.hash = '#/nadir'; } },
+        pergunta, h('button', { class: 'btn btn-ouro', type: 'submit' }, icone('lua'), 'Perguntar'))));
+}
+
 export async function inicio() {
   const aliado = !ehMorador();
   const [d, pr, procurados, convite] = await Promise.all([
@@ -270,6 +283,8 @@ export async function inicio() {
         h('p', { class: 'sobrelinha' }, 'Cidade de Lyendell · Casa Luckham'),
         h('h1', { class: 'pag-titulo bv-titulo' }, `${saudacao()}, ${eu.nome}`),
         h('div', { class: 'chips' }, cargos))),
+
+    chamadaNadir(),
 
     avisosDeAprovacao(d.pendencias),
 

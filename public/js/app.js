@@ -35,6 +35,7 @@ const app = document.getElementById('app');
 const MENU = [
   { secao: 'Cidade', itens: [
     { rota: '/', nome: 'Início', icone: 'casa' },
+    { rota: '/nadir', nome: 'A Grande Nadir', icone: 'lua', perm: ['nadir.usar'] },
     { rota: '/comunidade', nome: 'Comunidade', icone: 'usuarios' },
     { rota: '/mapa', nome: 'Mapa de Lyendell', icone: 'mapa' },
     { rota: '/anuncios', nome: 'Mural de Anúncios', icone: 'megafone', perm: ['anuncios.ver', 'aliados.ver'] },
@@ -62,6 +63,9 @@ const MENU = [
 
 const ROTAS = [
   [/^\/$/, () => inicio()],
+  // A Grande Nadir (a IA da Casa) e o Livro de Nadir, de quem ensina a ela.
+  [/^\/nadir$/, async () => (await import('./telas/nadir.js')).nadir()],
+  [/^\/nadir\/livro(?:\/(perguntas))?$/, async aba => (await import('./telas/nadir.js')).livroDeNadir(aba)],
   [/^\/anuncios$/, () => anuncios()],
   [/^\/atividades$/, () => atividades()],
   [/^\/atividades\/(\d+)$/, id => atividade(id)],

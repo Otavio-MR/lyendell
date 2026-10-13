@@ -8,6 +8,7 @@ const { CASAS_PADRAO } = require('./casas-padrao');
 const { PREDIOS_PADRAO } = require('./predios-padrao');
 const { PERGUNTAS_PADRAO } = require('./perguntas-padrao');
 const { PROFISSOES_PADRAO, TURNOS_SEMANA, SALDO_INICIAL, CONFIG_PADRAO } = require('./financas-padrao');
+const { SABER_PADRAO } = require('./nadir-padrao');
 const { linha, chaveNome } = require('./util');
 
 // Na internet o banco fica no Turso (TURSO_DATABASE_URL + TURSO_AUTH_TOKEN).
@@ -664,11 +665,41 @@ CREATE TABLE IF NOT EXISTS financas_auditoria (
   criado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_financas_auditoria ON financas_auditoria(entidade, entidade_id);
+
+-- A Grande Nadir (v33): o Livro de Nadir (o que ela sabe além do que lê no site) e as perguntas feitas a ela
+-- (para o limite do dia e para a Família Nobre ver o que falta ensinar).
+CREATE TABLE IF NOT EXISTS nadir_saber (
+  id INTEGER PRIMARY KEY,
+  categoria TEXT NOT NULL DEFAULT 'outro',
+  titulo TEXT NOT NULL,
+  apelidos TEXT NOT NULL DEFAULT '',
+  texto TEXT NOT NULL DEFAULT '',
+  ativo INTEGER NOT NULL DEFAULT 1,
+  criado_por_nome TEXT NOT NULL DEFAULT '',
+  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  atualizado_por_nome TEXT,
+  atualizado_em TEXT
+);
+
+CREATE TABLE IF NOT EXISTS nadir_perguntas (
+  id INTEGER PRIMARY KEY,
+  usuario_id INTEGER,
+  usuario_nome TEXT NOT NULL DEFAULT '',
+  dia TEXT NOT NULL,
+  pergunta TEXT NOT NULL,
+  resposta TEXT NOT NULL DEFAULT '',
+  sem_resposta INTEGER NOT NULL DEFAULT 0,
+  resolvida INTEGER NOT NULL DEFAULT 0,
+  tokens_entrada INTEGER NOT NULL DEFAULT 0,
+  tokens_saida INTEGER NOT NULL DEFAULT 0,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_nadir_perguntas_dia ON nadir_perguntas(dia, usuario_id);
 `;
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 32;
+const VERSAO = 33;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -765,6 +796,9 @@ async function migrar() {
   if (versao < 30) await darPermissoes({ Aliados: ['aliados.ver', 'anuncios.ver', 'congresso.ver', 'leis.ver', 'galeria.ver', 'recreacao.usar'] });
   // v31: Gestão Financeira. As tabelas novas vêm do ESQUEMA; aqui entram o cargo Mestre da Moeda e a
   // leitura para a Família Nobre. As profissões e o saldo inicial do tesouro entram uma vez só (semear).
+  // v33: a Grande Nadir. Todo morador conversa com ela; a Família Nobre escreve no Livro de Nadir.
+  // As tabelas vêm do ESQUEMA e o Livro começa com o que está em nadir-padrao.js (semear, uma vez só).
+  if (versao < 33) await darPermissoes({ base: ['nadir.usar'], 'Família Nobre': ['nadir.usar', 'nadir.ensinar'] });
   // v32: anúncios no Discord (quem marcar e a mensagem que foi para lá).
   if (versao < 32) {
     if (!await colunaExiste('anuncios', 'discord_marcar')) await db.run('ALTER TABLE anuncios ADD COLUMN discord_marcar TEXT');
@@ -1168,6 +1202,18 @@ async function semear() {
         "INSERT INTO tesouro_movimentos (tipo, valor, descricao, categoria, criado_por_nome) VALUES ('saldo_inicial', ?, 'Saldo inicial do tesouro da Capital', 'Saldo inicial', 'Sistema')", SALDO_INICIAL],
       ["INSERT INTO meta (chave, valor) VALUES ('financas_config', ?) ON CONFLICT (chave) DO NOTHING", JSON.stringify(CONFIG_PADRAO)],
       ["INSERT INTO meta (chave, valor) VALUES ('financas_semeadas', '1')"],
+    ]);
+  }
+
+  // O Livro de Nadir começa com o que já se sabe da fé, do mundo, da Casa, da cidade e das pessoas, uma vez só.
+  // Depois é a Família Nobre quem escreve: o que for apagado ou mudado pelo site não volta.
+  if (!await db.get("SELECT valor FROM meta WHERE chave = 'nadir_semeada'")) {
+    const vazio = !(await db.get('SELECT COUNT(*) AS n FROM nadir_saber')).n;
+    await db.lote([
+      ...(vazio ? SABER_PADRAO.map(s => [
+        "INSERT INTO nadir_saber (categoria, titulo, apelidos, texto, criado_por_nome) VALUES (?, ?, ?, ?, 'Sistema')", s.categoria, s.titulo, s.apelidos || '', s.texto,
+      ]) : []),
+      ["INSERT INTO meta (chave, valor) VALUES ('nadir_semeada', '1')"],
     ]);
   }
 

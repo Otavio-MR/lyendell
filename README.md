@@ -327,6 +327,43 @@ for comprido demais, o que não cabe passa para a página seguinte.
 
 Anúncios, atividades e pagamentos continuam no estilo antigo (moldura e cabeçalhos com ✦).
 
+## A Grande Nadir (a IA da Casa)
+
+No menu, **A Grande Nadir** (`#/nadir`): a Coelha Mãe Sagrada responde sobre o mundo de Eldoria, a fé, a Casa
+Luckham, Lyendell e as pessoas. Ela usa o Claude (API da Anthropic, modelo `claude-haiku-5-5`) e fala como a
+própria Nadir. Também dá para perguntar pela tela inicial.
+
+**O que ela sabe** vem de dois lugares, e só deles:
+1. o **Livro de Nadir** (`#/nadir/livro`), escrito pela Família Nobre: a história do mundo, a fé, a Casa, de
+   onde cada um veio, os apelidos ("Niko" é Nikolash) e os laços. Começa com o que estava no site da família;
+2. o **próprio site**, lido na hora: as fichas dos livros (Tabelionato, Guarda, Hospital, Congresso, Leis), os
+   perfis da Comunidade, o Mapa (prédios e casas), os anúncios, as atividades, as propostas e os cartazes de
+   procurados.
+
+**Sigilo.** O que vai para ela é montado conforme os cargos de quem pergunta: prontuários do Hospital, livros
+da Guarda e o tesouro só entram para quem já vê essas partes no site. Ela nunca conta o que a pessoa não
+poderia ver.
+
+**Ela não inventa.** Sem a resposta, diz que não sabe, e a pergunta fica anotada em **Livro de Nadir > O que
+perguntaram** para a Família Nobre completar (com o botão "Escrever no Livro"). Assuntos de fora do mundo
+(dever de casa, notícias) ela recusa com doçura.
+
+**Quem usa.** Todos os moradores e as crianças (`nadir.usar`; para criança ela fala de um jeito infantil). Os
+Aliados ficam de fora, mas dá para liberar em Cargos. Escrever no Livro e ver as perguntas é da Família Nobre
+(`nadir.ensinar`).
+
+**Custo e limites.** Cada pergunta custa uma fração de centavo de dólar nos créditos da Anthropic. Para não
+gastar sem controle: 40 perguntas por pessoa por dia e 600 no total por dia (mudam com `NADIR_LIMITE_PESSOA` e
+`NADIR_LIMITE_DIA`), pergunta de até 600 letras, e uma de cada vez por pessoa. A aba "O que perguntaram"
+mostra as perguntas e o gasto aproximado dos últimos 30 dias.
+
+**Configurar** (no `.env` e no Render, em Environment): `ANTHROPIC_API_KEY`, a chave criada em
+console.anthropic.com. Sem a chave, a tela aparece com o aviso de que a Nadir está em silêncio. Para trocar de
+modelo, `NADIR_MODELO` (ex.: `claude-sonnet-5-5`, mais esperto e mais caro).
+
+Arquivos: `src/nadir.js` (o que ela sabe, a voz e a conversa com o Claude), `src/nadir-padrao.js` (o Livro
+inicial), `src/rotas/nadir.js`, `public/js/telas/nadir.js` e `public/css/nadir.css`.
+
 ## Anúncios no Discord
 
 Todo anúncio publicado no Mural de Anúncios vai também para um canal do servidor do Discord da Casa

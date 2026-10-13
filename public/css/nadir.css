@@ -1,0 +1,237 @@
+/* A Grande Nadir: o santuário da Coelha Mãe (a IA da Casa) e o Livro de Nadir.
+   Mesma identidade do site (verde-floresta e o dourado do brasão), com a luz da lua por cima. */
+
+.nadir-pagina { max-width: 820px; margin: 0 auto; display: flex; flex-direction: column; min-height: calc(100vh - 96px); }
+/* Com o tocador de música, a área principal guarda 140px embaixo. Recolhido, o tocador é só uma bolinha no
+   canto, e a tela da Nadir pode descer até perto do fim. Aberto, ele é largo: aí a caixa de pergunta fica
+   acima dele (o espaço guardado), para o botão de enviar nunca ficar coberto. No celular também. */
+body.com-radio.radio-mini .nadir-pagina { margin-bottom: -104px; min-height: calc(100vh - 68px); }
+body.com-radio:not(.radio-mini) .nadir-pagina { min-height: calc(100vh - 172px); }
+.nadir-oculto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* ─── O santuário ─── */
+.nadir-santuario { position: relative; text-align: center; padding: 18px 0 6px; }
+.nadir-santuario::before {
+  content: ''; position: absolute; left: 50%; top: -30px; width: min(620px, 100%); height: 420px; transform: translateX(-50%);
+  background: radial-gradient(closest-side, rgba(244, 221, 128, 0.13), rgba(216, 177, 58, 0.05) 45%, transparent 72%);
+  pointer-events: none; z-index: -1; transition: opacity 0.6s ease;
+}
+.nadir-emblema-caixa { position: relative; width: 208px; height: 208px; margin: 0 auto; transition: width 0.55s cubic-bezier(0.2, 0.7, 0.2, 1), height 0.55s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.nadir-emblema { width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 0 18px rgba(244, 221, 128, 0.28)); transition: filter 0.6s ease; }
+.nadir-titulo {
+  margin-top: 10px; font-family: var(--f-titulo); font-weight: 600; font-size: clamp(1.7rem, 4.6vw, 2.5rem); letter-spacing: 0.16em; text-transform: uppercase; line-height: 1.15;
+  background: linear-gradient(180deg, #fff3c4 0%, var(--ouro-l) 30%, var(--ouro) 62%, var(--ouro-d) 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  transition: font-size 0.5s ease;
+}
+.nadir-sub { margin-top: 4px; font-family: var(--f-destaque); font-style: italic; font-size: 1.22rem; color: var(--texto-2); }
+.nadir-ornamento { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 14px auto 0; color: var(--ouro); }
+.nadir-ornamento span { width: 70px; height: 1px; background: linear-gradient(90deg, transparent, var(--ouro-d)); }
+.nadir-ornamento span:last-child { transform: scaleX(-1); }
+.nadir-ornamento em { font-style: normal; font-size: 0.8rem; }
+.nadir-bastidores { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 14px; }
+
+/* O emblema por dentro */
+.nadir-linha { fill: none; stroke: var(--ouro); stroke-width: 0.5; opacity: 0.45; }
+.nadir-pontilhada { stroke-dasharray: 0.6 6; stroke-width: 1; stroke-linecap: round; opacity: 0.7; }
+.nadir-estrela { fill: var(--ouro-l); }
+.nadir-anel { transform-origin: 100px 100px; animation: nadir-girar 90s linear infinite; }
+.nadir-anel-2 { animation-duration: 60s; animation-direction: reverse; }
+.nadir-anel .nadir-estrela { animation: nadir-cintilar 3.6s ease-in-out infinite; }
+.nadir-anel .nadir-estrela:nth-child(3n) { animation-delay: -1.2s; }
+.nadir-anel .nadir-estrela:nth-child(3n + 1) { animation-delay: -2.4s; }
+.nadir-halo { transform-origin: 100px 100px; animation: nadir-respirar 5.5s ease-in-out infinite; }
+.nadir-cratera { fill: #8c6d15; opacity: 0.14; }
+.nadir-coelha { fill: #0a130c; }
+.nadir-dentro { fill: #2a3a22; }
+.nadir-orelha { transform-box: fill-box; transform-origin: 50% 100%; transition: transform 0.5s cubic-bezier(0.3, 1.5, 0.5, 1); }
+.nadir-orelha-e { animation: nadir-orelha 9s ease-in-out infinite; }
+.nadir-orelha-d { animation: nadir-orelha 9s ease-in-out infinite -4.5s; }
+.nadir-olho { fill: none; stroke: var(--ouro-l); stroke-width: 1.7; stroke-linecap: round; }
+.nadir-focinho { fill: var(--ouro); }
+.nadir-joia { fill: #fff6cf; filter: drop-shadow(0 0 2px rgba(255, 246, 207, 0.9)); animation: nadir-cintilar 2.8s ease-in-out infinite; }
+.nadir-borda { fill: none; stroke: #fff3c4; stroke-width: 0.8; opacity: 0.55; }
+
+/* Os brilhos que sobem */
+.nadir-brilhos { position: absolute; inset: -30px -90px -10px; pointer-events: none; }
+.nadir-brilhos span {
+  position: absolute; left: var(--x); bottom: 8%; width: var(--s); height: var(--s); border-radius: 50%;
+  background: radial-gradient(circle, #fff6cf, rgba(244, 221, 128, 0.6) 45%, transparent 70%);
+  opacity: 0; animation: nadir-subir var(--t) linear infinite; animation-delay: var(--d);
+}
+
+/* Ela escuta (orelhas em pé, luz mais forte) e fala (a luz pulsa) */
+.nadir-ouvindo .nadir-orelha-e { animation: none; transform: rotate(-7deg) scaleY(1.06); }
+.nadir-ouvindo .nadir-orelha-d { animation: none; transform: rotate(7deg) scaleY(1.06); }
+.nadir-ouvindo .nadir-emblema, .nadir-falando .nadir-emblema { filter: drop-shadow(0 0 30px rgba(244, 221, 128, 0.55)); }
+.nadir-ouvindo .nadir-anel { animation-duration: 14s; }
+.nadir-falando .nadir-halo { animation-duration: 1.7s; }
+
+/* Com a conversa aberta, o santuário recolhe para dar lugar às palavras */
+.compacto .nadir-santuario { padding-top: 4px; }
+.compacto .nadir-emblema-caixa { width: 104px; height: 104px; }
+.compacto .nadir-titulo { font-size: 1.25rem; margin-top: 4px; }
+.compacto .nadir-sub, .compacto .nadir-ornamento { display: none; }
+.compacto .nadir-santuario::before { opacity: 0.6; height: 240px; }
+.compacto .nadir-brilhos { inset: -14px -60px -6px; }
+.compacto .nadir-bastidores { margin-top: 8px; }
+
+/* ─── A conversa ─── */
+.nadir-conversa { display: flex; flex-direction: column; gap: 16px; margin-top: 22px; }
+.nadir-fala-eu {
+  align-self: flex-end; max-width: min(78%, 560px); padding: 10px 18px; border-radius: 18px 18px 4px 18px;
+  background: var(--sup-2); border: 1px solid var(--borda-2); color: var(--texto-2); font-family: var(--f-destaque); font-style: italic; font-size: 1.14rem;
+  overflow-wrap: anywhere; animation: nadir-chegar 0.35s ease both;
+}
+.nadir-fala {
+  position: relative; padding: 18px 24px 20px 30px; border-radius: 14px; overflow: hidden;
+  background: linear-gradient(180deg, rgba(21, 36, 25, 0.94), rgba(11, 20, 14, 0.94));
+  border: 1px solid rgba(216, 177, 58, 0.3);
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.5), inset 0 0 60px rgba(216, 177, 58, 0.035);
+  animation: nadir-chegar 0.45s ease both;
+}
+.nadir-fala::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: linear-gradient(180deg, var(--ouro-l), var(--ouro) 40%, rgba(140, 109, 21, 0.2)); }
+.nadir-fala::after { content: ''; position: absolute; right: -60px; top: -60px; width: 190px; height: 190px; border-radius: 50%; background: radial-gradient(circle, rgba(244, 221, 128, 0.07), transparent 68%); pointer-events: none; }
+.nadir-fala-cab { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-family: var(--f-titulo); font-size: 0.72rem; letter-spacing: 0.24em; text-transform: uppercase; color: var(--ouro); }
+.nadir-selo { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--ouro-fundo); border: 1px solid rgba(216, 177, 58, 0.4); }
+.nadir-selo .ico { width: 13px; height: 13px; }
+.nadir-fala .texto-formatado { font-size: 1.16rem; line-height: 1.66; color: var(--texto); gap: 9px; }
+.nadir-fala .texto-formatado strong { color: var(--ouro-l); font-weight: 600; }
+.nadir-fala .texto-formatado em { color: var(--pergaminho); }
+.nadir-fala .texto-formatado li::marker { color: var(--ouro); }
+.nadir-fala.inteira:not(.nadir-fala-erro) .texto-formatado > p:first-child::first-letter {
+  float: left; margin: 0.06em 0.12em 0 0; font-family: var(--f-titulo); font-size: 2.7em; line-height: 0.82; color: var(--ouro-l);
+  text-shadow: 0 0 18px rgba(244, 221, 128, 0.35);
+}
+/* O pontinho de luz no fim do que ela está escrevendo */
+.nadir-fala.escrevendo .texto-formatado > :last-child::after {
+  content: ''; display: inline-block; width: 7px; height: 7px; margin-left: 6px; border-radius: 50%; vertical-align: baseline;
+  background: var(--ouro-l); box-shadow: 0 0 10px var(--ouro-l), 0 0 20px rgba(244, 221, 128, 0.6); animation: nadir-cintilar 0.9s ease-in-out infinite;
+}
+.nadir-fala-erro { border-color: var(--borda-2); }
+.nadir-fala-erro::before { background: var(--borda-2); }
+.nadir-fala-erro .texto-formatado { color: var(--texto-2); font-style: italic; }
+.nadir-escuta { display: flex; align-items: center; gap: 10px; font-family: var(--f-destaque); font-style: italic; font-size: 1.14rem; color: var(--texto-2); }
+.nadir-pontos { display: inline-flex; gap: 5px; color: var(--ouro-l); font-style: normal; font-size: 0.8rem; }
+.nadir-pontos i { font-style: normal; animation: nadir-cintilar 1.2s ease-in-out infinite; }
+.nadir-pontos i:nth-child(2) { animation-delay: 0.2s; }
+.nadir-pontos i:nth-child(3) { animation-delay: 0.4s; }
+.nadir-nota { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 0.95rem; color: var(--suave); }
+
+/* As fichas de quem ela citou */
+.nadir-fichas { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(216, 177, 58, 0.16); }
+.nadir-ficha { display: inline-flex; align-items: center; gap: 10px; padding: 6px 16px 6px 6px; border-radius: 999px; background: rgba(6, 10, 7, 0.55); border: 1px solid var(--borda-2); color: var(--texto); transition: border-color 0.2s ease, transform 0.2s ease, background 0.2s ease; }
+a.nadir-ficha:hover { border-color: var(--ouro); background: var(--ouro-fundo); color: var(--texto); transform: translateY(-1px); }
+.nadir-ficha .avatar { width: 38px; height: 38px; font-size: 0.74rem; box-shadow: 0 0 0 1px var(--bg), 0 0 0 2.5px var(--ouro-d); }
+.nadir-ficha-texto { display: grid; line-height: 1.2; text-align: left; }
+.nadir-ficha-texto strong { font-family: var(--f-titulo); font-size: 0.8rem; letter-spacing: 0.04em; font-weight: 600; }
+.nadir-ficha-texto small { color: var(--suave); font-size: 0.86rem; }
+
+/* ─── O convite e as perguntas prontas ─── */
+.nadir-sugestoes { margin-top: 20px; text-align: center; }
+.nadir-convite { font-family: var(--f-destaque); font-size: 1.14rem; color: var(--texto-2); }
+.nadir-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 14px; }
+.nadir-chip {
+  padding: 8px 18px; border-radius: 999px; cursor: pointer; font-family: var(--f-destaque); font-size: 1.08rem; color: var(--texto);
+  background: rgba(216, 177, 58, 0.055); border: 1px solid rgba(216, 177, 58, 0.34); transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+.nadir-chip:hover { background: var(--ouro-fundo); border-color: var(--ouro); transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35); }
+.nadir-silencio { display: grid; gap: 8px; font-family: var(--f-destaque); font-size: 1.16rem; color: var(--texto-2); }
+.nadir-erro-tecnico { margin-top: 16px; text-align: left; font-size: 0.95rem; }
+
+/* ─── Onde se pergunta ─── */
+.nadir-rodape { position: sticky; bottom: 0; margin-top: auto; padding: 26px 0 12px; background: linear-gradient(180deg, transparent, var(--bg) 46%); }
+.nadir-pergunta {
+  display: flex; align-items: flex-end; gap: 8px; padding: 7px 7px 7px 20px; border-radius: 26px;
+  background: rgba(14, 24, 17, 0.94); border: 1px solid var(--borda-2); box-shadow: 0 10px 32px rgba(0, 0, 0, 0.5);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+.nadir-pergunta:focus-within { border-color: var(--ouro); box-shadow: 0 10px 32px rgba(0, 0, 0, 0.5), 0 0 0 3px rgba(216, 177, 58, 0.14), 0 0 26px rgba(244, 221, 128, 0.12); }
+.nadir-campo { flex: 1; min-width: 0; min-height: 44px; max-height: 140px; padding: 10px 0; resize: none; border: 0; outline: 0; background: transparent; font-size: 1.12rem; line-height: 1.4; color: var(--texto); }
+.nadir-campo::placeholder { color: var(--suave); font-style: italic; font-family: var(--f-destaque); }
+.nadir-campo:disabled { opacity: 0.55; }
+.nadir-enviar {
+  flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; border: 0; cursor: pointer; color: #1b1403;
+  background: radial-gradient(circle at 35% 30%, #fff3c4, var(--ouro-l) 38%, var(--ouro) 78%); box-shadow: 0 4px 14px rgba(216, 177, 58, 0.3);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+.nadir-enviar:hover:not(:disabled) { transform: scale(1.07); box-shadow: 0 6px 22px rgba(244, 221, 128, 0.45); }
+.nadir-enviar:disabled { opacity: 0.4; cursor: default; }
+.nadir-enviar .ico { width: 19px; height: 19px; stroke-width: 2; }
+.nadir-meta { margin-top: 8px; text-align: center; font-size: 0.9rem; color: var(--suave); }
+.nadir-nova { padding: 0; border: 0; background: none; color: var(--ouro); cursor: pointer; font-size: inherit; }
+.nadir-nova:hover { color: var(--ouro-l); text-decoration: underline; }
+
+/* ─── A chamada na tela inicial ─── */
+.nadir-chamada {
+  position: relative; display: flex; align-items: center; gap: 16px; padding: 14px 18px; margin-bottom: 22px; border-radius: var(--raio); overflow: hidden;
+  background: linear-gradient(100deg, rgba(216, 177, 58, 0.11), rgba(14, 24, 17, 0.9) 42%); border: 1px solid rgba(216, 177, 58, 0.32);
+}
+.nadir-chamada .nadir-emblema { flex: none; width: 72px; height: 72px; }
+.nadir-chamada-texto { flex: 1; min-width: 0; display: grid; gap: 8px; }
+.nadir-chamada-texto strong { font-family: var(--f-titulo); font-size: 0.92rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ouro-l); }
+.nadir-chamada-texto small { font-family: var(--f-destaque); font-style: italic; font-size: 1.04rem; color: var(--texto-2); }
+.nadir-chamada form { display: flex; gap: 8px; }
+.nadir-chamada input { flex: 1; min-width: 0; }
+
+/* ─── O Livro de Nadir ─── */
+.nadir-livro-topo { display: flex; gap: 12px; margin-bottom: 16px; }
+.nadir-livro-topo .input { flex: 1; min-width: 0; }
+.nadir-paginas { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+.nadir-pagina-item { display: grid; gap: 4px; align-content: start; padding: 12px 14px; text-align: left; border-radius: var(--raio-p); background: var(--sup-2); border: 1px solid var(--borda); cursor: pointer; transition: border-color 0.2s ease, transform 0.2s ease; }
+.nadir-pagina-item:hover { border-color: var(--ouro-d); transform: translateY(-2px); }
+.nadir-pagina-item strong { display: flex; align-items: center; gap: 8px; font-family: var(--f-titulo); font-size: 0.86rem; letter-spacing: 0.03em; color: var(--ouro-l); }
+.nadir-pagina-item.desligada { opacity: 0.55; }
+.nadir-apelidos { color: var(--suave); font-style: italic; }
+.nadir-trecho { font-size: 0.95rem; color: var(--texto-2); overflow-wrap: anywhere; }
+.nadir-perguntas { display: grid; gap: 12px; margin: 16px 0; }
+.nadir-perguntada { display: grid; gap: 6px; padding: 14px 18px; }
+.nadir-perguntada + .nadir-perguntada { margin-top: 0; }
+.nadir-perguntada.pendente { border-color: rgba(216, 177, 58, 0.4); }
+.nadir-perguntada-q { display: flex; align-items: flex-start; gap: 8px; font-family: var(--f-destaque); font-size: 1.14rem; color: var(--texto); }
+.nadir-perguntada-q .ico { margin-top: 5px; color: var(--ouro); }
+.nadir-perguntada-quem { font-size: 0.9rem; }
+.nadir-perguntada-r { font-size: 0.98rem; color: var(--texto-2); padding-left: 12px; border-left: 2px solid var(--borda-2); }
+.nadir-perguntada-acoes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+
+/* ─── Movimento ─── */
+@keyframes nadir-girar { to { transform: rotate(360deg); } }
+@keyframes nadir-respirar { 0%, 100% { opacity: 0.55; transform: scale(0.97); } 50% { opacity: 1; transform: scale(1.04); } }
+@keyframes nadir-cintilar { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+@keyframes nadir-orelha { 0%, 86%, 100% { transform: rotate(0deg); } 90% { transform: rotate(5deg); } 94% { transform: rotate(-3deg); } }
+@keyframes nadir-subir {
+  0% { transform: translate(0, 0) scale(0.6); opacity: 0; }
+  12% { opacity: var(--o, 0.6); }
+  80% { opacity: var(--o, 0.6); }
+  100% { transform: translate(var(--dx), -230px) scale(1); opacity: 0; }
+}
+@keyframes nadir-chegar { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+@media (max-width: 640px) {
+  .nadir-pagina, body.com-radio.radio-mini .nadir-pagina, body.com-radio:not(.radio-mini) .nadir-pagina { margin-bottom: 0; min-height: calc(100vh - 190px); }
+  .nadir-emblema-caixa { width: 168px; height: 168px; }
+  .nadir-brilhos { inset: -20px -30px -10px; }
+  .compacto .nadir-emblema-caixa { width: 84px; height: 84px; }
+  .nadir-sub { font-size: 1.08rem; }
+  .nadir-fala { padding: 16px 16px 18px 22px; }
+  .nadir-fala .texto-formatado { font-size: 1.08rem; }
+  .nadir-fala-eu { max-width: 90%; }
+  /* A bolinha do tocador fica no canto de baixo: a caixa de pergunta para logo acima dela. */
+  body.com-radio .nadir-rodape { padding-bottom: 36px; }
+  body.com-radio .nadir-meta { padding-right: 62px; }
+  .nadir-chamada { align-items: flex-start; gap: 12px; padding: 14px; }
+  .nadir-chamada form { flex-direction: column; align-items: stretch; }
+  .nadir-chamada .nadir-emblema { width: 54px; height: 54px; }
+  .nadir-livro-topo { flex-direction: column; }
+}
+
+/* Quem pediu menos movimento: tudo parado, só a luz. */
+@media (prefers-reduced-motion: reduce) {
+  .nadir-anel, .nadir-halo, .nadir-orelha-e, .nadir-orelha-d, .nadir-joia, .nadir-anel .nadir-estrela, .nadir-pontos i,
+  .nadir-fala.escrevendo .texto-formatado > :last-child::after, .nadir-fala, .nadir-fala-eu { animation: none; }
+  .nadir-brilhos { display: none; }
+  .nadir-emblema-caixa, .nadir-titulo, .nadir-orelha { transition: none; }
+}
+
+/* No modo criança, as letras do site mudam; a Nadir acompanha. */
+body.modo-crianca .nadir-fala .texto-formatado { font-size: 1.2rem; }

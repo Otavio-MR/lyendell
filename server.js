@@ -85,6 +85,7 @@ app.use('/api/juramento', require('./src/rotas/juramento'));
 app.use('/api/sprites', require('./src/rotas/sprites'));
 app.use('/api/notificacoes', require('./src/rotas/notificacoes'));
 app.use('/api/financas', require('./src/rotas/financas'));
+app.use('/api/nadir', require('./src/rotas/nadir'));
 app.use('/api', require('./src/rotas/livros'));
 app.use('/api', require('./src/rotas/geral'));
 app.use('/api', (req, res, next) => next(erro(404, 'Rota não encontrada.')));

@@ -92,6 +92,10 @@ const CATALOGO = [
     { chave: 'financas.aprovar', nome: 'Aprovar, rejeitar e pagar folhas de pagamento e estornar movimentações (Mestre da Moeda)' },
     { chave: 'financas.excecao', nome: 'Autorizar pagamento ou saída acima do saldo disponível do tesouro (sempre com justificativa)' },
   ] },
+  { grupo: 'Nadir', itens: [
+    { chave: 'nadir.usar', nome: 'Conversar com a Grande Nadir (ela só conta o que a pessoa já pode ver no site)' },
+    { chave: 'nadir.ensinar', nome: 'Escrever no Livro de Nadir (o que ela sabe sobre o mundo, a Casa e as pessoas) e ver as perguntas feitas a ela' },
+  ] },
 ];
 
 const TODAS = CATALOGO.flatMap(g => g.itens.map(i => i.chave));
@@ -101,7 +105,7 @@ const TODAS = CATALOGO.flatMap(g => g.itens.map(i => i.chave));
 // A parte dos Aliados (convidados de outras casas) também fica de fora.
 const PERMITIDAS_CRIANCA = new Set([
   ...TODAS.filter(p => p.endsWith('.ver') && p !== 'usuarios.ver' && p !== 'diario.ver' && p !== 'aliados.ver' && p !== 'financas.ver'),
-  'atividades.participar', 'recreacao.usar', 'bobo.pegadinhas',
+  'atividades.participar', 'recreacao.usar', 'bobo.pegadinhas', 'nadir.usar',
 ]);
 // Coisas só do Bobo da Corte: nem a Família Nobre recebe junto com "tudo".
 const SO_DO_BOBO = new Set(['bobo.pegadinhas']);
@@ -115,7 +119,7 @@ const SO_DO_ADMIN = new Set(['jogos.admin']);
 const VALIDAS = new Set(TODAS);
 
 // Todo usuário é morador (menos quem tem um cargo que "não é morador", como os Aliados): estas permissões valem para eles.
-const MORADOR = ['tabelionato.ver', 'guarda.ver', 'congresso.ver', 'congresso.propor', 'leis.ver', 'galeria.ver', 'anuncios.ver', 'atividades.ver', 'atividades.participar', 'recreacao.usar'];
+const MORADOR = ['tabelionato.ver', 'guarda.ver', 'congresso.ver', 'congresso.propor', 'leis.ver', 'galeria.ver', 'anuncios.ver', 'atividades.ver', 'atividades.participar', 'recreacao.usar', 'nadir.usar'];
 // Quem está acima de morador publica anúncios, cria atividades e envia fotos.
 const MEMBRO = ['anuncios.publicar', 'atividades.criar', 'galeria.enviar'];
 const acoes = (modulo, ...lista) => lista.map(a => `${modulo}.${a}`);

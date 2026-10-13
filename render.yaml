@@ -35,3 +35,6 @@ services:
         sync: false
       - key: DISCORD_CARGO_ALIADOS
         sync: false
+      # A Grande Nadir (a IA da Casa): a chave da API da Anthropic (veja o README, "A Grande Nadir").
+      - key: ANTHROPIC_API_KEY
+        sync: false
