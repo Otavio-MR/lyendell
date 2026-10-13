@@ -340,7 +340,7 @@ async function perguntar(u, { pergunta, historico }, { aoTexto = () => {}, cance
     // O texto sai aos pedaços, segurando o finalzinho: a marca de "não sei" não pode aparecer na tela.
     let tudo = '';
     let enviado = 0;
-    const limpar = t => t.replace(/\s*[–—]\s*/g, ', ');
+    const limpar = t => t.replace(/\s*[\u2013\u2014]\s*/g, ', '); // a Nadir nunca escreve travessão
     const soltar = ate => { if (ate > enviado) { aoTexto(limpar(tudo.slice(enviado, ate))); enviado = ate; } };
     stream.on('text', pedaco => { tudo += pedaco; soltar(tudo.length - MARCA_NAO_SEI.length - 2); });
     const final = await stream.finalMessage();
