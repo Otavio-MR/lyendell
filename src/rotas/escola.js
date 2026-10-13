@@ -57,7 +57,7 @@ const CAMPOS_PUBLICOS_CONFIG = ['nome', 'diretor', 'idade_min', 'idade_max', 'me
 async function disciplinasComProfessores(req) {
   const disciplinas = await db.all('SELECT * FROM escola_disciplinas ORDER BY ativa DESC, ordem, nome');
   const professores = await db.all("SELECT * FROM escola_professores WHERE situacao IN ('titular', 'substituto', 'avaliacao') ORDER BY id");
-  const pessoa = p => (p ? { id: p.id, nome: p.nome, endereco: p.endereco, foto: p.foto, ingresso: p.ingresso } : null);
+  const pessoa = p => (p ? { id: p.id, nome: p.nome, endereco: p.endereco, procedencia: p.procedencia, foto: p.foto, ingresso: p.ingresso } : null);
   return disciplinas.filter(d => d.ativa || pode(req, 'escola.gerir')).map(d => ({
     id: d.id, nome: d.nome, descricao: d.descricao, ativa: !!d.ativa, ordem: d.ordem,
     titular: pessoa(professores.find(p => p.disciplina_id === d.id && p.situacao === 'titular')),
@@ -195,7 +195,7 @@ r.get('/professores', async (req, res) => {
     ${todos ? '' : "WHERE p.situacao IN ('titular', 'substituto')"} ORDER BY d.ordem, d.nome, CASE p.situacao WHEN 'titular' THEN 0 WHEN 'substituto' THEN 1 WHEN 'avaliacao' THEN 2 WHEN 'afastado' THEN 3 ELSE 4 END, p.nome`);
   res.json({
     professores: linhas.map(p => ({
-      id: p.id, disciplina_id: p.disciplina_id, disciplina_nome: p.disciplina_nome, nome: p.nome, endereco: p.endereco, foto: p.foto, situacao: p.situacao, ingresso: p.ingresso,
+      id: p.id, disciplina_id: p.disciplina_id, disciplina_nome: p.disciplina_nome, nome: p.nome, endereco: p.endereco, procedencia: p.procedencia, foto: p.foto, situacao: p.situacao, ingresso: p.ingresso,
       ...(todos ? { observacoes: p.observacoes, origem_registro_id: p.origem_registro_id } : {}),
     })),
   });
@@ -205,6 +205,7 @@ async function lerProfessor(body, atual = {}) {
   const p = {
     nome: linha(body?.nome ?? atual.nome, 80),
     endereco: linha(body?.endereco ?? atual.endereco ?? '', 60),
+    procedencia: linha(body?.procedencia ?? atual.procedencia ?? '', 80),
     disciplina_id: Number(body?.disciplina_id ?? atual.disciplina_id) || 0,
     foto: fotoOu(body?.foto, atual.foto ?? null),
     ingresso: body?.ingresso === undefined ? (atual.ingresso ?? null) : (body.ingresso ? diaOu(body.ingresso, 'a data de ingresso') : null),
@@ -222,8 +223,8 @@ r.post('/professores', gerir, async (req, res) => {
   const p = await lerProfessor(req.body);
   const igual = await db.get("SELECT id FROM escola_professores WHERE disciplina_id = ? AND situacao <> 'desligado' AND ((? <> '' AND lower(endereco) = lower(?)) OR lower(nome) = lower(?))", p.disciplina_id, p.endereco, p.endereco, p.nome);
   if (igual) throw erro(409, `${p.nome} já está inscrito nesta disciplina.`);
-  const { id } = await db.run(`INSERT INTO escola_professores (disciplina_id, nome, endereco, foto, situacao, ingresso, observacoes, criado_por_nome) VALUES (?, ?, ?, ?, 'avaliacao', ?, ?, ?)`,
-    p.disciplina_id, p.nome, p.endereco, p.foto, p.ingresso || hoje(), p.observacoes, quem(req));
+  const { id } = await db.run(`INSERT INTO escola_professores (disciplina_id, nome, endereco, procedencia, foto, situacao, ingresso, observacoes, criado_por_nome) VALUES (?, ?, ?, ?, ?, 'avaliacao', ?, ?, ?)`,
+    p.disciplina_id, p.nome, p.endereco, p.procedencia, p.foto, p.ingresso || hoje(), p.observacoes, quem(req));
   const d = await db.get('SELECT nome FROM escola_disciplinas WHERE id = ?', p.disciplina_id);
   await hist(req, 'professor', id, 'inscreveu o professor', `${p.nome} em ${d.nome}`);
   res.status(201).json({ id });
@@ -235,8 +236,8 @@ r.put('/professores/:id', gerir, async (req, res) => {
   if (p.disciplina_id !== atual.disciplina_id && ['titular', 'substituto'].includes(atual.situacao)) {
     throw erro(409, 'Quem é titular ou substituto não muda de disciplina: troque a situação antes.');
   }
-  await db.run("UPDATE escola_professores SET disciplina_id = ?, nome = ?, endereco = ?, foto = ?, ingresso = ?, observacoes = ?, atualizado_por_nome = ?, atualizado_em = datetime('now') WHERE id = ?",
-    p.disciplina_id, p.nome, p.endereco, p.foto, p.ingresso, p.observacoes, quem(req), atual.id);
+  await db.run("UPDATE escola_professores SET disciplina_id = ?, nome = ?, endereco = ?, procedencia = ?, foto = ?, ingresso = ?, observacoes = ?, atualizado_por_nome = ?, atualizado_em = datetime('now') WHERE id = ?",
+    p.disciplina_id, p.nome, p.endereco, p.procedencia, p.foto, p.ingresso, p.observacoes, quem(req), atual.id);
   await hist(req, 'professor', atual.id, 'mudou os dados do professor', p.nome, false);
   res.json({ ok: true });
 });
@@ -343,7 +344,7 @@ r.delete('/turmas/:id', gerir, async (req, res) => {
 /* ─── Alunos ─────────────────────────────────────── */
 
 const alunoPublico = (a, extra = {}) => ({
-  id: a.id, numero: a.numero, nome: a.nome, endereco: a.endereco, foto: a.foto, idade: a.idade, responsavel_nome: a.responsavel_nome, responsavel_endereco: a.responsavel_endereco,
+  id: a.id, numero: a.numero, nome: a.nome, endereco: a.endereco, procedencia: a.procedencia, foto: a.foto, idade: a.idade, responsavel_nome: a.responsavel_nome, responsavel_endereco: a.responsavel_endereco, responsavel_procedencia: a.responsavel_procedencia,
   turma_id: a.turma_id, turma_nome: a.turma_nome ?? null, situacao: a.situacao, data_matricula: a.data_matricula, etapa: a.etapa, ...extra,
 });
 
@@ -360,7 +361,7 @@ r.get('/alunos', exigirAlunos, async (req, res) => {
   const medias = await E.mediasDeTodos();
   const contagem = Object.fromEntries((await db.all('SELECT situacao, COUNT(*) AS n FROM escola_alunos GROUP BY situacao')).map(x => [x.situacao, Number(x.n)]));
   res.json({
-    alunos: alunos.filter(a => !q || chaveNome(`${a.nome} ${a.endereco} ${a.responsavel_nome} ${a.numero ?? ''}`).includes(q)).map(a => alunoPublico(a, {
+    alunos: alunos.filter(a => !q || chaveNome(`${a.nome} ${a.endereco} ${a.procedencia} ${a.responsavel_nome} ${a.numero ?? ''}`).includes(q)).map(a => alunoPublico(a, {
       frequencia: freq.get(a.id) ? { percentual: freq.get(a.id).percentual, total: freq.get(a.id).total } : null, media: medias.get(a.id) ?? null,
     })),
     contagem,
@@ -371,10 +372,12 @@ async function lerAluno(body, atual = {}, config) {
   const a = {
     nome: linha(body?.nome ?? atual.nome, 80),
     endereco: linha(body?.endereco ?? atual.endereco ?? '', 60),
+    procedencia: linha(body?.procedencia ?? atual.procedencia ?? '', 80),
     foto: fotoOu(body?.foto, atual.foto ?? null),
     idade: body?.idade === undefined ? (atual.idade ?? null) : inteiroOuNulo(body.idade, { max: 120, nome: 'A idade' }),
     responsavel_nome: linha(body?.responsavel_nome ?? atual.responsavel_nome ?? '', 80),
     responsavel_endereco: linha(body?.responsavel_endereco ?? atual.responsavel_endereco ?? '', 60),
+    responsavel_procedencia: linha(body?.responsavel_procedencia ?? atual.responsavel_procedencia ?? '', 80),
     turma_id: body?.turma_id === undefined ? (atual.turma_id ?? null) : (body.turma_id ? Number(body.turma_id) : null),
     data_matricula: body?.data_matricula === undefined ? (atual.data_matricula ?? null) : (body.data_matricula ? diaOu(body.data_matricula, 'a data da matrícula') : null),
     etapa: texto(body?.etapa ?? atual.etapa ?? '', 400),
@@ -417,9 +420,9 @@ r.post('/alunos', gerir, async (req, res) => {
   const situacao = req.body?.situacao === 'em_analise' ? 'em_analise' : 'matriculado';
   await conferirDuplicado(a);
   if (situacao === 'matriculado') await conferirVaga(a.turma_id);
-  const { id } = await db.run(`INSERT INTO escola_alunos (nome, endereco, foto, idade, responsavel_nome, responsavel_endereco, turma_id, situacao, data_matricula, etapa, observacoes, criado_por_nome)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  a.nome, a.endereco, a.foto, a.idade, a.responsavel_nome, a.responsavel_endereco, a.turma_id, situacao, situacao === 'matriculado' ? (a.data_matricula || hoje()) : a.data_matricula, a.etapa, a.observacoes, quem(req));
+  const { id } = await db.run(`INSERT INTO escola_alunos (nome, endereco, procedencia, foto, idade, responsavel_nome, responsavel_endereco, responsavel_procedencia, turma_id, situacao, data_matricula, etapa, observacoes, criado_por_nome)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  a.nome, a.endereco, a.procedencia, a.foto, a.idade, a.responsavel_nome, a.responsavel_endereco, a.responsavel_procedencia, a.turma_id, situacao, situacao === 'matriculado' ? (a.data_matricula || hoje()) : a.data_matricula, a.etapa, a.observacoes, quem(req));
   if (situacao === 'matriculado') await daNumero(id);
   const { numero } = await db.get('SELECT numero FROM escola_alunos WHERE id = ?', id);
   await hist(req, 'aluno', id, situacao === 'matriculado' ? 'matriculou o aluno' : 'recebeu a inscrição do aluno', `${a.nome}${numero ? ` (matrícula nº ${numero})` : ''}`);
@@ -447,9 +450,9 @@ r.put('/alunos/:id', gerir, async (req, res) => {
   const a = await lerAluno(req.body, atual, config);
   if (chaveNome(a.nome) !== chaveNome(atual.nome) || chaveNome(a.endereco) !== chaveNome(atual.endereco)) await conferirDuplicado(a, atual.id);
   if (a.turma_id !== atual.turma_id && atual.situacao === 'matriculado') await conferirVaga(a.turma_id, atual.id);
-  await db.run(`UPDATE escola_alunos SET nome = ?, endereco = ?, foto = ?, idade = ?, responsavel_nome = ?, responsavel_endereco = ?, turma_id = ?, data_matricula = ?, etapa = ?, observacoes = ?,
+  await db.run(`UPDATE escola_alunos SET nome = ?, endereco = ?, procedencia = ?, foto = ?, idade = ?, responsavel_nome = ?, responsavel_endereco = ?, responsavel_procedencia = ?, turma_id = ?, data_matricula = ?, etapa = ?, observacoes = ?,
     atualizado_por_nome = ?, atualizado_em = datetime('now') WHERE id = ?`,
-  a.nome, a.endereco, a.foto, a.idade, a.responsavel_nome, a.responsavel_endereco, a.turma_id, a.data_matricula, a.etapa, a.observacoes, quem(req), atual.id);
+  a.nome, a.endereco, a.procedencia, a.foto, a.idade, a.responsavel_nome, a.responsavel_endereco, a.responsavel_procedencia, a.turma_id, a.data_matricula, a.etapa, a.observacoes, quem(req), atual.id);
   const mudou = [];
   if (a.turma_id !== atual.turma_id) mudou.push('turma');
   if (a.idade !== atual.idade) mudou.push(`idade ${atual.idade ?? '?'} para ${a.idade}`);

@@ -717,6 +717,7 @@ CREATE TABLE IF NOT EXISTS escola_professores (
   disciplina_id INTEGER NOT NULL,
   nome TEXT NOT NULL,
   endereco TEXT NOT NULL DEFAULT '',
+  procedencia TEXT NOT NULL DEFAULT '',
   foto TEXT,
   situacao TEXT NOT NULL DEFAULT 'avaliacao',
   ingresso TEXT,
@@ -753,10 +754,12 @@ CREATE TABLE IF NOT EXISTS escola_alunos (
   numero INTEGER,
   nome TEXT NOT NULL,
   endereco TEXT NOT NULL DEFAULT '',
+  procedencia TEXT NOT NULL DEFAULT '',
   foto TEXT,
   idade INTEGER,
   responsavel_nome TEXT NOT NULL DEFAULT '',
   responsavel_endereco TEXT NOT NULL DEFAULT '',
+  responsavel_procedencia TEXT NOT NULL DEFAULT '',
   turma_id INTEGER,
   situacao TEXT NOT NULL DEFAULT 'em_analise',
   data_matricula TEXT,
@@ -829,7 +832,7 @@ CREATE INDEX IF NOT EXISTS idx_escola_historico ON escola_historico(entidade, en
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 34;
+const VERSAO = 35;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -928,6 +931,13 @@ async function migrar() {
   // leitura para a Família Nobre. As profissões e o saldo inicial do tesouro entram uma vez só (semear).
   // v34: a Escola Luckham. Todo morador vê a escola; os cargos Diretor da Escola e Professor da Escola nascem
   // aqui. Os registros do Corpo Docente e das Matrículas que estavam no Tabelionato vêm para o sistema da escola.
+  // v35: quem vem de fora de Lyendell não tem endereço aqui: a escola guarda a cidade ou região de onde vem.
+  // (Bancos já na v34 recebem as colunas aqui; bancos novos já as têm pelo ESQUEMA.)
+  if (versao < 35) {
+    for (const [tabela, coluna] of [['escola_alunos', 'procedencia'], ['escola_alunos', 'responsavel_procedencia'], ['escola_professores', 'procedencia']]) {
+      if (!await colunaExiste(tabela, coluna)) await db.run(`ALTER TABLE ${tabela} ADD COLUMN ${coluna} TEXT NOT NULL DEFAULT ''`);
+    }
+  }
   if (versao < 34) {
     await criarCargo('Diretor da Escola');
     await criarCargo('Professor da Escola');

@@ -43,7 +43,7 @@ export async function alunos(corpo, ctx) {
       if (filtro.situacao && a.situacao !== filtro.situacao) return false;
       if (filtro.turma === 'sem' && a.turma_id != null) return false;
       if (filtro.turma && filtro.turma !== 'sem' && String(a.turma_id) !== filtro.turma) return false;
-      return !b || normalizar(`${a.nome} ${a.endereco} ${a.responsavel_nome} ${a.numero ?? ''}`).includes(b);
+      return !b || normalizar(`${a.nome} ${a.endereco} ${a.procedencia} ${a.responsavel_nome} ${a.numero ?? ''}`).includes(b);
     });
     contador.textContent = `${vis.length} de ${lista.length} ${lista.length === 1 ? 'aluno' : 'alunos'}`;
     trocar(area, vis.length
@@ -103,8 +103,10 @@ export function formAluno(aluno, turmas, ctx, aoSalvar) {
   const nome = entradaTexto(a.nome, { maxlength: '80', autocomplete: 'off' });
   const idade = entradaNumero(a.idade ?? '', { step: '1', min: '0', max: '120', inputmode: 'numeric' });
   const endereco = entradaTexto(a.endereco, { maxlength: '60', placeholder: 'Ex.: Rua das Flores, 12' });
+  const procedencia = entradaTexto(a.procedencia, { maxlength: '80', placeholder: 'Ex.: Vale do Norte, Porto Alvo' });
   const respNome = entradaTexto(a.responsavel_nome, { maxlength: '80' });
   const respEndereco = entradaTexto(a.responsavel_endereco, { maxlength: '60' });
+  const respProcedencia = entradaTexto(a.responsavel_procedencia, { maxlength: '80', placeholder: 'Se vem de fora de Lyendell' });
   const turma = selecao(opcoesDeTurma(turmas, a.turma_id), a.turma_id ?? '');
   const data = entradaData(a.data_matricula || '');
   const etapa = entradaTexto(a.etapa, { maxlength: '400', placeholder: 'Ex.: alfabetização, primeiro ano' });
@@ -119,10 +121,12 @@ export function formAluno(aluno, turmas, ctx, aoSalvar) {
       h('div', { class: 'form-grade' },
         campo('Nome do aluno', nome, { obrigatorio: true }),
         campo('Idade', idade, { obrigatorio: true, ajuda: 'Em anos.' }),
-        campo('Endereço do aluno', endereco),
+        campo('Endereço do aluno', endereco, { ajuda: 'Deixe vazio se o aluno não mora em Lyendell.' }),
+        campo('Vem de (cidade ou região)', procedencia, { ajuda: 'Para quem vem de fora de Lyendell, no lugar do endereço.' }),
         campo('Turma', turma),
         campo('Nome do responsável', respNome),
         campo('Endereço do responsável', respEndereco),
+        campo('Responsável vem de', respProcedencia),
         novo ? campo('Situação inicial', situacao) : null,
         campo('Data da matrícula', data, { ajuda: novo ? 'Vazio usa o dia de hoje.' : null }),
         campo('Etapa ou série', etapa, { classe: 'largo' }),
@@ -132,8 +136,8 @@ export function formAluno(aluno, turmas, ctx, aoSalvar) {
     aoEnviar: async () => {
       if (envio.n) throw new Error('Espere a foto terminar de enviar.');
       const corpo = {
-        nome: nome.value, idade: idade.value, endereco: endereco.value, foto: fotoUrl, turma_id: turma.value || null,
-        responsavel_nome: respNome.value, responsavel_endereco: respEndereco.value, data_matricula: data.value || null,
+        nome: nome.value, idade: idade.value, endereco: endereco.value, procedencia: procedencia.value, foto: fotoUrl, turma_id: turma.value || null,
+        responsavel_nome: respNome.value, responsavel_endereco: respEndereco.value, responsavel_procedencia: respProcedencia.value, data_matricula: data.value || null,
         etapa: etapa.value, observacoes: obs.value,
       };
       if (novo) {
@@ -216,8 +220,10 @@ export async function ficha(corpo, ctx, id) {
     h('div', { class: 'escola-ficha-grade' },
       painel('Dados', 'usuario', h('dl', { class: 'escola-dl' },
         linhaDado('Endereço', a.endereco),
+        linhaDado('Vem de', a.procedencia),
         linhaDado('Responsável', a.responsavel_nome),
         linhaDado('Endereço do responsável', a.responsavel_endereco),
+        linhaDado('Responsável vem de', a.responsavel_procedencia),
         linhaDado('Data da matrícula', a.data_matricula && dataCurta(a.data_matricula)),
         linhaDado('Etapa', a.etapa),
         linhaDado('Observações', a.observacoes),
@@ -333,7 +339,7 @@ function cartaoProfessor(p, { lista, gerir, ctx, disciplinas }) {
     h('div', { class: 'escola-professor-corpo' },
       h('small', { class: 'suave' }, SIT_PROFESSOR[p.situacao]?.[0] || p.situacao),
       h('strong', null, p.nome),
-      p.endereco && h('span', { class: 'suave' }, p.endereco),
+      (p.endereco || p.procedencia) && h('span', { class: 'suave' }, p.endereco || `Vem de ${p.procedencia}`),
       p.ingresso && h('small', { class: 'suave' }, `Desde ${dataCurta(p.ingresso)}`),
       gerir && p.observacoes && h('p', { class: 'escola-professor-obs' }, p.observacoes),
       gerir && h('div', { class: 'escola-professor-acoes' },
@@ -416,6 +422,7 @@ function formProfessor(p, disciplinas, ctx, disciplinaInicial = null) {
   const envio = { n: 0 };
   const nome = entradaTexto(x.nome, { maxlength: '80', autocomplete: 'off' });
   const endereco = entradaTexto(x.endereco, { maxlength: '60', placeholder: 'Ex.: Rua das Flores, 12' });
+  const procedencia = entradaTexto(x.procedencia, { maxlength: '80', placeholder: 'Ex.: Vale do Norte, Porto Alvo' });
   const travada = !novo && ['titular', 'substituto'].includes(x.situacao);
   const sel = selecao([['', 'Escolha a disciplina'], ...disciplinas.map(d => [String(d.id), d.nome])], x.disciplina_id ?? disciplinaInicial ?? '', { disabled: travada || null });
   const ingresso = entradaData(x.ingresso || '');
@@ -426,7 +433,8 @@ function formProfessor(p, disciplinas, ctx, disciplinaInicial = null) {
       novo && h('p', { class: 'form-intro' }, 'O professor entra "em avaliação". Depois você escolhe o titular e o substituto de cada disciplina. Quem leciona duas disciplinas se inscreve duas vezes.'),
       h('div', { class: 'form-grade' },
         campo('Nome', nome, { obrigatorio: true }),
-        campo('Endereço', endereco),
+        campo('Endereço', endereco, { ajuda: 'Deixe vazio se não mora em Lyendell.' }),
+        campo('Vem de (cidade ou região)', procedencia, { ajuda: 'Para quem vem de fora de Lyendell, no lugar do endereço.' }),
         campo('Disciplina', sel, { obrigatorio: true, ajuda: travada ? 'Titular e substituto não mudam de disciplina: troque a situação antes.' : null }),
         campo('Data de ingresso', ingresso, { ajuda: novo ? 'Vazio usa o dia de hoje.' : null }),
         h('div', { class: 'campo largo' }, h('span', { class: 'campo-rotulo' }, 'Foto'), entradaImagem(fotoUrl, v => { fotoUrl = v; }, envio)),
@@ -434,7 +442,7 @@ function formProfessor(p, disciplinas, ctx, disciplinaInicial = null) {
     ],
     aoEnviar: async () => {
       if (envio.n) throw new Error('Espere a foto terminar de enviar.');
-      const corpo = { nome: nome.value, endereco: endereco.value, disciplina_id: sel.value, foto: fotoUrl, ingresso: ingresso.value || null, observacoes: obs.value };
+      const corpo = { nome: nome.value, endereco: endereco.value, procedencia: procedencia.value, disciplina_id: sel.value, foto: fotoUrl, ingresso: ingresso.value || null, observacoes: obs.value };
       if (novo) await post(`${API}/professores`, corpo); else await put(`${API}/professores/${x.id}`, corpo);
       aviso(novo ? 'Professor inscrito, em avaliação.' : 'Dados atualizados.');
       await ctx.recarregar();

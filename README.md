@@ -363,6 +363,10 @@ guiada quando o lugar já tem dono), disciplinas, turmas com vagas e faixa de id
 (presente, falta, justificada; a justificada conta como presença), **notas** com peso, **boletim** e média,
 frequência, e o **histórico** de tudo o que mudou. O boletim e a carteirinha do aluno saem como livro `.book`.
 
+**De fora de Lyendell**: quem não mora na Capital (aluno, responsável ou professor) não precisa de endereço:
+no formulário há o campo **Vem de (cidade ou região)**. O endereço pode ficar vazio, e a região aparece na
+ficha, na lista de professores e na carteirinha.
+
 **Regras**: a faixa de idade é da configuração; a mesma pessoa não se matricula duas vezes; turma cheia não
 aceita mais ninguém; titular e substituto são únicos por disciplina (garantido no banco); aluno com frequência ou
 notas não é apagado (vira "desligado"). Aprovado com média igual ou maior que a média de aprovação (6 por padrão).

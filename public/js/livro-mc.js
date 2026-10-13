@@ -834,6 +834,7 @@ export function carteirinhaDoAluno(aluno, config, autor) {
   const linha = (rotulo, valor) => (valorOuNada(valor) ? [`${rotulo}:`, `§0${umaLinha(valor)}§4`, ''] : null);
   const blocos = [
     linha('Endereço', aluno.endereco),
+    linha('Vem de', aluno.procedencia),
     linha('Responsável', aluno.responsavel_nome),
     linha('Matriculado em', aluno.data_matricula ? dataCurta(aluno.data_matricula) : ''),
     [...quebrar(umaLinha(config?.lema) || 'Pela educação, pelo conhecimento e pelo futuro de Eldoria.').map(t => `§8${t}`), ''],
