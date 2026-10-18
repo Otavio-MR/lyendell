@@ -5,12 +5,13 @@
 
 import { get, post, put, del, h, trocar, icone, cabecalho, botao, botaoIcone, aviso, aoSair, normalizar, avatar, modal, modalForm, campo, confirmar, tentar, enviarImagem, relativo, ehCrianca } from '../core.js';
 import { opiniaoDoLugar } from '../crianca.js';
-import { VISTA, CAMINHOS, AVENIDAS, RUAS } from '../mapa-lyendell.js';
+import { VISTA, AVENIDAS, RUAS } from '../mapa-lyendell.js';
 import { TAMANHO_CASA, amostrar, linhasDaVia, viaPorId, distribuir, encaixar, lerLista, trechoPrincipal, usarPredios } from '../mapa-casas.js';
 import { ICONES_MAPA, desenhoDoIcone } from '../icones-mapa.js';
 import {
   ESTILO_CARTA, defsCarta, papel, rio, chaoDaCidade, muralha, torres, viasSvg, toqueSvg, chave, cartucho, rosaDosVentos, barraDeEscala,
   moldura, vinheta, arvoresSvg, arteDoPredio, escalaDoPredio, chao, fita, alturaDaFita, medalha, variantesDeCasa, ITENS_CHAVE, miniaturaDaChave,
+  baseDosPortoes, pontoNaMuralha, direcaoPeloLado, orientacaoDoPortao, ALCANCE_PORTAO,
 } from '../mapa-arte.js';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -102,6 +103,56 @@ function edificio(p) {
   return g;
 }
 
+/* ─── Os portões da muralha ───────────────────────── */
+
+const DIRECOES = { norte: 'Norte', sul: 'Sul', leste: 'Leste', oeste: 'Oeste', outro: 'Outra direção' };
+const nomeSugerido = direcao => (DIRECOES[direcao] && direcao !== 'outro' ? `Portão do ${DIRECOES[direcao]}` : 'Novo portão');
+const encurtar = (t, n) => (t.length > n ? `${t.slice(0, n - 1).trimEnd()}…` : t);
+const linhasDoPortao = nome => (nome.length <= 24 ? [nome] : linhasDoNome(nome));
+
+// A fita de pergaminho com o nome, montada com elementos: o nome vem de quem edita o mapa, nunca entra como texto de HTML.
+function fitaDoPortao(x, y, linhas) {
+  const letra = 7.2;
+  const larg = Math.max(...linhas.map(l => l.length * letra)) + 16;
+  const alt = alturaDaFita(linhas, false);
+  const [a, b] = [x - larg / 2, x + larg / 2];
+  const cauda = (xa, dir) => s('path', { class: 'm-fita-cauda', d: `M${um(xa)} ${um(y + 2.4)}h${dir * 7}l${-dir * 3.4} ${um(alt / 2)}l${dir * 3.4} ${um(alt / 2)}h${-dir * 7}Z` });
+  return [
+    cauda(a + 0.6, -1), cauda(b - 0.6, 1),
+    s('path', { class: 'm-fita', d: `M${um(a)} ${um(y)}H${um(b)}V${um(y + alt)}H${um(a)}Z` }),
+    ...linhas.map((l, i) => s('text', { class: 'm-nome', x: um(x), y: um(y + 10.4 + i * 11), textLength: um(Math.max(8, l.length * letra)), lengthAdjust: 'spacing' }, l.toUpperCase())),
+  ];
+}
+
+// Um portão: a gravura (de frente ou de lado, conforme a muralha), a fita com o nome e, embaixo, "rumo a ...".
+function portaoNoMapa(g) {
+  const { modo } = orientacaoDoPortao(g);
+  const alc = ALCANCE_PORTAO[modo];
+  const linhas = linhasDoPortao(g.nome);
+  const alt = alturaDaFita(linhas, false);
+  const destino = g.destino ? `rumo a ${encurtar(g.destino, 30)}` : '';
+  const extra = destino ? 12 : 0;
+  // A fita vai embaixo do portão; se não couber no pé do mapa, vai em cima, com o destino entre ela e o portão.
+  const embaixo = g.y + alc.baixo + 4 + alt + extra + 6 <= VH - 15;
+  const yFita = embaixo ? g.y + alc.baixo + 4 : g.y - alc.cima - 4 - extra - alt;
+  const yDestino = embaixo ? yFita + alt + 9 : g.y - alc.cima - 5;
+  const meia = Math.max(Math.max(...linhas.map(l => l.length * 7.2)) + 30, destino.length * 3.7 + 10, 60) / 2;
+  const topo = embaixo ? g.y - alc.cima : yFita;
+  const fundo = embaixo ? yDestino + 3 : g.y + alc.baixo;
+  const el = s('g', {
+    class: 'm-poi m-portao', 'data-id': `g${g.id}`, 'data-portao': g.id, tabindex: 0, role: 'button',
+    'aria-label': `${g.nome}, portão da muralha${g.destino ? `, leva a ${g.destino}` : ''}. Abrir a ficha.`,
+  });
+  const aro = modo === 'lado' ? { cy: g.y - 6, rx: 24, ry: 46 } : { cy: g.y - 14, rx: 36, ry: 28 };
+  el.append(
+    s('rect', { class: 'm-hit', x: um(g.x - meia - 4), y: um(topo - 4), width: um(meia * 2 + 8), height: um(fundo - topo + 8), rx: 6 }),
+    s('ellipse', { class: 'm-aro', cx: g.x, cy: aro.cy, rx: aro.rx, ry: aro.ry }),
+    s('g', { class: 'm-art' }, s('use', { href: `#a-portao_${modo}`, transform: `translate(${g.x} ${g.y})` })),
+    ...fitaDoPortao(g.x, yFita, linhas));
+  if (destino) el.append(s('text', { class: 'm-sub', x: g.x, y: um(yDestino) }, destino));
+  return el;
+}
+
 function desenharMapa() {
   const svg = s('svg', {
     class: 'm-svg mapa-svg', viewBox: VISTA.join(' '), preserveAspectRatio: 'xMidYMid meet',
@@ -121,10 +172,12 @@ function desenharMapa() {
     grupo('', rio() + chaoDaCidade()),
     s('g', { class: 'm-arvores', 'pointer-events': 'none' }),
     s('g', { class: 'm-pracas', 'pointer-events': 'none' }),
-    grupo('', viasSvg(CAMINHOS)),
+    s('g', { class: 'm-portoes-base', 'pointer-events': 'none' }),
+    grupo('', viasSvg()),
     grupo('', muralha() + torres()),
     rotulosVias,
     grupo('', toqueSvg()),
+    s('g', { class: 'm-portoes' }),
     s('g', { class: 'm-casas' }),
     s('g', { class: 'm-predios' }));
 
@@ -221,19 +274,22 @@ export async function mapa() {
   const camadaPredios = svg.querySelector('.m-predios');
   const camadaPracas = svg.querySelector('.m-pracas');
   const camadaArvores = svg.querySelector('.m-arvores');
+  const camadaPortoes = svg.querySelector('.m-portoes');
+  const camadaBasePortoes = svg.querySelector('.m-portoes-base');
   const dica = h('div', { class: 'mapa-dica', hidden: true });
   const info = h('div', { class: 'mapa-info', hidden: true });
   const ficha = h('div', { class: 'mapa-ficha-lugar' });
   let vb = [...VISTA];
   let animacao = 0;
-  let selecionado = null; // via (av1, r3...) ou prédio (p12)
+  let selecionado = null; // via (av1, r3...), prédio (p12) ou portão (g3)
   let realcado = null;
   let casas = [];
   let predios = [];
+  let portoes = [];
   let nomes = [];
   let podeEditar = false;
   let editando = false;
-  let porNoMapa = 'casa'; // no modo de edição, o clique num lugar vazio põe uma casa ou um prédio
+  let porNoMapa = 'casa'; // no modo de edição, o clique num lugar vazio põe uma casa, um prédio ou um portão
   let casaFixa = null;   // casa com a ficha aberta (clicada)
   let casaSobre = null;  // casa com o mouse em cima
   aoSair(() => cancelAnimationFrame(animacao));
@@ -326,6 +382,47 @@ export async function mapa() {
     trocar(camadaPracas, ordem.map(praca));
     trocar(camadaPredios, ordem.map(edificio));
     acender();
+  }
+
+  /* Portões da muralha */
+  const portaoPorId = id => portoes.find(g => g.id === Number(id));
+  function desenharPortoes() {
+    camadaBasePortoes.innerHTML = baseDosPortoes(portoes);
+    trocar(camadaPortoes, [...portoes].sort((a, b) => a.y - b.y).map(portaoNoMapa));
+    acender();
+  }
+
+  // A ficha de um portão: para onde leva (em destaque), onde fica e o que se conta dele.
+  function abrirPortao(g, { voar = false } = {}) {
+    fecharFicha();
+    info.hidden = true;
+    selecionado = `g${g.id}`;
+    acender();
+    if (voar) enquadrarPonto(g.x, g.y);
+    let janela = null;
+    const via = viaMaisPerto(g.x, g.y);
+    const onde = [g.direcao !== 'outro' ? `Na muralha do ${DIRECOES[g.direcao]}` : 'Na muralha', via && `Fica perto da ${via.nome}`].filter(Boolean).join(' · ');
+    const corpo = h('div', { class: 'predio-ficha portao-ficha' },
+      h('div', { class: 'predio-sobre' },
+        h('span', { class: 'predio-selo cat-publico' }, iconeDoMapa('torre')),
+        h('div', null,
+          h('p', { class: 'predio-tipo' }, 'Portão da muralha'),
+          h('p', { class: 'predio-onde' }, onde))),
+      h('div', { class: `portao-destino ${g.destino ? '' : 'vazio'}`.trim() },
+        h('small', null, ehCrianca() ? 'Quem passa por aqui vai para' : 'Leva a'),
+        h('strong', null, g.destino || 'Destino ainda a definir'),
+        !g.destino && podeEditar && h('span', null, 'Clique em "Editar" para dizer a cidade ou a região para onde ele leva.')),
+      g.sobre && h('section', { class: 'predio-secao' }, h('h3', null, 'Sobre'), h('p', { class: 'predio-texto texto-livre' }, g.sobre)),
+      g.atualizado_por_nome && g.atualizado_por_nome !== 'Sistema' && h('p', { class: 'predio-atualizado' }, `Atualizado por ${g.atualizado_por_nome} ${relativo(g.atualizado_em)}`));
+    janela = modal({
+      titulo: g.nome, corpo, tamanho: 'medio', classe: 'predio-modal',
+      aoFechar: () => { if (selecionado === `g${g.id}`) { selecionado = null; acender(); } },
+      rodape: [
+        botao('Ver no mapa', { icone: 'mapa', onclick: () => { janela.fechar(); enquadrarPonto(g.x, g.y); selecionado = `g${g.id}`; acender(); } }),
+        h('span', { class: 'espaco' }),
+        podeEditar && botao('Editar', { icone: 'editar', classe: 'btn-ouro', onclick: () => { janela.fechar(); formularioPortao(g); } }),
+      ],
+    });
   }
 
   // A ficha de um prédio: fotos (de fora e de dentro), para que serve, quem mora e quem trabalha, e mais.
@@ -444,16 +541,18 @@ export async function mapa() {
   }
   // As árvores ficam nos espaços vazios: elas saem do caminho das casas e dos prédios (que vêm do banco).
   function desenharArvores() {
-    camadaArvores.innerHTML = arvoresSvg(casas, predios);
+    camadaArvores.innerHTML = arvoresSvg(casas, predios, portoes);
   }
   async function carregar() {
     const d = await get('/api/casas');
     casas = d.casas;
     predios = d.predios || [];
+    portoes = d.portoes || [];
     nomes = d.nomes || [];
     podeEditar = d.podeEditar;
     usarPredios(predios);
     desenharPredios();
+    desenharPortoes();
     desenharCasas();
     desenharListas();
     if (casaFixa && !casaPorId(casaFixa)) fecharFicha();
@@ -741,6 +840,51 @@ export async function mapa() {
     });
   }
 
+  /* Editar portões: nome, direção, para onde levam e um texto livre */
+  function formularioPortao(g, base = {}) {
+    const dados = { direcao: 'outro', nome: '', destino: '', sobre: '', ...base, ...(g || {}) };
+    let sugerido = g ? '' : nomeSugerido(dados.direcao);
+    const nome = h('input', { class: 'input', maxlength: '60', value: dados.nome || sugerido, placeholder: 'Ex.: Portão do Norte, Portão do Rio', required: true });
+    const direcao = h('select', { class: 'input' }, Object.entries(DIRECOES).map(([k, t]) => h('option', { value: k, selected: k === dados.direcao }, t)));
+    // Num portão novo, trocar a direção ajusta o nome sugerido (até a pessoa escrever outro).
+    direcao.addEventListener('change', () => {
+      if (g || (nome.value !== sugerido && nome.value.trim())) return;
+      sugerido = nomeSugerido(direcao.value);
+      nome.value = sugerido;
+    });
+    const destino = h('input', { class: 'input', maxlength: '80', value: dados.destino || '', placeholder: 'Ex.: Floresta de Vaelmoor, cidade de Argos' });
+    const sobre = h('textarea', { class: 'input', rows: 4, maxlength: '600', placeholder: 'Quem guarda, quando abre, o que se diz desse caminho...' }, dados.sobre || '');
+    let janela = null;
+    const apagar = g && h('button', {
+      class: 'btn btn-perigo', type: 'button', onclick: async () => {
+        if (!await confirmar(`Tirar "${g.nome}" do mapa?`, { ok: 'Tirar', perigo: true })) return;
+        if (await tentar(() => del(`/api/portoes/${g.id}`), 'Portão tirado do mapa.')) {
+          janela?.fechar();
+          if (selecionado === `g${g.id}`) selecionado = null;
+          await carregar();
+        }
+      },
+    }, 'Tirar do mapa');
+    janela = modalForm({
+      titulo: g ? `Editar ${g.nome}` : 'Novo portão',
+      conteudo: [
+        h('div', { class: 'form-grade' },
+          campo('Nome', nome, { obrigatorio: true }),
+          campo('Direção', direcao, { ajuda: 'Neste mapa o Norte fica embaixo e o Sul em cima.' })),
+        campo('Para onde leva', destino, { ajuda: 'A cidade ou a região do outro lado. Aparece embaixo do nome, no mapa. Pode ficar vazio.' }),
+        campo('Sobre o portão', sobre, { ajuda: 'Texto livre (até 600 letras).' }),
+      ],
+      extraRodape: apagar,
+      async aoEnviar() {
+        const corpo = { nome: nome.value, direcao: direcao.value, destino: destino.value, sobre: sobre.value, x: dados.x, y: dados.y };
+        if (g) await put(`/api/portoes/${g.id}`, corpo);
+        else await post('/api/portoes', corpo);
+        await carregar();
+        aviso(g ? 'Portão salvo.' : 'Portão colocado no mapa.');
+      },
+    });
+  }
+
   function colarLista() {
     const area = h('textarea', { class: 'input', rows: 12, placeholder: 'Avenida Santa Menefreda\n\nEsquerda\nCasa 02 - Layla Weeslay\nCasa 04 - Casa da Família Lombardi\n\nDireita\nCasa 01 - Sem Dono\nCasa 03 - Noctis Caelum' });
     const via = h('select', { class: 'input' }, h('option', { value: '' }, 'Escolha a rua ou avenida'), VIAS.map(v => h('option', { value: v.id }, v.nome)));
@@ -793,7 +937,9 @@ export async function mapa() {
     }
     trocar(textoEdicao, tipo === 'casa'
       ? 'Clique num lugar vazio para pôr uma casa (ela encosta alinhada na rua). Arraste para mudar de lugar e clique para editar.'
-      : 'Clique num lugar vazio para pôr um prédio, uma loja ou outro ponto (com o ícone que quiser). Arraste para mudar de lugar e clique para editar.');
+      : tipo === 'portao'
+        ? 'Clique perto da muralha para pôr um portão (ele encaixa na muralha). Arraste um portão para mudar de lugar e clique para editar o nome e para onde leva.'
+        : 'Clique num lugar vazio para pôr um prédio, uma loja ou outro ponto (com o ícone que quiser). Arraste para mudar de lugar e clique para editar.');
   }
 
   /* Mouse e dedo: arrastar o mapa, rodinha e pinça para o zoom, arrastar casa ou prédio no modo de edição */
@@ -837,6 +983,26 @@ export async function mapa() {
         aoSoltar: async pos => {
           Object.assign(c, pos);
           if (await tentar(() => put(`/api/casas/${c.id}`, pos))) await carregar();
+        },
+      });
+      return;
+    }
+    const alvoPortao = e.target.closest?.('[data-portao]');
+    if (editando && e.button === 0 && alvoPortao) {
+      const g = portaoPorId(alvoPortao.dataset.portao);
+      arrastarLugar(e, alvoPortao, {
+        // Perto da muralha o portão encaixa nela (e, se a direção era norte, sul, leste ou oeste, acompanha o lado).
+        aoMover: ponto => {
+          const m = pontoNaMuralha(ponto);
+          const pos = m.dist < 34
+            ? { x: m.x, y: m.y, direcao: g.direcao === 'outro' ? 'outro' : direcaoPeloLado(m.dentro) }
+            : { ...dentroDoMapa(ponto), direcao: g.direcao };
+          alvoPortao.setAttribute('transform', `translate(${um(pos.x - g.x)} ${um(pos.y - g.y)})`);
+          return pos;
+        },
+        aoSoltar: async pos => {
+          Object.assign(g, pos);
+          if (await tentar(() => put(`/api/portoes/${g.id}`, pos))) await carregar();
         },
       });
       return;
@@ -905,10 +1071,10 @@ export async function mapa() {
       window.addEventListener('pointercancel', soltar);
     }
   });
-  // Teclado: Enter ou espaço num prédio abre a ficha (ou o formulário, na edição).
+  // Teclado: Enter ou espaço num prédio ou portão abre a ficha (ou o formulário, na edição).
   svg.addEventListener('keydown', e => {
     if (e.key !== 'Enter' && e.key !== ' ') return;
-    const predio = e.target.closest?.('[data-predio]');
+    const predio = e.target.closest?.('[data-predio], [data-portao]');
     if (!predio) return;
     e.preventDefault();
     predio.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -933,10 +1099,21 @@ export async function mapa() {
       else abrirPredio(p);
       return;
     }
+    const portao = e.target.closest('[data-portao]');
+    if (portao) {
+      const g = portaoPorId(portao.dataset.portao);
+      if (editando) formularioPortao(g);
+      else abrirPortao(g);
+      return;
+    }
     const alvo = e.target.closest('[data-id]');
-    if (editando && !alvo) {
+    // Para pôr um portão o clique vale até em cima de uma rua: ele vai para o ponto mais perto da muralha.
+    if (editando && (!alvo || porNoMapa === 'portao')) {
       const ponto = paraMapa(e.clientX, e.clientY);
-      if (porNoMapa === 'casa') formularioCasa(null, { ...encaixar(ponto), situacao: 'ocupada' });
+      if (porNoMapa === 'portao') {
+        const m = pontoNaMuralha(ponto);
+        formularioPortao(null, { x: m.x, y: m.y, direcao: direcaoPeloLado(m.dentro) });
+      } else if (porNoMapa === 'casa') formularioCasa(null, { ...encaixar(ponto), situacao: 'ocupada' });
       else formularioPredio(null, dentroDoMapa(ponto));
       return;
     }
@@ -959,11 +1136,14 @@ export async function mapa() {
     if (!alvo && !(casa && editando)) { dica.hidden = true; return; }
     const r = quadro.getBoundingClientRect();
     const predio = alvo?.dataset.predio ? predioPorId(alvo.dataset.predio) : null;
+    const portao = alvo?.dataset.portao ? portaoPorId(alvo.dataset.portao) : null;
     dica.textContent = casa
       ? `${enderecoDaCasa(casaPorId(idCasa))} (clique para editar, arraste para mover)`
       : predio
         ? `${predio.nome}${editando ? ' (clique para editar, arraste para mover)' : ' (clique para ver)'}`
-        : viaDoItem.get(alvo.dataset.id)?.nome || '';
+        : portao
+          ? `${portao.nome}${portao.destino ? ` · leva a ${portao.destino}` : ''}${editando ? ' (clique para editar, arraste para mover)' : ' (clique para ver)'}`
+          : viaDoItem.get(alvo.dataset.id)?.nome || '';
     dica.style.left = `${e.clientX - r.left}px`;
     dica.style.top = `${e.clientY - r.top}px`;
     dica.hidden = false;
@@ -978,7 +1158,7 @@ export async function mapa() {
   const textoEdicao = h('span');
   const seletorPor = h('div', { class: 'mapa-por', role: 'group', 'aria-label': 'O que pôr no mapa' },
     h('span', null, 'Pôr no mapa:'),
-    [['casa', 'Casa', 'casa'], ['predio', 'Prédio ou ponto', 'coluna']].map(([tipo, texto, ic]) => h('button', {
+    [['casa', 'Casa', 'casa'], ['predio', 'Prédio ou ponto', 'coluna'], ['portao', 'Novo portão', 'torre']].map(([tipo, texto, ic]) => h('button', {
       type: 'button', class: 'filtro-chip', 'data-tipo': tipo, onclick: () => escolherOQuePor(tipo),
     }, iconeDoMapa(ic), texto)));
   const barraEdicao = h('div', { class: 'mapa-edicao', hidden: true },
@@ -1006,6 +1186,7 @@ export async function mapa() {
   const listas = h('div', { class: 'mapa-listas' });
   const marca = i => {
     if (i.tipo === 'predio') return h('span', { class: `mapa-num predio cat-${i.predio.categoria}` }, iconeDoMapa(i.predio.icone));
+    if (i.tipo === 'portao') return h('span', { class: 'mapa-num predio cat-publico' }, iconeDoMapa('torre'));
     if (i.tipo === 'casa') return h('span', { class: `mapa-num casa sit-${i.casa.situacao}` }, i.casa.icone ? iconeDoMapa(i.casa.icone) : i.casa.numero);
     return h('span', { class: `mapa-num ${i.tipo}` }, i.n);
   };
@@ -1019,6 +1200,10 @@ export async function mapa() {
       id: `p${p.id}`, tipo: 'predio', predio: p, nome: p.nome, sub: p.tipo,
       busca: normalizar([p.nome, p.tipo, p.sub, ...p.pessoas.map(x => x.registro?.nome || x.nome)].join(' ')),
     }));
+  const itensDePortao = () => [...portoes].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(g => ({
+    id: `g${g.id}`, tipo: 'portao', portao: g, nome: g.nome, sub: g.destino ? `Leva a ${g.destino}` : 'Destino a definir',
+    busca: normalizar([g.nome, g.destino, g.sobre, 'portao muralha'].join(' ')),
+  }));
   function desenharListas() {
     const q = normalizar(busca.value.trim());
     const n = sit => casas.filter(c => c.situacao === sit).length;
@@ -1029,6 +1214,7 @@ export async function mapa() {
       ['Avenidas', ITENS_VIAS.filter(i => i.tipo === 'avenida')],
       ['Ruas', ITENS_VIAS.filter(i => i.tipo === 'rua')],
       ...GRUPOS_PREDIOS.map(([cat, titulo]) => [titulo, itensDePredio(cat), cat !== 'publico']),
+      ['Portões da muralha', itensDePortao(), true],
     ];
     // As casas só aparecem na lista quando alguém procura (são muitas).
     if (q) grupos.push(['Casas', itensDeCasa()]);
@@ -1044,8 +1230,9 @@ export async function mapa() {
               onclick: () => {
                 if (i.tipo === 'casa') fixarCasa(i.casa.id, { voar: true });
                 else if (i.tipo === 'predio') abrirPredio(i.predio, { voar: true });
+                else if (i.tipo === 'portao') abrirPortao(i.portao, { voar: true });
                 else selecionarVia(i.id, { voar: true });
-                if (i.tipo !== 'predio') quadro.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                if (i.tipo !== 'predio' && i.tipo !== 'portao') quadro.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
               },
               onmouseenter: () => (i.tipo === 'casa' ? null : realcar(i.id)),
               onmouseleave: () => realcar(null),

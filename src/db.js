@@ -465,6 +465,19 @@ CREATE TABLE IF NOT EXISTS predios (
   atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Portões da muralha de Lyendell (no mapa). x e y no espaço do mapa (1154 x 773); destino é a cidade ou região para onde levam.
+CREATE TABLE IF NOT EXISTS portoes (
+  id INTEGER PRIMARY KEY,
+  nome TEXT NOT NULL,
+  direcao TEXT NOT NULL DEFAULT 'outro',
+  x REAL NOT NULL,
+  y REAL NOT NULL,
+  destino TEXT NOT NULL DEFAULT '',
+  sobre TEXT NOT NULL DEFAULT '',
+  atualizado_por_nome TEXT NOT NULL DEFAULT '',
+  atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS musicas (
   id INTEGER PRIMARY KEY,
   tipo TEXT NOT NULL,
@@ -870,7 +883,7 @@ CREATE INDEX IF NOT EXISTS idx_escola_historico ON escola_historico(entidade, en
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 38;
+const VERSAO = 39;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -965,6 +978,9 @@ async function migrar() {
   // v30: os Aliados passam a ver a cidade (mapa, anúncios, Congresso, Juramento, Leis, Galeria, Comunidade) e a jogar na Recreação.
   if (versao < 30) await db.run('UPDATE cargos SET descricao = ? WHERE nome = ? AND descricao = ?', CARGOS_PADRAO.find(c => c.nome === 'Aliados').descricao, 'Aliados', 'Convidados e aliados de outras casas. Não são moradores: veem só o que for marcado para Convidados e Aliados.');
   if (versao < 30) await darPermissoes({ Aliados: ['aliados.ver', 'anuncios.ver', 'congresso.ver', 'leis.ver', 'galeria.ver', 'recreacao.usar'] });
+  // v39: os portões da muralha viram dados do mapa (tabela portoes, criada pelo ESQUEMA). Os três de hoje
+  // (Sul, Norte e Oeste) entram uma vez só; o semear de bancos novos chama a mesma função e a marca em meta impede repetir.
+  if (versao < 39) await semearPortoes();
   // v31: Gestão Financeira. As tabelas novas vêm do ESQUEMA; aqui entram o cargo Mestre da Moeda e a
   // leitura para a Família Nobre. As profissões e o saldo inicial do tesouro entram uma vez só (semear).
   // v34: a Escola Luckham. Todo morador vê a escola; os cargos Diretor da Escola e Professor da Escola nascem
@@ -1351,6 +1367,24 @@ async function resolverReferencias() {
   }
 }
 
+// Os portões da muralha de hoje, uma vez só. O norte do mapa fica para baixo: o portão do topo é o do Sul.
+// Ficam sobre a muralha (contorno CIDADE de public/js/mapa-lyendell.js); o dono ajusta arrastando no mapa.
+const PORTOES_PADRAO = [
+  { nome: 'Portão do Sul', direcao: 'sul', x: 680, y: 55 },
+  { nome: 'Portão do Norte', direcao: 'norte', x: 680, y: 728 },
+  { nome: 'Portão do Oeste', direcao: 'oeste', x: 205, y: 402 },
+];
+async function semearPortoes() {
+  if (await db.get("SELECT valor FROM meta WHERE chave = 'portoes_semeados'")) return;
+  const vazio = !(await db.get('SELECT COUNT(*) AS n FROM portoes')).n;
+  await db.lote([
+    ...(vazio ? PORTOES_PADRAO.map(p => [
+      "INSERT INTO portoes (nome, direcao, x, y, destino, atualizado_por_nome) VALUES (?, ?, ?, ?, '', 'Sistema')", p.nome, p.direcao, p.x, p.y,
+    ]) : []),
+    ["INSERT INTO meta (chave, valor) VALUES ('portoes_semeados', '1')"],
+  ]);
+}
+
 async function semear() {
   if (!(await db.get('SELECT COUNT(*) AS n FROM cargos')).n) {
     await db.lote(CARGOS_PADRAO.map((c, i) => [
@@ -1378,6 +1412,8 @@ async function semear() {
       ["INSERT INTO meta (chave, valor) VALUES ('casas_semeadas', '1')"],
     ]);
   }
+
+  await semearPortoes();
 
   // Os prédios do mapa (Septo, Coliseu, Toca do Coelho, Tabelionato, Banco, Quartel e Senado), uma vez só.
   if (!await db.get("SELECT valor FROM meta WHERE chave = 'predios_semeados'")) {

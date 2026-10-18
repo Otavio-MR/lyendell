@@ -972,7 +972,7 @@ tem, para testar). Um Bobo criança também pode, porque pegadinha é brincadeir
 ## Mapa de Lyendell
 
 A tela **Mapa de Lyendell** mostra a capital vista de cima, como uma planta escura no estilo do
-site: o rio, as muralhas, as torres e o portão com a ponte, as casas em grade, as 4 avenidas
+site: o rio, as muralhas, as torres e os portões (com a ponte, onde o rio chega perto), as casas em grade, as 4 avenidas
 (douradas) e as 10 ruas alinhadas (só retas e cantos), com o nome escrito em cada uma, e os prédios.
 
 - Arraste para andar pelo mapa; use a rodinha, a pinça no celular ou os botões + e − para o zoom.
@@ -1003,8 +1003,16 @@ menos em casa de família: nem todo mundo com o sobrenome mora nela, então o fo
 tem o sobrenome e mostra onde cada um já mora. Quem foi escolhido para uma casa ou para morar num
 prédio não aparece em outra casa pelo nome parecido. Só entram registros aprovados.
 
+**Portões.** A muralha tem portões editáveis (os três de hoje, Sul, Norte e Oeste, já vêm no mapa; lembre que o
+Norte fica embaixo). Cada portão é uma gravura de arco de pedra entre duas torres, de frente ou de lado conforme a
+muralha, com uma fita com o nome e, embaixo, "rumo a ..." com a cidade ou a região para onde ele leva. Clicando
+abre a ficha ("Leva a ...", onde fica e um texto livre). Quem edita o mapa pode pôr um **Novo portão** (ele
+encaixa na muralha), arrastar para outro ponto da muralha, mudar o nome, a direção, o destino e o texto, e tirar do
+mapa; sem portões, a muralha fica inteira. Os três iniciais entram uma vez só (veja `semearPortoes` em
+`src/db.js`) e as rotas ficam em `src/rotas/portoes.js`.
+
 Quem tem o poder "Colocar, mover e editar as casas e os prédios do mapa" (a Família Nobre e a
-Tabeliã) usa **Editar mapa** e escolhe o que pôr: **Casa** ou **Prédio ou ponto**.
+Tabeliã) usa **Editar mapa** e escolhe o que pôr: **Casa**, **Prédio ou ponto** ou **Novo portão**.
 
 - clicar num lugar vazio põe o que foi escolhido (a casa encosta alinhada na rua mais perto; o
   prédio fica onde foi clicado);
@@ -1022,7 +1030,7 @@ Numa rua em pé, esquerda é o lado oeste; numa rua deitada, é o lado de cima. 
 cima para baixo, ou da esquerda para a direita. As casas da Avenida Santa Menefreda já vêm no mapa.
 
 As ruas e o contorno da cidade ficam em `public/js/mapa-lyendell.js`, com as coordenadas tiradas da
-vista de cima do jogo (imagem de 1154 x 773, norte para cima). As casas e os prédios ficam no banco
+vista de cima do jogo (imagem de 1154 x 773). As casas, os prédios e os portões ficam no banco
 e são mexidos pelo próprio mapa; os prédios que vêm prontos estão em `src/predios-padrao.js`.
 
 ## Perfil e Comunidade

@@ -1,7 +1,7 @@
 // Dados do mapa de Lyendell, tirados da vista de cima do jogo (imagem de 1154 x 773).
 // Todas as coordenadas estão nesse espaço: x para a direita, y para baixo, norte para cima.
 // As vias foram alinhadas (só retas, cantos de 90° e diagonais de 45°), como numa planta da cidade.
-// As casas e os prédios ficam no banco e são colocados pelo próprio mapa (modo de edição).
+// As casas, os prédios e os portões ficam no banco e são colocados pelo próprio mapa (modo de edição).
 
 export const VISTA = [0, 0, 1154, 773];
 
@@ -18,10 +18,8 @@ export const RIO = [
   [1150, 735], [1070, 762], [970, 772], [880, 800],
 ];
 
-export const TORRES = [[227, 77], [662, 55], [698, 55], [992, 67], [1088, 716], [216, 716]];
-export const PORTAO = { x: 680, y: 55 };
-// Caminho do portão norte até a Avenida Nadir (sem nome).
-export const CAMINHOS = [[[680, 55], [680, 120]]];
+// Torres dos cantos da muralha. Os portões ficam no banco (tabela portoes) e levam as próprias torres.
+export const TORRES = [[227, 77], [992, 67], [1088, 716], [216, 716]];
 
 // n = número da legenda. pontos = o traçado; rotulo = o trecho reto onde o nome é escrito.
 export const AVENIDAS = [

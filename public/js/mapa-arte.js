@@ -4,7 +4,7 @@
 // Não usa filtros do SVG (arrastar e dar zoom ficam leves): o "tremido de tinta" é feito no próprio traçado,
 // com um ruído suave que depende só da posição (assim todas as camadas de uma rua tremem juntas).
 
-import { VISTA, CIDADE, RIO, AVENIDAS, RUAS, TORRES, PORTAO } from './mapa-lyendell.js';
+import { VISTA, CIDADE, RIO, AVENIDAS, RUAS, TORRES } from './mapa-lyendell.js';
 import { amostrar, dentro, linhasDaVia } from './mapa-casas.js';
 import { desenhoDoIcone } from './icones-mapa.js';
 
@@ -459,6 +459,22 @@ ARTE.hospital_imperial = () => ARTE.hospital()
   + bandeira(-31, -7, 'vm', 7) + bandeira(31, -7, 'vm', 7);
 ARTE.justica = () => ARTE.banco().replace(/<circle class="i ou" cx="0" cy="-9" r="4"\/><g class="gl".*$/, '') + `<circle class="i br" cx="0" cy="-9" r="4.4"/>` + gl('balanca', 0, -9, 6.4);
 
+// Os portões da muralha: arco de pedra entre duas torres redondas, com bandeira. De frente quando a muralha corre
+// de um lado ao outro (cima e baixo do mapa) e de lado quando ela corre de cima a baixo (esquerda e direita).
+// A origem é o ponto do portão, em cima da muralha. O desenho cobre a muralha ali, deixando o vão do portão.
+ARTE.portao_frente = () => `<ellipse class="sb" cx="2" cy="6" rx="28" ry="3.6"/>`
+  + muro(-17, 17, -12, 5, 3, 3.2) + HT('M9 -12H17V5H9Z')
+  + P('pc', 'M-8.4 5V-2a8.4 8.4 0 0 1 16.8 0V5h-2.4V-2a6 6 0 0 0 -12 0V5Z')
+  + P('pt', 'M-6 5V-2a6 6 0 0 1 12 0V5Z') + P('f', 'M-3 5V-7.4M0 5V-8M3 5V-7.4M-6 -1H6M-6 2H6')
+  + `<use href="#torre-muro" x="-17" y="-1"/><use href="#torre-muro" x="17" y="-1"/>`
+  + bandeira(0, -15, 'az', 9);
+ARTE.portao_lado = () => `<ellipse class="sb" cx="2" cy="16" rx="14" ry="30"/>`
+  + `<use href="#torre-muro" x="0" y="-21"/>`
+  + casaTelhado({ x0: -8, x1: 8, yt: 0, yb: 15, alt: 9, dx: 8, dy: 4.5, parede: 'pd', lado: 'ps', rl: 'tv', rr: 'tvs' })
+  + `<g transform="translate(8 0) skewY(-29.4)">${P('pc', 'M1 15V4.4a3 3 0 0 1 6 0V15Z')}${P('pt', 'M2 15V4.6a2 2 0 0 1 4 0V15Z')}${P('f', 'M4 2.6V15M2 8H6M2 11.6H6')}</g>`
+  + `<use href="#torre-muro" x="0" y="24"/>`
+  + bandeira(0, -9, 'az', 9);
+
 // Qual gravura vale para cada ícone do mapa. Ícone novo (que não está aqui) vira o "marco" com o desenho do ícone.
 const POR_ICONE = {
   castelo: 'castelo', septo: 'septo', espada: 'arena', alvo: 'arena', pergaminho: 'tabelionato', moeda: 'banco', coluna: 'senado',
@@ -617,38 +633,104 @@ export function muralha() {
     + `<path d="${MURALHA}" fill="none" stroke="${COR.tinta}" stroke-width="6.2" stroke-linejoin="round" stroke-dasharray="1 6.2" stroke-opacity="0.75"/>`
     + `<path d="${MURALHA}" fill="none" stroke="${COR.tinta}" stroke-width="0.7" stroke-linejoin="round" transform="translate(0 0)" stroke-opacity="0.9"/>`;
 }
+// As torres dos cantos. Os portões (que vêm do banco) levam as próprias torres: veja portaoNoMapa em mapa.js.
 export function torres() {
-  const { x, y } = PORTAO;
-  const ponte = `<path d="M${x - 11} 8V${y + 2}M${x + 11} 8V${y + 2}" fill="none" stroke="${COR.tinta}" stroke-width="3.4" stroke-linecap="butt"/>`
-    + `<path d="M${x - 11} 8V${y + 2}M${x + 11} 8V${y + 2}" fill="none" stroke="#cdb98a" stroke-width="2.2"/>`
-    + `<rect x="${x - 9.4}" y="8" width="18.8" height="${y - 6}" fill="#e9dcb4"/>`
-    + Array.from({ length: 8 }, (_, i) => `<path d="M${x - 9.4} ${12 + i * 5.2}h18.8" stroke="${COR.tinta}" stroke-width="0.6" stroke-opacity="0.55"/>`).join('')
-    + `<path d="M${x - 14} 26q5 -6 10 0M${x + 4} 26q5 -6 10 0" fill="none" stroke="${COR.tinta}" stroke-width="0.9"/>`;
-  return ponte + TORRES.map(([tx, ty]) => `<use href="#torre-muro" x="${tx}" y="${ty}"/>`).join('')
-    + `<use href="#torre-muro" x="${x - 15}" y="${y - 2}" transform="translate(0 0)"/><use href="#torre-muro" x="${x + 15}" y="${y - 2}"/>`
-    + `<path class="i pd" d="M${x - 15} ${y - 7}H${x + 15}V${y + 4}H${x - 15}Z"/>`
-    + `<path class="i pt" d="M${x - 5} ${y + 4}V${y - 2}a5 5 0 0 1 10 0V${y + 4}Z"/><path class="i f" d="M${x - 2.4} ${y + 4}V${y - 5}M${x + 2.4} ${y + 4}V${y - 5}" stroke-width="0.6"/>`
-    + `<use href="#torre-muro" x="${x - 15}" y="${y - 2}"/><use href="#torre-muro" x="${x + 15}" y="${y - 2}"/>`;
+  return TORRES.map(([tx, ty]) => `<use href="#torre-muro" x="${tx}" y="${ty}"/>`).join('');
 }
 
 /* ─── As vias ─────────────────────────────────────── */
 
-export function viasSvg(caminhos) {
+export function viasSvg() {
   const tipoRua = RUAS.map(v => ({ ...v, tipo: 'rua' }));
   const tipoAv = AVENIDAS.map(v => ({ ...v, tipo: 'avenida' }));
   const d = v => linhasDaVia(v).map(l => traco(l, { raio: 9 })).join('');
-  const dc = caminhos.map(l => traco(l, { raio: 9 })).join('');
   const cam = (classe, extra = '') => (v, k) => `<path class="${classe} m-${v.tipo}" d="${d(v)}" data-id="${v.id}"${extra}/>`;
-  const caminho = (classe) => `<path class="${classe} m-rua" d="${dc}"/>`;
   const todas = [...tipoRua, ...tipoAv];
   return `<g class="m-vias">`
-    + caminho('vo') + tipoRua.map(cam('vo')).join('') + tipoAv.map(cam('vo')).join('')
-    + caminho('vf') + tipoRua.map(cam('vf')).join('') + tipoAv.map(cam('vf')).join('')
+    + tipoRua.map(cam('vo')).join('') + tipoAv.map(cam('vo')).join('')
+    + tipoRua.map(cam('vf')).join('') + tipoAv.map(cam('vf')).join('')
     + tipoAv.map(v => `<path class="vi" d="${d(v)}"/>`).join('') + tipoAv.map(v => `<path class="vj" d="${d(v)}" data-id="${v.id}"/>`).join('')
-    + caminho('vf') + tipoRua.map(cam('vf')).join('')
-    + todas.map(v => `<path class="vc m-${v.tipo}" d="${d(v)}"/>`).join('') + `<path class="vc m-rua" d="${dc}"/>`
+    + tipoRua.map(cam('vf')).join('')
+    + todas.map(v => `<path class="vc m-${v.tipo}" d="${d(v)}"/>`).join('')
     + `</g>`;
 }
+
+/* ─── Os portões da muralha (vêm do banco) ────────── */
+
+// Para onde é "para dentro da cidade" em cada direção. Neste mapa o Norte fica embaixo e o Sul em cima.
+const PARA_DENTRO = { norte: [0, -1], sul: [0, 1], leste: [-1, 0], oeste: [1, 0] };
+const SEGMENTOS = CIDADE.map((a, i) => [a, CIDADE[(i + 1) % CIDADE.length]]);
+
+// O ponto da muralha mais perto de um ponto qualquer, a que distância está e para onde fica o lado de dentro.
+export function pontoNaMuralha([x, y]) {
+  let melhor = null;
+  for (const [a, b] of SEGMENTOS) {
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy)));
+    const px = a[0] + t * dx;
+    const py = a[1] + t * dy;
+    const dist = Math.hypot(x - px, y - py);
+    if (!melhor || dist < melhor.dist) melhor = { x: px, y: py, dist, dx, dy };
+  }
+  const l = Math.hypot(melhor.dx, melhor.dy);
+  let dentroDele = [-melhor.dy / l, melhor.dx / l];
+  if (!dentro([melhor.x + dentroDele[0] * 6, melhor.y + dentroDele[1] * 6], CIDADE)) dentroDele = [-dentroDele[0], -dentroDele[1]];
+  return { x: um(melhor.x), y: um(melhor.y), dist: melhor.dist, dentro: dentroDele };
+}
+// A direção (norte, sul, leste ou oeste) de um portão que está na muralha, pelo lado de dentro dela.
+export const direcaoPeloLado = ([ix, iy]) => (Math.abs(iy) >= Math.abs(ix) ? (iy > 0 ? 'sul' : 'norte') : (ix > 0 ? 'oeste' : 'leste'));
+
+// De frente (na muralha de cima ou de baixo) ou de lado (na da esquerda ou da direita), e para onde fica o lado de dentro.
+export function orientacaoDoPortao(p) {
+  const dentroDele = PARA_DENTRO[p.direcao] || pontoNaMuralha([p.x, p.y]).dentro;
+  return { modo: Math.abs(dentroDele[0]) > Math.abs(dentroDele[1]) ? 'lado' : 'frente', dentro: dentroDele };
+}
+// Quanto a gravura sobe e desce a partir do ponto do portão (para pôr a fita com o nome e medir o toque).
+export const ALCANCE_PORTAO = { frente: { cima: 36, baixo: 8 }, lado: { cima: 55, baixo: 31 } };
+
+// A estradinha de terra que liga o portão à rua mais perto (ou um trecho curto, se não houver rua perto).
+function trechoDoPortao(p) {
+  const { dentro: [ix, iy] } = orientacaoDoPortao(p);
+  let t = 30;
+  for (let k = 24; k <= 150; k += 4) {
+    if (!longe([p.x + ix * k, p.y + iy * k], AMOSTRAS_VIAS, 7)) { t = k; break; }
+  }
+  return [[p.x, p.y], [p.x + ix * t, p.y + iy * t]];
+}
+// A ponte de madeira, se o rio passa logo ao lado de fora do portão (como no do Sul).
+function ponteDoPortao(p) {
+  const { dentro: [ix, iy] } = orientacaoDoPortao(p);
+  let fim = 0;
+  for (let k = 6; k <= 90; k += 3) if (!longe([p.x - ix * k, p.y - iy * k], RIO_PTS, 21)) fim = k;
+  if (!fim) return '';
+  fim += 8;
+  const ang = um((Math.atan2(-ix, iy) * 180) / Math.PI);
+  return `<g transform="translate(${p.x} ${p.y}) rotate(${ang})">`
+    + `<path d="M-11 ${-fim}V2M11 ${-fim}V2" fill="none" stroke="${COR.tinta}" stroke-width="3.4"/>`
+    + `<path d="M-11 ${-fim}V2M11 ${-fim}V2" fill="none" stroke="#cdb98a" stroke-width="2.2"/>`
+    + `<rect x="-9.4" y="${-fim}" width="18.8" height="${fim + 2}" fill="#e9dcb4"/>`
+    + `<path d="${Array.from({ length: Math.floor(fim / 5.2) }, (_, i) => `M-9.4 ${um(4 - fim + i * 5.2)}h18.8`).join('')}" stroke="${COR.tinta}" stroke-width="0.6" stroke-opacity="0.55"/>`
+    + `<path d="M-14 ${um(-fim / 2)}q5 -6 10 0M4 ${um(-fim / 2)}q5 -6 10 0" fill="none" stroke="${COR.tinta}" stroke-width="0.9"/>`
+    + `</g>`;
+}
+// O que fica embaixo dos portões: a estradinha para dentro da cidade e a ponte, quando o rio chega perto.
+export function baseDosPortoes(portoes) {
+  if (!portoes.length) return '';
+  const d = portoes.map(p => traco(trechoDoPortao(p), { raio: 0 })).join('');
+  return portoes.map(ponteDoPortao).join('')
+    + `<path class="vo m-rua" d="${d}"/><path class="vf m-rua" d="${d}"/><path class="vc m-rua" d="${d}"/>`;
+}
+// Diz se um ponto (de uma árvore) cai em cima de um portão: da gravura, da estradinha ou da fita com o nome.
+function zonaDosPortoes(portoes) {
+  const trechos = portoes.map(trechoDoPortao);
+  return (x, y) => portoes.some((g, i) => {
+    if (Math.abs(x - g.x) < 70 && y > g.y - 60 && y < g.y + 60 && Math.hypot(x - g.x, y - g.y) < 78) return true;
+    const [a, b] = trechos[i];
+    return [0, 0.25, 0.5, 0.75, 1].some(f => Math.hypot(x - (a[0] + (b[0] - a[0]) * f), y - (a[1] + (b[1] - a[1]) * f)) < 24);
+  });
+}
+
 export function toqueSvg() {
   const todas = [...RUAS.map(v => ({ ...v, tipo: 'rua' })), ...AVENIDAS.map(v => ({ ...v, tipo: 'avenida' }))];
   return todas.map(v => `<path class="m-toque" d="${linhasDaVia(v).map(l => traco(l, { raio: 9 })).join('')}" data-id="${v.id}"/>`).join('');
@@ -683,7 +765,7 @@ function candidatas() {
     if (rnd() > (cidade ? 0.17 : 0.3 + dens * 0.7)) continue;
     if (!longe([x, y], RIO_PTS, 29)) continue;
     if (!longe([x, y], AMOSTRAS_VIAS, cidade ? 30 : 22) || !longe([x, y], AMOSTRAS_MURO, 15)) continue;
-    if (Math.hypot(x - PORTAO.x, y - PORTAO.y) < 50) continue;
+    if (Math.hypot(x - 680, y - 55) < 50) continue; // o lugar do antigo portão fixo: mantém a mesma floresta de antes (as árvores são sorteadas em sequência)
     if (perto(x, y, 9 + rnd() * 4)) continue;
     const tipo = rnd();
     aceitas.push({
@@ -698,11 +780,12 @@ function candidatas() {
 }
 let CANDIDATAS = null;
 
-// As árvores que não ficam em cima de casas nem de prédios (que vêm do banco e mudam).
-export function arvoresSvg(casas, predios) {
+// As árvores que não ficam em cima de casas, prédios nem portões (que vêm do banco e mudam).
+export function arvoresSvg(casas, predios, portoes = []) {
   CANDIDATAS ||= candidatas();
+  const noPortao = zonaDosPortoes(portoes);
   const caixas = { grande: [46, 48, 54], medio: [40, 40, 48], pequeno: [32, 30, 38] };
-  const lugar = a => !casas.some(c => Math.abs(c.x - a.x) < 12 && Math.abs(c.y - a.y) < 13)
+  const lugar = a => !noPortao(a.x, a.y) && !casas.some(c => Math.abs(c.x - a.x) < 12 && Math.abs(c.y - a.y) < 13)
     && !predios.some(p => {
       const [w, cima, baixo] = caixas[p.tamanho] || caixas.medio;
       // A fita com o nome é mais larga que a gravura.
@@ -774,7 +857,7 @@ export function cartucho() {
 // A chave do mapa (legenda), na faixa da esquerda. É um grupo à parte para o celular poder esconder.
 export const ITENS_CHAVE = [
   ['avenida', 'Avenidas'], ['rua', 'Ruas'], ['publico', 'Prédios públicos'], ['comercio', 'Comércios e pontos'], ['centro', 'Centro da cidade'],
-  ['ocupada', 'Casa com morador'], ['comercio-casa', 'Casa de comércio'], ['sem_dono', 'Casa sem dono'], ['muro', 'Muralha e torres'], ['rio', 'Rio'],
+  ['ocupada', 'Casa com morador'], ['comercio-casa', 'Casa de comércio'], ['sem_dono', 'Casa sem dono'], ['muro', 'Muralha e torres'], ['portao', 'Portões'], ['rio', 'Rio'],
 ];
 function amostraDaChave(tipo, x, y) {
   switch (tipo) {
@@ -783,6 +866,7 @@ function amostraDaChave(tipo, x, y) {
     case 'publico': return `<use href="#a-septo" transform="translate(${x} ${y - 2}) scale(0.4)"/>`;
     case 'comercio': return `<use href="#a-taverna" transform="translate(${x} ${y - 2}) scale(0.4)"/>`;
     case 'centro': return medalha(x, y);
+    case 'portao': return `<use href="#a-portao_frente" transform="translate(${x} ${y + 3}) scale(0.46)"/>`;
     case 'ocupada': return `<use href="#c-ocupada-0" transform="translate(${x} ${y - 1}) scale(1.35)"/>`;
     case 'comercio-casa': return `<use href="#c-comercio-1" transform="translate(${x} ${y - 1}) scale(1.35)"/>`;
     case 'sem_dono': return `<use href="#c-sem_dono-0" transform="translate(${x} ${y - 1}) scale(1.35)"/>`;
@@ -795,9 +879,9 @@ export function miniaturaDaChave(tipo) {
   return `<svg viewBox="-20 -17 40 34" width="40" height="34" aria-hidden="true">${amostraDaChave(tipo, 0, 0)}</svg>`;
 }
 export function chave() {
-  const [x0, y0, w] = [20, 156, 168];
+  const [x0, y0, w] = [20, 150, 168];
   const linhas = ITENS_CHAVE.length;
-  const h = 40 + linhas * 21.6 + 6;
+  const h = 40 + linhas * 20.4 + 6;
   const cx = x0 + w / 2;
   return `<g class="m-chave" pointer-events="none">`
     + `<rect x="${x0 + 2}" y="${y0 + 3}" width="${w}" height="${h}" rx="3" fill="${COR.tinta}" opacity="0.22"/>`
@@ -806,7 +890,7 @@ export function chave() {
     + `<text class="m-chave-titulo" x="${cx}" y="${y0 + 22}">CHAVE DO MAPA</text>`
     + `<path d="M${cx - 44} ${y0 + 28}h88" stroke="${COR.tinta}" stroke-width="0.8"/><path class="i ou" d="M${cx - 3} ${y0 + 28}l3 -3 3 3 -3 3Z"/>`
     + ITENS_CHAVE.map(([tipo, texto], i) => {
-      const y = y0 + 46 + i * 21.6;
+      const y = y0 + 46 + i * 20.4;
       return `${amostraDaChave(tipo, x0 + 30, y)}<text class="m-chave-texto" x="${x0 + 56}" y="${y + 3.6}">${texto}</text>`;
     }).join('')
     + `</g>`;

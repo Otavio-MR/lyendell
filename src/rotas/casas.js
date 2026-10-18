@@ -2,7 +2,7 @@
 // a situação, o ícone (opcional) e quem mora. Quem mora é ligado pelo nome aos registros do Tabelionato
 // (Moradores, Nobres e Outros), de onde vêm a foto e os dados mostrados no mapa.
 // Sem ninguém escolhido à mão, o mapa tenta achar pelo nome da casa (menos casas de família).
-// O GET também manda os prédios (veja rotas/predios.js), para o mapa carregar tudo de uma vez.
+// O GET também manda os prédios (veja rotas/predios.js) e os portões da muralha (rotas/portoes.js), para o mapa carregar tudo de uma vez.
 const express = require('express');
 const { db } = require('../db');
 const { exigirLogin, exigir, pode } = require('../auth');
@@ -42,6 +42,7 @@ const formatar = c => ({ ...c, pessoas: JSON.parse(c.pessoas || '[]') });
 r.get('/', async (req, res) => {
   const casas = (await db.all('SELECT * FROM casas ORDER BY via, id')).map(formatar);
   const predios = (await db.all('SELECT * FROM predios ORDER BY id')).map(formatarPredio);
+  const portoes = await db.all('SELECT * FROM portoes ORDER BY id');
   const verTabelionato = pode(req, 'tabelionato.ver');
   const podeEditar = pode(req, 'mapa.editar');
   const pessoas = verTabelionato || podeEditar ? await pessoasRegistradas() : [];
@@ -53,6 +54,7 @@ r.get('/', async (req, res) => {
       palpite: !c.pessoas.length, // quem mora foi achado pelo nome da casa, e não escolhido à mão
     })),
     predios: predios.map(p => comPessoas(p, verTabelionato ? pessoas : [])),
+    portoes,
     podeEditar,
     // Para escolher quem mora, na hora de editar.
     nomes: podeEditar ? pessoas.map(p => ({ nome: p.nome, livro: p.livro })) : undefined,
