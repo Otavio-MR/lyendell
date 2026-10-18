@@ -35,32 +35,45 @@ function avisosDeAprovacao(p = {}) {
 }
 
 // Nível, sequência de dias e as missões de hoje: o motivo para voltar amanhã.
+// O adulto vê a ficha do morador (pergaminho); a criança mantém o painel dela.
 function painelProgresso(pr, { crianca = false } = {}) {
   const feitas = pr.missoes.filter(m => m.feito >= m.meta).length;
+  const missoes = h('ul', null, pr.missoes.map(m => {
+    const pronta = m.feito >= m.meta;
+    return h('li', { class: `missao ${pronta ? 'pronta' : ''}`.trim() },
+      h('span', { class: 'missao-marca' }, icone(pronta ? 'check' : 'alvo')),
+      h('div', { class: 'missao-texto' },
+        h('span', null, m.texto, m.funcao && h('span', { class: 'missao-funcao', title: 'Missão do seu cargo' }, crianca ? 'só sua' : 'da sua função')),
+        m.meta > 1 && !pronta && h('div', { class: 'missao-barra' }, barra(m.feito, m.meta), h('small', null, `${m.feito}/${m.meta}`))),
+      h('span', { class: 'missao-xp' }, `+${m.xp} XP`));
+  }));
+  const sequencia = h('div', { class: 'perfil-sequencia', title: 'Dias seguidos entrando no site' },
+    icone('fogo'), h('strong', null, pr.sequencia), h('small', null, pr.sequencia === 1 ? 'dia seguido' : 'dias seguidos'));
+  const resumo = feitas === pr.missoes.length ? 'Todas cumpridas! Amanhã tem mais.' : `${feitas} de ${pr.missoes.length} cumpridas · renovam à meia-noite`;
+  if (!crianca) {
+    return h('section', { class: 'ficha progresso-inicio' },
+      h('div', { class: 'ficha-topo' },
+        seloNivel(pr.nivel, 'grande'),
+        h('div', { class: 'ficha-nivel' }, h('strong', null, pr.nivel.titulo), barraNivel(pr.nivel)),
+        sequencia),
+      h('div', { class: 'ficha-missoes' },
+        h('div', { class: 'ficha-missoes-cab' }, h('h3', null, 'Missões de hoje'), h('small', { class: 'suave' }, resumo)),
+        missoes),
+      h('p', { class: 'progresso-dica suave' }, 'Ganhe XP conversando no chat, jogando, ajudando nas atividades e deixando recados. Subir de nível libera molduras novas para a foto.'));
+  }
   return h('section', { class: 'painel progresso-inicio' },
     h('div', { class: 'progresso-topo' },
       seloNivel(pr.nivel, 'grande'),
       h('div', { class: 'progresso-nivel' },
         h('strong', null, pr.nivel.titulo),
         barraNivel(pr.nivel)),
-      h('div', { class: 'perfil-sequencia', title: 'Dias seguidos entrando no site' },
-        icone('fogo'), h('strong', null, pr.sequencia), h('small', null, pr.sequencia === 1 ? 'dia seguido' : 'dias seguidos'))),
+      sequencia),
     h('div', { class: 'missoes' },
       h('div', { class: 'missoes-cab' },
-        h('h3', null, icone('tarefas'), crianca ? 'Aventuras de hoje' : 'Missões de hoje'),
-        h('small', { class: 'suave' }, feitas === pr.missoes.length ? 'Todas cumpridas! Amanhã tem mais.' : `${feitas} de ${pr.missoes.length} cumpridas · renovam à meia-noite`)),
-      h('ul', null, pr.missoes.map(m => {
-        const pronta = m.feito >= m.meta;
-        return h('li', { class: `missao ${pronta ? 'pronta' : ''}`.trim() },
-          h('span', { class: 'missao-marca' }, icone(pronta ? 'check' : 'alvo')),
-          h('div', { class: 'missao-texto' },
-            h('span', null, m.texto, m.funcao && h('span', { class: 'missao-funcao', title: 'Missão do seu cargo' }, crianca ? 'só sua' : 'da sua função')),
-            m.meta > 1 && !pronta && h('div', { class: 'missao-barra' }, barra(m.feito, m.meta), h('small', null, `${m.feito}/${m.meta}`))),
-          h('span', { class: 'missao-xp' }, `+${m.xp} XP`));
-      }))),
-    h('p', { class: 'progresso-dica suave' }, crianca
-      ? 'Brincar, conversar e ajudar os grandes faz o seu coelhinho crescer. Quanto maior ele fica, mais molduras bonitas você ganha!'
-      : 'Ganhe XP conversando no chat, jogando, ajudando nas atividades e deixando recados. Subir de nível libera molduras novas para a foto.'));
+        h('h3', null, icone('tarefas'), 'Aventuras de hoje'),
+        h('small', { class: 'suave' }, resumo)),
+      missoes),
+    h('p', { class: 'progresso-dica suave' }, 'Brincar, conversar e ajudar os grandes faz o seu coelhinho crescer. Quanto maior ele fica, mais molduras bonitas você ganha!'));
 }
 
 // As últimas publicações do Congresso e das Leis de Lyendell: todo mundo precisa saber o que mudou.
@@ -151,7 +164,7 @@ function painelAniversarios(lista, { crianca = false } = {}) {
     souEu && h('p', { class: 'aniversario-meu' }, crianca ? 'Feliz aniversário! Hoje o dia é seu!' : `Feliz aniversário, ${eu.nome.split(' ')[0]}! Toda Lyendell comemora com você.`),
     // Os Aliados não abrem a Comunidade: para eles o aniversariante aparece sem o link do perfil.
     h('div', { class: 'aniversario-lista' }, lista.map(p => h(ehMorador() || p.id === eu.id ? 'a' : 'div', { class: 'aniversario-pessoa', href: ehMorador() || p.id === eu.id ? `#/pessoa/${p.id}` : null },
-      h('span', { class: 'aniversario-foto' }, avatar(p.nome, 'avatar-m', p.foto), h('span', { class: 'aniversario-bolo', 'aria-hidden': 'true' }, '🎂')),
+      h('span', { class: 'aniversario-foto' }, avatar(p.nome, 'avatar-m', p.foto), h('span', { class: 'aniversario-bolo', 'aria-hidden': 'true' }, crianca ? '🎂' : icone('presente'))),
       h('strong', null, p.nome),
       h('small', null, p.id === eu.id ? 'É você!' : 'Dê parabéns!')))));
 }
@@ -178,37 +191,73 @@ function painelProcurados(p, { crianca = false } = {}) {
     })));
 }
 
-// Os últimos anúncios e as atividades abertas (para os Aliados, só os marcados para Convidados e Aliados).
-function gradeMurais(d) {
-  return h('div', { class: 'inicio-grade' },
-    d.anuncios && h('section', { class: 'painel' },
-      h('header', { class: 'painel-cab' }, h('h2', null, icone('megafone'), 'Últimos anúncios'), h('a', { href: '#/anuncios' }, 'Ver mural')),
-      d.anuncios.length
-        ? h('div', { class: 'lista-simples' }, d.anuncios.map(a =>
-          h('a', { class: 'anuncio-mini', href: '#/anuncios' },
-            h('div', { class: 'anuncio-mini-topo' },
-              a.fixado ? h('span', { class: 'etiqueta' }, icone('alfinete'), 'Fixado') : null,
-              a.importancia !== 'comum' ? h('span', { class: `etiqueta imp-${a.importancia}` }, a.importancia === 'urgente' ? 'Urgente' : 'Importante') : null,
-              a.aliados && ehMorador() ? chipAliados() : null),
-            h('strong', null, a.titulo),
-            h('p', null, (t => (t.length > 140 ? `${t.slice(0, 140)}…` : t))(semFormatacao(a.conteudo))),
-            h('small', null, `${a.autor_nome} · ${relativo(a.criado_em)}`))))
-        : h('p', { class: 'painel-vazio' }, 'Nenhum anúncio ainda.')),
+// Mural de avisos: cada anúncio é um papel pregado, com peso conforme a importância.
+function muralDeAvisos(d) {
+  if (!d.anuncios) return null;
+  const resumo = t => (t.length > 150 ? `${t.slice(0, 150)}…` : t);
+  return h('section', { class: 'quadro-avisos' },
+    h('header', { class: 'mural-cab' }, h('h2', null, 'Mural de avisos'), h('a', { href: '#/anuncios' }, 'Ver mural')),
+    d.anuncios.length
+      ? h('div', { class: 'mural-quadro' }, d.anuncios.map((a, i) => {
+        const imp = a.importancia === 'urgente' || a.importancia === 'importante' ? a.importancia : 'comum';
+        return h('a', { class: `aviso aviso-${imp}${a.fixado ? ' aviso-fixado' : ''}`, href: '#/anuncios', style: { '--i': i } },
+          imp !== 'comum' && h('span', { class: 'aviso-faixa' }, imp === 'urgente' ? 'Urgente' : 'Importante'),
+          h('strong', { class: 'aviso-titulo' }, a.titulo),
+          h('p', { class: 'aviso-texto' }, resumo(semFormatacao(a.conteudo))),
+          h('small', { class: 'aviso-rodape' },
+            a.fixado ? icone('alfinete') : null,
+            a.fixado ? h('span', null, 'Fixado ·') : null,
+            h('span', null, `${a.autor_nome} · ${relativo(a.criado_em)}`),
+            a.aliados && ehMorador() ? chipAliados() : null));
+      }))
+      : h('p', { class: 'mural-vazio' }, 'Nenhum anúncio ainda.'));
+}
 
-    d.atividades && h('section', { class: 'painel' },
-      h('header', { class: 'painel-cab' }, h('h2', null, icone('tarefas'), 'Precisamos de ajuda'), h('a', { href: '#/atividades' }, 'Ver todas')),
-      d.atividades.length
-        ? h('div', { class: 'lista-simples' }, d.atividades.map(a =>
-          h('a', { class: 'ativ-mini', href: `#/atividades/${a.id}` },
-            h('div', { class: 'ativ-mini-topo' },
-              h('strong', null, a.titulo),
-              a.aliados && ehMorador() ? chipAliados() : null,
-              h('span', { class: 'suave' }, `${Math.floor(Math.min(100, (a.total / a.meta) * 100))}%`)),
-            barra(a.total, a.meta),
-            h('small', null, `${num(a.total)} de ${num(a.meta)} ${a.item}`,
-              pacotes(a.meta, a.pacote) ? ` (${pacotes(a.meta, a.pacote)})` : '',
-              a.prazo ? ` · até ${dataCurta(a.prazo)}` : ''))))
-        : h('p', { class: 'painel-vazio' }, 'Nenhuma atividade aberta no momento.')));
+// As atividades abertas, como ordens de serviço (para os Aliados, só as marcadas para Convidados e Aliados).
+function ordensDeAjuda(d) {
+  if (!d.atividades) return null;
+  return h('section', { class: 'painel' },
+    h('header', { class: 'painel-cab' }, h('h2', null, 'Precisamos de ajuda'), h('a', { href: '#/atividades' }, 'Ver todas')),
+    d.atividades.length
+      ? h('div', null, d.atividades.map(a =>
+        h('a', { class: 'ordem', href: `#/atividades/${a.id}` },
+          h('div', { class: 'ordem-topo' },
+            h('strong', { class: 'ordem-titulo' }, a.titulo, a.aliados && ehMorador() ? chipAliados() : null),
+            h('span', { class: 'ordem-pct' }, `${Math.floor(Math.min(100, (a.total / a.meta) * 100))}%`)),
+          barra(a.total, a.meta),
+          h('small', null, `${num(a.total)} de ${num(a.meta)} ${a.item}`,
+            pacotes(a.meta, a.pacote) ? ` (${pacotes(a.meta, a.pacote)})` : '',
+            a.prazo ? ` · até ${dataCurta(a.prazo)}` : ''))))
+      : h('p', { class: 'painel-vazio' }, 'Nenhuma atividade aberta no momento.'));
+}
+
+// A cidade em números, como um livro-razão com pontilhado.
+function razaoDaCidade(linhas) {
+  if (!linhas.length) return null;
+  return h('nav', { class: 'razao', 'aria-label': 'A cidade em números' },
+    h('h2', { class: 'razao-titulo' }, 'A cidade em números'),
+    linhas.map(x => h('a', { class: 'razao-linha', href: x.href },
+      icone(x.icone), h('span', null, x.rotulo), h('span', { class: 'razao-pontos', 'aria-hidden': 'true' }),
+      h('strong', { class: `razao-valor${typeof x.valor === 'number' ? '' : ' texto'}` }, typeof x.valor === 'number' ? num(x.valor) : x.valor))));
+}
+
+// Cabeçalho da chancelaria: brasão grande, saudação em letra de proclamação e o selo de cera do cargo.
+function cabecalhoInicio(eu, cargos) {
+  return h('header', { class: 'chancelaria' },
+    h('img', { src: '/img/brasao.png', alt: '', class: 'ch-brasao' }),
+    h('div', { class: 'ch-texto' },
+      h('h1', { class: 'pag-titulo ch-saudacao' }, h('span', { class: 'ch-hora' }, `${saudacao()},`), ' ', h('span', { class: 'ch-nome' }, eu.nome)),
+      h('div', { class: 'ch-selos' }, cargos.map(c => h('span', { class: 'selo-cargo', style: { '--cor': c.cor } },
+        h('span', { class: 'selo-cera', 'aria-hidden': 'true' }, icone(c.icone || 'escudo')),
+        h('span', { class: 'selo-fita' }, c.nome))))));
+}
+
+// As duas colunas da tela inicial. No celular viram uma só, na ordem dada por --o.
+function colunasInicio(esq, dir) {
+  const marcar = lista => lista.filter(x => x && x[0]).map(([el, o]) => { el.style.setProperty('--o', o); return el; });
+  return h('div', { class: 'inicio-cols' },
+    h('div', { class: 'col col-a' }, marcar(esq)),
+    h('div', { class: 'col col-b' }, marcar(dir)));
 }
 
 // Início dos Aliados (convidados e aliados de outras casas, que não são moradores): os avisos públicos
@@ -216,38 +265,38 @@ function gradeMurais(d) {
 function inicioAliado(d, procurados, convite) {
   const eu = estado.eu;
   const modulos = Object.entries(MODULOS).filter(([m]) => veModulo(m));
+  const razao = razaoDaCidade(modulos.map(([m, info]) => ({
+    rotulo: info.titulo, icone: info.icone, href: m === 'leis' ? '#/leis' : `#/${m}`, valor: pode(`${m}.ver`) ? 'Ler' : 'Livros abertos',
+  })));
   return h('div', { class: 'pagina inicio' },
-    h('section', { class: 'boas-vindas' },
-      h('img', { src: '/img/brasao.png', alt: '', class: 'bv-brasao' }),
-      h('div', { class: 'bv-texto' },
-        h('p', { class: 'sobrelinha' }, 'Cidade de Lyendell · Casa Luckham'),
-        h('h1', { class: 'pag-titulo bv-titulo' }, `${saudacao()}, ${eu.nome}`),
-        h('div', { class: 'chips' }, eu.cargos.map(chipCargo)))),
+    cabecalhoInicio(eu, eu.cargos),
     h('p', { class: 'nota' }, icone('alianca'), h('span', null, 'Você é Aliado da Casa Luckham: pode ver a cidade, jogar e conversar na Recreação e no Club Coelho, mas não publica nem edita nada.')),
     avisosDeAprovacao(d.pendencias),
-    painelAniversarios(d.aniversariantes),
-    painelProcurados(procurados),
-    convite,
-    painelNovidades(d.leis, { titulo: 'Leis de Lyendell', icone: 'balanca', href: '#/leis' }),
-    painelNovidades(d.congresso, { titulo: 'Novidades do Congresso', icone: 'coluna', href: '#/congresso' }),
-    modulos.length ? h('div', { class: 'numeros' }, modulos.map(([m, info]) =>
-      h('a', { class: 'numero', href: m === 'leis' ? '#/leis' : `#/${m}` },
-        h('span', { class: 'numero-icone' }, icone(info.icone)),
-        h('strong', null, info.titulo),
-        h('span', null, pode(`${m}.ver`) ? 'Ler' : 'Livros abertos para você')))) : null,
-    gradeMurais(d));
+    colunasInicio([
+      [muralDeAvisos(d), 1],
+      [ordensDeAjuda(d), 5],
+      [painelNovidades(d.leis, { titulo: 'Leis de Lyendell', icone: 'balanca', href: '#/leis' }), 6],
+      [painelNovidades(d.congresso, { titulo: 'Novidades do Congresso', icone: 'coluna', href: '#/congresso' }), 7],
+      [razao, 8],
+    ], [
+      [painelAniversarios(d.aniversariantes), 3],
+      [painelProcurados(procurados), 4],
+      [convite, 9],
+    ]));
 }
 
-// A Grande Nadir na tela inicial: dá para perguntar daqui mesmo (a resposta vem na tela dela).
+// A Grande Nadir na tela inicial: o altar de vela, de onde dá para perguntar (a resposta vem na tela dela).
 function chamadaNadir() {
   if (!pode('nadir.usar')) return null;
   const pergunta = h('input', { class: 'input', maxlength: '600', placeholder: 'Quem é Niko? Como nasceu a Casa Luckham?', 'aria-label': 'Pergunte à Nadir' });
-  return h('section', { class: 'nadir-chamada' },
-    emblemaNadir(),
-    h('div', { class: 'nadir-chamada-texto' },
-      h('div', null, h('strong', null, 'Pergunte à Grande Nadir'), h('small', null, ' · a Coelha Mãe sabe do mundo, da Casa e de cada um')),
-      h('form', { onsubmit: e => { e.preventDefault(); if (pergunta.value.trim()) perguntarANadir(pergunta.value.trim()); else location.hash = '#/nadir'; } },
-        pergunta, h('button', { class: 'btn btn-ouro', type: 'submit' }, icone('lua'), 'Perguntar'))));
+  return h('section', { class: 'altar' },
+    h('div', { class: 'altar-nicho' }, emblemaNadir()),
+    h('div', { class: 'altar-corpo' },
+      h('h2', { class: 'altar-titulo' }, 'Pergunte à Grande Nadir'),
+      h('p', { class: 'altar-sub' }, 'A Coelha Mãe sabe do mundo, da Casa e de cada um.'),
+      h('form', { class: 'altar-form', onsubmit: e => { e.preventDefault(); if (pergunta.value.trim()) perguntarANadir(pergunta.value.trim()); else location.hash = '#/nadir'; } },
+        pergunta, h('button', { class: 'btn btn-ouro', type: 'submit' }, icone('lua'), 'Perguntar'))),
+    h('span', { class: 'altar-vela', 'aria-hidden': 'true' }));
 }
 
 export async function inicio() {
@@ -273,41 +322,29 @@ export async function inicio() {
   ].filter(Boolean);
 
   const cargos = eu.is_root
-    ? [h('span', { class: 'chip chip-ouro' }, icone('coroa'), 'Administrador')]
-    : eu.cargos.length ? eu.cargos.map(chipCargo) : [h('span', { class: 'chip' }, 'Morador')];
+    ? [{ nome: 'Administrador', cor: '#d8b13a', icone: 'coroa' }]
+    : eu.cargos.length ? eu.cargos : [{ nome: 'Morador', cor: '#9a9b74' }];
 
   return h('div', { class: 'pagina inicio' },
-    h('section', { class: 'boas-vindas' },
-      h('img', { src: '/img/brasao.png', alt: '', class: 'bv-brasao' }),
-      h('div', { class: 'bv-texto' },
-        h('p', { class: 'sobrelinha' }, 'Cidade de Lyendell · Casa Luckham'),
-        h('h1', { class: 'pag-titulo bv-titulo' }, `${saudacao()}, ${eu.nome}`),
-        h('div', { class: 'chips' }, cargos))),
+    cabecalhoInicio(eu, cargos),
 
     chamadaNadir(),
 
     avisosDeAprovacao(d.pendencias),
 
-    painelAniversarios(d.aniversariantes),
-
-    painelProcurados(procurados),
-
-    convite,
-
-    painelNovidades(d.leis, { titulo: 'Novas Leis de Lyendell', icone: 'balanca', href: '#/leis' }),
-
-    painelNovidades(d.congresso, { titulo: 'Novidades do Congresso', icone: 'coluna', href: '#/congresso', extra: pode('congresso.propor') && h('a', { class: 'nota nota-link', href: '#/congresso/propostas' },
-      icone('pena'), h('span', null, 'Tem uma ideia para Lyendell? Mande uma proposta de lei ao Congresso.'), h('strong', null, 'Propor')) }),
-
-    pr && painelProgresso(pr),
-
-    numeros.length ? h('div', { class: 'numeros' }, numeros.map(x =>
-      h('a', { class: 'numero', href: x.href },
-        h('span', { class: 'numero-icone' }, icone(x.icone)),
-        h('strong', null, num(x.valor)),
-        h('span', null, x.rotulo)))) : null,
-
-    gradeMurais(d),
+    colunasInicio([
+      [muralDeAvisos(d), 1],
+      [ordensDeAjuda(d), 5],
+      [painelNovidades(d.leis, { titulo: 'Novas Leis de Lyendell', icone: 'balanca', href: '#/leis' }), 6],
+      [painelNovidades(d.congresso, { titulo: 'Novidades do Congresso', icone: 'coluna', href: '#/congresso', extra: pode('congresso.propor') && h('a', { class: 'nota nota-link', href: '#/congresso/propostas' },
+        icone('pena'), h('span', null, 'Tem uma ideia para Lyendell? Mande uma proposta de lei ao Congresso.'), h('strong', null, 'Propor')) }), 7],
+      [razaoDaCidade(numeros), 8],
+    ], [
+      [pr && painelProgresso(pr), 2],
+      [painelAniversarios(d.aniversariantes), 3],
+      [painelProcurados(procurados), 4],
+      [convite, 9],
+    ]),
 
     pr && painelComunidade(pr),
 

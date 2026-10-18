@@ -194,7 +194,6 @@ function telaLogin() {
   trocar(app, h('main', { class: 'login' },
     h('div', { class: 'login-caixa' },
       h('img', { src: '/img/brasao.png', alt: 'Brasão da Casa Luckham', class: 'login-brasao' }),
-      h('p', { class: 'sobrelinha' }, 'Cidade de Lyendell'),
       h('h1', { class: 'login-titulo' }, 'Casa Luckham'),
       h('p', { class: 'login-sub' }, 'Administração da cidade'),
       form,
