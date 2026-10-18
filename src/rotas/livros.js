@@ -539,7 +539,28 @@ r.get('/modulos/:modulo/envios', async (req, res) => {
   res.json(await registrosNaoAprovados(req, m, "r.situacao <> 'aprovado' AND r.criado_por = ?", req.usuario.id));
 });
 
-async function revisar(req, situacao, motivo) {
+// A assinatura desenhada de quem aprova: { l, a, tracos: [[[x, y], ...], ...] } em uma grade de 600 x 200.
+// Guarda só os números (nada de imagem do navegador), com limites de tamanho. Vazia ou inválida vira null.
+function lerAssinatura(v) {
+  if (!v || typeof v !== 'object' || !Array.isArray(v.tracos)) return null;
+  const tracos = [];
+  let pontos = 0;
+  for (const t of v.tracos.slice(0, 40)) {
+    if (!Array.isArray(t)) continue;
+    const p = [];
+    for (const q of t.slice(0, 600)) {
+      const x = Number(q?.[0]); const y = Number(q?.[1]);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+      p.push([Math.min(600, Math.max(0, Math.round(x))), Math.min(200, Math.max(0, Math.round(y)))]);
+    }
+    pontos += p.length;
+    if (p.length) tracos.push(p);
+  }
+  if (!tracos.length || pontos < 3 || pontos > 6000) return null;
+  return JSON.stringify({ tracos });
+}
+
+async function revisar(req, situacao, motivo, assinatura = null) {
   const { reg, livro } = await buscarRegistro(req);
   checar(req, `${livro.modulo}.aprovar`);
   if (reg.situacao !== 'pendente') throw erro(409, 'Este registro não está mais aguardando aprovação.');
@@ -547,7 +568,7 @@ async function revisar(req, situacao, motivo) {
   if (situacao === 'aprovado') {
     // Ao ser aprovado, entra no livro com o menor número livre.
     await comNumeroLivre(() => db.run(`UPDATE registros SET situacao = 'aprovado', motivo = NULL, revisado_por_nome = ?,
-      revisado_em = datetime('now'), numero = ${PROXIMO_NUMERO} WHERE id = ? AND situacao = 'pendente'`, req.usuario.nome, livro.id, reg.id));
+      revisado_em = datetime('now'), numero = ${PROXIMO_NUMERO}, assinatura = ? WHERE id = ? AND situacao = 'pendente'`, req.usuario.nome, livro.id, lerAssinatura(assinatura), reg.id));
   } else {
     await db.run("UPDATE registros SET situacao = ?, motivo = ?, revisado_por_nome = ?, revisado_em = datetime('now') WHERE id = ?",
       situacao, motivo, req.usuario.nome, reg.id);
@@ -579,12 +600,24 @@ r.get('/procurados', async (req, res) => {
 });
 
 r.post('/registros/:id/aprovar', async (req, res) => {
-  const { reg, livro } = await revisar(req, 'aprovado', null);
+  const { reg, livro } = await revisar(req, 'aprovado', null, req.body?.assinatura);
   await anotar(req, `Aprovou um registro em "${livro.nome}"`, `nº ${reg.numero}: ${tituloDoRegistro(livro, reg.dados)} (enviado por ${reg.criado_por_nome})`);
   await progresso.registrar(req.usuario.id, `revisao_${livro.modulo}`);
   avisarRegistro(livro, reg.id, reg.dados);
   avisarAliados(livro, reg.id, reg.dados);
   avisarQuemMandou(livro, reg, true, req.usuario);
+  res.json({ ok: true });
+});
+
+// Quem aprova (ex.: a Tabeliã) assina um registro já aprovado, por exemplo um que ela mesma registrou. Refazer substitui.
+r.post('/registros/:id/assinar', async (req, res) => {
+  const { reg, livro } = await buscarRegistro(req);
+  checar(req, `${livro.modulo}.aprovar`);
+  if (reg.situacao !== 'aprovado') throw erro(409, 'Só dá para assinar um registro aprovado.');
+  const assinatura = lerAssinatura(req.body?.assinatura);
+  if (!assinatura) throw erro(400, 'Desenhe a assinatura (alguns traços).');
+  await db.run("UPDATE registros SET assinatura = ?, revisado_por_nome = ?, revisado_em = COALESCE(revisado_em, datetime('now')) WHERE id = ?", assinatura, req.usuario.nome, reg.id);
+  await anotar(req, `Assinou um registro em "${livro.nome}"`, `nº ${reg.numero}: ${tituloDoRegistro(livro, reg.dados)}`);
   res.json({ ok: true });
 });
 

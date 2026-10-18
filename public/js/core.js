@@ -494,7 +494,7 @@ export function modal({ titulo, corpo, rodape, tamanho = '', classe = '', fechar
 // aoEnviar pode devolver false para manter o modal aberto.
 // Campos com o atributo required vazios são apontados antes de enviar. Se a pessoa mexeu e tenta sair, pergunta antes de perder.
 let contadorForm = 0;
-export function modalForm({ titulo, conteudo, textoOk = 'Salvar', classeOk = 'btn-ouro', tamanho = '', extraRodape, aoEnviar }) {
+export function modalForm({ titulo, conteudo, textoOk = 'Salvar', classeOk = 'btn-ouro', tamanho = '', classe = '', extraRodape, aoEnviar }) {
   const id = `form-${++contadorForm}`;
   const erroEl = h('p', { class: 'form-erro', role: 'alert', hidden: true });
   const ok = h('button', { class: `btn ${classeOk}`, type: 'submit', form: id }, textoOk);
@@ -504,7 +504,7 @@ export function modalForm({ titulo, conteudo, textoOk = 'Salvar', classeOk = 'bt
   form.addEventListener('input', () => { mexeu = true; });
   form.addEventListener('change', () => { mexeu = true; });
   const m = modal({
-    titulo, tamanho, fecharFora: false, corpo: form,
+    titulo, tamanho, classe, fecharFora: false, corpo: form,
     antesDeFechar: () => (mexeu && !enviado
       ? confirmar('O que você preencheu aqui ainda não foi salvo e vai se perder.', { titulo: 'Sair sem salvar?', ok: 'Sair sem salvar', cancelar: 'Continuar editando', perigo: true })
       : true),

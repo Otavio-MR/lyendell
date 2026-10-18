@@ -390,6 +390,14 @@ marcar @Guardas) e `SITE_URL`.
 **Controle**: por período, mostra por guarda as horas marcadas e cumpridas, faltas, convocações recebidas, atendidas e
 retiradas, e um ranking de quem mais trabalha. O Comandante marca cada turno como cumprido ou faltou.
 
+## Registros como papel e assinatura
+
+O documento de cada registro e o formulário de novo registro parecem uma folha de livro (papel envelhecido, campos escritos em tinta, selo de cera,
+carimbo de pendente ou recusado). Quem aprova (Tabeliã, Comandante, Diretor do Hospital, Senadora) pode **assinar de verdade**:
+ao aprovar abre uma almofada para desenhar com o mouse, o dedo ou a caneta (a assinatura é opcional e dá para reusar a última).
+Registros já aprovados, inclusive os que a pessoa registra direto, podem ser assinados depois pelo botão **Assinar este registro**.
+A assinatura aparece só no site; no livro .book do Minecraft vai apenas o nome.
+
 ## A Grande Nadir (a IA da Casa)
 
 No menu, **A Grande Nadir** (`#/nadir`): a Coelha Mãe Sagrada responde sobre o mundo de Eldoria, a fé, a Casa

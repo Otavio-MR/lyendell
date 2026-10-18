@@ -7,6 +7,7 @@ import {
 import { livroDeRegistro, livroDeRegistros, livroDeMoradores, documentoDeIdentidade, modeloDePessoas } from '../livro-mc.js';
 import { verPagamentos, resumoCobranca } from './pagamentos.js';
 import { nomeInfantil } from '../crianca.js';
+import { almofadaDeAssinatura, desenharAssinatura, lerAssinatura, corpoDaAssinatura, lerUltimaAssinatura, guardarUltimaAssinatura } from '../assinatura.js';
 
 // Para os Aliados (convidados de outras casas): só os livros abertos para Convidados e Aliados aparecem.
 const notaAliado = m => !pode(`${m}.ver`) && pode('aliados.ver') && h('p', { class: 'nota' }, icone('alianca'),
@@ -92,7 +93,7 @@ function valorCurto(c, v, dados) {
 
 function valorCompleto(c, v, dados) {
   switch (c.tipo) {
-    case 'imagem': return h('a', { href: v, target: '_blank', rel: 'noopener' }, h('img', { class: 'doc-imagem', src: v, alt: c.nome }));
+    case 'imagem': return h('a', { class: 'doc-foto', href: v, target: '_blank', rel: 'noopener', title: 'Abrir a imagem inteira' }, h('img', { class: 'doc-imagem', src: v, alt: c.nome }));
     case 'texto_longo': return h('div', { class: 'texto-livre' }, v);
     case 'selecao': return String(v);
     default: return valorCurto(c, v, dados);
@@ -219,7 +220,7 @@ function cartaoPendente(m, r, l, permissoes, recarregar, modo) {
       modo === 'aprovacoes' && permissoes.aprovar && soATabeliaAprova(m, r) && h('small', { class: 'suave' }, 'Espera a aprovação da Tabeliã'),
       modo === 'aprovacoes' && permissoes.aprovar && !soATabeliaAprova(m, r) && [
         botao('Recusar', { classe: 'btn-pequeno', onclick: () => recusar(r, titulo, recarregar) }),
-        botao('Aprovar', { icone: 'check', classe: 'btn-pequeno btn-ouro', onclick: () => aprovar(r, recarregar) }),
+        botao('Aprovar', { icone: 'check', classe: 'btn-pequeno btn-ouro', onclick: () => aprovar(m, r, titulo, recarregar) }),
       ]));
 }
 
@@ -431,6 +432,12 @@ async function baixarIdentidade(m, l, r) {
 
 /* ─── Ver registro (como documento oficial) ───────── */
 
+// O cargo de quem aprova, para a linha de assinatura ("da Tabeliã" vira "Tabeliã").
+const cargoDe = m => {
+  const t = MODULOS[m].aprovador.replace(/^d[aeo]s?\s+/i, '');
+  return t.charAt(0).toUpperCase() + t.slice(1);
+};
+
 function verRegistro(m, d, r, recarregar, reabrir) {
   const l = d.livro;
   const titulo = tituloDe(l, r.dados);
@@ -439,41 +446,73 @@ function verRegistro(m, d, r, recarregar, reabrir) {
   const meuEnvio = !aprovado && r.criado_por === estado.eu.id;
   const podeEditar = d.permissoes.editar || meuEnvio;
   const podeApagar = d.permissoes.apagar || meuEnvio;
+  const tracos = lerAssinatura(r.assinatura);
+  const podeAssinar = !!d.permissoes.aprovar && aprovado && !ehCrianca();
   const linhas = [];
   let secaoPendente = null;
   for (const c of l.campos) {
     if (c.tipo === 'secao') { secaoPendente = c; continue; }
     const v = r.dados[c.id];
     if (!temValor(c, r.dados)) continue;
-    if (secaoPendente) { linhas.push(h('h3', { class: 'doc-secao' }, secaoPendente.nome)); secaoPendente = null; }
+    if (secaoPendente) { linhas.push(h('h3', { class: 'doc-secao' }, h('span', null, secaoPendente.nome))); secaoPendente = null; }
     const largo = c.tipo === 'texto_longo' || c.tipo === 'imagem';
-    linhas.push(h('div', { class: `doc-linha ${largo ? 'larga' : ''}`.trim() },
+    linhas.push(h('div', { class: `doc-linha ${largo ? 'larga' : ''} ${c.tipo === 'imagem' ? 'doc-linha-foto' : ''}`.trim() },
       h('span', { class: 'doc-rotulo' }, c.nome),
       h('div', { class: 'doc-valor' }, valorCompleto(c, v, r.dados))));
   }
 
+  // Depois de assinar, o documento abre de novo já com a assinatura no papel.
+  const aposAssinar = () => { janela.fechar(); (reabrir || recarregar)(r.id); };
+
+  // No fim do papel: a linha de assinatura. Aprovado: a assinatura desenhada (ou só a linha com o nome), o cargo e a data.
+  function blocoAssinatura() {
+    if (r.situacao === 'recusado') return null;
+    if (!aprovado) {
+      return h('section', { class: 'doc-assina', 'aria-label': 'Assinatura' },
+        h('div', { class: 'doc-assina-col' },
+          h('div', { class: 'doc-assina-tinta' }),
+          h('p', { class: 'doc-assina-nome doc-assina-espera' }, `Assinatura ${MODULOS[m].aprovador}`)));
+    }
+    if (!tracos && !r.revisado_por_nome && !podeAssinar) return null;
+    const tinta = h('div', { class: 'doc-assina-tinta' });
+    if (tracos) desenharAssinatura(tinta, tracos, { ajustar: true, rotulo: `Assinatura de ${r.revisado_por_nome || 'quem aprovou'}` });
+    const convite = podeAssinar && !tracos && h('div', { class: 'doc-convite' },
+      h('p', null, 'Este registro ainda não foi assinado. Assine no papel, com o mouse ou o dedo.'),
+      botao('Assinar este registro', { icone: 'pena', classe: 'btn-ouro', onclick: () => pedirAssinatura(m, r, titulo, { modo: 'assinar', depois: aposAssinar }) }));
+    const assinou = tracos || r.revisado_por_nome;
+    return h('section', { class: `doc-assina ${tracos ? 'assinado' : ''}`.trim(), 'aria-label': 'Assinatura' },
+      assinou && h('span', { class: 'selo-lacre', 'aria-hidden': 'true' }, icone('coelho')),
+      h('div', { class: 'doc-assina-col' },
+        convite,
+        tinta,
+        assinou && h('p', { class: 'doc-assina-nome' }, r.revisado_por_nome || 'Aprovado'),
+        assinou && h('p', { class: 'doc-assina-cargo' }, cargoDe(m), r.revisado_em && h('time', null, ` · ${dataCurta(r.revisado_em)}`))));
+  }
+
   const cartaz = ehLivroDeCartaz(l) ? h('canvas', { class: 'cartaz cartaz-doc', width: 600, height: 860 }) : null;
   if (cartaz) desenharCartaz(cartaz, dadosDoCartaz(l, r.dados));
-  const doc = h('article', { class: 'documento' },
+  const doc = h('article', { class: `documento documento-livro sit-${r.situacao || 'aprovado'}` },
     cartaz,
-    !aprovado && h('p', { class: `doc-situacao ${r.situacao}` },
-      r.situacao === 'pendente'
-        ? `Aguardando aprovação ${MODULOS[m].aprovador}`
-        : `Recusado por ${r.revisado_por_nome || 'desconhecido'}${r.motivo ? `: ${r.motivo}` : ''}`),
+    r.numero && h('div', { class: 'doc-numero', title: `Registro nº ${r.numero}` }, h('small', null, 'Registro nº'), h('strong', null, String(r.numero).padStart(4, '0'))),
     h('header', { class: 'doc-cab' },
       h('img', { src: '/img/brasao.png', alt: '', class: 'doc-brasao' }),
       h('p', { class: 'doc-sobre' }, `${MODULOS[m].titulo} de Lyendell`),
       h('h2', { class: 'doc-titulo' }, titulo),
       h('p', { class: 'doc-livro' }, r.numero ? `${l.nome} · Registro nº ${r.numero}` : `${l.nome} · sem número até ser aprovado`)),
+    !aprovado && h('p', { class: `doc-situacao ${r.situacao}` },
+      r.situacao === 'pendente'
+        ? `Aguardando aprovação ${MODULOS[m].aprovador}`
+        : `Recusado por ${r.revisado_por_nome || 'desconhecido'}${r.motivo ? `: ${r.motivo}` : ''}`),
     h('div', { class: 'doc-campos' }, linhas.length ? linhas : h('p', { class: 'suave' }, 'Registro sem informações.')),
+    !aprovado && h('div', { class: `doc-carimbo sit-${r.situacao}`, 'aria-hidden': 'true' }, h('span', null, r.situacao === 'pendente' ? 'Aguardando aprovação' : 'Recusado')),
+    blocoAssinatura(),
     h('footer', { class: 'doc-assinatura' },
       h('p', null, `Registrado por ${r.criado_por_nome || 'desconhecido'} em ${dataHora(r.criado_em)}.`),
-      r.atualizado_em && h('p', null, `Alterado por ${r.atualizado_por_nome} em ${dataHora(r.atualizado_em)}.`),
-      aprovado && r.revisado_por_nome && h('p', null, `Aprovado por ${r.revisado_por_nome} em ${dataHora(r.revisado_em)}.`)));
+      r.atualizado_em && h('p', null, `Alterado por ${r.atualizado_por_nome} em ${dataHora(r.atualizado_em)}.`)));
 
   const cancelar = meuEnvio && !d.permissoes.apagar;
   const janela = modal({
-    corpo: doc, tamanho: 'medio', classe: 'modal-documento',
+    corpo: h('div', { class: 'papel-mesa' }, doc), tamanho: 'medio', classe: 'modal-documento modal-livro',
     rodape: [
       podeApagar && botao(cancelar ? 'Cancelar envio' : 'Apagar', {
         icone: 'lixo', classe: 'btn-perigo-texto',
@@ -495,25 +534,80 @@ function verRegistro(m, d, r, recarregar, reabrir) {
         onclick: () => baixarIdentidade(m, l, r),
       }),
       botao('Baixar .book', {
-        icone: 'baixar', titulo: 'Baixa este registro como livro para o mod Scribble',
+        icone: 'baixar', titulo: 'Baixa este registro como livro para o mod Scribble (só com o nome de quem aprovou, sem a assinatura)',
         onclick: () => livroDeRegistro(MODULOS[m].titulo, l, r, estado.eu.nome).baixar(),
       }),
+      podeAssinar && tracos && botao('Refazer a assinatura', { icone: 'pena', onclick: () => pedirAssinatura(m, r, titulo, { modo: 'assinar', refazer: true, depois: aposAssinar }) }),
       podeEditar && botao('Editar', { icone: 'editar', onclick: () => { janela.fechar(); formRegistro(l, r, reabrir || recarregar); } }),
       d.permissoes.aprovar && r.situacao === 'pendente' && !soATabeliaAprova(m, r) && botao('Recusar', { onclick: () => recusar(r, titulo, () => { janela.fechar(); recarregar(); }) }),
       d.permissoes.aprovar && r.situacao === 'pendente' && !soATabeliaAprova(m, r) && botao('Aprovar', {
         icone: 'check', classe: 'btn-ouro',
-        onclick: () => aprovar(r, () => { janela.fechar(); recarregar(); }),
+        onclick: () => aprovar(m, r, titulo, () => { janela.fechar(); (reabrir || recarregar)(r.id); }),
       }),
       botao('Fechar', { onclick: () => janela.fechar() }),
     ],
   });
 }
 
-async function aprovar(r, depois) {
-  if (await tentar(() => post(`/api/registros/${r.id}/aprovar`), 'Registro aprovado. Já está no livro oficial.')) {
-    window.dispatchEvent(new Event('avisos'));
-    depois();
+// Aprovar abre a almofada: o aprovador assina o papel (ou aprova sem assinar, que é opcional).
+function aprovar(m, r, titulo, depois) {
+  pedirAssinatura(m, r, titulo, { modo: 'aprovar', depois });
+}
+
+// A janela "Assine para aprovar" (e "Assinar o registro", "Refazer a assinatura").
+function pedirAssinatura(m, r, titulo, { modo, refazer = false, depois }) {
+  const eu = estado.eu;
+  const chave = `lyendell.assinatura.${eu.id}`;
+  const aprovando = modo === 'aprovar';
+  let enviando = false;
+  const bOk = h('button', { class: 'btn btn-ouro', type: 'button', disabled: true, onclick: () => enviar(true) },
+    aprovando ? 'Aprovar e assinar' : refazer ? 'Trocar a assinatura' : 'Assinar o registro');
+  const bSem = aprovando && h('button', { class: 'btn btn-fantasma assinar-sem', type: 'button', onclick: () => enviar(false) }, 'Aprovar sem assinar');
+  const bCancelar = h('button', { class: 'btn', type: 'button', onclick: () => janela.fechar() }, 'Cancelar');
+  const almofada = almofadaDeAssinatura({ aoMudar: vazio => { bOk.disabled = enviando || vazio; } });
+  const ultima = lerUltimaAssinatura(chave);
+  const bUsar = ultima && h('button', { class: 'btn btn-pequeno', type: 'button', onclick: () => almofada.definir(ultima) },
+    icone('pena'), h('span', null, 'Usar a minha última assinatura'));
+
+  function travar(sim) {
+    enviando = sim;
+    bOk.disabled = sim || almofada.vazio();
+    for (const b of [bSem, bCancelar, bUsar]) if (b) b.disabled = sim;
+    bOk.classList.toggle('carregando', sim);
   }
+
+  async function enviar(comAssinatura) {
+    if (enviando) return;
+    if (comAssinatura && almofada.vazio()) return;
+    travar(true);
+    try {
+      const corpo = comAssinatura ? corpoDaAssinatura(almofada.tracos()) : undefined;
+      await post(`/api/registros/${r.id}/${aprovando ? 'aprovar' : 'assinar'}`, corpo);
+      if (comAssinatura) guardarUltimaAssinatura(almofada.tracos(), chave);
+      aviso(aprovando
+        ? (comAssinatura ? 'Registro aprovado e assinado. Já está no livro oficial.' : 'Registro aprovado. Já está no livro oficial.')
+        : 'Assinatura guardada no registro.');
+      window.dispatchEvent(new Event('avisos'));
+      janela.fechar();
+      depois();
+    } catch (e) {
+      aviso(e.message, 'erro');
+      travar(false);
+    }
+  }
+
+  const janela = modal({
+    titulo: aprovando ? 'Assine para aprovar' : refazer ? 'Refazer a assinatura' : 'Assinar o registro',
+    tamanho: 'medio', classe: 'modal-assinar',
+    corpo: h('div', { class: 'assinar' },
+      h('p', { class: 'assinar-intro' }, aprovando
+        ? `Você vai aprovar "${titulo}". Assine no papel, com o mouse, o dedo ou a caneta. A assinatura é opcional.`
+        : `Assine "${titulo}" no papel, com o mouse, o dedo ou a caneta. ${refazer ? 'A nova assinatura toma o lugar da anterior.' : ''}`.trim()),
+      almofada.elemento,
+      h('p', { class: 'assinar-quem' }, h('strong', null, eu.nome), h('span', null, cargoDe(m))),
+      bUsar),
+    rodape: [bSem, h('span', { class: 'espaco' }), bCancelar, bOk],
+  });
 }
 
 function recusar(r, titulo, depois) {
@@ -551,9 +645,15 @@ export async function formRegistro(l, r, aoSalvar, inicial = null) {
 
   modalForm({
     titulo: r ? `Editar registro · ${l.nome}` : `Novo registro · ${l.nome}`,
-    tamanho: 'medio',
+    tamanho: 'medio', classe: 'modal-papel',
     textoOk: r ? 'Salvar alterações' : 'Registrar',
-    conteudo: h('div', { class: 'form-grade' }, l.campos.map(c => entradaDoCampo(c, valores, ctx))),
+    conteudo: [
+      h('header', { class: 'folha-cab' },
+        h('img', { src: '/img/brasao.png', alt: '', class: 'folha-brasao' }),
+        h('p', { class: 'folha-sobre' }, `${MODULOS[l.modulo].titulo} de Lyendell`),
+        h('p', { class: 'folha-livro' }, r?.numero ? `${l.nome} · Registro nº ${r.numero}` : l.nome)),
+      h('div', { class: 'form-grade' }, l.campos.map(c => entradaDoCampo(c, valores, ctx))),
+    ],
     aoEnviar: async () => {
       if (ctx.envio.n) throw new Error('Espere a imagem terminar de enviar.');
       const faltando = l.campos.find(c => c.obrigatorio && (valores[c.id] == null || String(valores[c.id]).trim() === ''));

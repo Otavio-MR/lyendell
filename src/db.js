@@ -121,7 +121,8 @@ CREATE TABLE IF NOT EXISTS registros (
   revisado_por_nome TEXT,
   revisado_em TEXT,
   motivo TEXT,
-  numero INTEGER
+  numero INTEGER,
+  assinatura TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_registros_livro ON registros(livro_id);
 
@@ -869,7 +870,7 @@ CREATE INDEX IF NOT EXISTS idx_escola_historico ON escola_historico(entidade, en
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 36;
+const VERSAO = 37;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -968,6 +969,8 @@ async function migrar() {
   // leitura para a Família Nobre. As profissões e o saldo inicial do tesouro entram uma vez só (semear).
   // v34: a Escola Luckham. Todo morador vê a escola; os cargos Diretor da Escola e Professor da Escola nascem
   // aqui. Os registros do Corpo Docente e das Matrículas que estavam no Tabelionato vêm para o sistema da escola.
+  // v37: a assinatura desenhada de quem aprova um registro (traços guardados em JSON).
+  if (versao < 37 && !await colunaExiste('registros', 'assinatura')) await db.run('ALTER TABLE registros ADD COLUMN assinatura TEXT');
   // v36: a Escala da Guarda (turnos, convocações). O Comandante gere; os guardas veem a agenda e respondem.
   if (versao < 36) await darPermissoes({ 'Guarda': ['escala.ver'], 'Comandante da Guarda': ['escala.ver', 'escala.gerir'], 'Família Nobre': ['escala.ver', 'escala.gerir'] });
   // v35: quem vem de fora de Lyendell não tem endereço aqui: a escola guarda a cidade ou região de onde vem.
