@@ -83,6 +83,7 @@ app.use('/api/clube', require('./src/rotas/clube'));
 app.use('/api/propostas', require('./src/rotas/propostas'));
 app.use('/api/juramento', require('./src/rotas/juramento'));
 app.use('/api/tabeliao', require('./src/rotas/tabeliao'));
+app.use('/api/guarda-escala', require('./src/rotas/guarda-escala'));
 app.use('/api/sprites', require('./src/rotas/sprites'));
 app.use('/api/notificacoes', require('./src/rotas/notificacoes'));
 app.use('/api/financas', require('./src/rotas/financas'));

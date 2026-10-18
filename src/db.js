@@ -712,6 +712,43 @@ CREATE TABLE IF NOT EXISTS escola_disciplinas (
 
 -- Uma linha por professor em cada disciplina (quem se inscreve em duas tem duas linhas).
 -- situacao: avaliacao (inscrito), titular, substituto, afastado, desligado.
+-- Escala da Guarda do Coelho: turnos marcados pelo Comandante e convocações (chamadas extras no Discord).
+-- situacao do turno: agendado, cumprido ou faltou. Turno que termina antes de começar passa da meia-noite.
+CREATE TABLE IF NOT EXISTS guarda_turnos (
+  id INTEGER PRIMARY KEY,
+  usuario_id INTEGER NOT NULL,
+  data TEXT NOT NULL,
+  inicio TEXT NOT NULL,
+  fim TEXT NOT NULL,
+  obs TEXT NOT NULL DEFAULT '',
+  situacao TEXT NOT NULL DEFAULT 'agendado',
+  criado_por_nome TEXT NOT NULL DEFAULT '',
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_guarda_turnos_data ON guarda_turnos(data);
+CREATE INDEX IF NOT EXISTS idx_guarda_turnos_usuario ON guarda_turnos(usuario_id, data);
+-- Convocação: "preciso de guardas agora". Cada convocado diz que compareceu; o Comandante confere e pode retirar.
+CREATE TABLE IF NOT EXISTS guarda_convocacoes (
+  id INTEGER PRIMARY KEY,
+  motivo TEXT NOT NULL,
+  local TEXT NOT NULL DEFAULT '',
+  criada_por_nome TEXT NOT NULL DEFAULT '',
+  criada_em TEXT NOT NULL DEFAULT (datetime('now')),
+  encerrada_em TEXT,
+  discord_msg TEXT
+);
+-- situacao: convocado, compareceu (o guarda apertou o botão) ou removido (o Comandante retirou).
+CREATE TABLE IF NOT EXISTS guarda_convocados (
+  convocacao_id INTEGER NOT NULL,
+  usuario_id INTEGER NOT NULL,
+  situacao TEXT NOT NULL DEFAULT 'convocado',
+  respondeu_em TEXT,
+  conferido INTEGER NOT NULL DEFAULT 0,
+  removido_por_nome TEXT,
+  motivo_remocao TEXT,
+  PRIMARY KEY (convocacao_id, usuario_id)
+);
+
 CREATE TABLE IF NOT EXISTS escola_professores (
   id INTEGER PRIMARY KEY,
   disciplina_id INTEGER NOT NULL,
@@ -832,7 +869,7 @@ CREATE INDEX IF NOT EXISTS idx_escola_historico ON escola_historico(entidade, en
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 35;
+const VERSAO = 36;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -931,6 +968,8 @@ async function migrar() {
   // leitura para a Família Nobre. As profissões e o saldo inicial do tesouro entram uma vez só (semear).
   // v34: a Escola Luckham. Todo morador vê a escola; os cargos Diretor da Escola e Professor da Escola nascem
   // aqui. Os registros do Corpo Docente e das Matrículas que estavam no Tabelionato vêm para o sistema da escola.
+  // v36: a Escala da Guarda (turnos, convocações). O Comandante gere; os guardas veem a agenda e respondem.
+  if (versao < 36) await darPermissoes({ 'Guarda': ['escala.ver'], 'Comandante da Guarda': ['escala.ver', 'escala.gerir'], 'Família Nobre': ['escala.ver', 'escala.gerir'] });
   // v35: quem vem de fora de Lyendell não tem endereço aqui: a escola guarda a cidade ou região de onde vem.
   // (Bancos já na v34 recebem as colunas aqui; bancos novos já as têm pelo ESQUEMA.)
   if (versao < 35) {

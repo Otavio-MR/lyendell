@@ -98,6 +98,10 @@ const CATALOGO = [
     { chave: 'escola.lecionar', nome: 'Fazer a chamada das aulas e lançar notas' },
     { chave: 'escola.gerir', nome: 'Matricular alunos, inscrever professores, criar disciplinas, turmas e aulas e configurar a escola (Diretor da Escola)' },
   ] },
+  { grupo: 'Escala da Guarda', itens: [
+    { chave: 'escala.ver', nome: 'Ver a agenda de turnos da Guarda do Coelho, as convocações e responder às suas (Guardas, Comandante e Família Nobre)' },
+    { chave: 'escala.gerir', nome: 'Marcar os turnos dos guardas, convocar a Guarda (no Discord), confirmar ou retirar presenças e ver o controle de quem mais trabalha (Comandante da Guarda)' },
+  ] },
   { grupo: 'Nadir', itens: [
     { chave: 'nadir.usar', nome: 'Conversar com a Grande Nadir (ela só conta o que a pessoa já pode ver no site)' },
     { chave: 'nadir.ensinar', nome: 'Escrever no Livro de Nadir (o que ela sabe sobre o mundo, a Casa e as pessoas) e ver as perguntas feitas a ela' },
@@ -110,7 +114,7 @@ const TODAS = CATALOGO.flatMap(g => g.itens.map(i => i.chave));
 // Nada de registrar, editar, apagar, aprovar, publicar ou administrar (isso é coisa de gente grande).
 // A parte dos Aliados (convidados de outras casas) também fica de fora.
 const PERMITIDAS_CRIANCA = new Set([
-  ...TODAS.filter(p => p.endsWith('.ver') && p !== 'usuarios.ver' && p !== 'diario.ver' && p !== 'aliados.ver' && p !== 'financas.ver' && p !== 'escola.ver'),
+  ...TODAS.filter(p => p.endsWith('.ver') && p !== 'usuarios.ver' && p !== 'diario.ver' && p !== 'aliados.ver' && p !== 'financas.ver' && p !== 'escola.ver' && p !== 'escala.ver'),
   'atividades.participar', 'recreacao.usar', 'bobo.pegadinhas', 'nadir.usar',
 ]);
 // Coisas só do Bobo da Corte: nem a Família Nobre recebe junto com "tudo".
@@ -176,10 +180,10 @@ const CARGOS_PADRAO = [
     permissoes: [...MEMBRO, 'tabelionato.registrar'] },
   { nome: 'Comandante da Guarda', cor: '#c0553a',
     descricao: DESCRICOES['Comandante da Guarda'][1],
-    permissoes: [...MEMBRO, ...acoes('guarda', 'registrar', 'editar', 'apagar', 'configurar', 'aprovar')] },
+    permissoes: [...MEMBRO, ...acoes('guarda', 'registrar', 'editar', 'apagar', 'configurar', 'aprovar'), 'escala.ver', 'escala.gerir'] },
   { nome: 'Guarda', cor: '#6f9a58',
     descricao: DESCRICOES.Guarda[1],
-    permissoes: [...MEMBRO, 'guarda.registrar'] },
+    permissoes: [...MEMBRO, 'guarda.registrar', 'escala.ver'] },
   { nome: 'Diretor do Hospital', cor: '#4fa39b',
     descricao: 'Comanda o Hospital: aprova os registros de pacientes, edita, apaga e configura os livros.',
     permissoes: [...MEMBRO, ...acoes('hospital', 'ver', 'registrar', 'editar', 'apagar', 'configurar', 'aprovar')] },

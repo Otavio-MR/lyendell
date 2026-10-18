@@ -373,6 +373,23 @@ Docente e Matrículas) são **trazidos para cá** (alunos, professores e substit
 Tabelionato; nada é apagado, os livros ficam guardados. Registro que ainda aguardava aprovação entra como
 matriculado com uma observação explicando.
 
+## Escala da Guarda
+
+Em **Escala da Guarda** (menu Registros) o Comandante da Guarda controla quem atende e quando. Quem tem a permissão
+`escala.gerir` (Comandante da Guarda e Família Nobre) marca os **turnos** (guarda, dia, hora de início e fim; vários
+guardas e vários dias de uma vez; turno que termina antes de começar passa da meia-noite; o mesmo guarda não pode ter dois
+turnos que se cruzam). A **agenda** mostra tudo em calendário (mês e semana). Os guardas (cargo Guarda) só veem.
+
+**Convocação**: o botão "Preciso de guardas agora" avisa no Discord (com o link da convocação) e registra todos os
+guardas como convocados. Quem abre o link vê que foi convocado e aperta **Compareci**; o Comandante vê a lista, pode
+**confirmar** ou **retirar** a presença de quem apertou e não apareceu (com motivo, que fica registrado) e encerra a
+convocação (a mensagem no Discord é atualizada). Variáveis (opcionais, sem elas o site funciona e só não avisa no Discord):
+`DISCORD_WEBHOOK_GUARDA` (se faltar, usa o webhook dos anúncios), `DISCORD_CARGO_GUARDAS` (ID do cargo dos Guardas, para
+marcar @Guardas) e `SITE_URL`.
+
+**Controle**: por período, mostra por guarda as horas marcadas e cumpridas, faltas, convocações recebidas, atendidas e
+retiradas, e um ranking de quem mais trabalha. O Comandante marca cada turno como cumprido ou faltou.
+
 ## A Grande Nadir (a IA da Casa)
 
 No menu, **A Grande Nadir** (`#/nadir`): a Coelha Mãe Sagrada responde sobre o mundo de Eldoria, a fé, a Casa
