@@ -57,8 +57,11 @@ r.get('/agenda', async (req, res) => {
   if (ate < de) throw erro(400, 'O fim do período vem antes do começo.');
   const turnos = await db.all(`SELECT t.*, u.nome AS guarda_nome, u.foto AS guarda_foto FROM guarda_turnos t JOIN usuarios u ON u.id = t.usuario_id
     WHERE t.data >= ? AND t.data <= ? ORDER BY t.data, t.inicio, u.nome COLLATE NOCASE`, de, ate);
-  const convocacoes = await db.all(`SELECT id, motivo, criada_por_nome, criada_em, encerrada_em FROM guarda_convocacoes
-    WHERE substr(criada_em, 1, 10) >= ? AND substr(criada_em, 1, 10) <= ? ORDER BY id DESC`, de, ate);
+  // O dia da convocação é o de Brasília (o banco guarda em UTC). Guarda comum só vê as convocações em que foi convocado.
+  const todas = pode(req, 'escala.gerir');
+  const convocacoes = await db.all(`SELECT c.id, c.motivo, c.criada_por_nome, c.criada_em, c.encerrada_em FROM guarda_convocacoes c
+    WHERE substr(datetime(c.criada_em, '-3 hours'), 1, 10) >= ? AND substr(datetime(c.criada_em, '-3 hours'), 1, 10) <= ?
+    ${todas ? '' : 'AND EXISTS (SELECT 1 FROM guarda_convocados k WHERE k.convocacao_id = c.id AND k.usuario_id = ?)'} ORDER BY c.id DESC`, de, ate, ...(todas ? [] : [req.usuario.id]));
   res.json({ de, ate, hoje: hojeStr, turnos: turnos.map(t => ({ ...t, horas: duracao(t.inicio, t.fim), meu: t.usuario_id === req.usuario.id })), convocacoes });
 });
 
@@ -225,7 +228,7 @@ r.get('/controle', gerir, async (req, res) => {
   const de = dataValida(req.query.de) || new Date(new Date(`${ate}T12:00:00Z`).getTime() - 29 * 86400000).toISOString().slice(0, 10);
   const lista = await guardas();
   const turnos = await db.all('SELECT * FROM guarda_turnos WHERE data >= ? AND data <= ?', de, ate);
-  const convs = await db.all(`SELECT k.* FROM guarda_convocados k JOIN guarda_convocacoes c ON c.id = k.convocacao_id WHERE substr(c.criada_em, 1, 10) >= ? AND substr(c.criada_em, 1, 10) <= ?`, de, ate);
+  const convs = await db.all(`SELECT k.* FROM guarda_convocados k JOIN guarda_convocacoes c ON c.id = k.convocacao_id WHERE substr(datetime(c.criada_em, '-3 hours'), 1, 10) >= ? AND substr(datetime(c.criada_em, '-3 hours'), 1, 10) <= ?`, de, ate);
   const linhas = lista.map(g => {
     const t = turnos.filter(x => x.usuario_id === g.id);
     const k = convs.filter(x => x.usuario_id === g.id);

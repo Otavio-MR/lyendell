@@ -53,6 +53,7 @@ const MENU = [
   { secao: 'Registros', itens: [
     { rota: '/tabelionato', nome: 'Tabelionato', icone: 'pergaminho', modulo: 'tabelionato' },
     { rota: '/guarda', nome: 'Guarda do Coelho', icone: 'escudo', modulo: 'guarda' },
+    { rota: '/guarda-escala', nome: 'Escala da Guarda', icone: 'escudo', perm: ['escala.ver'], adulto: true },
     { rota: '/hospital', nome: 'Hospital', icone: 'cruz', modulo: 'hospital' },
   ] },
   { secao: 'Administração', itens: [
@@ -96,6 +97,9 @@ const ROTAS = [
   [/^\/financas\/(folha|cidadao)\/(\d+)$/, async (aba, id) => (await import('./telas/financas.js')).financas(aba, id)],
   // Escola Luckham: #/escola/<aba>; com número, abre a ficha do aluno (#/escola/alunos/12) ou a chamada (#/escola/aulas/5).
   [/^\/escola(?:\/([a-z]+))?(?:\/(\d+))?$/, async (aba, id) => (await import('./telas/escola.js')).escola(aba || 'visao', id ? Number(id) : null)],
+  // Escala da Guarda: agenda, convocações e controle; com número, abre uma convocação (é para onde vai o link do Discord).
+  [/^\/guarda-escala(?:\/(agenda|convocacoes|controle))?$/, async aba => (await import('./telas/guarda-escala.js')).guardaEscala(aba || 'agenda')],
+  [/^\/guarda-escala\/convocacao\/(\d+)$/, async id => (await import('./telas/guarda-escala.js')).convocacaoDetalhe(id)],
   [/^\/recreacao$/, () => recreacao()],
   [/^\/clube$/, () => clube()],
   [/^\/bobo$/, () => caixaDePegadinhas()],
