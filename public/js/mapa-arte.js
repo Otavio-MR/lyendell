@@ -445,12 +445,24 @@ const ARTE = {
     + [-17, -4, 9].map(x => P('pt', `M${x - 4} 22V12H${x + 4}V22Z`) + P('f', `M${x} 12V22`)).join('')
     + P('to', 'M22 20q0 -5 5 -5t5 5Z') + P('f', 'M-26 6H20'),
 };
+// A Escola Luckham: casa comprida de telhado azul, torrinha com sino, livro sobre a porta e bandeira.
+ARTE.escola = () => sombra(36)
+  + casaTelhado({ x0: -26, x1: 22, yt: -2, yb: 22, alt: 13, dx: 8, dy: 4.5, parede: 'pd', lado: 'ps', rl: 'tv', rr: 'tvs' })
+  + P('pd', 'M-5.5 -26H5.5V-8H-5.5Z') + HT('M2 -26H5.5V-8H2Z') + P('pc', 'M-7 -26H7v-2.4H-7Z')
+  + P('ta', 'M-8 -28.4L0 -38L8 -28.4Z') + P('ou', 'M-2.4 -22.5a2.4 2.4 0 0 1 4.8 0v3H-2.4Z') + P('f', 'M0 -38V-43') + P('az', 'M0 -43l6 1.8-6 1.8Z')
+  + janela(-18, 14, 4, 7) + janela(-18, 3, 3.6, 5.5) + janela(14, 14, 4, 7) + janela(14, 3, 3.6, 5.5)
+  + porta(0, 22, 9, 12) + P('br', 'M-8 5h16v5.5h-16Z') + gl('livro', 0, 7.8, 5.4)
+  + P('pc', 'M-11 22h22v1.8h-22Z');
+// O Hospital Imperial: o hospital com a cruz dourada, a coroa do Império no alto e duas bandeiras.
+ARTE.hospital_imperial = () => ARTE.hospital()
+  + P('ou', 'M-7 -12.5L-6 -19l3 3.4L0 -21.5l3 5.9L6 -19l1 6.5Z') + C('vm', 0, -15.4, 1.1)
+  + bandeira(-31, -7, 'vm', 7) + bandeira(31, -7, 'vm', 7);
 ARTE.justica = () => ARTE.banco().replace(/<circle class="i ou" cx="0" cy="-9" r="4"\/><g class="gl".*$/, '') + `<circle class="i br" cx="0" cy="-9" r="4.4"/>` + gl('balanca', 0, -9, 6.4);
 
 // Qual gravura vale para cada ícone do mapa. Ícone novo (que não está aqui) vira o "marco" com o desenho do ícone.
 const POR_ICONE = {
   castelo: 'castelo', septo: 'septo', espada: 'arena', alvo: 'arena', pergaminho: 'tabelionato', moeda: 'banco', coluna: 'senado',
-  balanca: 'justica', escudo: 'quartel', grades: 'prisao', cruz: 'hospital', livro: 'biblioteca', musica: 'teatro', torre: 'torre',
+  balanca: 'justica', capelo: 'escola', hospital_imperial: 'hospital_imperial', escudo: 'quartel', grades: 'prisao', cruz: 'hospital', livro: 'biblioteca', musica: 'teatro', torre: 'torre',
   sino: 'capela', poco: 'poco', jardim: 'jardim', barraca: 'mercado', porto: 'porto', bandeira: 'bandeira', coroa: 'solar',
   casa: 'casa', loja: 'loja', taverna: 'taverna', padaria: 'padaria', peixe: 'peixaria', ferraria: 'ferraria', pocao: 'botica',
   bau: 'armazem', fazenda: 'fazenda', estabulo: 'estabulo',

@@ -25,6 +25,13 @@ Para inscrever um aluno ou se candidatar a professor: procurar o Lorde Evran Luc
 Só quem trabalha na escola vê a lista de alunos, as notas e a frequência.`,
 };
 
+// O Hospital Imperial (também entra no Livro de bancos que já existiam: migração v38 em db.js).
+const SABER_HOSPITAL = {
+  categoria: 'cidade', titulo: 'O Hospital Imperial', apelidos: 'hospital, cura, curandeiros, médicos, hospital imperial',
+  texto: `O Hospital Imperial é onde são curadas pessoas de todo o Império, não apenas os Luckham. Fica na Capital, no lugar do antigo Coliseu no mapa, e atende feridos e doentes de qualquer Casa ou região.
+Quem cuida dele é o Diretor do Hospital, junto com a equipe. Os atendimentos ficam no livro Pacientes do Hospital Imperial, dentro do Hospital no site. Os prontuários são sigilosos: só a equipe do Hospital vê.`,
+};
+
 const SABER_PADRAO = [
   /* ─── A fé ─── */
   { categoria: 'fe', titulo: 'A Grande Nadir', apelidos: 'Nadir, Mãe Nadir, Coelha Mãe, Coelha Mãe Sagrada',
@@ -104,6 +111,7 @@ O Bobo da Corte alegra a cidade com piadas e pegadinhas.
 Os Aliados são convidados de outras casas: não são moradores.
 Em Lyendell, o "Endereço" de uma pessoa é o nome pelo qual ela é chamada no jogo; a "Residência" é a rua e o número da casa.` },
   SABER_ESCOLA,
+  SABER_HOSPITAL,
   { categoria: 'cidade', titulo: 'O Raposo', apelidos: 'raposa, raposos, vilão',
     texto: `Nas histórias e brincadeiras da Toca, o Raposo é o grande rival dos coelhos: é ele quem ataca à noite no jogo Lyendell Dorme, quem joga os barris e quem leva a Princesa Cenoura. Há até uma Rua Raposo na Capital.` },
 
@@ -172,4 +180,4 @@ Frase: "Eu sou eu e ninguém é mais eu do que eu mesmo."` },
     texto: 'O bardo da Casa Luckham. A sua música e o seu talento com incontáveis instrumentos fazem dele uma presença essencial, tanto nos momentos bons quanto nos ruins da família e da casa. Onde há Osiris, há canção.' },
 ];
 
-module.exports = { SABER_PADRAO, SABER_ESCOLA, CATEGORIAS };
+module.exports = { SABER_PADRAO, SABER_ESCOLA, SABER_HOSPITAL, CATEGORIAS };

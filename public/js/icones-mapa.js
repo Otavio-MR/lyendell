@@ -32,6 +32,8 @@ const DESENHOS = {
   peixe: '<path d="M2.5 12c3-5 9.5-6 14-1.2.6.7.6 1.7 0 2.4-4.5 4.8-11 3.8-14-1.2z"/><path d="m16.5 12 5-4v8z"/><circle cx="7" cy="11" r=".9"/>',
   padaria: '<path d="M4 15c0-5 3.6-8 8-8s8 3 8 8v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M9 9.5 10 13M13 8.5v4M16.5 9.8 15.3 13"/>',
   pocao: '<path d="M10 3h4M10.5 3v5L6 15.5A3.5 3.5 0 0 0 9 21h6a3.5 3.5 0 0 0 3-5.5L13.5 8V3"/><path d="M7.5 14h9"/>',
+  // O Hospital Imperial: o escudo do Império com a cruz da cura e uma coroa por cima.
+  hospital_imperial: '<path d="M12 6.5 5.5 8.5v4.2c0 3.5 2.6 6 6.5 7.8 3.9-1.8 6.5-4.3 6.5-7.8V8.5z"/><path d="M10.7 10.4h2.6v1.8h1.8v2.6h-1.8v1.8h-2.6v-1.8H8.9v-2.6h1.8z"/><path d="m8 5.6 1.2-2.4 2.8 1.6 2.8-1.6L16 5.6z"/>',
   barraca: '<path d="M3 10 12 4l9 6"/><path d="M5 10v10M19 10v10M3 20h18"/><path d="M5 10c0 2 1.5 3 3.5 3S12 12 12 10c0 2 1.5 3 3.5 3S19 12 19 10"/>',
 };
 
@@ -41,7 +43,7 @@ const LISTA = [
   ['peixe', 'Peixaria'], ['ferraria', 'Ferraria'], ['pocao', 'Boticário'], ['fazenda', 'Fazenda'], ['estabulo', 'Estábulo'],
   ['porto', 'Porto'], ['castelo', 'Castelo'], ['torre', 'Torre'], ['septo', 'Templo'], ['sino', 'Capela'],
   ['coluna', 'Senado'], ['pergaminho', 'Cartório'], ['balanca', 'Justiça'], ['escudo', 'Guarda'], ['grades', 'Prisão'],
-  ['espada', 'Arena'], ['alvo', 'Treino'], ['moeda', 'Banco'], ['cruz', 'Hospital'], ['livro', 'Biblioteca'],
+  ['espada', 'Arena'], ['alvo', 'Treino'], ['moeda', 'Banco'], ['cruz', 'Hospital'], ['hospital_imperial', 'Hospital Imperial'], ['capelo', 'Escola'], ['livro', 'Biblioteca'],
   ['musica', 'Teatro'], ['jardim', 'Jardim'], ['poco', 'Poço'], ['bau', 'Armazém'], ['coroa', 'Nobreza'],
   ['bandeira', 'Bandeira'], ['coelho', 'Coelho'], ['chave', 'Chave'], ['estrela', 'Outro'],
 ];

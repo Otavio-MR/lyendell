@@ -245,4 +245,14 @@ const LIVROS_PADRAO = [
   },
 ];
 
+// O Hospital Imperial cura gente de todo o Império, não só os Luckham: um livro à parte, cuidado pelo Diretor do Hospital.
+// É o Registro de Pacientes com a Casa ou região de origem e quem enviou o paciente.
+const PACIENTES_BASE = LIVROS_PADRAO.find(l => l.modulo === 'hospital' && l.nome === 'Registro de Pacientes');
+if (PACIENTES_BASE) {
+  const campos = PACIENTES_BASE.campos.flatMap(f => (f.id === 'idade' ? [f,
+    { id: 'origem', nome: 'Casa ou região de origem', tipo: 'texto', destaque: true, ajuda: 'De onde a pessoa vem no Império. Ex.: Casa Luckham, Terras Centrais' },
+    { id: 'enviado_por', nome: 'Enviado por', tipo: 'texto', ajuda: 'Quem trouxe ou encaminhou o paciente, se houver' }] : [f]));
+  LIVROS_PADRAO.push({ ...PACIENTES_BASE, nome: 'Pacientes do Hospital Imperial', descricao: 'Quem foi curado no Hospital Imperial, de qualquer Casa ou região do Império.', campos });
+}
+
 module.exports = { LIVROS_PADRAO, AJUDA_ABERTURA, CAMPOS_PENA, CAMPO_GUARDAS, CAMPOS_FICHA, FICHAS };

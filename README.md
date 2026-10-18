@@ -390,6 +390,12 @@ marcar @Guardas) e `SITE_URL`.
 **Controle**: por período, mostra por guarda as horas marcadas e cumpridas, faltas, convocações recebidas, atendidas e
 retiradas, e um ranking de quem mais trabalha. O Comandante marca cada turno como cumprido ou faltou.
 
+## Hospital Imperial
+
+O Hospital Imperial cura gente de todo o Império, não só os Luckham. No Hospital há o livro **Pacientes do Hospital Imperial** (com a Casa ou região de origem e
+quem enviou o paciente), cuidado pelo Diretor do Hospital como o resto. No mapa, o prédio tem símbolo e gravura próprios (escudo com cruz e coroa), diferentes do
+Hospital comum; a Escola ganhou o capelo. Ao atualizar, o prédio chamado Hospital Imperial fica ligado à página do Hospital e o chamado Escola, à da Escola, se ainda não tinham ligação.
+
 ## Registros como papel e assinatura
 
 O documento de cada registro e o formulário de novo registro parecem uma folha de livro (papel envelhecido, campos escritos em tinta, selo de cera,

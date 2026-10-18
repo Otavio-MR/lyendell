@@ -73,7 +73,7 @@ function lerCasa(b = {}, atual = {}) {
     via, lado, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10,
     situacao: b.situacao === 'sem_morador' ? 'sem_dono' : SITUACOES.includes(b.situacao) ? b.situacao : atual.situacao || 'ocupada',
     texto: linha(b.texto ?? atual.texto ?? '', 80),
-    icone: b.icone === undefined ? atual.icone || '' : typeof b.icone === 'string' && /^[a-z]{2,16}$/.test(b.icone) ? b.icone : '',
+    icone: b.icone === undefined ? atual.icone || '' : typeof b.icone === 'string' && /^[a-z_]{2,24}$/.test(b.icone) ? b.icone : '',
     pessoas,
   };
 }

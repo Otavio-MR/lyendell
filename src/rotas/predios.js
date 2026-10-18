@@ -67,7 +67,7 @@ function lerPredio(b = {}, atual = null) {
     nome,
     tipo: linha(b.tipo ?? a.tipo ?? '', 80),
     categoria: escolha(b.categoria ?? a.categoria, CATEGORIAS, 'publico'),
-    icone: typeof icone === 'string' && /^[a-z]{2,16}$/.test(icone) ? icone : 'estrela',
+    icone: typeof icone === 'string' && /^[a-z_]{2,24}$/.test(icone) ? icone : 'estrela',
     tamanho: escolha(b.tamanho ?? a.tamanho, TAMANHOS, 'medio'),
     x: Math.round(x * 10) / 10,
     y: Math.round(y * 10) / 10,

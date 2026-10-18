@@ -8,7 +8,7 @@ const { CASAS_PADRAO } = require('./casas-padrao');
 const { PREDIOS_PADRAO } = require('./predios-padrao');
 const { PERGUNTAS_PADRAO } = require('./perguntas-padrao');
 const { PROFISSOES_PADRAO, TURNOS_SEMANA, SALDO_INICIAL, CONFIG_PADRAO } = require('./financas-padrao');
-const { SABER_PADRAO, SABER_ESCOLA } = require('./nadir-padrao');
+const { SABER_PADRAO, SABER_ESCOLA, SABER_HOSPITAL } = require('./nadir-padrao');
 const { semearEscola, importarEscola } = require('./escola-padrao');
 const { linha, chaveNome } = require('./util');
 
@@ -870,7 +870,7 @@ CREATE INDEX IF NOT EXISTS idx_escola_historico ON escola_historico(entidade, en
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 37;
+const VERSAO = 38;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -969,6 +969,9 @@ async function migrar() {
   // leitura para a Família Nobre. As profissões e o saldo inicial do tesouro entram uma vez só (semear).
   // v34: a Escola Luckham. Todo morador vê a escola; os cargos Diretor da Escola e Professor da Escola nascem
   // aqui. Os registros do Corpo Docente e das Matrículas que estavam no Tabelionato vêm para o sistema da escola.
+  // v38: o Hospital Imperial (cura gente de todo o Império) ganha um livro próprio dentro do Hospital, um símbolo próprio
+  // no mapa e a ligação com a página do Hospital; a Escola ganha o capelo. Só mexe no que a pessoa ainda não escolheu.
+  if (versao < 38) await migrarHospitalImperial();
   // v37: a assinatura desenhada de quem aprova um registro (traços guardados em JSON).
   if (versao < 37 && !await colunaExiste('registros', 'assinatura')) await db.run('ALTER TABLE registros ADD COLUMN assinatura TEXT');
   // v36: a Escala da Guarda (turnos, convocações). O Comandante gere; os guardas veem a agenda e respondem.
@@ -1047,6 +1050,25 @@ async function alinharFichas() {
     const { m } = await db.get('SELECT COALESCE(MAX(ordem), 0) AS m FROM livros');
     await db.run('INSERT INTO livros (modulo, nome, descricao, icone, aberto, campos, cobranca, ordem) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       o.modulo, o.nome, o.descricao, o.icone, o.aberto, JSON.stringify(o.campos), null, m + 1);
+  }
+}
+
+async function migrarHospitalImperial() {
+  if (!(await db.get('SELECT COUNT(*) AS n FROM livros')).n) return; // banco novo: o semear cria os livros
+  const livros = await db.all("SELECT nome FROM livros WHERE modulo = 'hospital'");
+  const novo = LIVROS_PADRAO.find(l => l.nome === 'Pacientes do Hospital Imperial');
+  if (novo && !livros.some(l => chaveNome(l.nome) === chaveNome(novo.nome))) {
+    const { m } = await db.get('SELECT COALESCE(MAX(ordem), 0) AS m FROM livros');
+    await db.run('INSERT INTO livros (modulo, nome, descricao, icone, aberto, campos, cobranca, ordem) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      novo.modulo, novo.nome, novo.descricao, novo.icone, novo.aberto, JSON.stringify(novo.campos), null, m + 1);
+  }
+  // O prédio do mapa que o dono chamou de Hospital Imperial (hoje no lugar do Coliseu): símbolo próprio e ligação com o Hospital.
+  await db.run("UPDATE predios SET icone = 'hospital_imperial' WHERE lower(nome) LIKE '%hospital imperial%' AND icone IN ('espada', 'estrela', 'cruz')");
+  await db.run("UPDATE predios SET pagina = '/hospital' WHERE lower(nome) LIKE '%hospital imperial%' AND pagina = ''");
+  await db.run("UPDATE predios SET icone = 'capelo' WHERE lower(nome) LIKE 'escola%' AND icone = 'estrela'");
+  await db.run("UPDATE predios SET pagina = '/escola' WHERE lower(nome) LIKE 'escola%' AND pagina = ''");
+  if (await db.get("SELECT valor FROM meta WHERE chave = 'nadir_semeada'") && !await db.get('SELECT id FROM nadir_saber WHERE titulo = ?', SABER_HOSPITAL.titulo)) {
+    await db.run("INSERT INTO nadir_saber (categoria, titulo, apelidos, texto, criado_por_nome) VALUES (?, ?, ?, ?, 'Sistema')", SABER_HOSPITAL.categoria, SABER_HOSPITAL.titulo, SABER_HOSPITAL.apelidos, SABER_HOSPITAL.texto);
   }
 }
 
