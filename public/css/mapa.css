@@ -1,0 +1,58 @@
+/* ─── Mapa de Lyendell: a carta antiga ────────────────
+   O desenho em si (pergaminho, tinta, gravuras) tem os próprios estilos dentro do SVG (veja js/mapa-arte.js),
+   para a imagem baixada sair igual. Aqui fica só a moldura da tela em volta: o quadro, o zoom e a chave do celular. */
+
+.mapa-quadro {
+  background: #cdb98a;
+  border: 1px solid var(--ouro-d);
+  border-radius: var(--raio);
+  box-shadow: 0 0 0 3px #0b110d, 0 0 0 4px rgba(168, 134, 34, 0.45), 0 18px 34px -16px rgba(0, 0, 0, 0.85);
+}
+.mapa-svg { background: #e6d4a6; }
+.mapa-svg:focus-visible { outline: 2px solid var(--ouro-l); outline-offset: -3px; }
+.mapa-svg .m-poi:focus-visible { outline: none; }
+
+/* Zoom: botões de bronze sobre o pergaminho. */
+.mapa-zoom { top: 26px; right: 26px; gap: 6px; }
+.mapa-zoom .btn-icone {
+  width: 40px; height: 40px; color: #f6e7b2; background: linear-gradient(180deg, #6b4a1b, #4a3210);
+  border: 1px solid #2c1c08; border-radius: 50%; box-shadow: inset 0 1px 0 rgba(255, 235, 170, 0.35), 0 2px 5px rgba(40, 24, 6, 0.55);
+}
+.mapa-zoom .btn-icone:hover { background: linear-gradient(180deg, #86601f, #5c3f12); color: #fff3c4; }
+.mapa-zoom .btn-icone:active { transform: translateY(1px); box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5); }
+.mapa-zoom .btn-icone:focus-visible { outline: 2px solid #fff3c4; outline-offset: 2px; }
+
+/* A dica que segue o mouse e a barra de edição ficam na cor do site. */
+.mapa-dica { background: rgba(14, 10, 4, 0.94); }
+
+/* A chave do mapa dentro do desenho some no celular; no lugar dela entra a caixa que abre e fecha.
+   Os botões de zoom também saem de cima do mapa (que é pequeno) e ficam numa barra embaixo dele. */
+.mapa-chave { display: none; }
+@media (max-width: 760px) {
+  .m-svg .m-chave { display: none; }
+  .mapa-zoom {
+    position: static; display: flex; justify-content: flex-end; gap: 8px; padding: 8px 10px; background: #17231a;
+    border-top: 1px solid var(--ouro-d);
+  }
+  .mapa-zoom .btn-icone { width: 44px; height: 44px; }
+  .mapa-chave {
+    display: block; position: absolute; left: 10px; bottom: 8px; z-index: 3; width: 148px;
+    border-radius: 3px; background: #efe1ba; color: #2c1c0b; border: 1px solid #3a2713; box-shadow: 0 0 0 2px #efe1ba, 0 0 0 3px #3a2713, 0 6px 12px -4px rgba(40, 24, 6, 0.7);
+  }
+  .mapa-chave[open] { top: 8px; right: 8px; left: 8px; bottom: 68px; width: auto; max-width: none; overflow-y: auto; }
+  .mapa-chave > summary {
+    list-style: none; cursor: pointer; padding: 0 10px; min-height: 44px; display: flex; align-items: center; gap: 8px;
+    font-family: var(--f-titulo); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+  }
+  .mapa-chave > summary::-webkit-details-marker { display: none; }
+  .mapa-chave > summary::after { content: '+'; margin-left: auto; font-size: 1.2rem; line-height: 1; }
+  .mapa-chave[open] > summary::after { content: '\00d7'; }
+  .mapa-chave > summary:focus-visible { outline: 2px solid #8f2f1c; outline-offset: 1px; }
+  .mapa-chave ul { list-style: none; margin: 0; padding: 2px 12px 10px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 10px; border-top: 1px solid rgba(58, 39, 19, 0.4); }
+  .mapa-chave li { display: flex; align-items: center; gap: 8px; min-height: 32px; font-family: var(--f-texto); font-size: 0.92rem; line-height: 1.1; }
+  .mapa-chave li svg { flex: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mapa-zoom .btn-icone:active { transform: none; }
+}

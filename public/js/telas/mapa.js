@@ -5,9 +5,13 @@
 
 import { get, post, put, del, h, trocar, icone, cabecalho, botao, botaoIcone, aviso, aoSair, normalizar, avatar, modal, modalForm, campo, confirmar, tentar, enviarImagem, relativo, ehCrianca } from '../core.js';
 import { opiniaoDoLugar } from '../crianca.js';
-import { VISTA, CIDADE, RIO, TORRES, PORTAO, CAMINHOS, AVENIDAS, RUAS } from '../mapa-lyendell.js';
+import { VISTA, CAMINHOS, AVENIDAS, RUAS } from '../mapa-lyendell.js';
 import { TAMANHO_CASA, amostrar, linhasDaVia, viaPorId, distribuir, encaixar, lerLista, trechoPrincipal, usarPredios } from '../mapa-casas.js';
 import { ICONES_MAPA, desenhoDoIcone } from '../icones-mapa.js';
+import {
+  ESTILO_CARTA, defsCarta, papel, rio, chaoDaCidade, muralha, torres, viasSvg, toqueSvg, chave, cartucho, rosaDosVentos, barraDeEscala,
+  moldura, vinheta, arvoresSvg, arteDoPredio, escalaDoPredio, chao, fita, alturaDaFita, medalha, variantesDeCasa, ITENS_CHAVE, miniaturaDaChave,
+} from '../mapa-arte.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 const [VX, VY, VW, VH] = VISTA;
@@ -29,120 +33,19 @@ function iconeDoMapa(id, classe = '') {
 
 /* ─── Geometria ───────────────────────────────────── */
 
-// Linha reta por trechos, com os cantos levemente arredondados.
-function reta(p, raio = 9) {
-  let d = `M${p[0][0]} ${p[0][1]}`;
-  for (let i = 1; i < p.length - 1; i++) {
-    const [a, b, c] = [p[i - 1], p[i], p[i + 1]];
-    const l1 = Math.hypot(b[0] - a[0], b[1] - a[1]);
-    const l2 = Math.hypot(c[0] - b[0], c[1] - b[1]);
-    const r = Math.min(raio, l1 / 2, l2 / 2);
-    d += ` L${um(b[0] - ((b[0] - a[0]) / l1) * r)} ${um(b[1] - ((b[1] - a[1]) / l1) * r)}`
-      + ` Q${b[0]} ${b[1]} ${um(b[0] + ((c[0] - b[0]) / l2) * r)} ${um(b[1] + ((c[1] - b[1]) / l2) * r)}`;
-  }
-  const f = p[p.length - 1];
-  return `${d} L${f[0]} ${f[1]}`;
-}
-
-// Curva suave (para o rio, que não é reto).
-function curva(p) {
-  const n = p.length;
-  const pt = i => p[Math.max(0, Math.min(n - 1, i))];
-  let d = `M${p[0][0]} ${p[0][1]}`;
-  for (let i = 0; i < n - 1; i++) {
-    const [a, b, c, e] = [pt(i - 1), pt(i), pt(i + 1), pt(i + 2)];
-    d += ` C${um(b[0] + (c[0] - a[0]) / 6)} ${um(b[1] + (c[1] - a[1]) / 6)} ${um(c[0] - (e[0] - b[0]) / 6)} ${um(c[1] - (e[1] - b[1]) / 6)} ${c[0]} ${c[1]}`;
-  }
-  return d;
-}
-
 const distancia = (p, amostras) => Math.min(...amostras.map(q => Math.hypot(p[0] - q[0], p[1] - q[1])));
 
 const VIAS = [...AVENIDAS.map(v => ({ ...v, tipo: 'avenida' })), ...RUAS.map(v => ({ ...v, tipo: 'rua' }))];
 const AMOSTRAS = new Map(VIAS.map(v => [v.id, linhasDaVia(v).flatMap(l => amostrar(l))]));
 
-// Linhas de relevo (os morros em volta da cidade).
-function relevo() {
-  let d = '';
-  for (let i = 0; i < 90; i++) {
-    const x0 = -20 + i * 14;
-    for (let y = -20; y <= VH + 20; y += 16) {
-      const x = x0 + 9 * Math.sin(y / 70 + i * 0.9) + 4 * Math.sin(y / 23 + i * 1.7);
-      d += `${y === -20 ? 'M' : 'L'}${um(x)} ${y}`;
-    }
-  }
-  return d;
-}
-
 /* ─── Desenho ─────────────────────────────────────── */
 
-const CHAO = '#131a15';
-const ESTILO = `
-.m-svg text { font-family: Cinzel, 'Palatino Linotype', 'Book Antiqua', Georgia, serif; }
-.m-limpa, .m-borda, .m-cor, .m-toque { fill: none; stroke-linecap: round; stroke-linejoin: round; }
-.m-limpa { stroke: ${CHAO}; }
-.m-limpa.m-avenida { stroke-width: 22; }
-.m-limpa.m-rua { stroke-width: 15; }
-.m-borda { stroke: #070b08; }
-.m-borda.m-avenida { stroke-width: 13; }
-.m-borda.m-rua { stroke-width: 8.5; }
-.m-cor.m-avenida { stroke: #c29c3e; stroke-width: 8.5; }
-.m-cor.m-rua { stroke: #857d66; stroke-width: 5; }
-.m-toque { stroke: transparent; stroke-width: 20; pointer-events: stroke; cursor: pointer; }
-.m-borda.ativa { stroke: #5a4612; }
-.m-borda.m-avenida.ativa { stroke-width: 19; }
-.m-borda.m-rua.ativa { stroke-width: 14; }
-.m-cor.m-avenida.ativa { stroke: #f6d879; }
-.m-cor.m-rua.ativa { stroke: #f1e6c2; }
-.m-rotulo-via { font-size: 9px; font-weight: 600; letter-spacing: 0.4px; fill: #eee3c3; stroke: #070b08; stroke-width: 3px; paint-order: stroke; stroke-linejoin: round; pointer-events: none; }
-.m-rotulo-via.m-avenida { font-size: 10px; font-weight: 700; letter-spacing: 0.8px; fill: #fbe8a8; }
-.m-poi { cursor: pointer; }
-.m-praca { fill: ${CHAO}; }
-.m-placa { fill: #0b110d; stroke: #d8b13a; stroke-width: 1.6; }
-.m-placa-dentro { fill: none; stroke: #5e4c1c; stroke-width: 1; }
-.m-cat-comercio .m-placa { stroke: #6fc1b5; }
-.m-cat-comercio .m-placa-dentro { stroke: #24524c; }
-.m-cat-comercio .m-glifo { stroke: #d8f5f0; }
-.m-cat-outro .m-placa { stroke: #b9a27a; }
-.m-cat-outro .m-placa-dentro { stroke: #4d4433; }
-.m-poi.ativa .m-placa { fill: #3d300d; stroke: #ffe28a; stroke-width: 2.2; }
-.m-glifo { fill: none; stroke: #f6e3a6; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-.m-nome { font-size: 11px; font-weight: 700; letter-spacing: 1.4px; fill: #f8ecd2; stroke: #070b08; stroke-width: 3px; paint-order: stroke; stroke-linejoin: round; text-anchor: middle; pointer-events: none; }
-.m-nome.m-grande { font-size: 13px; letter-spacing: 1.8px; }
-.m-nome.m-pequeno { font-size: 8px; letter-spacing: 0.6px; stroke-width: 2.5px; }
-.m-sub { font-size: 8px; letter-spacing: 1px; fill: #c9b98a; stroke: #070b08; stroke-width: 2.5px; paint-order: stroke; text-anchor: middle; pointer-events: none; }
-.m-sub.m-centro { fill: #d6aef5; }
-.m-quadro { fill: #0a0f0b; fill-opacity: 0.9; stroke: #b8943a; stroke-width: 1.2; }
-.m-quadro-dentro { fill: none; stroke: #4a3e1f; stroke-width: 1; }
-.m-titulo { font-size: 23px; font-weight: 700; letter-spacing: 3px; fill: #e8c35a; text-anchor: middle; }
-.m-subtitulo { font-size: 7.5px; letter-spacing: 2.2px; fill: #b9ad88; text-anchor: middle; }
-.m-legenda { font-size: 8.5px; letter-spacing: 1px; fill: #d9cfae; }
-.m-legenda-titulo { font-size: 9px; letter-spacing: 2.4px; fill: #e8c35a; }
-.m-casa { cursor: pointer; }
-.m-casa rect { stroke-width: 1.3; }
-.m-casa text { font-size: 6.5px; font-weight: 700; text-anchor: middle; fill: #fff3d0; pointer-events: none; }
-.m-casa .m-glifo { stroke: #fff3d0; stroke-width: 2.6; pointer-events: none; }
-.m-sit-ocupada rect { fill: #5c4a1f; stroke: #e0bd5a; }
-.m-sit-comercio rect { fill: #173f3b; stroke: #6fc1b5; }
-.m-sit-sem_dono rect { fill: #1b201b; stroke: #77725f; stroke-dasharray: 2.5 1.6; }
-.m-sit-sem_dono text { fill: #a39d86; }
-.m-sit-sem_dono .m-glifo { stroke: #a39d86; }
-.m-casa:hover rect, .m-casa.ativa rect { stroke: #ffffff; stroke-width: 2; stroke-dasharray: none; }
-.m-editando .m-casa, .m-editando .m-poi { cursor: grab; }
-.m-casa.m-arrastada, .m-poi.m-arrastada { opacity: 0.85; cursor: grabbing; }
-`;
-
+// Os estilos do desenho ficam dentro do próprio SVG (ESTILO_CARTA), para a imagem baixada sair igual à tela.
 function desenhoDoGlifo(nome, x, y, tam) {
-  const g = s('g', { class: 'm-glifo', transform: `translate(${um(x - tam / 2)} ${um(y - tam / 2)}) scale(${(tam / 24).toFixed(3)})` });
+  const g = s('g', { class: 'gl', transform: `translate(${um(x - tam / 2)} ${um(y - tam / 2)}) scale(${(tam / 24).toFixed(3)})` });
   g.innerHTML = desenhoDoIcone(nome);
   return g;
 }
-
-const estrelaCentro = (x, y, r = 7) => s('path', {
-  d: `M${x} ${y - r}L${um(x + r * 0.28)} ${um(y - r * 0.28)}L${x + r} ${y}L${um(x + r * 0.28)} ${um(y + r * 0.28)}L${x} ${y + r}`
-    + `L${um(x - r * 0.28)} ${um(y + r * 0.28)}L${x - r} ${y}L${um(x - r * 0.28)} ${um(y - r * 0.28)}Z`,
-  fill: '#c38cf0', stroke: '#1a0f22', 'stroke-width': 1,
-});
 
 // Nome comprido vai em duas linhas, as mais parecidas possível ("Quartel" / "General").
 function linhasDoNome(nome) {
@@ -157,134 +60,78 @@ function linhasDoNome(nome) {
   return [palavras.slice(0, melhor).join(' '), palavras.slice(melhor).join(' ')];
 }
 
-// Todos os prédios com o mesmo desenho: um selo quadrado com o ícone e o nome embaixo.
-const TAM_SELO = { grande: 40, medio: 32, pequeno: 22 };
-function tamanhos(p) {
-  const tam = TAM_SELO[p.tamanho] || TAM_SELO.medio;
+// Um bloco de SVG em texto vira um grupo (o navegador já entende as tags no espaço do SVG).
+function grupo(classe, svgTexto = '') {
+  const g = s('g', classe ? { class: classe } : {});
+  g.innerHTML = svgTexto;
+  return g;
+}
+
+// A praça de terra batida embaixo do prédio.
+const praca = p => grupo('', chao(p));
+
+// Cada prédio é uma pequena gravura (a do seu ícone) com o nome numa fita de pergaminho.
+function edificio(p) {
+  const k = escalaDoPredio(p.tamanho);
+  const grande = p.tamanho === 'grande';
   const pequeno = p.tamanho === 'pequeno';
+  const arte = arteDoPredio(p.icone);
   const linhas = linhasDoNome(p.nome);
-  const letra = p.tamanho === 'grande' ? 10.6 : pequeno ? 6.4 : 9;
-  const alturaLinha = pequeno ? 10 : 14;
-  const largNome = Math.max(...linhas.map(l => l.length * letra));
-  return {
-    tam, linhas, alturaLinha, pequeno,
-    larg: Math.max(tam + (pequeno ? 12 : 26), largNome + (pequeno ? 10 : 20), p.sub ? p.sub.length * 6 + 20 : 0),
-    alt: tam + (pequeno ? 14 : 24) + linhas.length * alturaLinha + (p.sub ? 12 : 0),
-  };
-}
-
-function praca(p) {
-  const { tam, larg, alt, pequeno } = tamanhos(p);
-  return s('rect', { class: 'm-praca', x: um(p.x - larg / 2), y: p.y - tam / 2 - (pequeno ? 5 : 10), width: um(larg), height: alt, rx: pequeno ? 6 : 10 });
-}
-
-function selo(p) {
-  const { tam, linhas, alturaLinha, pequeno } = tamanhos(p);
-  const g = s('g', { class: `m-poi m-cat-${p.categoria}`, 'data-id': `p${p.id}`, 'data-predio': p.id },
-    s('rect', { class: 'm-placa', x: p.x - tam / 2, y: p.y - tam / 2, width: tam, height: tam, rx: pequeno ? 5 : 8 }),
-    !pequeno && s('rect', { class: 'm-placa-dentro', x: p.x - tam / 2 + 3.5, y: p.y - tam / 2 + 3.5, width: tam - 7, height: tam - 7, rx: 5 }),
-    desenhoDoGlifo(p.icone, p.x, p.y, tam * (pequeno ? 0.66 : 0.58)));
-  let y = p.y + tam / 2 + (pequeno ? 10 : 15);
-  const classe = `m-nome ${p.tamanho === 'grande' ? 'm-grande' : pequeno ? 'm-pequeno' : ''}`.trim();
-  for (const l of linhas) {
-    g.append(s('text', { class: classe, x: p.x, y }, l.toUpperCase()));
-    y += alturaLinha;
+  const yFita = p.y + 22 * k + 5;
+  const maisLonga = Math.max(...linhas.map(l => l.length));
+  const larg = Math.max(68 * k, pequeno ? maisLonga * 6.2 : maisLonga * (grande ? 8.3 : 7.2) + 30);
+  const fundo = yFita + (pequeno ? linhas.length * 8.6 + 4 : alturaDaFita(linhas, grande)) + (p.sub ? 11 : 0);
+  const topo = p.y - 42 * k;
+  const g = s('g', {
+    class: `m-poi m-cat-${p.categoria}`, 'data-id': `p${p.id}`, 'data-predio': p.id, tabindex: 0, role: 'button',
+    'aria-label': `${p.nome}${p.tipo ? `, ${p.tipo}` : ''}. Abrir a ficha.`,
+  });
+  g.append(
+    grupo('', `<rect class="m-hit" x="${um(p.x - larg / 2 - 4)}" y="${um(topo - 4)}" width="${um(larg + 8)}" height="${um(fundo - topo + 8)}" rx="6"/>`
+      + `<ellipse class="m-aro" cx="${p.x}" cy="${um(p.y + 8 * k)}" rx="${um(40 * k + 6)}" ry="${um(31 * k + 4)}"/>`),
+    grupo('m-art', arte.id
+      ? `<use href="#${arte.id}" transform="translate(${p.x} ${p.y}) scale(${k})"/>`
+      : `<g transform="translate(${p.x} ${p.y}) scale(${k})">${arte.solto}</g>`));
+  if (pequeno) {
+    linhas.forEach((l, i) => g.append(s('text', { class: 'm-nome m-solto', x: p.x, y: um(yFita + 7 + i * 8.6) }, l.toUpperCase())));
+  } else {
+    g.append(grupo('', fita(p.x, yFita, linhas, grande)));
   }
-  if (p.sub) g.append(s('text', { class: `m-sub ${p.centro ? 'm-centro' : ''}`.trim(), x: p.x, y: y - 2 }, p.sub.toUpperCase()));
-  if (p.centro) g.append(estrelaCentro(p.x + tam / 2, p.y - tam / 2));
+  if (p.sub) g.append(s('text', { class: 'm-sub', x: p.x, y: um(fundo - 1.5) }, p.sub));
+  if (p.centro) g.append(grupo('', medalha(um(p.x + 30 * k), um(p.y - 30 * k))));
   return g;
 }
 
 function desenharMapa() {
   const svg = s('svg', {
     class: 'm-svg mapa-svg', viewBox: VISTA.join(' '), preserveAspectRatio: 'xMidYMid meet',
-    role: 'img', 'aria-label': 'Mapa de Lyendell, a capital, vista de cima',
+    role: 'group', 'aria-label': 'Mapa de Lyendell, a capital, vista de cima',
   });
   const estilo = s('style');
-  estilo.textContent = ESTILO;
-  const cidade = `M${CIDADE.map(p => p.join(' ')).join(' L')} Z`;
-  const rio = curva(RIO);
+  estilo.textContent = ESTILO_CARTA;
+  const defs = s('defs');
+  defs.innerHTML = defsCarta();
+  defs.append(...VIAS.map(v => s('path', { id: `m-rotulo-${v.id}`, d: `M${v.rotulo[0].join(' ')} L${v.rotulo[1].join(' ')}` })));
 
-  const defs = s('defs', {},
-    // As casas: quadradinhos alinhados em grade.
-    s('pattern', { id: 'm-casas', width: 16, height: 16, patternUnits: 'userSpaceOnUse' },
-      s('rect', { x: 2.5, y: 2.5, width: 11, height: 11, rx: 1.5, fill: '#1a221b' })),
-    s('radialGradient', { id: 'm-vinheta', cx: '50%', cy: '50%', r: '75%' },
-      s('stop', { offset: '62%', 'stop-color': '#000', 'stop-opacity': 0 }), s('stop', { offset: '100%', 'stop-color': '#000', 'stop-opacity': 0.55 })),
-    ...VIAS.map(v => s('path', { id: `m-rotulo-${v.id}`, d: `M${v.rotulo[0].join(' ')} L${v.rotulo[1].join(' ')}` })),
-  );
-
-  // Vias em camadas (primeiro o espaço livre, depois a borda, depois a cor) para os cruzamentos ficarem limpos.
-  const ordem = [...RUAS.map(v => ({ ...v, tipo: 'rua' })), ...AVENIDAS.map(v => ({ ...v, tipo: 'avenida' }))];
-  const dDa = v => linhasDaVia(v).map(l => reta(l)).join(' ');
-  const caminhos = CAMINHOS.map(l => reta(l)).join(' ');
-  const camada = classe => s('g', {},
-    classe !== 'm-toque' && s('path', { class: `${classe} m-rua`, d: caminhos }),
-    ordem.map(v => s('path', { class: `${classe} m-${v.tipo}`, d: dDa(v), 'data-id': v.id })));
-
-  const rotulosVias = s('g', {}, VIAS.map(v => s('text', { class: `m-rotulo-via m-${v.tipo}`, dy: '0.35em' },
+  const rotulosVias = s('g', { 'pointer-events': 'none' }, VIAS.map(v => s('text', { class: `m-rotulo-via m-${v.tipo}`, dy: '0.35em' },
     s('textPath', { href: `#m-rotulo-${v.id}`, startOffset: '50%', 'text-anchor': 'middle' },
       v.tipo === 'avenida' ? v.nome.toUpperCase() : v.nome))));
 
-  // Título, legenda e rosa dos ventos, alinhados na faixa da esquerda (saem também na imagem baixada).
-  const seloLegenda = (y, ic, categoria) => s('g', { class: `m-cat-${categoria}` },
-    s('rect', { class: 'm-placa', x: 34, y: y - 9, width: 18, height: 18, rx: 4 }), desenhoDoGlifo(ic, 43, y, 11));
-  const coluna = s('g', {},
-    s('rect', { class: 'm-quadro', x: 16, y: 64, width: 170, height: 78, rx: 6 }),
-    s('rect', { class: 'm-quadro-dentro', x: 21, y: 69, width: 160, height: 68, rx: 4 }),
-    s('text', { class: 'm-titulo', x: 101, y: 105 }, 'LYENDELL'),
-    s('text', { class: 'm-subtitulo', x: 101, y: 123 }, 'A CAPITAL · CASA LUCKHAM'),
-    s('rect', { class: 'm-quadro', x: 16, y: 156, width: 170, height: 230, rx: 6, style: 'stroke:#4a3e1f' }),
-    s('text', { class: 'm-legenda-titulo', x: 30, y: 178 }, 'LEGENDA'),
-    s('path', { d: 'M30 200H56', stroke: '#070b08', 'stroke-width': 12, 'stroke-linecap': 'round' }),
-    s('path', { d: 'M30 200H56', stroke: '#c29c3e', 'stroke-width': 8, 'stroke-linecap': 'round' }),
-    s('text', { class: 'm-legenda', x: 68, y: 203 }, 'Avenidas'),
-    s('path', { d: 'M30 224H56', stroke: '#070b08', 'stroke-width': 8.5, 'stroke-linecap': 'round' }),
-    s('path', { d: 'M30 224H56', stroke: '#857d66', 'stroke-width': 5, 'stroke-linecap': 'round' }),
-    s('text', { class: 'm-legenda', x: 68, y: 227 }, 'Ruas'),
-    seloLegenda(248, 'coluna', 'publico'),
-    s('text', { class: 'm-legenda', x: 68, y: 251 }, 'Prédios públicos'),
-    seloLegenda(272, 'loja', 'comercio'),
-    s('text', { class: 'm-legenda', x: 68, y: 275 }, 'Comércios e pontos'),
-    estrelaCentro(43, 296, 7),
-    s('text', { class: 'm-legenda', x: 68, y: 299 }, 'Centro da cidade'),
-    ...[['ocupada', 'Casa com morador', 323], ['comercio', 'Comércio', 347], ['sem_dono', 'Sem dono', 371]].map(([sit, texto, y]) =>
-      s('g', {}, s('g', { class: `m-casa m-sit-${sit}`, transform: `translate(43 ${y - 3})`, style: 'cursor:default' },
-        s('rect', { x: -7, y: -7, width: 14, height: 14, rx: 2.5 })), s('text', { class: 'm-legenda', x: 68, y }, texto))),
-    s('g', { transform: 'translate(101 690)' },
-      s('circle', { r: 30, fill: 'none', stroke: '#6d5d34', 'stroke-width': 1 }),
-      s('circle', { r: 22, fill: 'none', stroke: '#3a3122', 'stroke-width': 1 }),
-      s('path', { d: 'M0 -34L6 -6L34 0L6 6L0 34L-6 6L-34 0L-6 -6Z', fill: '#1c1a12', stroke: '#b8943a', 'stroke-width': 1.2 }),
-      s('path', { d: 'M0 -34L6 -6L0 0Z M34 0L6 6L0 0Z M0 34L-6 6L0 0Z M-34 0L-6 -6L0 0Z', fill: '#b8943a' }),
-      // Na vista do jogo que serviu de base, o Norte fica para baixo e o Sul para cima.
-      s('text', { class: 'm-nome', y: -40 }, 'S'),
-      s('text', { class: 'm-nome', y: 48 }, 'N')));
-
-  const { x: px, y: py } = PORTAO;
-  svg.append(estilo, defs,
-    s('rect', { x: VX - 50, y: VY - 50, width: VW + 100, height: VH + 100, fill: '#0b110d' }),
-    s('path', { d: relevo(), fill: 'none', stroke: '#111a14', 'stroke-width': 1.4 }),
-    s('path', { d: rio, fill: 'none', stroke: '#08131a', 'stroke-width': 36, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }),
-    s('path', { d: rio, fill: 'none', stroke: '#10293a', 'stroke-width': 27, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }),
-    s('path', { d: rio, fill: 'none', stroke: '#1f4a5e', 'stroke-width': 1.2, 'stroke-dasharray': '10 14', 'stroke-opacity': 0.8 }),
-    s('path', { d: cidade, fill: CHAO }),
-    s('path', { d: cidade, fill: 'url(#m-casas)' }),
-    s('g', { class: 'm-pracas' }),
-    camada('m-limpa'), camada('m-borda'), camada('m-cor'),
-    s('path', { d: cidade, fill: 'none', stroke: '#3b3119', 'stroke-width': 6, 'stroke-linejoin': 'round' }),
-    s('path', { d: cidade, fill: 'none', stroke: '#8a7337', 'stroke-width': 1.4, 'stroke-linejoin': 'round' }),
-    // Portão norte e a ponte sobre o rio.
-    s('rect', { x: px - 12, y: -4, width: 24, height: py + 4, fill: '#2b2519', stroke: '#8a7337', 'stroke-width': 1.2 }),
-    s('path', { d: Array.from({ length: 8 }, (_, i) => `M${px - 12} ${2 + i * 6.5}h24`).join(''), stroke: '#4a3e1f', 'stroke-width': 1, fill: 'none' }),
-    ...TORRES.map(([x, y]) => s('g', {},
-      s('rect', { x: x - 8, y: y - 8, width: 16, height: 16, rx: 2, fill: '#1c2018', stroke: '#b8943a', 'stroke-width': 1.3 }),
-      s('rect', { x: x - 3.5, y: y - 3.5, width: 7, height: 7, fill: '#3b3119' }))),
+  const miolo = s('g', { 'clip-path': 'url(#m-miolo)' },
+    grupo('', rio() + chaoDaCidade()),
+    s('g', { class: 'm-arvores', 'pointer-events': 'none' }),
+    s('g', { class: 'm-pracas', 'pointer-events': 'none' }),
+    grupo('', viasSvg(CAMINHOS)),
+    grupo('', muralha() + torres()),
     rotulosVias,
-    camada('m-toque'),
+    grupo('', toqueSvg()),
     s('g', { class: 'm-casas' }),
-    s('g', { class: 'm-predios' }),
-    coluna,
-    s('rect', { x: VX, y: VY, width: VW, height: VH, fill: 'url(#m-vinheta)', 'pointer-events': 'none' }));
+    s('g', { class: 'm-predios' }));
+
+  svg.append(estilo, defs, grupo('', papel()), miolo,
+    grupo('', moldura()),
+    grupo('', cartucho() + chave() + rosaDosVentos(101, 650) + barraDeEscala(39, 742)),
+    grupo('', vinheta()));
   return svg;
 }
 
@@ -373,6 +220,7 @@ export async function mapa() {
   const camadaCasas = svg.querySelector('.m-casas');
   const camadaPredios = svg.querySelector('.m-predios');
   const camadaPracas = svg.querySelector('.m-pracas');
+  const camadaArvores = svg.querySelector('.m-arvores');
   const dica = h('div', { class: 'mapa-dica', hidden: true });
   const info = h('div', { class: 'mapa-info', hidden: true });
   const ficha = h('div', { class: 'mapa-ficha-lugar' });
@@ -476,7 +324,7 @@ export async function mapa() {
   function desenharPredios() {
     const ordem = [...predios].sort((a, b) => ['pequeno', 'medio', 'grande'].indexOf(a.tamanho) - ['pequeno', 'medio', 'grande'].indexOf(b.tamanho));
     trocar(camadaPracas, ordem.map(praca));
-    trocar(camadaPredios, ordem.map(selo));
+    trocar(camadaPredios, ordem.map(edificio));
     acender();
   }
 
@@ -580,11 +428,23 @@ export async function mapa() {
   /* Casas */
   const casaPorId = id => casas.find(c => c.id === id);
   function desenharCasas() {
-    trocar(camadaCasas, casas.map(c => s('g', { class: `m-casa m-sit-${c.situacao}`, 'data-casa': c.id, transform: `translate(${c.x} ${c.y})` },
-      s('rect', { x: -TAMANHO_CASA / 2, y: -TAMANHO_CASA / 2, width: TAMANHO_CASA, height: TAMANHO_CASA, rx: 2.5 }),
-      // Casa com ícone (ex.: uma lojinha) mostra o ícone; as outras, o número.
-      c.icone ? desenhoDoGlifo(c.icone, 0, 0, TAMANHO_CASA * 0.72) : s('text', { dy: '0.36em' }, c.numero))));
+    // Cada casa é uma casinha de telhado: o telhado muda com a situação, e há mais de um jeito de telhado.
+    trocar(camadaCasas, casas.map(c => {
+      const sit = variantesDeCasa[c.situacao] ? c.situacao : 'ocupada';
+      const v = c.id % variantesDeCasa[sit];
+      return s('g', { class: `m-casa m-sit-${c.situacao}`, 'data-casa': c.id, transform: `translate(${c.x} ${c.y})`, role: 'img', 'aria-label': `${enderecoDaCasa(c)}, ${nomeDaCasa(c)}` },
+        s('ellipse', { class: 'm-aro', cx: 0, cy: 0, rx: 10.5, ry: 9.5 }),
+        s('rect', { class: 'm-hit', x: -8, y: -8, width: 16, height: 16 }),
+        s('use', { href: `#c-${sit}-${v}` }),
+        // Casa com ícone (ex.: uma lojinha) mostra o ícone na parede; as outras, o número.
+        c.icone ? desenhoDoGlifo(c.icone, 0, 3.2, 6.2) : s('text', { y: 5.2 }, c.numero));
+    }));
+    desenharArvores();
     acender();
+  }
+  // As árvores ficam nos espaços vazios: elas saem do caminho das casas e dos prédios (que vêm do banco).
+  function desenharArvores() {
+    camadaArvores.innerHTML = arvoresSvg(casas, predios);
   }
   async function carregar() {
     const d = await get('/api/casas');
@@ -1045,6 +905,14 @@ export async function mapa() {
       window.addEventListener('pointercancel', soltar);
     }
   });
+  // Teclado: Enter ou espaço num prédio abre a ficha (ou o formulário, na edição).
+  svg.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const predio = e.target.closest?.('[data-predio]');
+    if (!predio) return;
+    e.preventDefault();
+    predio.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  });
   svg.addEventListener('wheel', e => {
     e.preventDefault();
     zoom(Math.exp(e.deltaY * 0.0015), paraMapa(e.clientX, e.clientY));
@@ -1119,7 +987,14 @@ export async function mapa() {
     textoEdicao,
     botao('Colar lista de uma rua', { icone: 'mais', classe: 'btn-ouro btn-pequeno', onclick: colarLista }));
   escolherOQuePor('casa');
-  const quadro = h('div', { class: 'mapa-quadro' }, svg, dica, info, ficha, barraEdicao,
+  // No celular a chave do mapa (legenda) sai de dentro do desenho e vira uma caixa que abre e fecha.
+  const chaveMovel = h('details', { class: 'mapa-chave' }, h('summary', null, 'Chave do mapa'),
+    h('ul', null, ITENS_CHAVE.map(([tipo, texto]) => {
+      const item = h('li', null, h('span', null, texto));
+      item.insertAdjacentHTML('afterbegin', miniaturaDaChave(tipo));
+      return item;
+    })));
+  const quadro = h('div', { class: 'mapa-quadro' }, svg, dica, info, ficha, barraEdicao, chaveMovel,
     h('div', { class: 'mapa-zoom' },
       h('button', { class: 'btn-icone', type: 'button', title: 'Aproximar', 'aria-label': 'Aproximar', onclick: () => zoom(1 / 1.5) }, icone('mais')),
       h('button', { class: 'btn-icone', type: 'button', title: 'Afastar', 'aria-label': 'Afastar', onclick: () => zoom(1.5) }, h('span', { class: 'mapa-menos' }, '−')),
@@ -1190,6 +1065,9 @@ export async function mapa() {
       copia.setAttribute('viewBox', VISTA.join(' '));
       copia.setAttribute('width', VW * 2);
       copia.setAttribute('height', VH * 2);
+      copia.setAttribute('xmlns', NS);
+      // A imagem solta não enxerga as fontes da página (e a segurança do site não deixa baixá-las daqui):
+      // o texto sai na fonte de reserva (serifa clássica) e as larguras são fixas, então nada se desencaixa.
       const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(copia)], { type: 'image/svg+xml' }));
       const img = new Image();
       img.src = url;
@@ -1200,6 +1078,7 @@ export async function mapa() {
       tela.getContext('2d').drawImage(img, 0, 0, tela.width, tela.height);
       URL.revokeObjectURL(url);
       const png = await new Promise(ok => tela.toBlob(ok, 'image/png'));
+      if (!png) throw new Error('sem imagem');
       const a = h('a', { href: URL.createObjectURL(png), download: 'mapa-de-lyendell.png' });
       document.body.append(a);
       a.click();
