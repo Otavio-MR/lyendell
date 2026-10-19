@@ -398,6 +398,8 @@ retiradas, e um ranking de quem mais trabalha. O Comandante marca cada turno com
 
 ## Hospital Imperial
 
+O **selo do Hospital de Lyendell** (o coelho coroado com a cruz e o lema "Serviço à vida", que representa o hospital e a equipe médica da Casa Luckham) aparece na página do Hospital e no cabeçalho dos documentos e formulários dos registros do Hospital, no lugar do brasão (`public/img/selo-hospital.webp`).
+
 O Hospital Imperial cura gente de todo o Império, não só os Luckham. No Hospital há o livro **Pacientes do Hospital Imperial** (com a Casa ou região de origem e
 quem enviou o paciente), cuidado pelo Diretor do Hospital como o resto. No mapa, o prédio tem símbolo e gravura próprios (escudo com cruz e coroa), diferentes do
 Hospital comum; a Escola ganhou o capelo. Ao atualizar, o prédio chamado Hospital Imperial fica ligado à página do Hospital e o chamado Escola, à da Escola, se ainda não tinham ligação.

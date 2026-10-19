@@ -34,6 +34,8 @@ export const MODULOS = {
   },
   hospital: {
     titulo: 'Hospital', icone: 'cruz', no: 'no Hospital', enviam: 'Médicos',
+    // O selo oficial do Hospital de Lyendell e da equipe médica da Casa Luckham (vai no documento, no formulário e na página do módulo).
+    selo: '/img/selo-hospital.webp', seloNome: 'Hospital de Lyendell, serviço à vida',
     sub: 'Os pacientes atendidos no hospital da capital e a equipe que cuida deles.',
     quemComanda: 'o Diretor do Hospital',
     aprovador: 'do Diretor do Hospital',
@@ -117,6 +119,8 @@ export async function modulo(m) {
           onclick: () => configurarLivro(m, null, id => { location.hash = `#/${m}/${id}`; }),
         })],
       }),
+      info.selo && h('figure', { class: 'modulo-selo' }, h('img', { src: info.selo, alt: info.seloNome, width: 150, height: 150 }),
+        h('figcaption', null, 'Selo do Hospital de Lyendell e da equipe médica da Casa Luckham')),
       abasModulo(m, '', contagem),
       notaCrianca(),
       notaAliado(m),
@@ -505,7 +509,7 @@ function verRegistro(m, d, r, recarregar, reabrir) {
     cartaz,
     r.numero && h('div', { class: 'doc-numero', title: `Registro nº ${r.numero}` }, h('small', null, 'Nº'), h('strong', null, romano(r.numero))),
     h('header', { class: 'doc-cab' },
-      h('img', { src: '/img/brasao.png', alt: '', class: 'doc-brasao' }),
+      h('img', { src: MODULOS[m].selo || '/img/brasao.png', alt: MODULOS[m].seloNome || '', class: `doc-brasao${MODULOS[m].selo ? ' com-selo' : ''}` }),
       h('p', { class: 'doc-sobre' }, `${MODULOS[m].titulo} de Lyendell`),
       h('h2', { class: 'doc-titulo' }, titulo),
       h('p', { class: 'doc-livro' }, r.numero ? `${l.nome} · Registro nº ${r.numero}` : `${l.nome} · sem número até ser aprovado`)),
@@ -659,7 +663,7 @@ export async function formRegistro(l, r, aoSalvar, inicial = null) {
     textoOk: r ? 'Salvar alterações' : 'Registrar',
     conteudo: [
       h('header', { class: 'folha-cab' },
-        h('img', { src: '/img/brasao.png', alt: '', class: 'folha-brasao' }),
+        h('img', { src: MODULOS[l.modulo].selo || '/img/brasao.png', alt: MODULOS[l.modulo].seloNome || '', class: `folha-brasao${MODULOS[l.modulo].selo ? ' com-selo' : ''}` }),
         h('p', { class: 'folha-sobre' }, `${MODULOS[l.modulo].titulo} de Lyendell`),
         h('p', { class: 'folha-livro' }, r?.numero ? `${l.nome} · Registro nº ${r.numero}` : l.nome)),
       h('div', { class: 'form-grade' }, l.campos.map(c => entradaDoCampo(c, valores, ctx))),

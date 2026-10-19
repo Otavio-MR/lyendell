@@ -422,3 +422,11 @@ body:not(.modo-crianca) .modal-assinar .modal-corpo { padding: 38px 36px 38px; }
 @media print {
   .papel-mesa { filter: none; }
 }
+
+/* O selo do Hospital de Lyendell no lugar do brasão (documento, formulário e página do módulo): sem o tom sépia do brasão. */
+body:not(.modo-crianca) .documento-livro .doc-brasao.com-selo { width: 104px; height: 104px; filter: drop-shadow(0 3px 5px rgba(44, 34, 20, 0.35)); border-radius: 50%; }
+body:not(.modo-crianca) .modal-papel .folha-brasao.com-selo { width: 84px; height: 84px; filter: drop-shadow(0 2px 4px rgba(44, 34, 20, 0.3)); border-radius: 50%; }
+.modulo-selo { display: flex; align-items: center; gap: 16px; margin: 0 0 18px; }
+.modulo-selo img { width: 120px; height: 120px; object-fit: contain; border-radius: 50%; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); flex: 0 0 auto; }
+.modulo-selo figcaption { max-width: 34ch; font-family: var(--f-destaque); font-style: italic; font-size: 1.05rem; color: var(--suave); line-height: 1.4; }
+@media (max-width: 520px) { .modulo-selo img { width: 88px; height: 88px; } }
