@@ -1,0 +1,127 @@
+/* escola.css: layout e visual da Escola Luckham (carregado depois dos outros).
+   A primeira tela (Visão geral) e a assinatura da Direção nas fichas. */
+
+/* ─── A faixa de cima: para quem é a escola ─── */
+.escola-faixa {
+  display: flex; align-items: center; gap: 12px; padding: 8px 14px; border-radius: var(--raio-p);
+  border: 1px solid var(--borda-2); background: linear-gradient(90deg, var(--ouro-fundo), transparent 70%);
+}
+.escola-faixa-brasao { width: 36px; height: 36px; flex: none; object-fit: contain; }
+.escola-faixa-texto { margin: 0; min-width: 0; color: var(--texto-2); line-height: 1.4; overflow-wrap: anywhere; }
+.escola-faixa-texto strong { color: var(--ouro-l); font-weight: 600; }
+
+/* ─── A ação principal de cada papel ─── */
+.escola-principal {
+  display: grid; gap: 14px; padding: 20px 22px; border-radius: var(--raio);
+  border: 1px solid var(--borda-2); border-top: 3px solid var(--ouro-d); background: linear-gradient(170deg, var(--sup-2), var(--sup) 70%);
+}
+.escola-titulo-bloco { font-family: var(--f-titulo); font-size: 1.05rem; letter-spacing: 0.03em; color: var(--ouro); margin: 0; }
+
+.escola-atencao { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+.escola-atencao-card {
+  display: grid; grid-template-columns: auto 1fr; grid-template-areas: 'n texto' 'n acao'; align-items: center; gap: 2px 14px;
+  min-height: 72px; padding: 12px 16px; border-radius: var(--raio-p); color: var(--texto);
+  background: var(--sup); border: 1px solid rgba(216, 177, 58, 0.45); border-left: 4px solid var(--ouro); text-decoration: none;
+  transition: border-color 0.15s, transform 0.15s;
+}
+.escola-atencao-card:hover { border-color: var(--ouro); transform: translateY(-1px); color: var(--texto); }
+.escola-atencao-n { grid-area: n; display: grid; justify-items: center; gap: 2px; min-width: 44px; color: var(--ouro); }
+.escola-atencao-n .ico { width: 18px; height: 18px; }
+.escola-atencao-n strong { font-family: var(--f-titulo); font-size: 1.8rem; line-height: 1; color: var(--ouro-l); }
+.escola-atencao-texto { grid-area: texto; font-size: 1.02rem; line-height: 1.3; overflow-wrap: anywhere; }
+.escola-atencao-acao { grid-area: acao; font-family: var(--f-titulo); font-size: 0.78rem; letter-spacing: 0.06em; color: var(--ouro); }
+.escola-atencao-acao::after { content: ' \203A'; }
+
+.escola-tudo-certo { display: flex; align-items: center; gap: 10px; margin: 0; color: var(--texto-2); font-size: 1.05rem; }
+.escola-tudo-certo .ico { width: 20px; height: 20px; color: var(--verde); flex: none; }
+
+.escola-atalhos { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.escola-atalho {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 52px; padding: 10px 16px;
+  font-family: var(--f-titulo); font-size: 0.9rem; letter-spacing: 0.04em; color: var(--texto); cursor: pointer;
+  background: var(--sup-2); border: 1px solid var(--borda-2); border-radius: var(--raio-p);
+  transition: border-color 0.15s, background 0.15s;
+}
+.escola-atalho:hover:not(:disabled) { border-color: var(--ouro-d); background: var(--sup-3); }
+.escola-atalho:disabled { opacity: 0.6; cursor: progress; }
+.escola-atalho .ico { width: 20px; height: 20px; color: var(--ouro); flex: none; }
+.escola-atalho-principal { color: #1b1403; background: linear-gradient(180deg, var(--ouro-l), var(--ouro) 55%, #b8921f); border-color: #b8921f; }
+.escola-atalho-principal:hover:not(:disabled) { background: linear-gradient(180deg, #fbe99a, var(--ouro-l) 55%, var(--ouro)); border-color: var(--ouro-l); }
+.escola-atalho-principal .ico { color: #1b1403; }
+
+.escola-convite-texto { margin: 0; max-width: 70ch; color: var(--texto-2); font-size: 1.08rem; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.escola-convite .escola-atalhos { grid-template-columns: minmax(0, 320px); }
+
+.escola-hoje li.escola-aula-sua { border-color: rgba(216, 177, 58, 0.55); background: var(--ouro-fundo); }
+.escola-hoje .btn { white-space: nowrap; min-height: 44px; display: inline-flex; align-items: center; gap: 6px; }
+
+/* ─── Os dois blocos úteis ─── */
+.escola-duplo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
+.escola-duplo > .painel { margin-top: 0; min-width: 0; }
+.escola-duplo .escola-lista li { padding: 6px 10px; }
+.escola-duplo .escola-painel > a:last-child { min-height: 44px; display: inline-flex; align-items: center; margin-top: 6px; }
+
+.escola-disc-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.escola-disc-lista li {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); align-items: center; gap: 4px 12px;
+  padding: 8px 10px; border-radius: var(--raio-p); background: var(--sup-2); border-left: 2px solid var(--borda-2);
+}
+.escola-disc-lista li.escola-disc-vaga { border-left-color: var(--ouro); background: var(--ouro-fundo); }
+.escola-disc-nome { font-weight: 600; overflow-wrap: anywhere; }
+.escola-disc-quem { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; min-width: 0; }
+.escola-disc-titular { overflow-wrap: anywhere; }
+.escola-disc-subst { font-size: 0.82rem; overflow-wrap: anywhere; }
+
+/* ─── Sobre a escola: fechado por padrão ─── */
+.escola-sobre { border: 1px solid var(--borda-2); border-radius: var(--raio); background: var(--sup); }
+.escola-sobre > summary {
+  display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 10px 18px; cursor: pointer; list-style: none; color: var(--ouro);
+}
+.escola-sobre > summary::-webkit-details-marker { display: none; }
+.escola-sobre > summary > .ico:first-child { width: 22px; height: 22px; flex: none; }
+.escola-sobre > summary > span { display: grid; flex: 1; min-width: 0; }
+.escola-sobre > summary strong { font-family: var(--f-titulo); font-size: 1rem; letter-spacing: 0.03em; }
+.escola-sobre > summary small { font-size: 0.9rem; }
+.escola-sobre-seta { width: 20px; height: 20px; flex: none; transition: transform 0.2s; }
+.escola-sobre[open] .escola-sobre-seta { transform: rotate(180deg); }
+.escola-sobre > summary:hover { background: var(--ouro-fundo); border-radius: var(--raio); }
+.escola-sobre-corpo { display: grid; gap: 16px; padding: 4px 18px 20px; }
+.escola-sobre .escola-editais { margin: 0; }
+.escola-sobre .escola-rodape-mural { margin: 0; }
+
+/* ─── A assinatura da Direção nas fichas ─── */
+.escola-assina { display: grid; gap: 12px; justify-items: start; }
+.escola-assina-tinta {
+  width: 100%; max-width: 360px; min-height: 72px; padding: 8px 12px; display: flex; align-items: flex-end; justify-content: center;
+  color: var(--tinta); border-radius: var(--raio-p); border-bottom: 2px solid rgba(40, 24, 6, 0.7);
+  background: linear-gradient(160deg, var(--pergaminho), var(--pergaminho-2));
+}
+.escola-assina-tinta .assinatura-svg { display: block; height: 72px; width: auto; max-width: 100%; }
+.escola-assina-quem { margin: 0; }
+.escola-assina-quem strong { font-family: var(--f-destaque); font-size: 1.2rem; }
+.escola-assina-vazia { margin: 0; font-style: italic; }
+.escola-assina .btn { min-height: 44px; display: inline-flex; align-items: center; gap: 8px; }
+
+/* Na ficha do professor, o bloco entra pequeno dentro do cartão */
+.escola-prof-assina { margin-top: 6px; }
+.escola-prof-assina .escola-assina { gap: 6px; }
+.escola-prof-assina .escola-assina-tinta { min-height: 44px; padding: 4px 8px; max-width: 220px; }
+.escola-prof-assina .assinatura-svg { height: 40px; }
+.escola-prof-assina .escola-assina-quem { font-size: 0.85rem; }
+.escola-prof-assina .escola-assina-quem strong { font-size: 1rem; }
+.escola-prof-assina .escola-assina-vazia { font-size: 0.9rem; }
+
+/* ─── Celular ─── */
+@media (max-width: 760px) {
+  .escola-duplo { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .escola-principal { padding: 16px; }
+  .escola-atalhos { grid-template-columns: minmax(0, 1fr); }
+  .escola-atalho { min-height: 48px; }
+  .escola-atencao { grid-template-columns: minmax(0, 1fr); }
+  .escola-atencao-card { min-height: 64px; }
+  .escola-disc-lista li { grid-template-columns: minmax(0, 1fr); }
+  .escola-hoje li { flex-wrap: wrap; }
+  .escola-hoje .btn { width: 100%; justify-content: center; }
+  .escola-sobre-corpo { padding: 4px 14px 16px; }
+  .escola-assina-tinta { max-width: 100%; }
+}

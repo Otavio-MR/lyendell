@@ -10,7 +10,9 @@ import {
 // Semana de segunda a domingo (como na Gestão Financeira). A visão e o filtro escolhidos ficam guardados entre as trocas de aba.
 const est = { visao: lembrar('visao') === 'semana' ? 'semana' : 'mes', ref: null, filtro: 'todos' };
 const ORDEM_SEMANA = [1, 2, 3, 4, 5, 6, 0];
-const MAX_PILULAS = 3;
+const MOBILE = '(max-width: 760px)';
+// Hora curta para caber na pílula: 08:00 vira 8h, 09:30 vira 9h30.
+const hc = s => { const [a, b] = s.split(':'); return `${+a}h${b === '00' ? '' : b}`; };
 
 const abs = (dia, hhmm) => Date.UTC(+dia.slice(0, 4), +dia.slice(5, 7) - 1, +dia.slice(8, 10)) + minutos(hhmm) * 60000;
 const inicioAbs = t => abs(t.data, t.inicio);
@@ -32,7 +34,7 @@ export async function agenda(corpo, ctx) {
   const resumoEl = h('div', { class: 'gesc-resumo-vaga' });
   const gradeEl = h('div', { class: 'gesc-grade-vaga', 'aria-live': 'polite' });
   const tituloEl = h('h2', { class: 'gesc-titulo-per', 'aria-live': 'polite' });
-  const filtroEl = h('select', { class: 'input gesc-filtro', 'aria-label': 'Filtrar por guarda', onchange: () => { const v = filtroEl.value; est.filtro = v === 'todos' || v === 'meus' ? v : Number(v); desenharGrade(); desenharLegenda(); } });
+  const filtroEl = h('select', { class: 'input gesc-filtro', 'aria-label': 'Filtrar por guarda', onchange: () => { const v = filtroEl.value; est.filtro = v === 'todos' || v === 'meus' ? v : Number(v); desenharGrade(); desenharLegenda(); ajustarPilulas(gradeEl); } });
   const legendaEl = h('div', { class: 'gesc-legenda', role: 'group', 'aria-label': 'Cores dos guardas' });
   const seg = h('div', { class: 'segmentado gesc-visao', role: 'group', 'aria-label': 'Tipo de visão' });
   let dados = { turnos: [], convocacoes: [] };
@@ -50,7 +52,7 @@ export async function agenda(corpo, ctx) {
     trocar(legendaEl, ctx.guardas.map(g => h('button', {
       type: 'button', class: `gesc-leg ${est.filtro === g.id ? 'ativa' : ''}`.trim(), style: { '--cor': ctx.cor(g.id) }, 'aria-pressed': String(est.filtro === g.id),
       title: est.filtro === g.id ? 'Mostrar todos de novo' : `Ver só ${g.nome}`,
-      onclick: () => { est.filtro = est.filtro === g.id ? 'todos' : g.id; desenharFiltro(); desenharGrade(); desenharLegenda(); },
+      onclick: () => { est.filtro = est.filtro === g.id ? 'todos' : g.id; desenharFiltro(); desenharGrade(); desenharLegenda(); ajustarPilulas(gradeEl); },
     }, h('i', { class: 'gesc-leg-cor' }), g.nome)));
   }
   function desenharVisao() {
@@ -80,6 +82,7 @@ export async function agenda(corpo, ctx) {
       if (minha !== senha) return;
       dados = r;
       desenharGrade();
+      requestAnimationFrame(() => ajustarPilulas(gradeEl));
     } catch (e) {
       if (minha !== senha) return;
       trocar(gradeEl, h('p', { class: 'form-erro', role: 'alert' }, e.message));
@@ -101,7 +104,7 @@ export async function agenda(corpo, ctx) {
       est.visao === 'mes' ? gradeMes(por, convs, ctx) : gradeSemana(por, convs, ctx),
       !turnos.length && h('p', { class: 'gesc-sem-turnos' }, icone('calendario'),
         est.filtro === 'todos'
-          ? (ctx.gerir ? 'Nenhum turno neste período. Toque em um dia (ou em "Marcar turno") para definir quem atende e em que horário.' : 'Nenhum turno marcado neste período. O Comandante da Guarda define os horários.')
+          ? (ctx.gerir ? 'Nenhum turno neste período. Clique em um dia (ou em "Marcar turno") para definir quem atende e quando.' : 'Nenhum turno marcado neste período. O Comandante da Guarda define os horários.')
           : 'Nenhum turno deste filtro neste período.'));
   }
 
@@ -109,7 +112,6 @@ export async function agenda(corpo, ctx) {
 
   desenharFiltro(); desenharLegenda(); desenharVisao();
   trocar(corpo,
-    resumoEl,
     h('div', { class: 'gesc-barra' },
       h('div', { class: 'gesc-nav' },
         h('button', { class: 'btn-icone', type: 'button', 'aria-label': est.visao === 'mes' ? 'Mês anterior' : 'Semana anterior', onclick: () => andar(-1) }, icone('voltar')),
@@ -119,8 +121,17 @@ export async function agenda(corpo, ctx) {
       h('div', { class: 'gesc-barra-dir' },
         seg, filtroEl,
         ctx.gerir && botao('Marcar turno', { icone: 'mais', classe: 'btn-ouro', onclick: () => formularioTurno(ctx, { dia: diaSugerido() }) }))),
-    legendaEl,
+    h('div', { class: 'gesc-faixa-topo' }, resumoEl, legendaEl),
     gradeEl);
+  // Fecha o painel do resumo ao clicar fora ou apertar Esc.
+  const fecharResumo = e => {
+    if (!resumoEl.isConnected) { document.removeEventListener('click', fecharResumo); document.removeEventListener('keydown', fecharResumo); return; }
+    const d = resumoEl.querySelector('details');
+    if (d?.open && (e.type === 'keydown' ? e.key === 'Escape' : !d.contains(e.target))) d.open = false;
+  };
+  document.addEventListener('click', fecharResumo); document.addEventListener('keydown', fecharResumo);
+  // Pílulas que não cabem na célula viram "+N" (a altura das células depende da janela).
+  if (typeof ResizeObserver === 'function') new ResizeObserver(() => ajustarPilulas(gradeEl)).observe(gradeEl);
   // Os botões de navegação mudam de rótulo com a visão: refaz depois de trocar.
   seg.addEventListener('click', () => {
     corpo.querySelector('.gesc-nav .btn-icone:first-child')?.setAttribute('aria-label', est.visao === 'mes' ? 'Mês anterior' : 'Semana anterior');
@@ -143,13 +154,21 @@ function resumo(turnos, ctx) {
   const coluna = (tit, ic, lista, vazio, fn) => h('div', { class: 'gesc-res-col' },
     h('h3', null, icone(ic), tit),
     lista.length ? h('ul', { class: 'gesc-res-lista' }, lista.map(fn)) : h('p', { class: 'gesc-res-vazio' }, vazio));
-  return h('section', { class: 'painel gesc-resumo', 'aria-label': 'Resumo da escala' },
-    meu && h('p', { class: 'gesc-meu-aviso' }, icone('escudo'),
-      inicioAbs(meu) <= agora ? `Você está de turno agora, até as ${meu.fim}.` : `Seu próximo turno: ${semanaAbrev(meu.data)}, ${diaMes(meu.data)}, das ${meu.inicio} às ${meu.fim}.`),
-    h('div', { class: 'gesc-res-grade' },
-      coluna('De turno agora', 'escudo', agoraT, 'Ninguém está de turno neste momento.', t => linha(t, `até as ${t.fim}${viraNoite(t) ? ' (dia seguinte)' : ''}`)),
-      coluna('Hoje', 'calendario', hojeT, 'Nenhum turno marcado para hoje.', t => linha(t, `${t.inicio} às ${t.fim}${t.situacao !== 'agendado' ? ` · ${SIT_TURNO[t.situacao][0]}` : ''}`)),
-      coluna('Próximos turnos', 'relogio', proximos, 'Nada marcado para os próximos dias.', t => linha(t, `${semanaAbrev(t.data)}, ${diaMes(t.data)} · ${t.inicio} às ${t.fim}`))));
+  const nomes = [...new Set(agoraT.map(t => t.guarda_nome))].join(', ');
+  const linhaMeu = meu && (inicioAbs(meu) <= agora ? `Você está de turno até as ${meu.fim}` : `Seu próximo turno: ${semanaAbrev(meu.data)}, ${diaMes(meu.data)}, ${meu.inicio} às ${meu.fim}`);
+  return h('details', { class: 'gesc-resumo', 'aria-label': 'Resumo da escala' },
+    h('summary', { class: 'gesc-res-sum' },
+      icone('escudo'),
+      h('span', { class: 'gesc-res-txt' },
+        linhaMeu && h('span', { class: 'gesc-res-meu' }, linhaMeu),
+        h('span', null, h('b', null, 'Agora: '), agoraT.length ? nomes : 'ninguém de turno'),
+        h('span', null, h('b', null, 'Hoje: '), hojeT.length ? `${hojeT.length} ${hojeT.length === 1 ? 'turno' : 'turnos'}` : 'sem turnos')),
+      h('span', { class: 'gesc-res-abre' }, 'Detalhes')),
+    h('div', { class: 'gesc-res-painel' },
+      h('div', { class: 'gesc-res-grade' },
+        coluna('De turno agora', 'escudo', agoraT, 'Ninguém está de turno neste momento.', t => linha(t, `até as ${t.fim}${viraNoite(t) ? ' (dia seguinte)' : ''}`)),
+        coluna('Hoje', 'calendario', hojeT, 'Nenhum turno marcado para hoje.', t => linha(t, `${t.inicio} às ${t.fim}${t.situacao !== 'agendado' ? ` · ${SIT_TURNO[t.situacao][0]}` : ''}`)),
+        coluna('Próximos turnos', 'relogio', proximos, 'Nada marcado para os próximos dias.', t => linha(t, `${semanaAbrev(t.data)}, ${diaMes(t.data)} · ${t.inicio} às ${t.fim}`)))));
 }
 
 /* ─── Mês ────────────────────────────────────────── */
@@ -163,7 +182,7 @@ function pilula(t, ctx) {
   },
   t.situacao === 'cumprido' ? icone('check') : t.situacao === 'faltou' ? icone('x') : null,
   h('span', { class: 'gesc-pil-nome' }, t.guarda_nome),
-  h('span', { class: 'gesc-pil-hora' }, `${t.inicio}-${t.fim}`));
+  h('span', { class: 'gesc-pil-hora' }, `${hc(t.inicio)}-${hc(t.fim)}`, viraNoite(t) && h('sup', null, '+1')));
 }
 
 function marcasConvocacao(lista, ctx) {
@@ -180,7 +199,7 @@ function gradeMes(por, convs, ctx) {
   const { de, ate } = periodo();
   const dias = listaDeDias(de, ate);
   const mes = est.ref.slice(0, 7);
-  return h('div', { class: 'gesc-mes' },
+  return h('div', { class: 'gesc-mes', style: { '--linhas': dias.length / 7 } },
     h('div', { class: 'gesc-mes-cab', 'aria-hidden': 'true' }, ORDEM_SEMANA.map(i => h('span', null, SEMANA_CURTA[i]))),
     h('div', { class: 'gesc-mes-grade' }, dias.map(d => {
       const lista = por.get(d) || [];
@@ -194,11 +213,26 @@ function gradeMes(por, convs, ctx) {
           ? h('button', { type: 'button', class: 'gesc-dia-num', 'aria-label': ctx.gerir ? `Marcar turno em ${dataBr(d)}` : `Ver os turnos de ${dataBr(d)}`, title: ctx.gerir ? 'Marcar turno neste dia' : null, onclick: clique },
             h('b', null, +d.slice(8)), h('span', { class: 'gesc-dia-rot' }, `${semanaAbrev(d)}, ${diaMes(d)}`), d === ctx.hoje && h('em', null, 'hoje'))
           : h('span', { class: 'gesc-dia-num sem-botao' }, h('b', null, +d.slice(8)), h('span', { class: 'gesc-dia-rot' }, `${semanaAbrev(d)}, ${diaMes(d)}`)),
+        lista.length > 0 && h('button', { type: 'button', class: 'gesc-mais', hidden: true, onclick: () => abrirDia(d, lista, ctx), 'aria-label': `Ver os ${lista.length} turnos de ${dataBr(d)}` }),
         marcasConvocacao(convs.get(d), ctx)),
-      lista.map((t, i) => { const p = pilula(t, ctx); if (i >= MAX_PILULAS) p.classList.add('extra'); return p; }),
-      lista.length > MAX_PILULAS && h('button', { type: 'button', class: 'gesc-mais', onclick: () => abrirDia(d, lista, ctx), 'aria-label': `Ver os ${lista.length} turnos de ${dataBr(d)}` }, `+${lista.length - MAX_PILULAS}`));
+      lista.length > 0 && h('div', { class: 'gesc-dia-pils' }, lista.map(t => pilula(t, ctx))));
       return cel;
     })));
+}
+
+// Esconde as pílulas que passam da altura da célula e mostra "+N" no lugar (no celular a lista mostra tudo).
+function ajustarPilulas(gradeEl) {
+  const celular = matchMedia(MOBILE).matches;
+  for (const box of gradeEl.querySelectorAll('.gesc-dia-pils')) {
+    const pils = [...box.querySelectorAll('.gesc-pil')];
+    const mais = box.parentElement.querySelector('.gesc-mais');
+    pils.forEach(p => p.classList.remove('extra'));
+    mais.hidden = true;
+    if (celular || box.scrollHeight <= box.clientHeight + 1) continue;
+    mais.hidden = false;
+    let n = pils.length;
+    while (n > 0 && box.scrollHeight > box.clientHeight + 1) { n--; pils[n].classList.add('extra'); mais.textContent = `+${pils.length - n}`; }
+  }
 }
 
 /* ─── Semana ─────────────────────────────────────── */
@@ -223,9 +257,9 @@ function gradeSemana(por, convs, ctx) {
   return h('div', { class: 'gesc-sem' }, listaDeDias(s.inicio, s.fim).map(d => {
     const lista = por.get(d) || [];
     return h('section', { class: `gesc-sem-dia ${d === ctx.hoje ? 'hoje' : ''} ${lista.length ? '' : 'sem-turno'}`.trim(), 'aria-label': diaLongo(d) },
-      h('header', null, h('span', null, semanaAbrev(d)), h('b', null, diaMes(d)), d === ctx.hoje && h('em', null, 'hoje'), marcasConvocacao(convs.get(d), ctx)),
-      lista.length ? lista.map(t => cartaoSemana(t, ctx)) : h('p', { class: 'gesc-sem-vazio' }, 'Sem turnos'),
-      ctx.gerir && h('button', { type: 'button', class: 'gesc-sem-add', onclick: () => formularioTurno(ctx, { dia: d }), 'aria-label': `Marcar turno em ${dataBr(d)}` }, icone('mais'), h('span', null, 'Marcar')));
+      h('header', null, h('span', null, semanaAbrev(d)), h('b', null, diaMes(d)), d === ctx.hoje && h('em', null, 'hoje'), marcasConvocacao(convs.get(d), ctx),
+        ctx.gerir && h('button', { type: 'button', class: 'gesc-sem-add', onclick: () => formularioTurno(ctx, { dia: d }), 'aria-label': `Marcar turno em ${dataBr(d)}`, title: 'Marcar turno neste dia' }, icone('mais'))),
+      h('div', { class: 'gesc-sem-lista' }, lista.length ? lista.map(t => cartaoSemana(t, ctx)) : h('p', { class: 'gesc-sem-vazio' }, 'Sem turnos')));
   }));
 }
 

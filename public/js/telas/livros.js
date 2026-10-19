@@ -438,6 +438,16 @@ const cargoDe = m => {
   return t.charAt(0).toUpperCase() + t.slice(1);
 };
 
+// Numeração do decreto em algarismos romanos (acima de 3999 volta aos arábicos).
+function romano(n) {
+  n = Number(n);
+  if (!Number.isInteger(n) || n < 1 || n > 3999) return String(n);
+  const t = [[1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];
+  let o = '';
+  for (const [v, s] of t) while (n >= v) { o += s; n -= v; }
+  return o;
+}
+
 function verRegistro(m, d, r, recarregar, reabrir) {
   const l = d.livro;
   const titulo = tituloDe(l, r.dados);
@@ -493,7 +503,7 @@ function verRegistro(m, d, r, recarregar, reabrir) {
   if (cartaz) desenharCartaz(cartaz, dadosDoCartaz(l, r.dados));
   const doc = h('article', { class: `documento documento-livro sit-${r.situacao || 'aprovado'}` },
     cartaz,
-    r.numero && h('div', { class: 'doc-numero', title: `Registro nº ${r.numero}` }, h('small', null, 'Registro nº'), h('strong', null, String(r.numero).padStart(4, '0'))),
+    r.numero && h('div', { class: 'doc-numero', title: `Registro nº ${r.numero}` }, h('small', null, 'Nº'), h('strong', null, romano(r.numero))),
     h('header', { class: 'doc-cab' },
       h('img', { src: '/img/brasao.png', alt: '', class: 'doc-brasao' }),
       h('p', { class: 'doc-sobre' }, `${MODULOS[m].titulo} de Lyendell`),

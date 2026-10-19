@@ -456,3 +456,10 @@ function formNota(al, v, n, recarregar) {
     },
   });
 }
+
+// Abre o formulário de "Marcar aula" sem passar pela aba Aulas.
+export async function marcarAula(ctx) {
+  const [{ disciplinas }, { turmas: listaTurmas }, { professores }] = await Promise.all([
+    get(`${API}/disciplinas`), get(`${API}/turmas`), get(`${API}/professores`)]);
+  formAula(null, { disciplinas, turmas: listaTurmas, professores }, ctx);
+}

@@ -777,7 +777,10 @@ CREATE TABLE IF NOT EXISTS escola_professores (
   criado_por_nome TEXT NOT NULL DEFAULT '',
   criado_em TEXT NOT NULL DEFAULT (datetime('now')),
   atualizado_por_nome TEXT,
-  atualizado_em TEXT
+  atualizado_em TEXT,
+  assinatura TEXT,
+  assinado_por_nome TEXT,
+  assinado_em TEXT
 );
 -- Um titular e um substituto por disciplina (o banco recusa o segundo, mesmo com dois cliques juntos).
 CREATE UNIQUE INDEX IF NOT EXISTS escola_um_titular ON escola_professores(disciplina_id) WHERE situacao = 'titular';
@@ -820,7 +823,10 @@ CREATE TABLE IF NOT EXISTS escola_alunos (
   criado_por_nome TEXT NOT NULL DEFAULT '',
   criado_em TEXT NOT NULL DEFAULT (datetime('now')),
   atualizado_por_nome TEXT,
-  atualizado_em TEXT
+  atualizado_em TEXT,
+  assinatura TEXT,
+  assinado_por_nome TEXT,
+  assinado_em TEXT
 );
 CREATE UNIQUE INDEX IF NOT EXISTS escola_numero_unico ON escola_alunos(numero) WHERE numero IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_escola_alunos_turma ON escola_alunos(turma_id);
@@ -883,7 +889,7 @@ CREATE INDEX IF NOT EXISTS idx_escola_historico ON escola_historico(entidade, en
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 39;
+const VERSAO = 40;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -978,6 +984,14 @@ async function migrar() {
   // v30: os Aliados passam a ver a cidade (mapa, anúncios, Congresso, Juramento, Leis, Galeria, Comunidade) e a jogar na Recreação.
   if (versao < 30) await db.run('UPDATE cargos SET descricao = ? WHERE nome = ? AND descricao = ?', CARGOS_PADRAO.find(c => c.nome === 'Aliados').descricao, 'Aliados', 'Convidados e aliados de outras casas. Não são moradores: veem só o que for marcado para Convidados e Aliados.');
   if (versao < 30) await darPermissoes({ Aliados: ['aliados.ver', 'anuncios.ver', 'congresso.ver', 'leis.ver', 'galeria.ver', 'recreacao.usar'] });
+  // v40: a assinatura desenhada do Diretor nas fichas de alunos e professores da escola (traços em JSON, quem assinou e quando).
+  if (versao < 40) {
+    for (const tabela of ['escola_alunos', 'escola_professores']) {
+      for (const coluna of ['assinatura', 'assinado_por_nome', 'assinado_em']) {
+        if (!await colunaExiste(tabela, coluna)) await db.run(`ALTER TABLE ${tabela} ADD COLUMN ${coluna} TEXT`);
+      }
+    }
+  }
   // v39: os portões da muralha viram dados do mapa (tabela portoes, criada pelo ESQUEMA). Os três de hoje
   // (Sul, Norte e Oeste) entram uma vez só; o semear de bancos novos chama a mesma função e a marca em meta impede repetir.
   if (versao < 39) await semearPortoes();

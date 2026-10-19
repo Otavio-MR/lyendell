@@ -3,6 +3,7 @@ import {
   get, post, put, del, h, trocar, icone, botao, campo, aviso, modalForm, confirmar, normalizar, estado, dataCurta, dataHora, barra,
 } from '../core.js';
 import { entradaImagem } from './livros.js';
+import { blocoAssinatura, pedirAssinaturaEscola } from './escola-assinatura.js';
 import {
   API, SIT_ALUNO, SIT_PROFESSOR, SIT_PRESENCA, SIT_BOLETIM, etiqueta, notaBr, matriculaNum, idadeTexto, plural, painel, vazioSimples,
   tabela, td, foto, agir, consulta, detalheLegivel, selecao, areaTexto, entradaData, entradaNumero, entradaTexto,
@@ -143,6 +144,9 @@ export function formAluno(aluno, turmas, ctx, aoSalvar) {
       if (novo) {
         const r = await post(`${API}/alunos`, { ...corpo, situacao: situacao.value });
         aviso(r.numero ? `Matrícula feita: ${nome.value.trim()}, matrícula nº ${String(r.numero).padStart(4, '0')}.` : 'Inscrição recebida: o aluno está em análise.');
+        // Depois de salvar, o Diretor assina para confirmar (pode continuar sem assinar).
+        const nomeDele = nome.value.trim();
+        setTimeout(() => pedirAssinaturaEscola({ tipo: 'aluno', id: r.id, nome: nomeDele, modo: 'confirmar', depois: aoSalvar || (() => ctx.recarregar()) }), 0);
       } else {
         await put(`${API}/alunos/${a.id}`, corpo);
         aviso('Ficha atualizada.');
@@ -228,6 +232,10 @@ export async function ficha(corpo, ctx, id) {
         linhaDado('Etapa', a.etapa),
         linhaDado('Observações', a.observacoes),
         linhaDado('Cadastrado por', a.criado_por_nome && `${a.criado_por_nome}${a.criado_em ? `, ${dataHora(a.criado_em)}` : ''}`))),
+
+      painel('Assinatura da Direção', 'pena', blocoAssinatura({
+        tipo: 'aluno', id: a.id, nome: a.nome, d: a, podeAssinar: ctx.podes.gerir, aoMudar: () => ctx.recarregar(),
+      })),
 
       painel('Frequência', 'calendario', f.total
         ? h('div', { class: 'escola-freq' },
@@ -341,6 +349,8 @@ function cartaoProfessor(p, { lista, gerir, ctx, disciplinas }) {
       h('strong', null, p.nome),
       (p.endereco || p.procedencia) && h('span', { class: 'suave' }, p.endereco || `Vem de ${p.procedencia}`),
       p.ingresso && h('small', { class: 'suave' }, `Desde ${dataCurta(p.ingresso)}`),
+      'assinatura' in p && p.situacao !== 'desligado' && h('div', { class: 'escola-prof-assina' },
+        blocoAssinatura({ tipo: 'professor', id: p.id, nome: p.nome, d: p, podeAssinar: gerir, aoMudar: () => ctx.recarregar() })),
       gerir && p.observacoes && h('p', { class: 'escola-professor-obs' }, p.observacoes),
       gerir && h('div', { class: 'escola-professor-acoes' },
         p.situacao !== 'titular' && p.situacao !== 'desligado' && botao('Titular', { icone: 'coroa', classe: 'btn-pequeno', titulo: 'Tornar titular da disciplina', onclick: e => atribuir('titular', e) }),
@@ -415,7 +425,7 @@ function escolherSituacao(p, lista, ctx) {
   });
 }
 
-function formProfessor(p, disciplinas, ctx, disciplinaInicial = null) {
+export function formProfessor(p, disciplinas, ctx, disciplinaInicial = null) {
   const novo = !p;
   const x = p || {};
   let fotoUrl = x.foto || '';
@@ -443,9 +453,12 @@ function formProfessor(p, disciplinas, ctx, disciplinaInicial = null) {
     aoEnviar: async () => {
       if (envio.n) throw new Error('Espere a foto terminar de enviar.');
       const corpo = { nome: nome.value, endereco: endereco.value, procedencia: procedencia.value, disciplina_id: sel.value, foto: fotoUrl, ingresso: ingresso.value || null, observacoes: obs.value };
-      if (novo) await post(`${API}/professores`, corpo); else await put(`${API}/professores/${x.id}`, corpo);
+      let criado = null;
+      if (novo) criado = await post(`${API}/professores`, corpo); else await put(`${API}/professores/${x.id}`, corpo);
       aviso(novo ? 'Professor inscrito, em avaliação.' : 'Dados atualizados.');
       await ctx.recarregar();
+      // Depois de inscrever, o Diretor assina para confirmar (pode continuar sem assinar).
+      if (novo && criado?.id) setTimeout(() => pedirAssinaturaEscola({ tipo: 'professor', id: criado.id, nome: corpo.nome.trim(), modo: 'confirmar', depois: () => ctx.recarregar() }), 0);
     },
   });
 }
@@ -457,4 +470,18 @@ async function apagarProfessor(p, ctx) {
     aviso('Professor apagado.');
     await ctx.recarregar();
   } catch (e) { aviso(e.message, 'erro'); }
+}
+
+/* ─── Atalhos da primeira tela ──────────────────── */
+
+// Abre o formulário de matrícula sem passar pela aba Alunos.
+export async function matricularAluno(ctx) {
+  const { turmas } = await get(`${API}/turmas`);
+  formAluno(null, turmas, ctx);
+}
+
+// Abre o formulário de inscrição de professor (disciplinaId: já escolhe a disciplina).
+export async function inscreverProfessor(ctx, disciplinaId = null) {
+  const { disciplinas } = await get(`${API}/disciplinas`);
+  formProfessor(null, disciplinas.filter(d => d.ativa), ctx, disciplinaId);
 }

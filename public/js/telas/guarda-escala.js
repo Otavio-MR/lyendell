@@ -28,7 +28,7 @@ export async function guardaEscala(aba = 'agenda') {
   const corpo = h('div', { class: 'gesc-corpo' }, carregando());
   ctx.recarregar = () => seguro(corpo, () => TELAS[aba](corpo, ctx));
 
-  const raiz = h('div', { class: 'pagina gesc' },
+  const raiz = h('div', { class: `pagina gesc${aba === 'agenda' ? ' gesc-ag' : ''}` },
     cabecalho({ titulo: 'Escala da Guarda do Coelho', icone: 'escudo', sub: 'Os horários dos guardas, as convocações na hora e o controle de quem se dedica.' }),
     !ctx.guardas.length && h('p', { class: 'nota nota-ouro' }, icone('alerta'),
       h('span', null, ctx.gerir ? 'Ainda não há guardas cadastrados. Dê o cargo Guarda aos usuários (Administração, Usuários) para poder marcar turnos.' : 'Ainda não há guardas cadastrados.')),

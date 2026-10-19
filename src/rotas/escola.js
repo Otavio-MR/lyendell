@@ -14,6 +14,7 @@ const { urlValida } = require('../uploads');
 const { hoje } = require('../cobranca');
 const { erro, texto, linha, chaveNome, idDaRota, dataValida } = require('../util');
 const E = require('../escola');
+const { lerAssinatura } = require('../assinatura');
 
 const r = express.Router();
 r.use(exigirLogin, exigir('escola.ver'));
@@ -191,12 +192,14 @@ r.put('/disciplinas/:id', gerir, async (req, res) => {
 
 r.get('/professores', async (req, res) => {
   const todos = pode(req, 'escola.gerir');
+  const vendo = veAlunos(req); // a assinatura da Direção só vai para quem vê a parte interna da escola
   const linhas = await db.all(`SELECT p.*, d.nome AS disciplina_nome FROM escola_professores p JOIN escola_disciplinas d ON d.id = p.disciplina_id
     ${todos ? '' : "WHERE p.situacao IN ('titular', 'substituto')"} ORDER BY d.ordem, d.nome, CASE p.situacao WHEN 'titular' THEN 0 WHEN 'substituto' THEN 1 WHEN 'avaliacao' THEN 2 WHEN 'afastado' THEN 3 ELSE 4 END, p.nome`);
   res.json({
     professores: linhas.map(p => ({
       id: p.id, disciplina_id: p.disciplina_id, disciplina_nome: p.disciplina_nome, nome: p.nome, endereco: p.endereco, procedencia: p.procedencia, foto: p.foto, situacao: p.situacao, ingresso: p.ingresso,
       ...(todos ? { observacoes: p.observacoes, origem_registro_id: p.origem_registro_id } : {}),
+      ...(vendo ? { assinatura: p.assinatura ?? null, assinado_por_nome: p.assinado_por_nome ?? null, assinado_em: p.assinado_em ?? null } : {}),
     })),
   });
 });
@@ -223,11 +226,23 @@ r.post('/professores', gerir, async (req, res) => {
   const p = await lerProfessor(req.body);
   const igual = await db.get("SELECT id FROM escola_professores WHERE disciplina_id = ? AND situacao <> 'desligado' AND ((? <> '' AND lower(endereco) = lower(?)) OR lower(nome) = lower(?))", p.disciplina_id, p.endereco, p.endereco, p.nome);
   if (igual) throw erro(409, `${p.nome} já está inscrito nesta disciplina.`);
-  const { id } = await db.run(`INSERT INTO escola_professores (disciplina_id, nome, endereco, procedencia, foto, situacao, ingresso, observacoes, criado_por_nome) VALUES (?, ?, ?, ?, ?, 'avaliacao', ?, ?, ?)`,
-    p.disciplina_id, p.nome, p.endereco, p.procedencia, p.foto, p.ingresso || hoje(), p.observacoes, quem(req));
+  const assinatura = lerAssinatura(req.body?.assinatura); // opcional: a assinatura do Diretor junto com a inscrição
+  const { id } = await db.run(`INSERT INTO escola_professores (disciplina_id, nome, endereco, procedencia, foto, situacao, ingresso, observacoes, criado_por_nome, assinatura, assinado_por_nome, assinado_em)
+    VALUES (?, ?, ?, ?, ?, 'avaliacao', ?, ?, ?, ?, ?, ${assinatura ? "datetime('now')" : 'NULL'})`,
+  p.disciplina_id, p.nome, p.endereco, p.procedencia, p.foto, p.ingresso || hoje(), p.observacoes, quem(req), assinatura, assinatura ? quem(req) : null);
   const d = await db.get('SELECT nome FROM escola_disciplinas WHERE id = ?', p.disciplina_id);
-  await hist(req, 'professor', id, 'inscreveu o professor', `${p.nome} em ${d.nome}`);
+  await hist(req, 'professor', id, 'inscreveu o professor', `${p.nome} em ${d.nome}${assinatura ? ' (com a assinatura da Direção)' : ''}`);
   res.status(201).json({ id });
+});
+
+// O Diretor assina a ficha do professor. Refazer substitui a assinatura anterior.
+r.post('/professores/:id/assinar', gerir, async (req, res) => {
+  const p = await buscar('escola_professores', idDaRota(req), 'Professor');
+  const assinatura = lerAssinatura(req.body?.assinatura);
+  if (!assinatura) throw erro(400, 'Desenhe a assinatura (alguns traços).');
+  await db.run("UPDATE escola_professores SET assinatura = ?, assinado_por_nome = ?, assinado_em = datetime('now') WHERE id = ?", assinatura, quem(req), p.id);
+  await hist(req, 'professor', p.id, p.assinatura ? 'refez a assinatura da Direção na ficha do professor' : 'assinou a ficha do professor', p.nome);
+  res.json({ ok: true });
 });
 
 r.put('/professores/:id', gerir, async (req, res) => {
@@ -345,7 +360,7 @@ r.delete('/turmas/:id', gerir, async (req, res) => {
 
 const alunoPublico = (a, extra = {}) => ({
   id: a.id, numero: a.numero, nome: a.nome, endereco: a.endereco, procedencia: a.procedencia, foto: a.foto, idade: a.idade, responsavel_nome: a.responsavel_nome, responsavel_endereco: a.responsavel_endereco, responsavel_procedencia: a.responsavel_procedencia,
-  turma_id: a.turma_id, turma_nome: a.turma_nome ?? null, situacao: a.situacao, data_matricula: a.data_matricula, etapa: a.etapa, ...extra,
+  turma_id: a.turma_id, turma_nome: a.turma_nome ?? null, situacao: a.situacao, data_matricula: a.data_matricula, etapa: a.etapa, assinado: !!a.assinatura, ...extra,
 });
 
 r.get('/alunos', exigirAlunos, async (req, res) => {
@@ -420,12 +435,13 @@ r.post('/alunos', gerir, async (req, res) => {
   const situacao = req.body?.situacao === 'em_analise' ? 'em_analise' : 'matriculado';
   await conferirDuplicado(a);
   if (situacao === 'matriculado') await conferirVaga(a.turma_id);
-  const { id } = await db.run(`INSERT INTO escola_alunos (nome, endereco, procedencia, foto, idade, responsavel_nome, responsavel_endereco, responsavel_procedencia, turma_id, situacao, data_matricula, etapa, observacoes, criado_por_nome)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  a.nome, a.endereco, a.procedencia, a.foto, a.idade, a.responsavel_nome, a.responsavel_endereco, a.responsavel_procedencia, a.turma_id, situacao, situacao === 'matriculado' ? (a.data_matricula || hoje()) : a.data_matricula, a.etapa, a.observacoes, quem(req));
+  const assinatura = lerAssinatura(req.body?.assinatura); // opcional: a assinatura do Diretor junto com a matrícula
+  const { id } = await db.run(`INSERT INTO escola_alunos (nome, endereco, procedencia, foto, idade, responsavel_nome, responsavel_endereco, responsavel_procedencia, turma_id, situacao, data_matricula, etapa, observacoes, criado_por_nome, assinatura, assinado_por_nome, assinado_em)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${assinatura ? "datetime('now')" : 'NULL'})`,
+  a.nome, a.endereco, a.procedencia, a.foto, a.idade, a.responsavel_nome, a.responsavel_endereco, a.responsavel_procedencia, a.turma_id, situacao, situacao === 'matriculado' ? (a.data_matricula || hoje()) : a.data_matricula, a.etapa, a.observacoes, quem(req), assinatura, assinatura ? quem(req) : null);
   if (situacao === 'matriculado') await daNumero(id);
   const { numero } = await db.get('SELECT numero FROM escola_alunos WHERE id = ?', id);
-  await hist(req, 'aluno', id, situacao === 'matriculado' ? 'matriculou o aluno' : 'recebeu a inscrição do aluno', `${a.nome}${numero ? ` (matrícula nº ${numero})` : ''}`);
+  await hist(req, 'aluno', id, situacao === 'matriculado' ? 'matriculou o aluno' : 'recebeu a inscrição do aluno', `${a.nome}${numero ? ` (matrícula nº ${numero})` : ''}${assinatura ? ', com a assinatura da Direção' : ''}`);
   res.status(201).json({ id, numero });
 });
 
@@ -434,7 +450,7 @@ r.get('/alunos/:id', exigirAlunos, async (req, res) => {
   if (!a) throw erro(404, 'Aluno não encontrado.');
   const config = await E.lerConfig();
   res.json({
-    aluno: { ...alunoPublico(a), observacoes: a.observacoes, criado_por_nome: a.criado_por_nome, criado_em: a.criado_em, origem_registro_id: a.origem_registro_id },
+    aluno: { ...alunoPublico(a), assinatura: a.assinatura ?? null, assinado_por_nome: a.assinado_por_nome ?? null, assinado_em: a.assinado_em ?? null, observacoes: a.observacoes, criado_por_nome: a.criado_por_nome, criado_em: a.criado_em, origem_registro_id: a.origem_registro_id },
     frequencia: await E.frequenciaDe(a.id),
     boletim: await E.boletimDe(a.id, config),
     presencas: await db.all(`SELECT p.situacao, p.observacao, au.data, au.hora, au.tema, d.nome AS disciplina_nome FROM escola_presencas p JOIN escola_aulas au ON au.id = p.aula_id
@@ -442,6 +458,16 @@ r.get('/alunos/:id', exigirAlunos, async (req, res) => {
     historico: pode(req, 'escola.gerir') ? await db.all("SELECT acao, detalhe, usuario_nome, criado_em FROM escola_historico WHERE entidade = 'aluno' AND entidade_id = ? ORDER BY id DESC LIMIT 60", a.id) : [],
     config: { media_aprovacao: Number(config.media_aprovacao), frequencia_minima: Number(config.frequencia_minima), nome: config.nome },
   });
+});
+
+// O Diretor assina a ficha do aluno. Refazer substitui a assinatura anterior.
+r.post('/alunos/:id/assinar', gerir, async (req, res) => {
+  const a = await buscar('escola_alunos', idDaRota(req), 'Aluno');
+  const assinatura = lerAssinatura(req.body?.assinatura);
+  if (!assinatura) throw erro(400, 'Desenhe a assinatura (alguns traços).');
+  await db.run("UPDATE escola_alunos SET assinatura = ?, assinado_por_nome = ?, assinado_em = datetime('now') WHERE id = ?", assinatura, quem(req), a.id);
+  await hist(req, 'aluno', a.id, a.assinatura ? 'refez a assinatura da Direção na ficha do aluno' : 'assinou a ficha do aluno', a.nome);
+  res.json({ ok: true });
 });
 
 r.put('/alunos/:id', gerir, async (req, res) => {

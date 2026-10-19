@@ -44,7 +44,6 @@ const MENU = [
     { rota: '/juramento', nome: 'Juramento', icone: 'bandeira', perm: ['tabelionato.ver', 'aliados.ver'] },
     { rota: '/leis', nome: 'Leis de Lyendell', icone: 'balanca', modulo: 'leis' },
     { rota: '/atividades', nome: 'Mural de Atividades', icone: 'tarefas', perm: ['atividades.ver', 'aliados.ver'] },
-    { rota: '/escola', nome: 'Escola Luckham', icone: 'capelo', perm: ['escola.ver'], adulto: true },
     { rota: '/galeria', nome: 'Galeria', icone: 'imagem', perm: ['galeria.ver'] },
     { rota: '/recreacao', nome: 'Recreação', icone: 'jogos', perm: ['recreacao.usar'] },
     { rota: '/clube', nome: 'Club Coelho', icone: 'balao', perm: ['recreacao.usar'] },
@@ -55,12 +54,13 @@ const MENU = [
     { rota: '/guarda', nome: 'Guarda do Coelho', icone: 'escudo', modulo: 'guarda' },
     { rota: '/guarda-escala', nome: 'Escala da Guarda', icone: 'escudo', perm: ['escala.ver'], adulto: true },
     { rota: '/hospital', nome: 'Hospital', icone: 'cruz', modulo: 'hospital' },
+    { rota: '/escola', nome: 'Escola Luckham', icone: 'capelo', perm: ['escola.ver'], adulto: true },
+    { rota: '/financas', nome: 'Gestão Financeira', icone: 'moeda', perm: ['financas.ver'] },
   ] },
   { secao: 'Administração', itens: [
     { rota: '/admin/usuarios', nome: 'Usuários', icone: 'usuarios', perm: ['usuarios.ver'] },
     { rota: '/admin/cargos', nome: 'Cargos', icone: 'chave', perm: ['usuarios.ver', 'cargos.gerenciar'] },
     { rota: '/admin/diario', nome: 'Diário do sistema', icone: 'livro', perm: ['diario.ver'] },
-    { rota: '/financas', nome: 'Gestão Financeira', icone: 'moeda', perm: ['financas.ver'] },
   ] },
 ];
 

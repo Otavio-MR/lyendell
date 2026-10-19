@@ -1,154 +1,178 @@
 /* Casa Luckham · papel.css
-   O registro como página de um livro de registros: papel envelhecido sobre a mesa escura, tinta de escrivão,
-   campos como linhas pontilhadas, selo de cera e a assinatura desenhada. Carregado depois de visual.css.
-   O visual de papel vale só fora do modo criança (a criança só olha, com o pergaminho de sempre). */
+   O registro como um pergaminho de decreto: pele clara de velino, rolos nas duas pontas, cabeçalho de chancelaria,
+   campos escritos a pena em tinta sépia, lacre de cera e a assinatura desenhada. Carregado depois de visual.css.
+   O visual de pergaminho vale só fora do modo criança (a criança só olha, com o pergaminho de sempre). */
 
 :root {
-  --tinta-escrita: #1f2540;
+  --tinta-escrita: #2a1a08;
+  --tinta-rotulo: #62400f;
   --lacre: #8f2f1c;
-  --papel-fibra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='360'%3E%3Cfilter id='f' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.012 .42' numOctaves='3' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .52  0 0 0 0 .38  0 0 0 0 .16  0 0 0 1.5 -.62'/%3E%3C/filter%3E%3Crect width='360' height='360' filter='url(%23f)' opacity='.55'/%3E%3C/svg%3E");
-  --cantoneira-se: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Cpath d='M0 0H20L0 20Z' fill='%23735a22' stroke='%234a3a12' stroke-width='1'/%3E%3C/svg%3E");
-  --cantoneira-sd: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Cpath d='M0 0H20V20Z' fill='%23735a22' stroke='%234a3a12' stroke-width='1'/%3E%3C/svg%3E");
-  --cantoneira-ie: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Cpath d='M0 0V20H20Z' fill='%23735a22' stroke='%234a3a12' stroke-width='1'/%3E%3C/svg%3E");
-  --cantoneira-id: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Cpath d='M20 0V20H0Z' fill='%23735a22' stroke='%234a3a12' stroke-width='1'/%3E%3C/svg%3E");
+  --papel-fibra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='360'%3E%3Cfilter id='f' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.018 .09' numOctaves='3' seed='11' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .56  0 0 0 0 .38  0 0 0 0 .13  0 0 0 1.3 -.5'/%3E%3C/filter%3E%3Crect width='360' height='360' filter='url(%23f)' opacity='.5'/%3E%3C/svg%3E");
   --seta-papel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235c4a2b' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-  /* A folha: fibras, grão, luz no alto e o tom do papel. */
+  /* O filete ornamental: linhas que somem, losango e floreios. */
+  --filete: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='16' viewBox='0 0 260 16' fill='none' stroke='%237a5418' stroke-width='1.2' stroke-linecap='round'%3E%3Cpath d='M4 8H104' opacity='.55'/%3E%3Cpath d='M156 8H256' opacity='.55'/%3E%3Cpath d='M130 2 136 8 130 14 124 8Z' fill='%237a5418'/%3E%3Cpath d='M113 8 119 4M113 8 119 12M147 8 141 4M147 8 141 12'/%3E%3Ccircle cx='108' cy='8' r='1.6' fill='%237a5418' stroke='none'/%3E%3Ccircle cx='152' cy='8' r='1.6' fill='%237a5418' stroke='none'/%3E%3C/svg%3E");
+  /* O rolo: um cilindro de pergaminho com luz no meio e sombra nas bordas. */
+  --rolo-cil: linear-gradient(180deg, #3f2a0e 0, #8f6d31 11%, #d4b06a 30%, #f3dfa6 44%, #e2c47f 58%, #a17a38 78%, #5a3d15 92%, #2f1f09 100%);
+  --rolo-cap: radial-gradient(ellipse at 50% 50%, #4a3010 0 10%, #b48d4c 11% 26%, #6b4a1c 27% 33%, #d9b673 34% 52%, #7c5a26 53% 60%, #cda764 61% 78%, #5a3d15 79% 100%);
+  /* A pele: fibras, grão, manchas suaves e o tom quente do velino. */
   --folha:
     var(--papel-fibra) 0 0 / 360px 360px,
     var(--textura-papel) 0 0 / 200px 200px,
-    radial-gradient(ellipse 70% 38% at 50% 0%, rgba(255, 250, 232, 0.6), transparent 72%),
-    linear-gradient(176deg, #f3e8c9, #e7d7a9 62%, #dec996);
+    radial-gradient(ellipse 26% 12% at 16% 26%, rgba(158, 106, 32, 0.16), transparent 70%),
+    radial-gradient(ellipse 22% 10% at 84% 58%, rgba(150, 98, 28, 0.15), transparent 70%),
+    radial-gradient(ellipse 30% 9% at 30% 88%, rgba(140, 92, 26, 0.14), transparent 70%),
+    radial-gradient(ellipse 70% 38% at 50% 0%, rgba(255, 248, 224, 0.55), transparent 72%),
+    linear-gradient(178deg, #efe0ac, #e8d49b 55%, #dfc687);
 }
 
-/* ─── A mesa onde o papel repousa ─── */
+/* ─── A mesa onde o pergaminho repousa ─── */
 
 .modal-livro .modal-corpo, .modal-papel .modal-corpo, .modal-assinar .modal-corpo { overflow-x: hidden; }
 
 body:not(.modo-crianca) .modal-livro { background: #0a110c; }
 
 body:not(.modo-crianca) .modal-livro .modal-corpo {
-  padding: 22px 20px 28px;
+  padding: 22px 16px 28px;
   background: var(--textura) 0 0 / 240px 240px, radial-gradient(ellipse at 50% 0%, rgba(240, 188, 96, 0.07), transparent 70%), #08100a;
 }
 
 .papel-mesa { max-width: 100%; }
 
-body:not(.modo-crianca) .papel-mesa { filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.5)) drop-shadow(0 16px 14px rgba(0, 0, 0, 0.55)); }
-
-/* ─── A página ─── */
-
-body:not(.modo-crianca) .documento-livro {
-  position: relative; padding: 36px 40px 30px 76px; border-radius: 0; color: var(--tinta); isolation: isolate;
-  background: var(--folha);
-  box-shadow: inset 0 0 0 1px rgba(110, 80, 30, 0.22), inset 0 0 64px rgba(125, 88, 32, 0.4), inset 0 -34px 56px -24px rgba(110, 70, 20, 0.32);
-  clip-path: polygon(0 0.5%, 11% 0, 30% 0.3%, 54% 0, 79% 0.35%, 100% 0, 99.7% 21%, 100% 47%, 99.6% 76%, 100% calc(100% - 26px), calc(100% - 26px) 100%, 62% 99.6%, 37% 100%, 14% 99.7%, 0 100%, 0.3% 72%, 0 45%, 0.35% 19%);
+body:not(.modo-crianca) .papel-mesa {
+  position: relative; padding: 0; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.5)) drop-shadow(0 18px 14px rgba(0, 0, 0, 0.55));
 }
 
-/* Margem do livro, pauta leve, dobras e o canto dobrado */
+/* Os dois rolos, no topo e na base */
+body:not(.modo-crianca) .papel-mesa::before, body:not(.modo-crianca) .papel-mesa::after {
+  content: ''; position: absolute; left: 0; right: 0; z-index: 3; height: 38px; pointer-events: none; border-radius: 8px / 19px;
+  background: var(--rolo-cap) left center / 16px 100% no-repeat, var(--rolo-cap) right center / 16px 100% no-repeat, var(--rolo-cil);
+  box-shadow: inset 0 1px 0 rgba(255, 236, 190, 0.35), 0 5px 7px -2px rgba(0, 0, 0, 0.5);
+}
+
+body:not(.modo-crianca) .papel-mesa::before { top: 0; }
+
+body:not(.modo-crianca) .papel-mesa::after { bottom: 0; }
+
+/* ─── A pele de pergaminho ─── */
+
+body:not(.modo-crianca) .documento-livro {
+  position: relative; margin: 22px 13px; padding: 40px 48px 36px; border-radius: 0; color: var(--tinta); isolation: isolate;
+  background: var(--folha);
+  box-shadow: inset 0 0 0 1px rgba(110, 72, 24, 0.3), inset 0 0 46px 2px rgba(122, 80, 24, 0.5), inset 0 0 120px rgba(150, 104, 36, 0.22);
+  clip-path: polygon(0 0, 100% 0, 99.6% 14%, 100% 30%, 99.5% 52%, 100% 71%, 99.6% 88%, 100% 100%, 0 100%, 0.4% 86%, 0 68%, 0.5% 47%, 0 27%, 0.4% 11%);
+}
+
+/* A sombra que os rolos jogam na pele */
 body:not(.modo-crianca) .documento-livro::before {
   content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
   background:
-    linear-gradient(135deg, #e9dcb0 0 46%, #86693a 49%, transparent 50%) right bottom / 26px 26px no-repeat,
-    linear-gradient(90deg, transparent 54px, rgba(143, 47, 28, 0.4) 54px 55px, transparent 55px 58px, rgba(143, 47, 28, 0.4) 58px 59px, transparent 59px),
-    linear-gradient(180deg, transparent 33%, rgba(70, 48, 15, 0.1) 33.2%, rgba(255, 255, 255, 0.28) 33.7%, transparent 35%),
-    linear-gradient(180deg, transparent 66%, rgba(70, 48, 15, 0.09) 66.2%, rgba(255, 255, 255, 0.24) 66.7%, transparent 68%),
-    repeating-linear-gradient(180deg, transparent 0 31px, rgba(95, 70, 35, 0.09) 31px 32px);
+    linear-gradient(180deg, rgba(48, 30, 8, 0.55), rgba(48, 30, 8, 0.12) 22px, transparent 44px),
+    linear-gradient(0deg, rgba(48, 30, 8, 0.55), rgba(48, 30, 8, 0.12) 22px, transparent 44px);
 }
 
-/* O cabeçalho: brasão, o livro e o título */
-body:not(.modo-crianca) .documento-livro .doc-cab { margin-bottom: 22px; padding-bottom: 16px; border-bottom: 3px double rgba(92, 74, 43, 0.55); }
+/* ─── O cabeçalho do decreto ─── */
 
-body:not(.modo-crianca) .documento-livro .doc-brasao { width: 68px; height: 68px; filter: sepia(0.35) drop-shadow(0 2px 2px rgba(44, 34, 20, 0.3)); }
+body:not(.modo-crianca) .documento-livro .doc-cab {
+  display: grid; justify-items: center; margin-bottom: 26px; padding-bottom: 36px; border-bottom: 0;
+  background: var(--filete) bottom center / 260px 16px no-repeat;
+}
+
+body:not(.modo-crianca) .documento-livro .doc-brasao { width: 76px; height: 76px; filter: sepia(0.5) saturate(0.85) drop-shadow(0 2px 2px rgba(44, 28, 8, 0.35)); }
 
 body:not(.modo-crianca) .documento-livro .doc-sobre {
-  margin-top: 8px; font-family: var(--f-letreiro); font-size: 1.05rem; font-weight: 700; letter-spacing: 0.06em; text-transform: none; color: #4a3608;
+  margin-top: 10px; font-family: var(--f-letreiro); font-size: 1.3rem; font-weight: 700; letter-spacing: 0.08em; text-transform: none; color: #4a2c08; text-wrap: balance;
 }
 
-body:not(.modo-crianca) .documento-livro .doc-titulo { margin: 6px 0 2px; font-size: 2.2rem; line-height: 1.1; color: var(--tinta-escrita); text-wrap: balance; }
+body:not(.modo-crianca) .documento-livro .doc-titulo {
+  margin: 12px 0 4px; font-family: var(--f-destaque); font-size: 2.7rem; font-weight: 700; line-height: 1.08; color: var(--tinta-escrita); text-wrap: balance; overflow-wrap: anywhere;
+}
 
-body:not(.modo-crianca) .documento-livro .doc-livro { font-size: 1.08rem; color: var(--tinta-3); }
+body:not(.modo-crianca) .documento-livro .doc-livro { font-size: 1.12rem; font-style: italic; color: var(--tinta-rotulo); }
 
+/* A numeração: um medalhão com algarismos romanos */
 body:not(.modo-crianca) .doc-numero {
-  position: absolute; top: 26px; right: 30px; display: grid; justify-items: center; gap: 1px; padding: 5px 11px 4px;
-  border: 1px solid rgba(92, 74, 43, 0.6); outline: 1px solid rgba(92, 74, 43, 0.3); outline-offset: 2px;
+  position: absolute; top: 40px; right: 34px; display: grid; justify-items: center; align-content: center; gap: 0; min-width: 58px; height: 58px; padding: 0 10px;
+  border-radius: 29px; border: 1px solid rgba(98, 64, 15, 0.7); outline: 1px solid rgba(98, 64, 15, 0.35); outline-offset: 2px;
+  background: radial-gradient(circle at 40% 30%, rgba(255, 240, 200, 0.45), rgba(150, 104, 36, 0.14));
 }
 
-body:not(.modo-crianca) .doc-numero small { font-family: var(--f-titulo); font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--tinta-3); }
+body:not(.modo-crianca) .doc-numero small { font-family: var(--f-titulo); font-size: 0.6rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--tinta-rotulo); }
 
-body:not(.modo-crianca) .doc-numero strong { font-family: var(--f-titulo); font-size: 1.3rem; font-weight: 700; letter-spacing: 0.06em; line-height: 1.1; color: var(--lacre); font-variant-numeric: lining-nums tabular-nums; }
+body:not(.modo-crianca) .doc-numero strong { font-family: var(--f-titulo); font-size: 1rem; font-weight: 700; letter-spacing: 0.06em; line-height: 1.15; color: #7a2616; font-variant-numeric: lining-nums; }
 
 body.modo-crianca .doc-numero, body.modo-crianca .doc-carimbo, body.modo-crianca .selo-lacre { display: none; }
 
 /* O aviso de situação, escrito à mão */
 body:not(.modo-crianca) .documento-livro .doc-situacao {
-  margin: -8px 0 18px; padding: 2px 6px 6px; border: 0; border-bottom: 1px dotted rgba(92, 74, 43, 0.6); border-radius: 0; background: none;
-  font-family: var(--f-texto); font-style: italic; font-size: 1.08rem; letter-spacing: 0; line-height: 1.4; text-align: center; color: #5c3f06;
+  margin: -6px 0 20px; padding: 2px 6px 6px; border: 0; border-radius: 0; background: none;
+  font-family: var(--f-texto); font-style: italic; font-size: 1.12rem; letter-spacing: 0; line-height: 1.4; text-align: center; color: #5a3a06;
 }
 
 body:not(.modo-crianca) .documento-livro .doc-situacao.recusado { color: #7a2616; }
 
-/* Os campos, como num formulário escrito à mão */
-body:not(.modo-crianca) .documento-livro .doc-campos { gap: 18px 32px; }
+/* ─── Os campos, escritos a pena ─── */
 
-body:not(.modo-crianca) .documento-livro .doc-linha { gap: 3px; }
+body:not(.modo-crianca) .documento-livro .doc-campos { gap: 20px 34px; }
 
-body:not(.modo-crianca) .documento-livro .doc-rotulo { font-size: 0.74rem; font-weight: 600; letter-spacing: 0.14em; color: var(--tinta-3); }
+body:not(.modo-crianca) .documento-livro .doc-linha { gap: 2px; }
+
+body:not(.modo-crianca) .documento-livro .doc-rotulo {
+  font-family: var(--f-destaque); font-size: 1rem; font-weight: 700; letter-spacing: 0.1em; text-transform: lowercase; font-variant-caps: all-small-caps; color: var(--tinta-rotulo);
+}
 
 body:not(.modo-crianca) .documento-livro .doc-valor {
-  min-height: 1.9rem; padding: 0 2px 3px; font-family: var(--f-texto); font-style: italic; font-size: 1.3rem; line-height: 1.35; color: var(--tinta-escrita);
-  border-bottom: 1px dotted rgba(60, 45, 20, 0.7);
+  min-height: 1.9rem; padding: 0 2px 3px; font-family: var(--f-texto); font-style: italic; font-size: 1.28rem; line-height: 1.35; color: var(--tinta-escrita);
+  background: linear-gradient(90deg, rgba(58, 36, 10, 0.7), rgba(58, 36, 10, 0.3) 70%, rgba(58, 36, 10, 0.08)) bottom / 100% 1px no-repeat;
 }
 
 body:not(.modo-crianca) .documento-livro .doc-valor .etiqueta {
-  background: rgba(92, 74, 43, 0.1); color: var(--tinta-escrita); border: 1px solid rgba(92, 74, 43, 0.45); font-family: var(--f-texto); font-style: italic; font-size: 1.1rem; padding: 0 8px;
+  background: rgba(98, 64, 15, 0.1); color: var(--tinta-escrita); border: 1px solid rgba(98, 64, 15, 0.45); font-family: var(--f-texto); font-style: italic; font-size: 1.1rem; padding: 0 8px;
 }
 
-body:not(.modo-crianca) .documento-livro .doc-valor .texto-livre {
-  line-height: 2rem; padding-top: 0.1rem;
-  background: repeating-linear-gradient(180deg, transparent 0 calc(2rem - 1px), rgba(92, 74, 43, 0.32) calc(2rem - 1px) 2rem);
-}
-
-body:not(.modo-crianca) .documento-livro .doc-linha.larga:has(.texto-livre) .doc-valor { border-bottom: 0; padding-bottom: 0; }
+body:not(.modo-crianca) .documento-livro .doc-valor .texto-livre { line-height: 1.65; padding-top: 0.1rem; }
 
 body:not(.modo-crianca) .documento-livro a { color: inherit; }
 
-/* Seções: um filete duplo com o título no meio */
+/* Seções: o título centrado entre dois filetes que somem */
 body:not(.modo-crianca) .documento-livro .doc-secao {
-  display: flex; align-items: center; gap: 14px; margin-top: 14px; padding: 0; border: 0;
-  font-size: 0.82rem; letter-spacing: 0.22em; color: #6b4e0c;
+  display: flex; align-items: center; gap: 14px; margin-top: 16px; padding: 0; border: 0;
+  font-family: var(--f-titulo); font-size: 0.86rem; letter-spacing: 0.2em; color: #5a3a06;
 }
 
 body:not(.modo-crianca) .documento-livro .doc-secao::before, body:not(.modo-crianca) .documento-livro .doc-secao::after {
-  content: ''; flex: 1; min-width: 12px; height: 4px; border-top: 1px solid rgba(92, 74, 43, 0.5); border-bottom: 1px solid rgba(92, 74, 43, 0.5);
+  content: ''; flex: 1; min-width: 12px; height: 1px; background: linear-gradient(90deg, transparent, rgba(98, 64, 15, 0.65));
 }
 
-/* O retrato, colado no papel com cantoneiras */
+body:not(.modo-crianca) .documento-livro .doc-secao::after { background: linear-gradient(270deg, transparent, rgba(98, 64, 15, 0.65)); }
+
+/* O retrato pintado, numa moldura dourada com um pingo de cera */
 .doc-linha-foto { display: flex; flex-direction: column-reverse; align-items: center; gap: 8px; }
 
-body:not(.modo-crianca) .documento-livro .doc-linha-foto { padding: 6px 0 4px; }
+body:not(.modo-crianca) .documento-livro .doc-linha-foto { padding: 8px 0 4px; }
 
 body:not(.modo-crianca) .documento-livro .doc-linha-foto .doc-rotulo { text-align: center; }
 
-body:not(.modo-crianca) .documento-livro .doc-linha-foto .doc-valor { min-height: 0; padding: 0; border-bottom: 0; }
+body:not(.modo-crianca) .documento-livro .doc-linha-foto .doc-valor { min-height: 0; padding: 0; background: none; }
 
 body:not(.modo-crianca) .documento-livro .doc-foto {
-  position: relative; display: inline-block; max-width: 100%; padding: 10px; background: #f8f2e2; border: 1px solid rgba(92, 74, 43, 0.4);
-  box-shadow: 0 1px 1px rgba(40, 28, 10, 0.4), 0 6px 10px -3px rgba(40, 28, 10, 0.45); transform: rotate(-1.1deg);
+  position: relative; display: inline-block; max-width: 100%; padding: 8px;
+  background: linear-gradient(135deg, #f0d484, #a4781f 38%, #e6c468 62%, #8a6218);
+  border: 1px solid #5a3d0e;
+  box-shadow: inset 0 0 0 1px rgba(255, 238, 180, 0.55), inset 0 0 0 4px rgba(90, 58, 10, 0.35), 0 2px 3px rgba(40, 24, 6, 0.5), 0 10px 14px -4px rgba(40, 24, 6, 0.5);
 }
 
-body:not(.modo-crianca) .documento-livro .doc-foto::after {
-  content: ''; position: absolute; inset: 0; pointer-events: none;
-  background:
-    var(--cantoneira-se) top left / 20px 20px no-repeat, var(--cantoneira-sd) top right / 20px 20px no-repeat,
-    var(--cantoneira-ie) bottom left / 20px 20px no-repeat, var(--cantoneira-id) bottom right / 20px 20px no-repeat;
+body:not(.modo-crianca) .documento-livro .doc-foto::before {
+  content: ''; position: absolute; top: -9px; left: 50%; z-index: 1; width: 20px; height: 18px; margin-left: -10px;
+  border-radius: 48% 52% 50% 50% / 52% 48% 52% 48%; background: radial-gradient(circle at 36% 30%, #c85a40, var(--lacre) 58%, #561407);
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.45);
 }
 
-body:not(.modo-crianca) .documento-livro .doc-foto:focus-visible { outline: 2px solid #6b4e0c; outline-offset: 4px; }
+body:not(.modo-crianca) .documento-livro .doc-foto:focus-visible { outline: 2px solid #5a3a06; outline-offset: 4px; }
 
-body:not(.modo-crianca) .documento-livro .doc-imagem { display: block; max-width: 100%; max-height: 300px; margin: 0; border: 1px solid rgba(40, 28, 10, 0.55); border-radius: 0; box-shadow: none; filter: sepia(0.14) contrast(1.03); }
+body:not(.modo-crianca) .documento-livro .doc-imagem { display: block; max-width: 100%; max-height: 300px; margin: 0; border: 2px solid #3a2508; border-radius: 0; box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.4); filter: sepia(0.22) contrast(1.03); }
 
 /* O carimbo inclinado (aguardando ou recusado) */
-.doc-carimbo { display: table; margin: 26px auto 6px; }
+.doc-carimbo { display: table; margin: 28px auto 6px; }
 
 body:not(.modo-crianca) .doc-carimbo {
   --giro-c: -7deg; padding: 6px 20px 5px; border: 3px double currentColor; border-radius: 3px; transform: rotate(var(--giro-c)); mix-blend-mode: multiply; opacity: 0.9;
@@ -157,26 +181,29 @@ body:not(.modo-crianca) .doc-carimbo {
 
 body:not(.modo-crianca) .doc-carimbo.sit-recusado { --giro-c: 6deg; color: #9a2f1a; }
 
-/* A assinatura: no fim do papel, sobre uma linha */
-.doc-assina { display: flex; align-items: flex-end; justify-content: flex-end; gap: 20px; margin-top: 30px; }
+/* ─── O rodapé: assinatura sobre a linha, lacre e fita ─── */
+
+.doc-assina { display: flex; align-items: flex-end; justify-content: flex-end; gap: 22px; margin-top: 32px; }
+
+.doc-assina:has(.selo-lacre) { padding-bottom: 46px; }
 
 .doc-assina-col { position: relative; flex: 0 1 380px; min-width: 0; text-align: center; }
 
-.doc-assina-tinta { position: relative; display: flex; align-items: flex-end; justify-content: center; min-height: 84px; border-bottom: 1px solid rgba(40, 30, 15, 0.8); color: var(--tinta-escrita); }
+.doc-assina-tinta { position: relative; display: flex; align-items: flex-end; justify-content: center; min-height: 84px; border-bottom: 1px solid rgba(40, 24, 6, 0.8); color: var(--tinta-escrita); }
 
-.doc-assina-tinta::before { content: 'X'; position: absolute; left: 2px; bottom: 3px; font-family: var(--f-titulo); font-size: 1rem; color: var(--tinta-3); }
+.doc-assina-tinta::before { content: 'X'; position: absolute; left: 2px; bottom: 3px; font-family: var(--f-titulo); font-size: 1rem; color: var(--tinta-rotulo); }
 
 .doc-assina-tinta .assinatura-svg { display: block; height: 88px; width: auto; max-width: 100%; }
 
-.doc-assina-nome { margin-top: 6px; font-family: var(--f-destaque); font-size: 1.35rem; font-weight: 700; line-height: 1.15; color: var(--tinta); overflow-wrap: anywhere; }
+.doc-assina-nome { margin-top: 6px; font-family: var(--f-destaque); font-size: 1.4rem; font-weight: 700; line-height: 1.15; color: var(--tinta-escrita); overflow-wrap: anywhere; }
 
-.doc-assina-nome.doc-assina-espera { font-family: var(--f-texto); font-weight: 400; font-style: italic; font-size: 1.02rem; color: var(--tinta-3); }
+.doc-assina-nome.doc-assina-espera { font-family: var(--f-texto); font-weight: 400; font-style: italic; font-size: 1.04rem; color: var(--tinta-rotulo); }
 
-.doc-assina-cargo { margin-top: 2px; font-family: var(--f-titulo); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--tinta-3); }
+.doc-assina-cargo { margin-top: 2px; font-family: var(--f-titulo); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--tinta-rotulo); }
 
 .doc-assina-cargo time { text-transform: none; letter-spacing: 0.04em; }
 
-.doc-convite { display: grid; justify-items: center; gap: 10px; margin-bottom: 14px; padding: 14px 16px; border: 1px dashed rgba(143, 47, 28, 0.6); background: rgba(255, 249, 228, 0.55); }
+.doc-convite { display: grid; justify-items: center; gap: 10px; margin-bottom: 14px; padding: 14px 16px; border: 1px dashed rgba(143, 47, 28, 0.6); background: rgba(255, 249, 228, 0.5); }
 
 .doc-convite p { font-style: italic; font-size: 1.05rem; line-height: 1.4; color: var(--tinta); }
 
@@ -184,19 +211,30 @@ body:not(.modo-crianca) .doc-carimbo.sit-recusado { --giro-c: 6deg; color: #9a2f
 
 .documento-livro .doc-convite .btn { color: #1b1403; }
 
+/* O lacre de cera, com borda irregular, anel em relevo e a fita vermelha que pende */
 .selo-lacre {
-  flex: none; align-self: flex-end; display: grid; place-items: center; width: 66px; height: 66px; margin-bottom: 26px;
-  border-radius: 48% 52% 50% 50% / 52% 48% 52% 48%; color: rgba(60, 12, 4, 0.55);
-  background: radial-gradient(circle at 36% 30%, #c85a40, var(--lacre) 55%, #561407);
-  box-shadow: 0 3px 4px rgba(0, 0, 0, 0.45), inset 0 0 0 6px var(--lacre), inset 0 0 0 7px rgba(255, 205, 175, 0.25), inset 0 -3px 4px rgba(0, 0, 0, 0.3);
+  position: relative; flex: none; align-self: flex-end; display: grid; place-items: center; width: 72px; height: 72px; margin-bottom: 10px;
+  border-radius: 46% 54% 49% 51% / 53% 47% 53% 47%; color: rgba(70, 14, 4, 0.6);
+  background: radial-gradient(circle at 34% 28%, #d4684a, var(--lacre) 52%, #561407 100%);
+  box-shadow: 0 3px 5px rgba(0, 0, 0, 0.5), 0 0 0 3px rgba(143, 47, 28, 0.55), inset 0 0 0 7px var(--lacre), inset 0 0 0 8px rgba(255, 205, 175, 0.3), inset 0 -4px 6px rgba(0, 0, 0, 0.35), inset 0 3px 3px rgba(255, 190, 160, 0.25);
 }
 
-.selo-lacre .ico { width: 30px; height: 30px; stroke-width: 1.6; }
+.selo-lacre .ico { width: 34px; height: 34px; stroke-width: 1.7; filter: drop-shadow(0 1px 0 rgba(255, 190, 160, 0.4)); }
+
+.selo-lacre::before, .selo-lacre::after {
+  content: ''; position: absolute; top: calc(100% - 8px); z-index: -1; width: 17px; height: 54px;
+  background: linear-gradient(90deg, #6d1c0e, #a63a22 45%, #7b2111); box-shadow: 0 3px 4px rgba(0, 0, 0, 0.35);
+}
+
+.selo-lacre::before { left: 16px; transform: rotate(7deg); transform-origin: top; clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 84%, 0 100%); }
+
+.selo-lacre::after { right: 16px; transform: rotate(-9deg); transform-origin: top; clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 84%, 0 100%); }
 
 /* O rodapé do escrivão */
 body:not(.modo-crianca) .documento-livro .doc-assinatura {
-  margin-top: 26px; padding-top: 10px; border-top: 1px solid rgba(92, 74, 43, 0.45); text-align: left;
-  font-family: var(--f-texto); font-style: italic; font-size: 0.88rem; line-height: 1.4; color: var(--tinta-3);
+  margin-top: 26px; padding-top: 14px; text-align: center;
+  background: linear-gradient(90deg, transparent, rgba(98, 64, 15, 0.5), transparent) top / 100% 1px no-repeat;
+  font-family: var(--f-texto); font-style: italic; font-size: 0.92rem; line-height: 1.4; color: var(--tinta-rotulo);
 }
 
 @keyframes carimbar { from { opacity: 0; transform: scale(1.4) rotate(calc(var(--giro-c, 0deg) - 8deg)); } 60% { opacity: 0.95; } to { opacity: 0.9; transform: rotate(var(--giro-c, 0deg)); } }
@@ -206,7 +244,7 @@ body:not(.modo-crianca) .documento-livro .doc-assinatura {
   body:not(.modo-crianca) .selo-lacre { animation: lacrar 0.5s 0.2s var(--saida) backwards; }
 }
 
-/* ─── O formulário: escrever num livro ─── */
+/* ─── O formulário e a assinatura: o mesmo pergaminho, com rolos no começo e no fim ─── */
 
 body:not(.modo-crianca) .modal-papel { background: #0a110c; }
 
@@ -214,58 +252,64 @@ body:not(.modo-crianca) .modal-papel .modal-corpo,
 body:not(.modo-crianca) .modal-assinar .modal-corpo {
   position: relative; color-scheme: light; color: var(--tinta); margin: 12px 12px 4px; border-radius: 0;
   background:
-    linear-gradient(90deg, transparent 54px, rgba(143, 47, 28, 0.4) 54px 55px, transparent 55px 58px, rgba(143, 47, 28, 0.4) 58px 59px, transparent 59px) local,
+    var(--rolo-cil) top / 100% 18px no-repeat local,
+    var(--rolo-cil) bottom / 100% 18px no-repeat local,
     var(--folha);
-  box-shadow: inset 0 0 0 1px rgba(110, 80, 30, 0.22), inset 0 0 56px rgba(125, 88, 32, 0.34), 0 8px 14px -4px rgba(0, 0, 0, 0.6);
+  box-shadow: inset 0 0 0 1px rgba(110, 72, 24, 0.3), inset 0 0 46px rgba(122, 80, 24, 0.42), 0 8px 14px -4px rgba(0, 0, 0, 0.6);
 }
 
-body:not(.modo-crianca) .modal-papel .modal-corpo { padding: 26px 32px 26px 76px; }
+body:not(.modo-crianca) .modal-papel .modal-corpo { padding: 40px 40px 40px; }
 
-body:not(.modo-crianca) .modal-papel .folha-cab { display: grid; justify-items: center; gap: 2px; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 3px double rgba(92, 74, 43, 0.55); text-align: center; }
+body:not(.modo-crianca) .modal-papel .folha-cab {
+  display: grid; justify-items: center; gap: 2px; margin-bottom: 22px; padding-bottom: 34px; border-bottom: 0; text-align: center;
+  background: var(--filete) bottom center / 260px 16px no-repeat;
+}
 
-body:not(.modo-crianca) .modal-papel .folha-brasao { width: 52px; height: 52px; object-fit: contain; filter: sepia(0.35) drop-shadow(0 2px 2px rgba(44, 34, 20, 0.3)); }
+body:not(.modo-crianca) .modal-papel .folha-brasao { width: 60px; height: 60px; object-fit: contain; filter: sepia(0.5) saturate(0.85) drop-shadow(0 2px 2px rgba(44, 28, 8, 0.35)); }
 
-body:not(.modo-crianca) .modal-papel .folha-sobre { margin-top: 4px; font-family: var(--f-letreiro); font-size: 0.98rem; font-weight: 700; letter-spacing: 0.06em; color: #4a3608; }
+body:not(.modo-crianca) .modal-papel .folha-sobre { margin-top: 6px; font-family: var(--f-letreiro); font-size: 1.15rem; font-weight: 700; letter-spacing: 0.08em; color: #4a2c08; }
 
-body:not(.modo-crianca) .modal-papel .folha-livro { font-style: italic; font-size: 1.05rem; color: var(--tinta-3); }
+body:not(.modo-crianca) .modal-papel .folha-livro { font-family: var(--f-destaque); font-size: 1.7rem; font-weight: 700; line-height: 1.15; color: var(--tinta-escrita); text-wrap: balance; }
 
 body:not(.modo-crianca) .modal-papel .form-grade { gap: 20px 30px; }
 
 body:not(.modo-crianca) .modal-papel .campo { gap: 3px; align-content: start; }
 
-body:not(.modo-crianca) .modal-papel .campo-rotulo { font-size: 0.74rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--tinta-3); }
+body:not(.modo-crianca) .modal-papel .campo-rotulo { font-family: var(--f-destaque); font-size: 1rem; font-weight: 700; letter-spacing: 0.1em; text-transform: lowercase; font-variant-caps: all-small-caps; color: var(--tinta-rotulo); }
 
 body:not(.modo-crianca) .modal-papel .obrig { color: var(--lacre); }
 
-body:not(.modo-crianca) .modal-papel .campo-ajuda { font-style: italic; font-size: 0.95rem; color: var(--tinta-3); }
+body:not(.modo-crianca) .modal-papel .campo-ajuda { font-style: italic; font-size: 0.95rem; color: var(--tinta-rotulo); }
 
 body:not(.modo-crianca) .modal-papel .form-secao {
   display: flex; align-items: center; gap: 14px; margin-top: 8px; padding: 0; border: 0;
-  font-size: 0.82rem; letter-spacing: 0.22em; color: #6b4e0c;
+  font-family: var(--f-titulo); font-size: 0.86rem; letter-spacing: 0.2em; color: #5a3a06;
 }
 
 body:not(.modo-crianca) .modal-papel .form-secao::before, body:not(.modo-crianca) .modal-papel .form-secao::after {
-  content: ''; flex: 1; min-width: 12px; height: 4px; border-top: 1px solid rgba(92, 74, 43, 0.5); border-bottom: 1px solid rgba(92, 74, 43, 0.5);
+  content: ''; flex: 1; min-width: 12px; height: 1px; background: linear-gradient(90deg, transparent, rgba(98, 64, 15, 0.65));
 }
 
+body:not(.modo-crianca) .modal-papel .form-secao::after { background: linear-gradient(270deg, transparent, rgba(98, 64, 15, 0.65)); }
+
 body:not(.modo-crianca) .modal-papel .input {
-  min-height: 46px; padding: 6px 4px 5px; background-color: transparent; border: 0; border-bottom: 1px dotted rgba(60, 45, 20, 0.75); border-radius: 0; box-shadow: none;
+  min-height: 46px; padding: 6px 4px 5px; background-color: transparent; border: 0; border-bottom: 1px solid rgba(58, 36, 10, 0.6); border-radius: 0; box-shadow: none;
   font-family: var(--f-texto); font-style: italic; font-size: 1.28rem; line-height: 1.3; color: var(--tinta-escrita); caret-color: var(--lacre);
 }
 
 body:not(.modo-crianca) .modal-papel .input::placeholder { color: #66573b; font-style: italic; opacity: 1; }
 
-body:not(.modo-crianca) .modal-papel .input:hover { border-bottom-color: rgba(60, 45, 20, 0.95); }
+body:not(.modo-crianca) .modal-papel .input:hover { border-bottom-color: rgba(58, 36, 10, 0.95); }
 
 body:not(.modo-crianca) .modal-papel .input:focus, body:not(.modo-crianca) .modal-papel .input:focus-visible {
-  outline: 2px solid #6b4e0c; outline-offset: 2px; background-color: rgba(255, 251, 232, 0.55); border-bottom: 1px solid #6b4e0c; box-shadow: none;
+  outline: 2px solid #5a3a06; outline-offset: 2px; background-color: rgba(255, 249, 224, 0.5); border-bottom: 1px solid #5a3a06; box-shadow: none;
 }
 
 body:not(.modo-crianca) .modal-papel .input[aria-invalid='true'] { border-bottom: 2px solid #b3341c; background-color: rgba(179, 52, 28, 0.08); box-shadow: none; }
 
 body:not(.modo-crianca) .modal-papel textarea.input {
-  min-height: 0; padding-top: 0; padding-bottom: 0; line-height: 2rem; resize: vertical; border-bottom: 0;
-  background: repeating-linear-gradient(180deg, transparent 0 calc(2rem - 1px), rgba(92, 74, 43, 0.38) calc(2rem - 1px) 2rem) local;
+  min-height: 0; padding: 6px 8px; line-height: 1.6; resize: vertical; border: 1px solid rgba(58, 36, 10, 0.28); border-bottom: 1px solid rgba(58, 36, 10, 0.6);
+  background: rgba(255, 248, 220, 0.3);
 }
 
 body:not(.modo-crianca) .modal-papel select.input { padding-right: 30px; background-image: var(--seta-papel); background-repeat: no-repeat; background-position: right 6px center; background-size: 16px; }
@@ -278,31 +322,31 @@ body:not(.modo-crianca) .modal-papel .interruptor-trilho { background: rgba(60, 
 
 body:not(.modo-crianca) .modal-papel .interruptor-trilho::after { background: #5c4a2b; }
 
-body:not(.modo-crianca) .modal-papel .interruptor input:checked + .interruptor-trilho { background: rgba(140, 109, 21, 0.32); border-color: #6b4e0c; }
+body:not(.modo-crianca) .modal-papel .interruptor input:checked + .interruptor-trilho { background: rgba(140, 109, 21, 0.32); border-color: #5a3a06; }
 
-body:not(.modo-crianca) .modal-papel .interruptor input:checked + .interruptor-trilho::after { background: #6b4e0c; }
+body:not(.modo-crianca) .modal-papel .interruptor input:checked + .interruptor-trilho::after { background: #5a3a06; }
 
-body:not(.modo-crianca) .modal-papel .interruptor input:focus-visible + .interruptor-trilho { outline-color: #6b4e0c; }
+body:not(.modo-crianca) .modal-papel .interruptor input:focus-visible + .interruptor-trilho { outline-color: #5a3a06; }
 
 body:not(.modo-crianca) .modal-papel .interruptor-texto strong { font-family: var(--f-texto); font-style: italic; font-size: 1.2rem; font-weight: 500; color: var(--tinta-escrita); }
 
-body:not(.modo-crianca) .modal-papel .interruptor-texto small { color: var(--tinta-3); }
+body:not(.modo-crianca) .modal-papel .interruptor-texto small { color: var(--tinta-rotulo); }
 
-body:not(.modo-crianca) .modal-papel .img-previa { padding: 6px; background: #f8f2e2; border: 1px solid rgba(92, 74, 43, 0.4); border-radius: 0; box-shadow: 0 4px 8px -3px rgba(40, 28, 10, 0.5); transform: rotate(-1deg); width: 108px; height: 108px; box-sizing: border-box; }
+body:not(.modo-crianca) .modal-papel .img-previa { padding: 6px; background: linear-gradient(135deg, #f0d484, #a4781f 40%, #e6c468 65%, #8a6218); border: 1px solid #5a3d0e; border-radius: 0; box-shadow: 0 4px 8px -3px rgba(40, 24, 6, 0.5); width: 108px; height: 108px; box-sizing: border-box; }
 
-body:not(.modo-crianca) .modal-papel .img-vazia { background: rgba(255, 251, 232, 0.4); border: 1px dashed rgba(92, 74, 43, 0.7); border-radius: 0; color: var(--tinta-3); }
+body:not(.modo-crianca) .modal-papel .img-vazia { background: rgba(255, 249, 224, 0.4); border: 1px dashed rgba(98, 64, 15, 0.7); border-radius: 0; color: var(--tinta-rotulo); }
 
-body:not(.modo-crianca) .modal-papel .btn-fantasma { color: var(--tinta-3); }
+body:not(.modo-crianca) .modal-papel .btn-fantasma { color: var(--tinta-rotulo); }
 
 body:not(.modo-crianca) .modal-papel .btn-fantasma:hover { color: var(--tinta); background: rgba(60, 45, 20, 0.1); border-color: rgba(60, 45, 20, 0.3); }
 
-body:not(.modo-crianca) .modal-papel .opcao-chip { background: rgba(92, 74, 43, 0.1); border-color: rgba(92, 74, 43, 0.5); color: var(--tinta-escrita); font-family: var(--f-texto); font-style: italic; }
+body:not(.modo-crianca) .modal-papel .opcao-chip { background: rgba(98, 64, 15, 0.1); border-color: rgba(98, 64, 15, 0.5); color: var(--tinta-escrita); font-family: var(--f-texto); font-style: italic; }
 
-body:not(.modo-crianca) .modal-papel .opcao-chip button { color: var(--tinta-3); }
+body:not(.modo-crianca) .modal-papel .opcao-chip button { color: var(--tinta-rotulo); }
 
-body:not(.modo-crianca) .modal-papel .suave, body:not(.modo-crianca) .modal-papel .calculado { color: var(--tinta-3); font-style: italic; }
+body:not(.modo-crianca) .modal-papel .suave, body:not(.modo-crianca) .modal-papel .calculado { color: var(--tinta-rotulo); font-style: italic; }
 
-body:not(.modo-crianca) .modal-papel .nota { background: rgba(255, 251, 232, 0.45); border-color: rgba(92, 74, 43, 0.45); color: var(--tinta); }
+body:not(.modo-crianca) .modal-papel .nota { background: rgba(255, 249, 224, 0.45); border-color: rgba(98, 64, 15, 0.45); color: var(--tinta); }
 
 /* ─── A almofada de assinatura ─── */
 
@@ -343,38 +387,34 @@ body:not(.modo-crianca) .modal-papel .nota { background: rgba(255, 251, 232, 0.4
 
 .assinar-sem:hover:not(:disabled) { color: var(--ouro-l); }
 
-body:not(.modo-crianca) .modal-assinar .modal-corpo { padding: 24px 28px 24px 76px; }
+
+
+body:not(.modo-crianca) .modal-assinar .modal-corpo { padding: 38px 36px 38px; }
 
 /* ─── Celular ─── */
 
 @media (max-width: 640px) {
-  body:not(.modo-crianca) .modal-livro .modal-corpo { padding: 14px 8px 20px; }
-  body:not(.modo-crianca) .documento-livro { padding: 28px 16px 24px 42px; clip-path: polygon(0 0.3%, 14% 0, 40% 0.2%, 70% 0, 100% 0.2%, 99.7% 40%, 100% 75%, 100% calc(100% - 22px), calc(100% - 22px) 100%, 60% 99.7%, 25% 100%, 0 99.8%, 0.3% 60%, 0 25%); }
-  body:not(.modo-crianca) .documento-livro::before {
-    background:
-      linear-gradient(135deg, #e9dcb0 0 46%, #86693a 49%, transparent 50%) right bottom / 22px 22px no-repeat,
-      linear-gradient(90deg, transparent 27px, rgba(143, 47, 28, 0.4) 27px 28px, transparent 28px 30px, rgba(143, 47, 28, 0.4) 30px 31px, transparent 31px),
-      linear-gradient(180deg, transparent 33%, rgba(70, 48, 15, 0.1) 33.2%, rgba(255, 255, 255, 0.28) 33.7%, transparent 35%),
-      linear-gradient(180deg, transparent 66%, rgba(70, 48, 15, 0.09) 66.2%, rgba(255, 255, 255, 0.24) 66.7%, transparent 68%),
-      repeating-linear-gradient(180deg, transparent 0 31px, rgba(95, 70, 35, 0.09) 31px 32px);
-  }
-  body:not(.modo-crianca) .documento-livro .doc-titulo { font-size: 1.7rem; }
-  body:not(.modo-crianca) .documento-livro .doc-sobre { font-size: 0.92rem; }
-  body:not(.modo-crianca) .documento-livro .doc-valor { font-size: 1.22rem; }
-  body:not(.modo-crianca) .doc-numero { top: 14px; right: 12px; padding: 3px 8px 2px; }
-  body:not(.modo-crianca) .doc-numero strong { font-size: 1.05rem; }
+  body:not(.modo-crianca) .modal-livro .modal-corpo { padding: 14px 6px 20px; }
+  body:not(.modo-crianca) .papel-mesa::before, body:not(.modo-crianca) .papel-mesa::after { height: 28px; border-radius: 6px / 14px; background-size: 12px 100%, 12px 100%, auto; }
+  body:not(.modo-crianca) .documento-livro { margin: 16px 8px; padding: 32px 18px 28px; }
+  body:not(.modo-crianca) .documento-livro .doc-titulo { font-size: 2rem; }
+  body:not(.modo-crianca) .documento-livro .doc-sobre { font-size: 1.02rem; }
+  body:not(.modo-crianca) .documento-livro .doc-valor { font-size: 1.2rem; }
+  body:not(.modo-crianca) .doc-numero { top: 30px; right: 14px; min-width: 46px; height: 46px; padding: 0 7px; border-radius: 23px; }
+  body:not(.modo-crianca) .doc-numero small { font-size: 0.5rem; }
+  body:not(.modo-crianca) .doc-numero strong { font-size: 0.82rem; }
   .doc-assina { flex-direction: column-reverse; align-items: center; gap: 10px; }
+  .doc-assina:has(.selo-lacre) { padding-bottom: 46px; }
   .doc-assina-col { flex: 1 1 auto; width: 100%; }
-  .selo-lacre { width: 52px; height: 52px; margin-bottom: 0; }
-  .selo-lacre .ico { width: 24px; height: 24px; }
+  .selo-lacre { align-self: center; width: 58px; height: 58px; margin-bottom: 0; }
+  .selo-lacre .ico { width: 28px; height: 28px; }
   body:not(.modo-crianca) .modal-papel .modal-corpo, body:not(.modo-crianca) .modal-assinar .modal-corpo {
     margin: 8px 6px 2px;
-    background:
-      linear-gradient(90deg, transparent 27px, rgba(143, 47, 28, 0.4) 27px 28px, transparent 28px 30px, rgba(143, 47, 28, 0.4) 30px 31px, transparent 31px) local,
-      var(--folha);
+    background: var(--rolo-cil) top / 100% 14px no-repeat local, var(--rolo-cil) bottom / 100% 14px no-repeat local, var(--folha);
   }
-  body:not(.modo-crianca) .modal-papel .modal-corpo { padding: 20px 14px 20px 42px; }
-  body:not(.modo-crianca) .modal-assinar .modal-corpo { padding: 18px 14px 18px 42px; }
+  body:not(.modo-crianca) .modal-papel .modal-corpo { padding: 28px 16px 28px; }
+  body:not(.modo-crianca) .modal-assinar .modal-corpo { padding: 26px 16px 26px; }
+  body:not(.modo-crianca) .modal-papel .folha-livro { font-size: 1.45rem; }
   .assinatura-x { font-size: 1.1rem; }
   .assinatura-dica { font-size: 1.15rem; }
 }
