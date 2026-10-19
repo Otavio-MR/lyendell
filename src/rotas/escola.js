@@ -1,5 +1,5 @@
 // A Escola Luckham: um sistema próprio (fora do Tabelionato) para dirigir a escola.
-//   escola.ver       ver a escola: disciplinas, professores titulares e substitutos, turmas e calendário (todo morador);
+//   escola.ver       ver a escola: disciplinas, professores titulares e substitutos, turmas e calendário (quem trabalha nela: Diretor, Professores, Tabeliã, Lorde Comandante, General e Família Nobre; o morador comum não vê);
 //   escola.alunos    ver os alunos, as matrículas, a frequência e o boletim (Diretor, Professor, Família Nobre);
 //   escola.lecionar  fazer a chamada das aulas e lançar notas (Diretor, Professor, Família Nobre);
 //   escola.gerir     matricular, inscrever professores, criar disciplinas, turmas e aulas, configurar (Diretor da Escola).

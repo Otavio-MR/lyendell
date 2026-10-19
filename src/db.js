@@ -889,7 +889,7 @@ CREATE INDEX IF NOT EXISTS idx_escola_historico ON escola_historico(entidade, en
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 42;
+const VERSAO = 43;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -984,6 +984,15 @@ async function migrar() {
   // v30: os Aliados passam a ver a cidade (mapa, anúncios, Congresso, Juramento, Leis, Galeria, Comunidade) e a jogar na Recreação.
   if (versao < 30) await db.run('UPDATE cargos SET descricao = ? WHERE nome = ? AND descricao = ?', CARGOS_PADRAO.find(c => c.nome === 'Aliados').descricao, 'Aliados', 'Convidados e aliados de outras casas. Não são moradores: veem só o que for marcado para Convidados e Aliados.');
   if (versao < 30) await darPermissoes({ Aliados: ['aliados.ver', 'anuncios.ver', 'congresso.ver', 'leis.ver', 'galeria.ver', 'recreacao.usar'] });
+  // v43: a Escola é restrita (Diretor, Professores, Tabeliã, Lorde Comandante, General e a Família Nobre): o morador comum
+  // deixa de vê-la. O Lorde Comandante e o General passam a ver o módulo da Guarda no menu (guarda.ver).
+  if (versao < 43) {
+    for (const c of await db.all('SELECT id, permissoes FROM cargos WHERE base = 1')) {
+      const lista = JSON.parse(c.permissoes);
+      if (lista.includes('escola.ver')) await db.run('UPDATE cargos SET permissoes = ? WHERE id = ?', JSON.stringify(lista.filter(p => p !== 'escola.ver')), c.id);
+    }
+    await darPermissoes({ 'Tabeliã': ['escola.ver', 'escola.alunos'], 'Lorde Comandante': ['guarda.ver', 'escola.ver', 'escola.alunos'], General: ['guarda.ver', 'escola.ver', 'escola.alunos'] });
+  }
   // v42: o General passa a ter tudo o que o Lorde Comandante tem (inclusive as Leis), menos escolher o General.
   if (versao < 42) {
     await darPermissoes({ General: ['leis.registrar', 'leis.editar', 'leis.apagar', 'leis.configurar', 'leis.aprovar'] });
@@ -1093,7 +1102,7 @@ async function alinharFichas() {
   }
 }
 
-const PERMISSOES_GUARDA = ['guarda.registrar', 'guarda.editar', 'guarda.apagar', 'guarda.configurar', 'guarda.aprovar', 'escala.ver', 'escala.gerir', 'escala.nomear'];
+const PERMISSOES_GUARDA = ['guarda.ver', 'guarda.registrar', 'guarda.editar', 'guarda.apagar', 'guarda.configurar', 'guarda.aprovar', 'escala.ver', 'escala.gerir', 'escala.nomear'];
 // O Lorde Comandante comanda a Guarda (e faz as Leis); o General é o braço direito dele. O antigo cargo "Comandante da Guarda"
 // vira Lorde Comandante: quem o tinha passa a ter o Lorde Comandante, e o cargo antigo sai.
 async function migrarHierarquiaGuarda() {

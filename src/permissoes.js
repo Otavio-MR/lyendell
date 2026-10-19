@@ -131,7 +131,7 @@ const SO_DO_ADMIN = new Set(['jogos.admin']);
 const VALIDAS = new Set(TODAS);
 
 // Todo usuário é morador (menos quem tem um cargo que "não é morador", como os Aliados): estas permissões valem para eles.
-const MORADOR = ['tabelionato.ver', 'guarda.ver', 'congresso.ver', 'congresso.propor', 'leis.ver', 'galeria.ver', 'anuncios.ver', 'atividades.ver', 'atividades.participar', 'recreacao.usar', 'nadir.usar', 'escola.ver'];
+const MORADOR = ['tabelionato.ver', 'guarda.ver', 'congresso.ver', 'congresso.propor', 'leis.ver', 'galeria.ver', 'anuncios.ver', 'atividades.ver', 'atividades.participar', 'recreacao.usar', 'nadir.usar'];
 // Quem está acima de morador publica anúncios, cria atividades e envia fotos.
 const MEMBRO = ['anuncios.publicar', 'atividades.criar', 'galeria.enviar'];
 const acoes = (modulo, ...lista) => lista.map(a => `${modulo}.${a}`);
@@ -182,7 +182,7 @@ const CARGOS_PADRAO = [
     permissoes: TODAS.filter(p => p !== 'usuarios.criar' && p !== 'cargos.gerenciar' && !EXCLUSIVAS[p] && !SO_DO_BOBO.has(p) && !SO_DOS_ALIADOS.has(p) && !SO_DA_MOEDA.has(p) && !SO_DO_ADMIN.has(p)) },
   { nome: 'Tabeliã', cor: '#c98b4a',
     descricao: DESCRICOES['Tabeliã'][1],
-    permissoes: [...MEMBRO, ...acoes('tabelionato', 'registrar', 'editar', 'apagar', 'configurar', 'pagamentos', 'aprovar'), 'mapa.editar', 'juramento.marcar'] },
+    permissoes: [...MEMBRO, ...acoes('tabelionato', 'registrar', 'editar', 'apagar', 'configurar', 'pagamentos', 'aprovar'), 'mapa.editar', 'juramento.marcar', 'escola.ver', 'escola.alunos'] },
   { nome: 'Escriba', cor: '#b9a27a',
     descricao: DESCRICOES.Escriba[1],
     permissoes: [...MEMBRO, 'tabelionato.registrar'] },
@@ -190,7 +190,7 @@ const CARGOS_PADRAO = [
   { nome: 'General', cor: '#c0553a',
     descricao: DESCRICOES.General[1],
     permissoes: [...MEMBRO, ...acoes('leis', 'registrar', 'editar', 'apagar', 'configurar', 'aprovar'),
-      ...acoes('guarda', 'registrar', 'editar', 'apagar', 'configurar', 'aprovar'), 'escala.ver', 'escala.gerir', 'escala.nomear'] },
+      ...acoes('guarda', 'registrar', 'editar', 'apagar', 'configurar', 'aprovar'), 'guarda.ver', 'escola.ver', 'escola.alunos', 'escala.ver', 'escala.gerir', 'escala.nomear'] },
   { nome: 'Guarda', cor: '#6f9a58',
     descricao: DESCRICOES.Guarda[1],
     permissoes: [...MEMBRO, 'guarda.registrar', 'escala.ver'] },
@@ -203,7 +203,7 @@ const CARGOS_PADRAO = [
   { nome: 'Lorde Comandante', cor: '#b5563f',
     descricao: DESCRICOES['Lorde Comandante'][1],
     permissoes: [...MEMBRO, ...acoes('leis', 'registrar', 'editar', 'apagar', 'configurar', 'aprovar'),
-      ...acoes('guarda', 'registrar', 'editar', 'apagar', 'configurar', 'aprovar'), 'escala.ver', 'escala.gerir', 'escala.nomear', 'escala.nomear_general'] },
+      ...acoes('guarda', 'registrar', 'editar', 'apagar', 'configurar', 'aprovar'), 'guarda.ver', 'escola.ver', 'escola.alunos', 'escala.ver', 'escala.gerir', 'escala.nomear', 'escala.nomear_general'] },
   { nome: 'Senadora', cor: '#7f93d8',
     descricao: DESCRICOES.Senadora[1],
     permissoes: [...MEMBRO, ...acoes('congresso', 'registrar', 'editar', 'apagar', 'configurar', 'aprovar')] },

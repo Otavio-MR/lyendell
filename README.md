@@ -351,8 +351,9 @@ de confiança por disciplina**, o lema e como se inscrever. Tudo isso é editáv
 
 **Cargos**: o **Diretor da Escola** (Lorde Evran Luckham, no jornal) faz a inscrição de alunos e professores e
 cuida de tudo (`escola.gerir`); o **Professor da Escola** vê os alunos, faz a chamada e lança notas; a Família
-Nobre tem tudo. Todo morador vê o mural da escola (disciplinas, titulares e substitutos, turmas e aulas), mas só
-quem trabalha nela vê alunos, notas e frequência.
+Nobre tem tudo. **A Escola é restrita**: só o Diretor, os Professores, a Tabeliã, o Lorde Comandante, o General e a
+Família Nobre a veem (o morador comum nem vê o item no menu). Alunos, notas e frequência ficam com quem tem `escola.alunos`.
+No menu, a Escola e a Gestão Financeira ficam na seção Registros.
 
 **O que tem**: alunos (matrícula numerada sem buracos, responsável, turma, situação: em análise, matriculado,
 afastado, concluído, desligado), professores (inscrição "em avaliação", depois titular ou substituto, com troca
