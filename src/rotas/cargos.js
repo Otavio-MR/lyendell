@@ -31,12 +31,14 @@ function lerCorpo(req, atual) {
   return { nome, cor, descricao, permissoes, exclui_base: excluiBase };
 }
 
-// Aprovar registros só pode estar num cargo por módulo (a Tabeliã no Tabelionato, o Comandante na Guarda).
-async function conferirExclusivas(permissoes, excetoId = 0, base = false) {
+// Aprovar registros só pode estar num cargo por módulo (a Tabeliã no Tabelionato; na Guarda, o Lorde Comandante e o General).
+async function conferirExclusivas(permissoes, excetoId = 0, base = false, nome = '') {
   for (const p of permissoes.filter(x => EXCLUSIVAS[x])) {
+    const permitidos = [].concat(EXCLUSIVAS[p]);
     if (base) throw erro(400, 'O cargo de Morador não pode aprovar registros.');
-    const dono = (await db.all('SELECT id, nome, permissoes FROM cargos WHERE id <> ?', excetoId))
-      .find(c => JSON.parse(c.permissoes).includes(p));
+    const outros = (await db.all('SELECT id, nome, permissoes FROM cargos WHERE id <> ?', excetoId)).filter(c => JSON.parse(c.permissoes).includes(p));
+    // Quem tem a permissão fora do grupo permitido, ou um cargo de fora querendo entrar onde já há dono, é recusado.
+    const dono = outros.find(c => !permitidos.includes(c.nome)) || (permitidos.includes(nome) ? null : outros[0]);
     if (dono) throw erro(400, `Aprovar registros é exclusivo de um só cargo e já pertence ao cargo "${dono.nome}".`);
   }
 }
@@ -75,7 +77,7 @@ r.get('/', exigirLogin, async (req, res) => {
 r.post('/', exigir('cargos.gerenciar'), async (req, res) => {
   const c = lerCorpo(req);
   await nomeLivre(c.nome);
-  await conferirExclusivas(c.permissoes);
+  await conferirExclusivas(c.permissoes, 0, false, c.nome);
   const ordem = ((await db.get('SELECT MAX(ordem) AS m FROM cargos')).m ?? 0) + 1;
   const { id } = await db.run('INSERT INTO cargos (nome, descricao, cor, permissoes, ordem, exclui_base) VALUES (?, ?, ?, ?, ?, ?)',
     c.nome, c.descricao, c.cor, JSON.stringify(c.permissoes), ordem, c.exclui_base);
@@ -87,7 +89,7 @@ r.put('/:id', exigir('cargos.gerenciar'), async (req, res) => {
   const atual = await buscar(req);
   const c = lerCorpo(req, atual);
   await nomeLivre(c.nome, atual.id);
-  await conferirExclusivas(c.permissoes, atual.id, !!atual.base);
+  await conferirExclusivas(c.permissoes, atual.id, !!atual.base, c.nome);
   await db.run('UPDATE cargos SET nome = ?, descricao = ?, cor = ?, permissoes = ?, exclui_base = ? WHERE id = ?',
     c.nome, c.descricao, c.cor, JSON.stringify(c.permissoes), c.exclui_base, atual.id);
   await anotar(req, 'Editou um cargo', c.nome);

@@ -387,6 +387,11 @@ convocação (a mensagem no Discord é atualizada). Variáveis (opcionais, sem e
 `DISCORD_WEBHOOK_GUARDA` (se faltar, usa o webhook dos anúncios), `DISCORD_CARGO_GUARDAS` (ID do cargo dos Guardas, para
 marcar @Guardas) e `SITE_URL`.
 
+**Hierarquia da Guarda**: três níveis. O **Lorde Comandante** (o mesmo cargo que faz as Leis) comanda a Guarda e escolhe o **General**;
+o **General** é o braço direito dele e faz o mesmo na Guarda (aprova registros, marca a escala, convoca), mas não escolhe nem tira o Lorde
+Comandante (isso é só do administrador do site); os **Guardas** veem a agenda e respondem às convocações. Na aba **Quadro** da Escala o Lorde nomeia
+e exonera o General e os Guardas, e o General nomeia e exonera só os Guardas. Ao atualizar, quem tinha o cargo antigo Comandante da Guarda vira Lorde Comandante.
+
 **Controle**: por período, mostra por guarda as horas marcadas e cumpridas, faltas, convocações recebidas, atendidas e
 retiradas, e um ranking de quem mais trabalha. O Comandante marca cada turno como cumprido ou faltou.
 

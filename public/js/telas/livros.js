@@ -29,8 +29,8 @@ export const MODULOS = {
   guarda: {
     titulo: 'Guarda do Coelho', icone: 'escudo', no: 'na Guarda do Coelho', enviam: 'Guardas',
     sub: 'Prisioneiros, efetivo da guarda e procurados da capital.',
-    quemComanda: 'o Comandante da Guarda',
-    aprovador: 'do Comandante da Guarda',
+    quemComanda: 'o Lorde Comandante e o General',
+    aprovador: 'do Lorde Comandante ou do General',
   },
   hospital: {
     titulo: 'Hospital', icone: 'cruz', no: 'no Hospital', enviam: 'Médicos',

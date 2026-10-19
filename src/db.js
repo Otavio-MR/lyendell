@@ -889,7 +889,7 @@ CREATE INDEX IF NOT EXISTS idx_escola_historico ON escola_historico(entidade, en
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 40;
+const VERSAO = 41;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -984,6 +984,8 @@ async function migrar() {
   // v30: os Aliados passam a ver a cidade (mapa, anúncios, Congresso, Juramento, Leis, Galeria, Comunidade) e a jogar na Recreação.
   if (versao < 30) await db.run('UPDATE cargos SET descricao = ? WHERE nome = ? AND descricao = ?', CARGOS_PADRAO.find(c => c.nome === 'Aliados').descricao, 'Aliados', 'Convidados e aliados de outras casas. Não são moradores: veem só o que for marcado para Convidados e Aliados.');
   if (versao < 30) await darPermissoes({ Aliados: ['aliados.ver', 'anuncios.ver', 'congresso.ver', 'leis.ver', 'galeria.ver', 'recreacao.usar'] });
+  // v41: a hierarquia da Guarda: Lorde Comandante, General (braço direito) e Guardas.
+  if (versao < 41) await migrarHierarquiaGuarda();
   // v40: a assinatura desenhada do Diretor nas fichas de alunos e professores da escola (traços em JSON, quem assinou e quando).
   if (versao < 40) {
     for (const tabela of ['escola_alunos', 'escola_professores']) {
@@ -1080,6 +1082,32 @@ async function alinharFichas() {
     const { m } = await db.get('SELECT COALESCE(MAX(ordem), 0) AS m FROM livros');
     await db.run('INSERT INTO livros (modulo, nome, descricao, icone, aberto, campos, cobranca, ordem) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       o.modulo, o.nome, o.descricao, o.icone, o.aberto, JSON.stringify(o.campos), null, m + 1);
+  }
+}
+
+const PERMISSOES_GUARDA = ['guarda.registrar', 'guarda.editar', 'guarda.apagar', 'guarda.configurar', 'guarda.aprovar', 'escala.ver', 'escala.gerir', 'escala.nomear'];
+// O Lorde Comandante comanda a Guarda (e faz as Leis); o General é o braço direito dele. O antigo cargo "Comandante da Guarda"
+// vira Lorde Comandante: quem o tinha passa a ter o Lorde Comandante, e o cargo antigo sai.
+async function migrarHierarquiaGuarda() {
+  if (!(await db.get('SELECT COUNT(*) AS n FROM cargos')).n) return; // banco novo: o semear cria tudo
+  await criarCargo('General');
+  const antigo = await db.get("SELECT id FROM cargos WHERE nome = 'Comandante da Guarda'");
+  // A permissão exclusiva de aprovar sai do cargo antigo antes de entrar nos novos.
+  if (antigo) await db.run("UPDATE cargos SET permissoes = '[]' WHERE id = ?", antigo.id);
+  await darPermissoes({ 'Lorde Comandante': [...PERMISSOES_GUARDA, 'escala.nomear_general'], General: PERMISSOES_GUARDA });
+  const lorde = await db.get("SELECT id FROM cargos WHERE nome = 'Lorde Comandante'");
+  if (antigo && lorde) {
+    for (const u of await db.all('SELECT usuario_id FROM usuario_cargos WHERE cargo_id = ?', antigo.id)) {
+      await db.run('INSERT OR IGNORE INTO usuario_cargos (usuario_id, cargo_id) VALUES (?, ?)', u.usuario_id, lorde.id);
+    }
+    await db.run('DELETE FROM usuario_cargos WHERE cargo_id = ?', antigo.id);
+    await db.run('DELETE FROM cargos WHERE id = ?', antigo.id);
+  }
+  const [antigasL, atualL] = DESCRICOES['Lorde Comandante'];
+  const l = await db.get("SELECT descricao FROM cargos WHERE nome = 'Lorde Comandante'");
+  if (l && antigasL.includes(l.descricao)) await db.run("UPDATE cargos SET descricao = ? WHERE nome = 'Lorde Comandante'", atualL);
+  if (await db.get("SELECT valor FROM meta WHERE chave = 'nadir_semeada'")) {
+    await db.run("UPDATE nadir_saber SET texto = replace(texto, 'Quem aprova é o Comandante da Guarda', 'Quem aprova é o Lorde Comandante ou o General, o braço direito dele') WHERE texto LIKE '%Quem aprova é o Comandante da Guarda%'");
   }
 }
 
@@ -1341,7 +1369,7 @@ async function migrarNumeracao() {
   // A permissão de aprovar fica só no cargo dono dela (Tabeliã ou Comandante); sai da Família Nobre e de qualquer outro.
   for (const c of await db.all('SELECT id, nome, descricao, permissoes FROM cargos')) {
     const lista = JSON.parse(c.permissoes);
-    const limpa = lista.filter(p => !EXCLUSIVAS[p] || EXCLUSIVAS[p] === c.nome);
+    const limpa = lista.filter(p => !EXCLUSIVAS[p] || [].concat(EXCLUSIVAS[p]).includes(c.nome));
     const [antigas = [], atual] = DESCRICOES[c.nome] || [];
     const descricao = antigas.includes(c.descricao) ? atual : c.descricao;
     if (limpa.length !== lista.length || descricao !== c.descricao) {

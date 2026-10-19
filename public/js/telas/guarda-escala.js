@@ -7,8 +7,9 @@ import { API, carregando, seguro, corDos, agoraBr } from './guarda-escala-comum.
 import { agenda } from './guarda-escala-agenda.js';
 import { convocacoes, convocacaoDetalhe as detalhe } from './guarda-escala-conv.js';
 import { controle } from './guarda-escala-controle.js';
+import { quadro } from './guarda-escala-quadro.js';
 
-const TELAS = { agenda, convocacoes, controle };
+const TELAS = { agenda, convocacoes, quadro, controle };
 
 const portaAlta = () => vazio('Essa porta é alta demais!', 'A escala da Guarda é coisa de gente grande. Vamos brincar em outro lugar?', h('a', { class: 'btn', href: '#/recreacao' }, 'Ir brincar'));
 
@@ -20,7 +21,7 @@ async function contexto() {
 export async function guardaEscala(aba = 'agenda') {
   if (ehCrianca()) return portaAlta();
   const ctx = await contexto();
-  const abas = [['agenda', 'Agenda', 'calendario'], ['convocacoes', 'Convocações', 'megafone'], ctx.gerir && ['controle', 'Controle', 'trofeu']].filter(Boolean);
+  const abas = [['agenda', 'Agenda', 'calendario'], ['convocacoes', 'Convocações', 'megafone'], ['quadro', 'Quadro', 'usuarios'], ctx.gerir && ['controle', 'Controle', 'trofeu']].filter(Boolean);
   if (!abas.some(a => a[0] === aba)) aba = 'agenda';
 
   const nav = h('nav', { class: 'abas gesc-abas', 'aria-label': 'Partes da Escala da Guarda' },

@@ -101,7 +101,7 @@ Os prédios públicos: a Toca do Coelho (o castelo da Família Nobre Luckham), o
 Os detalhes de cada casa e de cada prédio (quem mora, quem trabalha, para que serve) estão no Mapa de Lyendell.` },
   { categoria: 'cidade', titulo: 'Como a Capital funciona', apelidos: 'instituições, cargos, governo',
     texto: `O Tabelionato guarda os registros e os documentos importantes: moradores, nobres, comerciantes, casamentos e propriedades. Quem aprova os registros é a Tabeliã; o Escriba faz registros, que vão para a aprovação dela.
-A Guarda do Coelho protege a Capital: faz as rondas, registra presos e procurados. Quem aprova é o Comandante da Guarda. Os cartazes de procurados e banidos são públicos.
+A Guarda do Coelho protege a Capital: faz as rondas, registra presos e procurados. Quem aprova é o Lorde Comandante ou o General, o braço direito dele. Os cartazes de procurados e banidos são públicos.
 O Hospital cuida dos feridos e doentes. Os prontuários são sigilosos: só a equipe do Hospital vê.
 O Senado é onde o Congresso se reúne e vota as leis, PECs e regras. Qualquer morador pode mandar uma proposta; a Senadora avalia e leva à pauta.
 As Leis de Lyendell são feitas pelo Lorde Comandante junto com a Família Nobre.

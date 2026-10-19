@@ -15,14 +15,14 @@ const r = express.Router();
 r.use(exigirLogin, exigir('escala.ver'));
 const gerir = exigir('escala.gerir');
 
-const CARGOS_GUARDA = ['Guarda', 'Comandante da Guarda'];
+const CARGOS_GUARDA = ['Guarda', 'General', 'Lorde Comandante'];
 const SITUACOES_TURNO = ['agendado', 'cumprido', 'faltou'];
 const hora = v => (/^([01]\d|2[0-3]):[0-5]\d$/.test(String(v || '')) ? String(v) : '');
 const minutos = h => Number(h.slice(0, 2)) * 60 + Number(h.slice(3));
 // Duração do turno em horas; se termina antes de começar, passou da meia-noite.
 const duracao = (ini, fim) => { const d = minutos(fim) - minutos(ini); return (d <= 0 ? d + 1440 : d) / 60; };
 
-// Os guardas: quem tem o cargo Guarda ou Comandante da Guarda (e não é criança nem está desativado).
+// Os guardas: quem tem o cargo Guarda, General ou Lorde Comandante (e não é criança nem está desativado).
 async function guardas() {
   const marcas = CARGOS_GUARDA.map(() => '?').join(',');
   return db.all(`SELECT DISTINCT u.id, u.nome, u.foto FROM usuarios u JOIN usuario_cargos uc ON uc.usuario_id = u.id JOIN cargos c ON c.id = uc.cargo_id
@@ -244,6 +244,72 @@ r.get('/controle', gerir, async (req, res) => {
     };
   }).sort((a, b) => b.pontos - a.pontos || a.nome.localeCompare(b.nome, 'pt-BR'));
   res.json({ de, ate, guardas: linhas });
+});
+
+/* ─── O quadro da Guarda: Lorde Comandante, General e Guardas ───── */
+
+// O Lorde Comandante escolhe o General (e os Guardas); o General, braço direito dele, escolhe só os Guardas.
+// O General não escolhe nem tira o Lorde Comandante (isso é só do administrador do site, nos Cargos).
+async function portadores(nome) {
+  return db.all(`SELECT DISTINCT u.id, u.nome, u.foto FROM usuarios u JOIN usuario_cargos uc ON uc.usuario_id = u.id JOIN cargos c ON c.id = uc.cargo_id
+    WHERE c.nome = ? COLLATE NOCASE AND u.ativo = 1 ORDER BY u.nome COLLATE NOCASE`, nome);
+}
+async function cargoId(nome) {
+  const c = await db.get('SELECT id FROM cargos WHERE nome = ? COLLATE NOCASE', nome);
+  if (!c) throw erro(409, `O cargo ${nome} não existe. Peça ao administrador do site para criá-lo.`);
+  return c.id;
+}
+const temCargo = async (uid, nome) => !!(await db.get(`SELECT 1 AS x FROM usuario_cargos uc JOIN cargos c ON c.id = uc.cargo_id WHERE uc.usuario_id = ? AND c.nome = ? COLLATE NOCASE`, uid, nome));
+
+r.get('/quadro', async (req, res) => {
+  const lorde = await portadores('Lorde Comandante');
+  const generais = await portadores('General');
+  const idsAlto = new Set([...lorde, ...generais].map(u => u.id));
+  const guardas = (await portadores('Guarda')).filter(u => !idsAlto.has(u.id));
+  const podes = { nomear: pode(req, 'escala.nomear'), nomear_general: pode(req, 'escala.nomear_general') };
+  let candidatos = [];
+  if (podes.nomear || podes.nomear_general) {
+    const naGuarda = new Set([...idsAlto, ...guardas.map(u => u.id)]);
+    const aliados = new Set((await portadores('Aliados')).map(u => u.id));
+    candidatos = (await db.all('SELECT id, nome, foto FROM usuarios WHERE ativo = 1 AND crianca = 0 ORDER BY nome COLLATE NOCASE'))
+      .filter(u => !naGuarda.has(u.id) && !aliados.has(u.id));
+  }
+  res.json({ lorde, generais, guardas, podes, candidatos });
+});
+
+async function alvoDoQuadro(req) {
+  const cargo = req.body?.cargo;
+  if (!['General', 'Guarda'].includes(cargo)) throw erro(400, 'Escolha o cargo: General ou Guarda.');
+  if (!pode(req, cargo === 'General' ? 'escala.nomear_general' : 'escala.nomear')) {
+    throw erro(403, cargo === 'General' ? 'Só o Lorde Comandante escolhe o General.' : 'Você não pode nomear Guardas.');
+  }
+  const u = await db.get('SELECT id, nome, ativo, crianca FROM usuarios WHERE id = ?', Number(req.body?.usuario_id));
+  if (!u || !u.ativo) throw erro(404, 'Usuário não encontrado.');
+  if (u.crianca) throw erro(400, 'Um personagem criança não entra na Guarda.');
+  if (await temCargo(u.id, 'Lorde Comandante')) throw erro(409, `${u.nome} é o Lorde Comandante. Esse cargo só o administrador do site muda.`);
+  return { cargo, u };
+}
+
+r.post('/quadro/nomear', async (req, res) => {
+  const { cargo, u } = await alvoDoQuadro(req);
+  if (await temCargo(u.id, 'Aliados')) throw erro(409, `${u.nome} é aliado (convidado de outra casa) e não entra na Guarda.`);
+  if (cargo === 'Guarda' && await temCargo(u.id, 'General')) throw erro(409, `${u.nome} já é General.`);
+  if (await temCargo(u.id, cargo)) throw erro(409, `${u.nome} já é ${cargo}.`);
+  await db.run('INSERT OR IGNORE INTO usuario_cargos (usuario_id, cargo_id) VALUES (?, ?)', u.id, await cargoId(cargo));
+  // Quem sobe a General deixa de ser só Guarda (o General já tem tudo o que o Guarda tem e mais).
+  if (cargo === 'General') await db.run('DELETE FROM usuario_cargos WHERE usuario_id = ? AND cargo_id = (SELECT id FROM cargos WHERE nome = ? COLLATE NOCASE)', u.id, 'Guarda');
+  await anotar(req, `Quadro da Guarda: nomeou ${cargo}`, u.nome);
+  res.json({ ok: true });
+});
+
+// Tirar o cargo. O General exonerado volta a Guarda (por ordem do Lorde Comandante); o Guarda exonerado sai da Guarda.
+r.post('/quadro/exonerar', async (req, res) => {
+  const { cargo, u } = await alvoDoQuadro(req);
+  if (!await temCargo(u.id, cargo)) throw erro(409, `${u.nome} não é ${cargo}.`);
+  await db.run('DELETE FROM usuario_cargos WHERE usuario_id = ? AND cargo_id = ?', u.id, await cargoId(cargo));
+  if (cargo === 'General') await db.run('INSERT OR IGNORE INTO usuario_cargos (usuario_id, cargo_id) VALUES (?, ?)', u.id, await cargoId('Guarda'));
+  await anotar(req, `Quadro da Guarda: exonerou ${cargo}`, u.nome);
+  res.json({ ok: true });
 });
 
 module.exports = r;

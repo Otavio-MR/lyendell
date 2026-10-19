@@ -100,6 +100,8 @@ const CATALOGO = [
   ] },
   { grupo: 'Escala da Guarda', itens: [
     { chave: 'escala.ver', nome: 'Ver a agenda de turnos da Guarda do Coelho, as convocações e responder às suas (Guardas, Comandante e Família Nobre)' },
+    { chave: 'escala.nomear', nome: 'Nomear e exonerar os Guardas (dar e tirar o cargo Guarda) no Quadro da Guarda (Lorde Comandante e General)' },
+    { chave: 'escala.nomear_general', nome: 'Nomear e exonerar o General no Quadro da Guarda (só o Lorde Comandante)' },
     { chave: 'escala.gerir', nome: 'Marcar os turnos dos guardas, convocar a Guarda (no Discord), confirmar ou retirar presenças e ver o controle de quem mais trabalha (Comandante da Guarda)' },
   ] },
   { grupo: 'Nadir', itens: [
@@ -138,10 +140,13 @@ const acoes = (modulo, ...lista) => lista.map(a => `${modulo}.${a}`);
 // O Hospital não é aberto a todos os moradores (prontuário de paciente); o resto é.
 const MODULOS = { tabelionato: 'Tabelionato', guarda: 'Guarda do Coelho', hospital: 'Hospital', congresso: 'Congresso', leis: 'Leis de Lyendell' };
 
-// Aprovar registros é exclusivo de um único cargo em cada módulo (além do administrador principal).
+// Aprovar registros é exclusivo de um único cargo em cada módulo (além do administrador principal); na Guarda, o Lorde
+// Comandante e o General (o braço direito dele) têm o mesmo poder. O valor é um cargo ou uma lista de cargos.
 // Nem a Família Nobre aprova: tudo passa pela Tabeliã, pelo Comandante, pelo Diretor do Hospital ou pela Senadora.
 const EXCLUSIVAS = {
-  'tabelionato.aprovar': 'Tabeliã', 'guarda.aprovar': 'Comandante da Guarda',
+  'tabelionato.aprovar': 'Tabeliã', 'guarda.aprovar': ['Lorde Comandante', 'General'],
+  // Quem nomeia: o Lorde Comandante nomeia o General e os Guardas; o General, braço direito dele, nomeia só os Guardas.
+  'escala.nomear': ['Lorde Comandante', 'General'], 'escala.nomear_general': 'Lorde Comandante',
   'hospital.aprovar': 'Diretor do Hospital', 'congresso.aprovar': 'Senadora',
 };
 
@@ -153,6 +158,7 @@ const DESCRICOES = {
     'Faz registros no Tabelionato, que vão para a aprovação da Tabeliã.'],
   'Comandante da Guarda': [['Comanda a Guarda do Coelho: registra, edita, apaga e configura os livros.'],
     'Comanda a Guarda do Coelho: aprova os registros, edita, apaga e configura os livros.'],
+  General: [[], 'Braço direito do Lorde Comandante: faz o mesmo que ele na Guarda do Coelho (aprova os registros, marca a escala, convoca a Guarda), mas quem decide quem é o General é o Lorde Comandante. O General nomeia os Guardas.'],
   Guarda: [['Vê os registros da Guarda e registra prisioneiros.', 'Vê os registros da Guarda e registra prisioneiros, que vão para a aprovação do Comandante.'],
     'Vê todos os livros e registros da Guarda e registra em qualquer um deles; os registros vão para a aprovação do Comandante.'],
   'Família Nobre': [['Pode tudo, menos adicionar novos usuários.', 'Pode tudo, menos adicionar usuários e aprovar registros (isso é da Tabeliã e do Comandante).',
@@ -164,6 +170,8 @@ const DESCRICOES = {
   'Lorde Comandante': [['Faz as Leis da Capital junto com a Família Nobre: escreve, publica, edita e revoga.'],
     'Faz as Leis de Lyendell junto com a Família Nobre: escreve, publica, edita e revoga.'],
 };
+DESCRICOES['Lorde Comandante'] = [[...DESCRICOES['Lorde Comandante'][0], DESCRICOES['Lorde Comandante'][1]],
+  'Comanda a Guarda do Coelho e faz as Leis de Lyendell junto com a Família Nobre. Aprova os registros da Guarda, marca a escala, convoca a Guarda e escolhe o General, seu braço direito.'];
 
 const CARGOS_PADRAO = [
   { nome: 'Morador', base: 1, cor: '#9a9b74',
@@ -178,9 +186,9 @@ const CARGOS_PADRAO = [
   { nome: 'Escriba', cor: '#b9a27a',
     descricao: DESCRICOES.Escriba[1],
     permissoes: [...MEMBRO, 'tabelionato.registrar'] },
-  { nome: 'Comandante da Guarda', cor: '#c0553a',
-    descricao: DESCRICOES['Comandante da Guarda'][1],
-    permissoes: [...MEMBRO, ...acoes('guarda', 'registrar', 'editar', 'apagar', 'configurar', 'aprovar'), 'escala.ver', 'escala.gerir'] },
+  { nome: 'General', cor: '#c0553a',
+    descricao: DESCRICOES.General[1],
+    permissoes: [...MEMBRO, ...acoes('guarda', 'registrar', 'editar', 'apagar', 'configurar', 'aprovar'), 'escala.ver', 'escala.gerir', 'escala.nomear'] },
   { nome: 'Guarda', cor: '#6f9a58',
     descricao: DESCRICOES.Guarda[1],
     permissoes: [...MEMBRO, 'guarda.registrar', 'escala.ver'] },
@@ -192,7 +200,8 @@ const CARGOS_PADRAO = [
     permissoes: [...MEMBRO, 'hospital.ver', 'hospital.registrar'] },
   { nome: 'Lorde Comandante', cor: '#b5563f',
     descricao: DESCRICOES['Lorde Comandante'][1],
-    permissoes: [...MEMBRO, ...acoes('leis', 'registrar', 'editar', 'apagar', 'configurar', 'aprovar')] },
+    permissoes: [...MEMBRO, ...acoes('leis', 'registrar', 'editar', 'apagar', 'configurar', 'aprovar'),
+      ...acoes('guarda', 'registrar', 'editar', 'apagar', 'configurar', 'aprovar'), 'escala.ver', 'escala.gerir', 'escala.nomear', 'escala.nomear_general'] },
   { nome: 'Senadora', cor: '#7f93d8',
     descricao: DESCRICOES.Senadora[1],
     permissoes: [...MEMBRO, ...acoes('congresso', 'registrar', 'editar', 'apagar', 'configurar', 'aprovar')] },
