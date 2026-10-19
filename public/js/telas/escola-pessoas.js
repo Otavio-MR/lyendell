@@ -1,6 +1,6 @@
 // Escola Luckham: os alunos (lista, ficha, matrícula, situação) e os professores (inscrição, titular e substituto).
 import {
-  get, post, put, del, h, trocar, icone, botao, campo, aviso, modalForm, confirmar, normalizar, estado, dataCurta, dataHora, barra,
+  get, post, put, del, h, trocar, icone, botao, campo, aviso, modal, modalForm, confirmar, normalizar, estado, dataCurta, dataHora, barra,
 } from '../core.js';
 import { entradaImagem } from './livros.js';
 import { blocoAssinatura, pedirAssinaturaEscola } from './escola-assinatura.js';
@@ -349,15 +349,33 @@ function cartaoProfessor(p, { lista, gerir, ctx, disciplinas }) {
       h('strong', null, p.nome),
       (p.endereco || p.procedencia) && h('span', { class: 'suave' }, p.endereco || `Vem de ${p.procedencia}`),
       p.ingresso && h('small', { class: 'suave' }, `Desde ${dataCurta(p.ingresso)}`),
-      'assinatura' in p && p.situacao !== 'desligado' && h('div', { class: 'escola-prof-assina' },
-        blocoAssinatura({ tipo: 'professor', id: p.id, nome: p.nome, d: p, podeAssinar: gerir, aoMudar: () => ctx.recarregar() })),
       gerir && p.observacoes && h('p', { class: 'escola-professor-obs' }, p.observacoes),
       gerir && h('div', { class: 'escola-professor-acoes' },
         p.situacao !== 'titular' && p.situacao !== 'desligado' && botao('Titular', { icone: 'coroa', classe: 'btn-pequeno', titulo: 'Tornar titular da disciplina', onclick: e => atribuir('titular', e) }),
         p.situacao !== 'substituto' && p.situacao !== 'desligado' && botao('Substituto', { icone: 'alianca', classe: 'btn-pequeno', titulo: 'Tornar substituto da disciplina', onclick: e => atribuir('substituto', e) }),
+        'assinatura' in p && botao('Registro', { icone: 'olho', classe: 'btn-pequeno', titulo: 'Abrir o registro do professor (com a assinatura da Direção)', onclick: () => registroDoProfessor(p, ctx) }),
         botao('Situação', { icone: 'ajustes', classe: 'btn-pequeno', titulo: 'Afastar, desligar ou voltar à avaliação', onclick: () => escolherSituacao(p, lista, ctx) }),
         botao('', { icone: 'editar', classe: 'btn-pequeno', titulo: 'Editar', onclick: () => formProfessor(p, disciplinas, ctx) }),
         botao('', { icone: 'lixo', classe: 'btn-pequeno btn-perigo-texto', titulo: 'Apagar', onclick: () => apagarProfessor(p, ctx) }))));
+}
+
+// O registro do professor: os dados dele e a assinatura da Direção (a assinatura só aparece aqui, não na lista).
+function registroDoProfessor(p, ctx) {
+  const janela = modal({
+    titulo: `Registro de ${p.nome}`, tamanho: 'medio',
+    corpo: h('div', { class: 'escola-ficha-prof' },
+      h('dl', { class: 'escola-dl' },
+        linhaDado('Disciplina', p.disciplina_nome),
+        linhaDado('Situação', SIT_PROFESSOR[p.situacao]?.[0] || p.situacao),
+        linhaDado('Endereço', p.endereco),
+        linhaDado('Vem de', p.procedencia),
+        linhaDado('Ingresso', p.ingresso && dataCurta(p.ingresso)),
+        linhaDado('Observações', p.observacoes)),
+      painel('Assinatura da Direção', 'pena', blocoAssinatura({
+        tipo: 'professor', id: p.id, nome: p.nome, d: p, podeAssinar: ctx.podes.gerir, aoMudar: () => { janela.fechar(); ctx.recarregar(); },
+      }))),
+    rodape: [botao('Fechar', { onclick: () => janela.fechar() })],
+  });
 }
 
 // Muda a situação do professor. Se o lugar de titular (ou de substituto) já tem dono, o servidor devolve 409:
