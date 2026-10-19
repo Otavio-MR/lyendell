@@ -889,7 +889,7 @@ CREATE INDEX IF NOT EXISTS idx_escola_historico ON escola_historico(entidade, en
 
 /* ─── Atualizações de bancos criados por versões anteriores ─ */
 
-const VERSAO = 41;
+const VERSAO = 42;
 
 async function colunaExiste(tabela, coluna) {
   return (await cliente.execute(`SELECT * FROM ${tabela} LIMIT 0`)).columns.includes(coluna);
@@ -984,6 +984,14 @@ async function migrar() {
   // v30: os Aliados passam a ver a cidade (mapa, anúncios, Congresso, Juramento, Leis, Galeria, Comunidade) e a jogar na Recreação.
   if (versao < 30) await db.run('UPDATE cargos SET descricao = ? WHERE nome = ? AND descricao = ?', CARGOS_PADRAO.find(c => c.nome === 'Aliados').descricao, 'Aliados', 'Convidados e aliados de outras casas. Não são moradores: veem só o que for marcado para Convidados e Aliados.');
   if (versao < 30) await darPermissoes({ Aliados: ['aliados.ver', 'anuncios.ver', 'congresso.ver', 'leis.ver', 'galeria.ver', 'recreacao.usar'] });
+  // v42: o General passa a ter tudo o que o Lorde Comandante tem (inclusive as Leis), menos escolher o General.
+  if (versao < 42) {
+    await darPermissoes({ General: ['leis.registrar', 'leis.editar', 'leis.apagar', 'leis.configurar', 'leis.aprovar'] });
+    const g = await db.get("SELECT descricao FROM cargos WHERE nome = 'General'");
+    if (g && DESCRICOES.General[0].concat([DESCRICOES.General[1]]).includes(g.descricao) === false && /Braço direito do Lorde Comandante: faz o mesmo que ele na Guarda/.test(g.descricao)) {
+      await db.run("UPDATE cargos SET descricao = ? WHERE nome = 'General'", DESCRICOES.General[1]);
+    }
+  }
   // v41: a hierarquia da Guarda: Lorde Comandante, General (braço direito) e Guardas.
   if (versao < 41) await migrarHierarquiaGuarda();
   // v40: a assinatura desenhada do Diretor nas fichas de alunos e professores da escola (traços em JSON, quem assinou e quando).
@@ -1094,7 +1102,7 @@ async function migrarHierarquiaGuarda() {
   const antigo = await db.get("SELECT id FROM cargos WHERE nome = 'Comandante da Guarda'");
   // A permissão exclusiva de aprovar sai do cargo antigo antes de entrar nos novos.
   if (antigo) await db.run("UPDATE cargos SET permissoes = '[]' WHERE id = ?", antigo.id);
-  await darPermissoes({ 'Lorde Comandante': [...PERMISSOES_GUARDA, 'escala.nomear_general'], General: PERMISSOES_GUARDA });
+  await darPermissoes({ 'Lorde Comandante': [...PERMISSOES_GUARDA, 'escala.nomear_general'], General: [...PERMISSOES_GUARDA, 'leis.registrar', 'leis.editar', 'leis.apagar', 'leis.configurar', 'leis.aprovar'] });
   const lorde = await db.get("SELECT id FROM cargos WHERE nome = 'Lorde Comandante'");
   if (antigo && lorde) {
     for (const u of await db.all('SELECT usuario_id FROM usuario_cargos WHERE cargo_id = ?', antigo.id)) {
